@@ -7,421 +7,233 @@
     <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://unpkg.com/vconsole@latest/dist/vconsole.min.js"></script>
+    
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
+        /* ================= UI 樣式區 ================= */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Microsoft JhengHei", sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px;
-            color: #333;
+            min-height: 100vh; padding: 20px; color: #333;
+        }
+        .container { max-width: 600px; margin: 0 auto; }
+        
+        /* 頁面與卡片 */
+        .page { display: none; animation: fadeIn 0.3s ease-out; }
+        .page.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .card, .user-card, .checkin-page {
+            background: white; border-radius: 20px; padding: 25px; 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2); margin-bottom: 20px;
         }
 
-        .container {
-            max-width: 600px;
-            margin: 0 auto;
-        }
+        /* 綁定頁面 */
+        .bind-header { text-align: center; margin-bottom: 20px; }
+        .bind-header .logo { font-size: 50px; display: block; margin-bottom: 10px; }
+        
+        /* 頁籤切換 */
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+        .tab-btn { flex: 1; padding: 10px; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; transition: all 0.3s; }
+        .tab-btn.active { background: #667eea; color: white; }
+        .tab-btn.inactive { background: #e0e0e0; color: #666; }
 
-        /* 用戶卡片 */
-        .user-card {
-            background: white;
-            border-radius: 20px;
-            padding: 25px;
-            margin-bottom: 20px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-            animation: slideDown 0.5s ease-out;
-        }
-
-        .user-info {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-
+        /* 首頁資訊 */
+        .user-info { display: flex; align-items: center; gap: 15px; }
         .avatar {
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
+            width: 60px; height: 60px; border-radius: 50%;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 28px;
-            color: white;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 28px; color: white;
         }
+        .user-details h2 { font-size: 20px; margin-bottom: 5px; color: #333; }
+        .user-details p { font-size: 13px; color: #666; }
 
-        .user-details h2 {
-            font-size: 20px;
-            margin-bottom: 5px;
-            color: #333;
+        /* GPS 定位狀態指示器 */
+        .location-status {
+            display: flex; align-items: center; gap: 8px; margin-top: 12px;
+            padding: 8px 12px; border-radius: 8px; font-size: 12px; font-weight: 600;
         }
-
-        .user-details p {
-            font-size: 13px;
-            color: #666;
+        .location-status.loading {
+            background: #fff3cd; color: #856404;
         }
-
-        /* 主要打卡按鈕 */
-        .primary-actions {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 15px;
-            margin-bottom: 20px;
+        .location-status.ready {
+            background: #d4edda; color: #155724;
         }
+        .location-status .dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            background: currentColor; animation: pulse 1.5s ease-in-out infinite;
+        }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
 
+        /* 按鈕樣式 */
+        .primary-actions { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-bottom: 20px; }
         .primary-btn {
-            background: white;
-            border-radius: 15px;
-            padding: 25px 15px;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.15);
+            background: white; border-radius: 15px; padding: 25px 15px; text-align: center;
+            cursor: pointer; transition: all 0.3s ease; box-shadow: 0 5px 15px rgba(0,0,0,0.15);
             position: relative;
-            overflow: hidden;
         }
-
-        .primary-btn.checkin {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-        }
-
-        .primary-btn.checkout {
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-            color: white;
-        }
-
-        .primary-btn.disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        .primary-btn .icon {
-            font-size: 48px;
-            margin-bottom: 10px;
-        }
-
-        .primary-btn .label {
-            font-size: 16px;
-            font-weight: 700;
-        }
-
-        .primary-btn .status-badge {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            background: rgba(255,255,255,0.3);
-            padding: 5px 10px;
-            border-radius: 20px;
-            font-size: 11px;
-            font-weight: 600;
-        }
+        .primary-btn:active { transform: scale(0.98); }
+        .primary-btn.checkin { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+        .primary-btn.checkout { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; }
+        .primary-btn.disabled { opacity: 0.6; cursor: not-allowed; }
+        .primary-btn .icon { font-size: 40px; margin-bottom: 10px; }
+        .primary-btn .label { font-size: 16px; font-weight: 700; }
 
         /* 功能選單 */
-        .menu-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-
+        .menu-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px; }
         .menu-item {
-            background: white;
-            border-radius: 15px;
-            padding: 20px 10px;
-            text-align: center;
-            cursor: pointer;
+            background: white; border-radius: 15px; padding: 20px 10px; text-align: center;
+            cursor: pointer; transition: all 0.3s ease; box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        .menu-item:active { transform: scale(0.95); }
+        .menu-item .icon { font-size: 32px; margin-bottom: 8px; }
+        .menu-item .label { font-size: 13px; font-weight: 600; color: #333; }
+
+        /* 表單 */
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; margin-bottom: 8px; font-weight: 600; color: #555; }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 10px; font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+            outline: none; border-color: #667eea;
+        }
+        .form-group textarea { min-height: 80px; resize: vertical; }
+        
+        .btn { 
+            width: 100%; padding: 15px; border: none; border-radius: 10px; 
+            font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px;
             transition: all 0.3s ease;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-            animation: fadeIn 0.5s ease-out;
         }
+        .btn:active { transform: scale(0.98); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+        .btn-success { background: linear-gradient(135deg, #28a745 0%, #218838 100%); color: white; }
+        .btn-secondary { background: #e0e0e0; color: #666; }
 
-        .menu-item:active {
-            transform: scale(0.95);
+        /* 便當統計與農曆提示 */
+        .lunch-summary { 
+            background: #f8f9fa; border-radius: 12px; padding: 15px; margin-bottom: 20px;
         }
-
-        .menu-item .icon {
-            font-size: 36px;
-            margin-bottom: 8px;
+        .lunch-summary h3 { margin-bottom: 10px; font-size: 16px; color: #333; }
+        .stat-row { 
+            display: flex; justify-content: space-between; padding: 10px 0; 
+            border-bottom: 1px solid #e0e0e0;
         }
+        .stat-row:last-child { border-bottom: none; }
+        .stat-value { font-weight: bold; color: #667eea; }
 
-        .menu-item .label {
-            font-size: 13px;
-            font-weight: 600;
-            color: #333;
+        .lunar-notice {
+            background: #fff3cd; border-left: 4px solid #ffc107;
+            padding: 12px; margin-bottom: 15px; border-radius: 8px;
+            font-size: 13px; color: #856404; display: none;
         }
+        .lunar-notice.show { display: block; }
 
-        /* 頁面容器 */
-        .page {
-            display: none;
-            animation: fadeIn 0.3s ease-out;
+        /* 狀態與相機 */
+        .status-box { 
+            background: #f8f9fa; border-radius: 10px; padding: 15px; 
+            margin-bottom: 20px; text-align: center; display: none; 
         }
-
-        .page.active {
-            display: block;
-        }
-
-        /* 返回按鈕 */
-        .back-btn {
-            background: white;
-            border-radius: 50%;
-            width: 45px;
-            height: 45px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-bottom: 15px;
-            cursor: pointer;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-            font-size: 24px;
-        }
-
-        /* 打卡頁面 */
-        .checkin-page {
-            background: white;
-            border-radius: 20px;
-            padding: 25px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-        }
-
-        .checkin-page h2 {
-            font-size: 22px;
-            margin-bottom: 20px;
-            text-align: center;
-        }
-
-        /* 相機容器 */
+        .status-box.show { display: block; }
+        .status-box.success { background: #d4edda; color: #155724; }
+        .status-box.error { background: #f8d7da; color: #721c24; }
+        .status-box.info { background: #d1ecf1; color: #0c5460; }
+        
         .camera-container {
-            position: relative;
-            width: 100%;
-            max-width: 400px;
-            margin: 0 auto 20px;
-            border-radius: 15px;
-            overflow: hidden;
-            background: #000;
+            position: relative; width: 100%; max-width: 400px; margin: 0 auto 20px;
+            border-radius: 15px; overflow: hidden; background: #000; display: none;
         }
-
-        #video {
-            width: 100%;
-            display: block;
-            transform: scaleX(-1);
-        }
-
-        #canvas {
-            display: none;
-        }
-
-        .camera-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: rgba(0,0,0,0.5);
-            color: white;
-            font-size: 18px;
-            font-weight: 600;
-        }
-
-        /* 狀態提示 */
-        .status-box {
-            background: #f8f9fa;
-            border-radius: 10px;
-            padding: 15px;
-            margin-bottom: 20px;
-            text-align: center;
-        }
-
-        .status-box.success {
-            background: #d4edda;
-            color: #155724;
-        }
-
-        .status-box.error {
-            background: #f8d7da;
-            color: #721c24;
-        }
-
-        .status-box.info {
-            background: #d1ecf1;
-            color: #0c5460;
-        }
-
-        /* 按鈕 */
-        .btn {
-            width: 100%;
-            padding: 15px;
-            border: none;
-            border-radius: 10px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            margin-top: 10px;
-        }
-
-        .btn-primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-        }
-
-        .btn-danger {
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-            color: white;
-        }
-
-        .btn-secondary {
-            background: #e0e0e0;
-            color: #666;
-        }
-
-        .btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        .btn:active:not(:disabled) {
-            transform: scale(0.98);
-        }
-
-        /* 請假表單 */
-        .form-group {
-            margin-bottom: 20px;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: 600;
-            color: #333;
-        }
-
-        .form-group input,
-        .form-group select,
-        .form-group textarea {
-            width: 100%;
-            padding: 12px;
-            border: 2px solid #e0e0e0;
-            border-radius: 10px;
-            font-size: 15px;
-            transition: border 0.3s ease;
-        }
-
-        .form-group input:focus,
-        .form-group select:focus,
-        .form-group textarea:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-
-        .form-group textarea {
-            min-height: 100px;
-            resize: vertical;
-        }
-
-        /* Loading */
-        .loading {
-            text-align: center;
-            padding: 40px;
-            color: white;
-            font-size: 18px;
-        }
-
-        .spinner {
-            border: 4px solid rgba(255,255,255,0.3);
-            border-top: 4px solid white;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-            margin: 20px auto;
-        }
-
-        /* 考勤記錄 */
+        .camera-container.show { display: block; }
+        #video { width: 100%; display: block; transform: scaleX(-1); }
+        
+        /* 考勤記錄樣式 */
         .attendance-item {
-            background: white;
-            padding: 15px;
-            border-radius: 10px;
-            margin-bottom: 10px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            background: white; border-radius: 10px; padding: 15px;
+            margin-bottom: 10px; border-left: 4px solid #667eea;
         }
-
         .attendance-item .date {
-            font-weight: 600;
-            margin-bottom: 8px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+            font-weight: bold; color: #333; margin-bottom: 8px;
         }
-
         .attendance-item .details {
-            font-size: 13px;
-            color: #666;
+            font-size: 13px; color: #666; display: flex;
+            justify-content: space-between; margin-top: 5px;
         }
-
         .badge {
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 600;
+            display: inline-block; padding: 3px 8px; border-radius: 4px;
+            font-size: 11px; font-weight: 600;
         }
-
-        .badge.success {
-            background: #d4edda;
-            color: #155724;
+        .badge-success { background: #d4edda; color: #155724; }
+        .badge-warning { background: #fff3cd; color: #856404; }
+        
+        .hidden { display: none !important; }
+        .loading { text-align: center; padding: 50px; color: white; }
+        .spinner { 
+            border: 4px solid rgba(255,255,255,0.3); 
+            border-top: 4px solid white; border-radius: 50%; 
+            width: 40px; height: 40px; 
+            animation: spin 1s linear infinite; margin: 20px auto; 
         }
+        @keyframes spin { to { transform: rotate(360deg); } }
 
-        .badge.danger {
-            background: #f8d7da;
-            color: #721c24;
+        /* Toast 通知 */
+        .toast {
+            position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+            background: rgba(0,0,0,0.85); color: white; padding: 12px 24px;
+            border-radius: 25px; font-size: 14px; z-index: 9999;
+            animation: fadeInOut 3s ease; pointer-events: none;
         }
-
-        /* 動畫 */
-        @keyframes slideDown {
-            from {
-                opacity: 0;
-                transform: translateY(-20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        /* 隱藏類 */
-        .hidden {
-            display: none !important;
+        @keyframes fadeInOut {
+            0%, 100% { opacity: 0; }
+            10%, 90% { opacity: 1; }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <!-- Loading 畫面 -->
-        <div id="loadingScreen" class="loading">
+        <!-- 載入頁面 -->
+        <div id="loadingPage" class="loading">
             <div class="spinner"></div>
-            <p>載入中...</p>
+            <p>系統載入中...</p>
+        </div>
+
+        <!-- 綁定頁面 -->
+        <div id="bindPage" class="page">
+            <div class="card">
+                <div class="bind-header">
+                    <span class="logo">🔐</span>
+                    <h2>員工身分綁定</h2>
+                    <p>初次使用請驗證身分</p>
+                </div>
+
+                <div class="tabs">
+                    <button class="tab-btn active" id="tabIdCard" onclick="switchBindMode('id_card')">身分證驗證</button>
+                    <button class="tab-btn inactive" id="tabCode" onclick="switchBindMode('code')">驗證碼驗證</button>
+                </div>
+                
+                <div class="form-group">
+                    <label>員工編號 (ID) *</label>
+                    <input type="text" id="bindEmpId" placeholder="例如：ADMIN001" autocomplete="off">
+                </div>
+                
+                <div id="modeIdCard" class="form-group">
+                    <label>身分證後 4 碼 *</label>
+                    <input type="tel" id="bindIdLast4" maxlength="4" placeholder="例如：1234" autocomplete="off">
+                </div>
+
+                <div id="modeCode" class="form-group hidden">
+                    <label>一次性驗證碼 *</label>
+                    <input type="text" id="bindCode" placeholder="請輸入 HR 提供的驗證碼" autocomplete="off">
+                </div>
+
+                <button class="btn btn-primary" onclick="handleBind()">🔗 立即綁定</button>
+                <div id="bindStatus" class="status-box"></div>
+            </div>
         </div>
 
         <!-- 首頁 -->
         <div id="homePage" class="page">
-            <!-- 用戶卡片 -->
             <div class="user-card">
                 <div class="user-info">
                     <div class="avatar" id="userAvatar">👤</div>
@@ -431,783 +243,717 @@
                         <p id="userId" style="font-size: 11px; color: #999;">ID: -</p>
                     </div>
                 </div>
+                <!-- GPS 定位狀態指示器 -->
+                <div class="location-status loading" id="locationStatus">
+                    <div class="dot"></div>
+                    <span>正在取得定位...</span>
+                </div>
             </div>
 
-            <!-- 打卡狀態提示 -->
-            <div id="checkInStatusBox" class="status-box hidden"></div>
-
-            <!-- 主要打卡按鈕 -->
             <div class="primary-actions">
                 <div class="primary-btn checkin" id="checkInBtn" onclick="startCheckIn()">
-                    <div class="status-badge" id="checkInBadge">可用</div>
-                    <div class="icon">🕐</div>
-                    <div class="label">上班打卡</div>
+                    <div class="icon">📸</div><div class="label">上班打卡</div>
                 </div>
-                <div class="primary-btn checkout disabled" id="checkOutBtn" onclick="startCheckOut()">
-                    <div class="status-badge" id="checkOutBadge">不可用</div>
-                    <div class="icon">🏠</div>
-                    <div class="label">下班打卡</div>
+                <div class="primary-btn checkout" id="checkOutBtn" onclick="startCheckOut()">
+                    <div class="icon">👋</div><div class="label">下班打卡</div>
                 </div>
             </div>
 
-            <!-- 功能選單 -->
             <div class="menu-grid">
                 <div class="menu-item" onclick="showPage('leavePage')">
-                    <div class="icon">📝</div>
-                    <div class="label">我要請假</div>
+                    <div class="icon">📝</div><div class="label">我要請假</div>
                 </div>
                 <div class="menu-item" onclick="showPage('attendancePage')">
-                    <div class="icon">📊</div>
-                    <div class="label">考勤查詢</div>
+                    <div class="icon">📊</div><div class="label">考勤查詢</div>
+                </div>
+                <div class="menu-item" onclick="showPage('lunchPage')">
+                    <div class="icon">🍱</div><div class="label">便當訂購</div>
                 </div>
                 <div class="menu-item" onclick="showPage('salaryPage')">
-                    <div class="icon">💰</div>
-                    <div class="label">薪資查詢</div>
+                    <div class="icon">💰</div><div class="label">薪資查詢</div>
                 </div>
-                <div class="menu-item" onclick="alert('功能開發中')">
-                    <div class="icon">📅</div>
-                    <div class="label">班表查詢</div>
-                </div>
-                <div class="menu-item" onclick="alert('功能開發中')">
-                    <div class="icon">📢</div>
-                    <div class="label">最新公告</div>
+                <div class="menu-item" onclick="showToast('功能開發中')">
+                    <div class="icon">📅</div><div class="label">班表查詢</div>
                 </div>
                 <div class="menu-item" onclick="showPage('settingsPage')">
-                    <div class="icon">⚙️</div>
-                    <div class="label">設定</div>
+                    <div class="icon">⚙️</div><div class="label">設定</div>
                 </div>
             </div>
         </div>
 
         <!-- 打卡頁面 -->
         <div id="checkInPage" class="page">
-            <div class="back-btn" onclick="cancelCheckIn()">←</div>
+            <button class="btn btn-secondary" onclick="cancelCheckIn()" style="width:auto;margin-bottom:10px;">← 返回</button>
             <div class="checkin-page">
                 <h2 id="checkInTitle">📍 上班打卡</h2>
+                <div id="checkInStatus" class="status-box show info">準備開啟相機...</div>
                 
-                <div id="checkInStatus" class="status-box">
-                    準備開啟相機...
+                <div class="camera-container" id="cameraContainer">
+                    <video id="video" autoplay playsinline muted></video>
+                    <canvas id="canvas" class="hidden"></canvas>
                 </div>
 
-                <div class="camera-container" id="cameraContainer">
-                    <video id="video" autoplay playsinline></video>
-                    <canvas id="canvas"></canvas>
-                    <div class="camera-overlay" id="cameraOverlay">
-                        <span>正在開啟相機...</span>
+                <button class="btn btn-primary" id="captureBtn" onclick="captureAndCheckIn()" disabled>📸 拍照打卡</button>
+            </div>
+        </div>
+
+        <!-- 便當訂購頁面 -->
+        <div id="lunchPage" class="page">
+            <button class="btn btn-secondary" onclick="showPage('homePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
+            <div class="checkin-page">
+                <h2>🍱 便當訂購</h2>
+                
+                <!-- 農曆提示 -->
+                <div class="lunar-notice" id="lunarNotice">
+                    🌙 今天是農曆初一/十五，建議訂購素食便當
+                </div>
+                
+                <div class="lunch-summary">
+                    <h3>📊 明日訂購統計</h3>
+                    <div class="stat-row">
+                        <span>總訂購數</span>
+                        <span class="stat-value" id="totalOrders">0</span>
+                    </div>
+                    <div class="stat-row">
+                        <span>🥗 素食</span>
+                        <span class="stat-value" id="vegCount">0</span>
+                    </div>
+                    <div class="stat-row">
+                        <span>🍖 葷食</span>
+                        <span class="stat-value" id="regularCount">0</span>
                     </div>
                 </div>
 
-                <button class="btn btn-primary" id="captureBtn" onclick="captureAndCheckIn()" disabled>
-                    📸 拍照打卡
-                </button>
-                <button class="btn btn-secondary" onclick="cancelCheckIn()">
-                    取消
-                </button>
+                <div class="form-group">
+                    <label>訂購日期</label>
+                    <input type="date" id="lunchDate">
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="lunchVegetarian" onchange="updateLunchType()"> 素食便當
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label>特殊需求（選填）</label>
+                    <input type="text" id="lunchNotes" placeholder="例如：不要飯、不吃辣">
+                </div>
+                <button class="btn btn-success" onclick="submitLunchOrder()">✅ 確認訂購</button>
             </div>
         </div>
 
         <!-- 請假頁面 -->
         <div id="leavePage" class="page">
-            <div class="back-btn" onclick="showPage('homePage')">←</div>
+            <button class="btn btn-secondary" onclick="showPage('homePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
             <div class="checkin-page">
                 <h2>📝 請假申請</h2>
-                
                 <div class="form-group">
-                    <label>假別 *</label>
+                    <label>假別</label>
                     <select id="leaveType">
-                        <option value="">請選擇假別</option>
-                        <option value="annual">年假</option>
+                        <option value="annual">特休假</option>
                         <option value="sick">病假</option>
                         <option value="personal">事假</option>
+                        <option value="compensatory">補休</option>
                     </select>
                 </div>
-
                 <div class="form-group">
-                    <label>開始日期 *</label>
+                    <label>開始日期</label>
                     <input type="date" id="leaveStartDate">
                 </div>
-
                 <div class="form-group">
-                    <label>結束日期 *</label>
+                    <label>結束日期</label>
                     <input type="date" id="leaveEndDate">
                 </div>
-
                 <div class="form-group">
-                    <label>請假原因 *</label>
+                    <label>請假原因</label>
                     <textarea id="leaveReason" placeholder="請輸入請假原因..."></textarea>
                 </div>
-
-                <button class="btn btn-primary" onclick="submitLeave()">送出申請</button>
-                <button class="btn btn-secondary" onclick="showPage('homePage')">取消</button>
-
-                <div id="leaveStatus"></div>
+                <button class="btn btn-primary" onclick="submitLeave()">📤 提交申請</button>
+                <div id="leaveStatus" class="status-box"></div>
             </div>
         </div>
-
+        
         <!-- 考勤查詢頁面 -->
         <div id="attendancePage" class="page">
-            <div class="back-btn" onclick="showPage('homePage')">←</div>
+            <button class="btn btn-secondary" onclick="showPage('homePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
             <div class="checkin-page">
                 <h2>📊 考勤記錄</h2>
                 <div id="attendanceList">
-                    <div class="spinner" style="border-color: #667eea; border-top-color: transparent;"></div>
+                    <div class="loading" style="color:#666;">
+                        <div class="spinner" style="border-color:#ddd;border-top-color:#667eea;"></div>
+                        <p>載入中...</p>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <!-- 薪資查詢頁面 -->
+        <!-- 薪資頁面 -->
         <div id="salaryPage" class="page">
-            <div class="back-btn" onclick="showPage('homePage')">←</div>
+            <button class="btn btn-secondary" onclick="showPage('homePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
             <div class="checkin-page">
                 <h2>💰 薪資查詢</h2>
-                <div class="status-box info">功能開發中...</div>
+                <p style="text-align:center;color:#666;padding:40px;">功能開發中...</p>
             </div>
         </div>
-
+        
         <!-- 設定頁面 -->
         <div id="settingsPage" class="page">
-            <div class="back-btn" onclick="showPage('homePage')">←</div>
+            <button class="btn btn-secondary" onclick="showPage('homePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
             <div class="checkin-page">
                 <h2>⚙️ 設定</h2>
-                <div class="status-box info">功能開發中...</div>
+                <p style="text-align:center;color:#666;padding:40px;">功能開發中...</p>
             </div>
         </div>
     </div>
 
     <script>
-        // 初始化 vConsole
+        // ================= 全域設定 =================
+        const CONFIG = {
+            LIFF_ID: '2008962829-bnsS1bbB',
+            SUPABASE_URL: 'https://nssuisyvlrqnqfxupklb.supabase.co',
+            SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5zc3Vpc3l2bHJxbnFmeHVwa2xiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkyOTAwMzUsImV4cCI6MjA4NDg2NjAzNX0.q_B6v3gf1TOCuAq7z0xIw10wDueCSJn0p37VzdMfmbc',
+            BUCKET: 'selfies'
+        };
+
+        // 初始化 Supabase 與 vConsole
+        const sb = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
         const vConsole = new window.VConsole();
-        console.log('✅ vConsole 已啟動');
-
-        // Supabase 設定
-        const SUPABASE_URL = 'https://nssuisyvlrqnqfxupklb.supabase.co';
-        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5zc3Vpc3l2bHJxbnFmeHVwa2xiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkyOTAwMzUsImV4cCI6MjA4NDg2NjAzNX0.q_B6v3gf1TOCuAq7z0xIw10wDueCSJn0p37VzdMfmbc';
-        const STORAGE_BUCKET = 'selfies';
-        const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-        // LIFF 設定
-        const LIFF_ID = '2008962829-bnsS1bbB';
-
+        
         // 全域變數
         let liffProfile = null;
+        let currentEmployee = null;
         let videoStream = null;
-        let currentCheckInType = null; // 'in' or 'out'
-        let todayAttendance = null; // 今日打卡記錄
+        let currentCheckInType = 'in';
+        let cachedLocation = null;
+        let currentBindMode = 'id_card';
 
-        // ============================================
-        // 初始化
-        // ============================================
+        // ================= ⭐ 關鍵修正：時區處理函數 =================
+        /**
+         * 取得台灣時間的 YYYY-MM-DD 格式日期
+         * @param {number} offsetDays - 日期偏移量（0=今天, 1=明天, -1=昨天）
+         * @returns {string} YYYY-MM-DD 格式的日期字串
+         */
+        function getTaiwanDate(offsetDays = 0) {
+            const date = new Date();
+            date.setDate(date.getDate() + offsetDays);
+            // 使用 en-CA locale 會返回 YYYY-MM-DD 格式，搭配 Asia/Taipei 時區
+            return date.toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' });
+        }
+
+        // ================= 初始化流程 =================
         window.addEventListener('load', async () => {
             try {
                 console.log('🚀 開始初始化 LIFF...');
-                await liff.init({ liffId: LIFF_ID });
+                await liff.init({ liffId: CONFIG.LIFF_ID });
                 
-                if (!liff.isLoggedIn()) {
-                    console.log('❌ 未登入，跳轉登入頁面');
-                    liff.login();
-                    return;
+                if (!liff.isLoggedIn()) { 
+                    console.log('❌ 未登入，導向 LINE 登入');
+                    liff.login(); 
+                    return; 
                 }
-
-                console.log('✅ LIFF 初始化成功');
+                
                 liffProfile = await liff.getProfile();
-                console.log('✅ 取得用戶資料:', liffProfile);
+                console.log('✅ LINE 用戶:', liffProfile);
+                
+                await checkUserStatus();
 
-                // 更新 UI
-                updateUserInfo();
-
-                // 檢查今日打卡狀態
-                await checkTodayAttendance();
-
-                // 隱藏 Loading，顯示首頁
-                document.getElementById('loadingScreen').style.display = 'none';
-                showPage('homePage');
-
-                console.log('✅ 初始化完成！');
             } catch (error) {
                 console.error('❌ 初始化失敗:', error);
-                alert('初始化失敗: ' + error.message);
+                alert('初始化失敗，請重新整理頁面: ' + error.message);
             }
         });
 
-        // 更新用戶資訊
-        function updateUserInfo() {
-            document.getElementById('userName').textContent = liffProfile.displayName;
-            document.getElementById('userId').textContent = `ID: ${liffProfile.userId.substring(0, 10)}...`;
+        // ================= 核心：檢查綁定狀態 =================
+        async function checkUserStatus() {
+            document.getElementById('loadingPage').style.display = 'block';
             
-            // 設定頭像（使用 LINE 大頭貼或首字）
-            const avatarDiv = document.getElementById('userAvatar');
-            if (liffProfile.pictureUrl) {
-                avatarDiv.style.backgroundImage = `url(${liffProfile.pictureUrl})`;
-                avatarDiv.style.backgroundSize = 'cover';
-                avatarDiv.textContent = '';
-            } else {
-                avatarDiv.textContent = liffProfile.displayName.substring(0, 1);
-            }
-        }
-
-        // ============================================
-        // 檢查今日打卡狀態
-        // ============================================
-        async function checkTodayAttendance() {
             try {
-                console.log('🔍 檢查今日打卡狀態...');
-                
                 const { data, error } = await sb
-                    .from('attendance')
-                    .select('*, employees!inner(line_user_id)')
-                    .eq('employees.line_user_id', liffProfile.userId)
-                    .eq('date', new Date().toISOString().split('T')[0])
+                    .from('employees')
+                    .select('*')
+                    .eq('line_user_id', liffProfile.userId)
                     .single();
 
-                if (error && error.code !== 'PGRST116') { // PGRST116 = 找不到記錄
+                document.getElementById('loadingPage').style.display = 'none';
+
+                if (error && error.code !== 'PGRST116') {
                     throw error;
                 }
 
-                todayAttendance = data;
-                updateCheckInButtons();
-                
-                console.log('✅ 今日打卡狀態:', todayAttendance);
+                if (data) {
+                    // ✅ 已綁定
+                    currentEmployee = data;
+                    updateUserInfo(data);
+                    showPage('homePage');
+                    preloadGPS(); // 預先抓取定位
+                    console.log('✅ 員工已綁定:', data);
+                } else {
+                    // ❌ 未綁定
+                    showPage('bindPage');
+                    console.log('⚠️ 員工未綁定，顯示綁定頁面');
+                }
             } catch (error) {
-                console.error('❌ 檢查打卡狀態失敗:', error);
+                document.getElementById('loadingPage').style.display = 'none';
+                console.error('❌ 檢查狀態失敗:', error);
+                showPage('bindPage');
             }
         }
 
-        // 更新打卡按鈕狀態
-        function updateCheckInButtons() {
-            const checkInBtn = document.getElementById('checkInBtn');
-            const checkOutBtn = document.getElementById('checkOutBtn');
-            const checkInBadge = document.getElementById('checkInBadge');
-            const checkOutBadge = document.getElementById('checkOutBadge');
-            const statusBox = document.getElementById('checkInStatusBox');
+        // 更新首頁用戶資訊
+        function updateUserInfo(data) {
+            document.getElementById('userName').textContent = data.name || '未知';
+            document.getElementById('userDept').textContent = `${data.department || '-'} · ${data.position || '-'}`;
+            document.getElementById('userId').textContent = `ID: ${data.employee_number || data.employee_id}`;
+            document.getElementById('userAvatar').textContent = (data.name || '?').charAt(0);
+        }
 
-            if (!todayAttendance) {
-                // 尚未上班打卡
-                checkInBtn.classList.remove('disabled');
-                checkOutBtn.classList.add('disabled');
-                checkInBadge.textContent = '可用';
-                checkOutBadge.textContent = '不可用';
-                statusBox.classList.add('hidden');
-            } else if (todayAttendance.check_out_time) {
-                // 已經下班打卡
-                checkInBtn.classList.add('disabled');
-                checkOutBtn.classList.add('disabled');
-                checkInBadge.textContent = '已打卡';
-                checkOutBadge.textContent = '已打卡';
-                statusBox.className = 'status-box success';
-                statusBox.textContent = `✅ 今日已完成打卡（工時：${todayAttendance.work_hours?.toFixed(2) || 0} 小時）`;
-                statusBox.classList.remove('hidden');
-            } else {
-                // 已上班打卡，等待下班打卡
-                checkInBtn.classList.add('disabled');
-                checkOutBtn.classList.remove('disabled');
-                checkInBadge.textContent = '已打卡';
-                checkOutBadge.textContent = '可用';
-                statusBox.className = 'status-box info';
-                statusBox.textContent = `ℹ️ 上班打卡時間：${new Date(todayAttendance.check_in_time).toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei' })}`;
-                statusBox.classList.remove('hidden');
+        // ================= 員工綁定邏輯 =================
+        function switchBindMode(mode) {
+            currentBindMode = mode;
+            document.getElementById('modeIdCard').classList.toggle('hidden', mode !== 'id_card');
+            document.getElementById('modeCode').classList.toggle('hidden', mode !== 'code');
+            document.getElementById('tabIdCard').className = mode === 'id_card' ? 'tab-btn active' : 'tab-btn inactive';
+            document.getElementById('tabCode').className = mode === 'code' ? 'tab-btn active' : 'tab-btn inactive';
+        }
+
+        async function handleBind() {
+            const empId = document.getElementById('bindEmpId').value.trim();
+            const idLast4 = document.getElementById('bindIdLast4').value.trim();
+            const code = document.getElementById('bindCode').value.trim();
+            const statusBox = document.getElementById('bindStatus');
+
+            if (!empId) {
+                return showStatus(statusBox, 'error', '⚠️ 請輸入員工編號');
+            }
+
+            if (currentBindMode === 'id_card' && (!idLast4 || idLast4.length !== 4)) {
+                return showStatus(statusBox, 'error', '⚠️ 請輸入完整身分證後 4 碼');
+            }
+
+            if (currentBindMode === 'code' && !code) {
+                return showStatus(statusBox, 'error', '⚠️ 請輸入驗證碼');
+            }
+
+            const params = {
+                p_line_user_id: liffProfile.userId,
+                p_employee_id: empId,
+                p_device_info: navigator.userAgent,
+                p_id_card_last_4: currentBindMode === 'id_card' ? idLast4 : null,
+                p_verification_code: currentBindMode === 'code' ? code : null
+            };
+
+            showStatus(statusBox, 'info', '🔄 驗證中，請稍候...');
+            
+            try {
+                const { data, error } = await sb.rpc('bind_employee', params);
+                
+                if (error) {
+                    console.error('❌ RPC 錯誤:', error);
+                    throw new Error(error.message);
+                }
+
+                if (data && data.success) {
+                    showStatus(statusBox, 'success', '✅ ' + data.message);
+                    showToast('✅ 綁定成功！');
+                    setTimeout(() => {
+                        checkUserStatus();
+                    }, 1500);
+                } else {
+                    showStatus(statusBox, 'error', '❌ ' + (data?.error || '綁定失敗'));
+                }
+            } catch (err) {
+                console.error('❌ 綁定失敗:', err);
+                showStatus(statusBox, 'error', '❌ ' + err.message);
             }
         }
 
-        // ============================================
-        // 頁面切換
-        // ============================================
-        function showPage(pageId) {
-            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-            document.getElementById(pageId).classList.add('active');
+        // ================= 預先抓取定位 =================
+        function preloadGPS() {
+            const statusEl = document.getElementById('locationStatus');
+            statusEl.className = 'location-status loading';
+            statusEl.innerHTML = '<div class="dot"></div><span>正在取得定位...</span>';
 
-            // 特定頁面的載入邏輯
-            if (pageId === 'attendancePage') {
-                loadAttendanceRecords();
+            if (!navigator.geolocation) {
+                statusEl.className = 'location-status';
+                statusEl.innerHTML = '<span>⚠️ 您的裝置不支援定位</span>';
+                return;
             }
+
+            console.log('📍 開始預先抓取定位...');
+            
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    cachedLocation = {
+                        latitude: position.coords.latitude,
+                        longitude: position.coords.longitude,
+                        accuracy: position.coords.accuracy
+                    };
+                    
+                    console.log('✅ 定位取得成功:', cachedLocation);
+                    
+                    statusEl.className = 'location-status ready';
+                    statusEl.innerHTML = '<div class="dot"></div><span>✅ 定位已就緒（快速打卡）</span>';
+                },
+                (error) => {
+                    console.error('❌ 定位失敗:', error);
+                    statusEl.className = 'location-status';
+                    statusEl.innerHTML = '<span>⚠️ 定位失敗，打卡時將重試</span>';
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 0
+                }
+            );
         }
 
-        // ============================================
-        // 打卡流程
-        // ============================================
+        // ================= 打卡流程 =================
+        function startCheckIn() { 
+            currentCheckInType = 'in'; 
+            showCheckInPage('📍 上班打卡'); 
+        }
         
-        // 開始上班打卡
-        function startCheckIn() {
-            if (todayAttendance && !todayAttendance.check_out_time) {
-                alert('您今天已經上班打卡了！');
-                return;
-            }
-            currentCheckInType = 'in';
-            document.getElementById('checkInTitle').textContent = '🕐 上班打卡';
+        function startCheckOut() { 
+            currentCheckInType = 'out'; 
+            showCheckInPage('👋 下班打卡'); 
+        }
+
+        function showCheckInPage(title) {
+            document.getElementById('checkInTitle').textContent = title;
             showPage('checkInPage');
             openCamera();
         }
 
-        // 開始下班打卡
-        function startCheckOut() {
-            if (!todayAttendance || todayAttendance.check_out_time) {
-                alert('無法下班打卡');
-                return;
-            }
-            currentCheckInType = 'out';
-            document.getElementById('checkInTitle').textContent = '🏠 下班打卡';
-            showPage('checkInPage');
-            openCamera();
-        }
-
-        // 取消打卡
-        function cancelCheckIn() {
-            closeCamera();
-            showPage('homePage');
-        }
-
-        // ============================================
-        // 相機功能
-        // ============================================
         async function openCamera() {
             const video = document.getElementById('video');
-            const overlay = document.getElementById('cameraOverlay');
-            const statusDiv = document.getElementById('checkInStatus');
-            const captureBtn = document.getElementById('captureBtn');
-
+            const statusBox = document.getElementById('checkInStatus');
+            
             try {
-                statusDiv.className = 'status-box info';
-                statusDiv.textContent = '正在開啟相機...';
-
-                videoStream = await navigator.mediaDevices.getUserMedia({
-                    video: {
-                        facingMode: 'user',
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 }
-                    }
-                });
-
-                video.srcObject = videoStream;
+                showStatus(statusBox, 'info', '📷 正在啟動相機...');
                 
-                // 等待視訊載入
-                await new Promise((resolve, reject) => {
-                    video.onloadedmetadata = () => {
-                        video.play();
-                        resolve();
-                    };
-                    video.onerror = reject;
-                    
-                    // 超時保護
-                    setTimeout(() => {
-                        if (video.readyState >= 2) {
-                            resolve();
-                        }
-                    }, 3000);
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } }
                 });
-
-                overlay.classList.add('hidden');
-                captureBtn.disabled = false;
-                statusDiv.className = 'status-box success';
-                statusDiv.textContent = '✅ 相機已就緒，請對準臉部拍照';
-
-                console.log('✅ 相機開啟成功');
+                
+                video.srcObject = stream;
+                videoStream = stream;
+                
+                video.onloadedmetadata = () => {
+                    video.play();
+                    document.getElementById('cameraContainer').classList.add('show');
+                    document.getElementById('captureBtn').disabled = false;
+                    showStatus(statusBox, 'success', '✅ 相機就緒，請微笑');
+                };
             } catch (error) {
-                console.error('❌ 相機開啟失敗:', error);
-                statusDiv.className = 'status-box error';
-                
-                if (error.name === 'NotAllowedError') {
-                    statusDiv.textContent = '❌ 請允許存取相機權限';
-                } else if (error.name === 'NotFoundError') {
-                    statusDiv.textContent = '❌ 找不到相機裝置';
-                } else {
-                    statusDiv.textContent = '❌ 相機開啟失敗: ' + error.message;
-                }
+                console.error('❌ 相機啟動失敗:', error);
+                showStatus(statusBox, 'error', '❌ 相機啟動失敗: ' + error.message);
+                showToast('❌ 無法啟動相機');
             }
         }
 
-        function closeCamera() {
+        function cancelCheckIn() {
             if (videoStream) {
                 videoStream.getTracks().forEach(track => track.stop());
                 videoStream = null;
-                console.log('✅ 相機已關閉');
             }
+            showPage('homePage');
         }
 
-        // ============================================
-        // 拍照並打卡
-        // ============================================
         async function captureAndCheckIn() {
-            const video = document.getElementById('video');
-            const canvas = document.getElementById('canvas');
-            const statusDiv = document.getElementById('checkInStatus');
-            const captureBtn = document.getElementById('captureBtn');
+            if (!currentEmployee) {
+                showToast('⚠️ 請先完成員工綁定');
+                return;
+            }
 
+            const btn = document.getElementById('captureBtn');
+            const statusBox = document.getElementById('checkInStatus');
+            
+            btn.disabled = true;
+            btn.textContent = '⏳ 處理中...';
+            showStatus(statusBox, 'info', '📸 正在拍照...');
+            
             try {
-                captureBtn.disabled = true;
-                statusDiv.className = 'status-box info';
-                statusDiv.textContent = '📸 正在拍照...';
-
-                // 設定 canvas 尺寸
+                // 1. 拍照
+                const video = document.getElementById('video');
+                const canvas = document.getElementById('canvas');
                 canvas.width = video.videoWidth;
                 canvas.height = video.videoHeight;
-
-                if (canvas.width === 0 || canvas.height === 0) {
-                    throw new Error('無法取得影像尺寸');
-                }
-
-                // 繪製鏡像翻轉的影像
                 const ctx = canvas.getContext('2d');
+                
+                // ⭐ 翻轉回正常方向（修正鏡像問題）
                 ctx.translate(canvas.width, 0);
                 ctx.scale(-1, 1);
                 ctx.drawImage(video, 0, 0);
+                
+                // 轉換為 JPEG blob
+                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.8));
+                
+                showStatus(statusBox, 'info', '☁️ 正在上傳照片...');
 
-                // 轉換成 Blob
-                const blob = await new Promise((resolve, reject) => {
-                    canvas.toBlob(
-                        blob => {
-                            if (blob) resolve(blob);
-                            else reject(new Error('照片轉換失敗'));
-                        },
-                        'image/jpeg',
-                        0.7
-                    );
+                // 2. 上傳照片到 Supabase Storage
+                const fileName = `${currentEmployee.employee_id}_${Date.now()}.jpg`;
+                const { data: uploadData, error: uploadError } = await sb.storage
+                    .from(CONFIG.BUCKET)
+                    .upload(fileName, blob, { upsert: false });
+
+                if (uploadError) throw uploadError;
+
+                // ⭐ 關鍵修正：取得公開網址
+                const { data: urlData } = sb.storage
+                    .from(CONFIG.BUCKET)
+                    .getPublicUrl(fileName);
+                
+                const publicUrl = urlData.publicUrl;
+                console.log('✅ 照片公開網址:', publicUrl);
+
+                showStatus(statusBox, 'info', '📍 正在確認定位...');
+
+                // 3. 取得定位（優先使用預先抓取的）
+                let location = cachedLocation;
+                if (!location) {
+                    console.log('⚠️ 預先定位不可用，重新取得...');
+                    location = await getGPS();
+                }
+
+                showStatus(statusBox, 'info', '✅ 正在記錄打卡...');
+
+                // 4. 呼叫打卡 RPC
+                const { data: checkData, error: checkError } = await sb.rpc('quick_check_in', {
+                    p_line_user_id: liffProfile.userId,
+                    p_latitude: location.latitude,
+                    p_longitude: location.longitude,
+                    p_photo_url: publicUrl,  // ⭐ 使用公開網址
+                    p_device_id: navigator.userAgent
                 });
 
-                console.log('✅ 照片拍攝成功，大小:', blob.size);
+                if (checkError) throw checkError;
 
-                // 上傳照片
-                statusDiv.textContent = '☁️ 正在上傳照片...';
-                const photoUrl = await uploadPhoto(blob);
-
-                // 取得 GPS
-                statusDiv.textContent = '📍 正在取得位置...';
-                const { latitude, longitude } = await getGPS();
-
-                // 呼叫打卡 API
-                statusDiv.textContent = '💾 正在儲存打卡記錄...';
-                await callCheckInAPI(latitude, longitude, photoUrl);
-
-                // 成功
-                statusDiv.className = 'status-box success';
-                statusDiv.textContent = currentCheckInType === 'in' 
-                    ? '✅ 上班打卡成功！' 
-                    : '✅ 下班打卡成功！';
-
-                closeCamera();
-
-                // 3 秒後返回首頁
-                setTimeout(async () => {
-                    await checkTodayAttendance(); // 重新檢查狀態
-                    showPage('homePage');
-                }, 3000);
+                if (checkData && checkData.success) {
+                    // ⭐ 關鍵修正：根據後端回傳的 type 顯示正確訊息
+                    const typeText = checkData.type === 'check_in' ? '上班' : '下班';
+                    showStatus(statusBox, 'success', '✅ ' + checkData.message);
+                    showToast(`✅ ${typeText}打卡成功！`);
+                    
+                    setTimeout(() => {
+                        cancelCheckIn();
+                    }, 1500);
+                } else {
+                    throw new Error(checkData?.error || '打卡失敗');
+                }
 
             } catch (error) {
                 console.error('❌ 打卡失敗:', error);
-                statusDiv.className = 'status-box error';
-                statusDiv.textContent = '❌ 打卡失敗: ' + error.message;
-                captureBtn.disabled = false;
+                showStatus(statusBox, 'error', '❌ 打卡失敗: ' + error.message);
+                showToast('❌ 打卡失敗');
+                btn.disabled = false;
+                btn.textContent = '📸 拍照打卡';
             }
         }
 
-        // 上傳照片到 Supabase Storage
-        async function uploadPhoto(blob) {
-            const fileName = `${liffProfile.userId}_${Date.now()}.jpg`;
-            const filePath = `${fileName}`;
-
-            const { data, error } = await sb.storage
-                .from(STORAGE_BUCKET)
-                .upload(filePath, blob, {
-                    contentType: 'image/jpeg',
-                    upsert: false
-                });
-
-            if (error) throw error;
-
-            const { data: urlData } = sb.storage
-                .from(STORAGE_BUCKET)
-                .getPublicUrl(filePath);
-
-            console.log('✅ 照片上傳成功:', urlData.publicUrl);
-            return urlData.publicUrl;
-        }
-
-        // 取得 GPS 位置
+        // 取得 GPS 定位
         function getGPS() {
             return new Promise((resolve, reject) => {
-                if (!navigator.geolocation) {
-                    reject(new Error('您的裝置不支援定位功能'));
-                    return;
-                }
-
-                const timeout = setTimeout(() => {
-                    reject(new Error('定位逾時，請確認已開啟定位權限'));
-                }, 15000);
-
                 navigator.geolocation.getCurrentPosition(
-                    position => {
-                        clearTimeout(timeout);
-                        console.log('✅ GPS 定位成功:', position.coords);
-                        resolve({
-                            latitude: position.coords.latitude,
-                            longitude: position.coords.longitude
-                        });
-                    },
-                    error => {
-                        clearTimeout(timeout);
-                        let message = '定位失敗';
-                        if (error.code === 1) message = '請允許存取位置權限';
-                        else if (error.code === 2) message = '無法取得位置資訊';
-                        else if (error.code === 3) message = '定位逾時';
-                        reject(new Error(message));
-                    },
-                    {
-                        enableHighAccuracy: true,
-                        timeout: 15000,
-                        maximumAge: 0
-                    }
+                    (position) => resolve({
+                        latitude: position.coords.latitude,
+                        longitude: position.coords.longitude
+                    }),
+                    (error) => reject(new Error('定位失敗: ' + error.message)),
+                    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
                 );
             });
         }
 
-        // 呼叫打卡 API
-        async function callCheckInAPI(latitude, longitude, photoUrl) {
-            const deviceId = navigator.userAgent;
+        // ================= 便當訂購系統 =================
+        async function loadLunchSummary() {
+            try {
+                // ⭐ 修正：使用台灣時間取得明天日期
+                const dateStr = getTaiwanDate(1); // 1 = 明天
+                document.getElementById('lunchDate').value = dateStr;
 
-            const { data, error } = await sb.rpc('quick_check_in', {
-                p_line_user_id: liffProfile.userId,
-                p_latitude: latitude,
-                p_longitude: longitude,
-                p_photo_url: photoUrl,
-                p_device_id: deviceId
-            });
+                const { data, error } = await sb.rpc('get_lunch_summary', { p_date: dateStr });
+                
+                if (error) throw error;
 
-            if (error) throw error;
+                if (data) {
+                    document.getElementById('totalOrders').textContent = data.total_orders || 0;
+                    document.getElementById('vegCount').textContent = data.vegetarian_count || 0;
+                    document.getElementById('regularCount').textContent = data.regular_count || 0;
 
-            console.log('✅ 打卡 API 回應:', data);
-
-            if (!data.success) {
-                throw new Error(data.message || '打卡失敗');
+                    // 顯示農曆提示（如果有農曆日期表）
+                    if (data.is_lunar_vegetarian_day) {
+                        document.getElementById('lunarNotice').classList.add('show');
+                        document.getElementById('lunchVegetarian').checked = true;
+                    } else {
+                        document.getElementById('lunarNotice').classList.remove('show');
+                    }
+                }
+            } catch (error) {
+                console.error('❌ 載入便當統計失敗:', error);
             }
-
-            return data;
         }
 
-        // ============================================
-        // 考勤記錄查詢
-        // ============================================
-        async function loadAttendanceRecords() {
-            const listDiv = document.getElementById('attendanceList');
-            listDiv.innerHTML = '<div class="spinner" style="border-color: #667eea; border-top-color: transparent;"></div>';
+        function updateLunchType() {
+            // 可擴充：根據勾選狀態更新 UI
+        }
 
+        async function submitLunchOrder() {
+            if (!currentEmployee) {
+                showToast('⚠️ 請先完成員工綁定');
+                return;
+            }
+
+            const date = document.getElementById('lunchDate').value;
+            const isVeg = document.getElementById('lunchVegetarian').checked;
+            const notes = document.getElementById('lunchNotes').value.trim();
+
+            if (!date) {
+                showToast('⚠️ 請選擇訂購日期');
+                return;
+            }
+
+            try {
+                const { data, error } = await sb.rpc('order_lunch', {
+                    p_line_user_id: liffProfile.userId,
+                    p_order_date: date,
+                    p_is_vegetarian: isVeg,
+                    p_special_requirements: notes || null
+                });
+
+                if (error) throw error;
+
+                if (data && data.success) {
+                    showToast('✅ 便當訂購成功！');
+                    loadLunchSummary(); // 重新載入統計
+                } else {
+                    throw new Error(data?.error || '訂購失敗');
+                }
+            } catch (error) {
+                console.error('❌ 訂購失敗:', error);
+                showToast('❌ 訂購失敗: ' + error.message);
+            }
+        }
+
+        // ================= 請假系統 =================
+        async function submitLeave() {
+            if (!currentEmployee) {
+                showToast('⚠️ 請先完成員工綁定');
+                return;
+            }
+
+            const leaveType = document.getElementById('leaveType').value;
+            const startDate = document.getElementById('leaveStartDate').value;
+            const endDate = document.getElementById('leaveEndDate').value;
+            const reason = document.getElementById('leaveReason').value.trim();
+            const statusBox = document.getElementById('leaveStatus');
+
+            if (!startDate || !endDate || !reason) {
+                showStatus(statusBox, 'error', '⚠️ 請填寫完整資訊');
+                return;
+            }
+
+            if (new Date(endDate) < new Date(startDate)) {
+                showStatus(statusBox, 'error', '⚠️ 結束日期不能早於開始日期');
+                return;
+            }
+
+            showStatus(statusBox, 'info', '📤 提交中...');
+
+            try {
+                const { error } = await sb.from('leave_requests').insert([{
+                    employee_id: currentEmployee.id,
+                    leave_type: leaveType,
+                    start_date: startDate,
+                    end_date: endDate,
+                    reason: reason,
+                    status: 'pending'
+                }]);
+
+                if (error) throw error;
+
+                showStatus(statusBox, 'success', '✅ 請假申請已提交');
+                showToast('✅ 請假申請已提交');
+                
+                setTimeout(() => {
+                    showPage('homePage');
+                }, 1500);
+
+            } catch (error) {
+                console.error('❌ 請假失敗:', error);
+                showStatus(statusBox, 'error', '❌ 提交失敗: ' + error.message);
+            }
+        }
+
+        // ================= 考勤查詢 =================
+        async function loadAttendance() {
+            if (!currentEmployee) return;
+
+            const listEl = document.getElementById('attendanceList');
+            
             try {
                 const { data, error } = await sb
                     .from('attendance')
-                    .select('*, employees!inner(line_user_id, name)')
-                    .eq('employees.line_user_id', liffProfile.userId)
+                    .select('*')
+                    .eq('employee_id', currentEmployee.id)
                     .order('date', { ascending: false })
                     .limit(10);
 
                 if (error) throw error;
 
                 if (!data || data.length === 0) {
-                    listDiv.innerHTML = '<div class="status-box info">尚無打卡記錄</div>';
+                    listEl.innerHTML = '<p style="text-align:center;color:#666;padding:40px;">暫無打卡記錄</p>';
                     return;
                 }
 
-                let html = '';
-                data.forEach(record => {
-                    const date = new Date(record.date).toLocaleDateString('zh-TW');
-                    const checkIn = record.check_in_time 
-                        ? new Date(record.check_in_time).toLocaleTimeString('zh-TW', { 
-                            timeZone: 'Asia/Taipei',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })
-                        : '-';
-                    const checkOut = record.check_out_time
-                        ? new Date(record.check_out_time).toLocaleTimeString('zh-TW', { 
-                            timeZone: 'Asia/Taipei',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })
-                        : '-';
-                    const workHours = record.work_hours ? record.work_hours.toFixed(2) : '-';
-                    const status = record.is_late 
-                        ? `<span class="badge danger">遲到 ${record.late_minutes} 分</span>`
-                        : `<span class="badge success">準時</span>`;
-
-                    html += `
+                listEl.innerHTML = data.map(record => {
+                    const checkInTime = record.check_in_time ? 
+                        new Date(record.check_in_time).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' }) : '--';
+                    const checkOutTime = record.check_out_time ? 
+                        new Date(record.check_out_time).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' }) : '--';
+                    const statusBadge = record.is_late ? 
+                        '<span class="badge badge-warning">遲到</span>' : 
+                        '<span class="badge badge-success">正常</span>';
+                    
+                    return `
                         <div class="attendance-item">
-                            <div class="date">
-                                <span>${date}</span>
-                                ${status}
+                            <div class="date">${record.date} ${statusBadge}</div>
+                            <div class="details">
+                                <span>上班: ${checkInTime}</span>
+                                <span>下班: ${checkOutTime}</span>
                             </div>
                             <div class="details">
-                                上班: ${checkIn} | 下班: ${checkOut} | 工時: ${workHours}h
+                                <span>工時: ${record.total_work_hours || '--'} 小時</span>
                             </div>
                         </div>
                     `;
-                });
-
-                listDiv.innerHTML = html;
+                }).join('');
 
             } catch (error) {
-                console.error('❌ 載入考勤記錄失敗:', error);
-                listDiv.innerHTML = '<div class="status-box error">載入失敗: ' + error.message + '</div>';
+                console.error('❌ 載入考勤失敗:', error);
+                listEl.innerHTML = '<p style="text-align:center;color:#666;padding:40px;">載入失敗</p>';
             }
         }
 
-        // ============================================
-        // 請假申請（完整資料庫整合版）
-        // ============================================
-        async function submitLeave() {
-            const type = document.getElementById('leaveType').value;
-            const startDate = document.getElementById('leaveStartDate').value;
-            const endDate = document.getElementById('leaveEndDate').value;
-            const reason = document.getElementById('leaveReason').value;
-            const statusDiv = document.getElementById('leaveStatus');
-
-            // ========================================
-            // 1. 前端驗證
-            // ========================================
+        // ================= 輔助功能 =================
+        function showPage(id) {
+            document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
             
-            if (!type || !startDate || !endDate || !reason.trim()) {
-                statusDiv.innerHTML = '<div class="status-box error">❌ 請填寫所有必填欄位</div>';
-                return;
-            }
+            // 頁面載入時觸發對應的初始化
+            if (id === 'lunchPage') loadLunchSummary();
+            if (id === 'attendancePage') loadAttendance();
+        }
 
-            // 日期邏輯驗證
-            const start = new Date(startDate);
-            const end = new Date(endDate);
-            const today = new Date();
-            today.setHours(0, 0, 0, 0); // 重置時間為午夜
+        function showStatus(el, type, msg) {
+            el.className = `status-box show ${type}`;
+            el.innerHTML = msg;
+        }
 
-            if (start < today) {
-                statusDiv.innerHTML = '<div class="status-box error">❌ 開始日期不能早於今天</div>';
-                return;
-            }
-
-            if (end < start) {
-                statusDiv.innerHTML = '<div class="status-box error">❌ 結束日期不能早於開始日期</div>';
-                return;
-            }
-
-            // 計算請假天數（前端顯示用）
-            const daysDiff = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
-
-            // ========================================
-            // 2. 顯示處理中狀態
-            // ========================================
-            
-            statusDiv.innerHTML = '<div class="status-box info">⏳ 正在提交請假申請...</div>';
-
-            try {
-                // ========================================
-                // 3. 查詢員工 UUID
-                // ========================================
-                
-                const { data: empData, error: empError } = await sb
-                    .from('employees')
-                    .select('id, name, department')
-                    .eq('line_user_id', liffProfile.userId)
-                    .single();
-
-                if (empError || !empData) {
-                    console.error('查詢員工錯誤:', empError);
-                    statusDiv.innerHTML = '<div class="status-box error">❌ 找不到員工資料，請確認您的帳號設定</div>';
-                    return;
-                }
-
-                // ========================================
-                // 4. 寫入請假申請到資料庫
-                // ========================================
-                
-                const { data: leaveData, error: leaveError } = await sb
-                    .from('leave_requests')
-                    .insert({
-                        employee_id: empData.id,
-                        leave_type: type,
-                        start_date: startDate,
-                        end_date: endDate,
-                        reason: reason.trim(),
-                        status: 'pending' // 預設待審核
-                    })
-                    .select()
-                    .single();
-
-                if (leaveError) {
-                    console.error('請假申請錯誤:', leaveError);
-                    
-                    // 友善的錯誤訊息
-                    let errorMsg = '❌ 申請失敗: ';
-                    if (leaveError.code === '23503') {
-                        errorMsg += '員工資料異常，請聯絡系統管理員';
-                    } else if (leaveError.code === '23514') {
-                        errorMsg += '日期範圍不符合規定';
-                    } else {
-                        errorMsg += leaveError.message;
-                    }
-                    
-                    statusDiv.innerHTML = `<div class="status-box error">${errorMsg}</div>`;
-                    return;
-                }
-
-                // ========================================
-                // 5. 成功回饋
-                // ========================================
-                
-                // 取得假別中文名稱
-                const leaveTypeNames = {
-                    'annual': '年假',
-                    'sick': '病假',
-                    'personal': '事假',
-                    'compensatory': '補休',
-                    'maternity': '產假',
-                    'marriage': '婚假'
-                };
-                
-                const leaveTypeName = leaveTypeNames[type] || type;
-
-                statusDiv.innerHTML = `
-                    <div class="status-box success">
-                        ✅ 請假申請已送出！
-                        <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.3);">
-                            <div>📝 假別：${leaveTypeName}</div>
-                            <div>📅 日期：${startDate} ~ ${endDate}</div>
-                            <div>⏱️ 天數：${daysDiff} 天</div>
-                            <div>📋 狀態：等待主管審核</div>
-                        </div>
-                    </div>
-                `;
-
-                // ========================================
-                // 6. 清空表單
-                // ========================================
-                
-                document.getElementById('leaveType').value = 'annual';
-                document.getElementById('leaveStartDate').value = '';
-                document.getElementById('leaveEndDate').value = '';
-                document.getElementById('leaveReason').value = '';
-
-                // ========================================
-                // 7. 3 秒後自動返回首頁
-                // ========================================
-                
-                setTimeout(() => {
-                    showPage('homePage');
-                    statusDiv.innerHTML = ''; // 清空狀態訊息
-                }, 3000);
-
-                // ========================================
-                // 8. Console Log（除錯用）
-                // ========================================
-                
-                console.log('✅ 請假申請成功:', {
-                    employee: empData.name,
-                    department: empData.department,
-                    leave_type: leaveTypeName,
-                    days: daysDiff,
-                    leave_id: leaveData.id
-                });
-
-            } catch (error) {
-                console.error('未預期的錯誤:', error);
-                statusDiv.innerHTML = `
-                    <div class="status-box error">
-                        ❌ 系統錯誤，請稍後再試<br>
-                        <small>${error.message}</small>
-                    </div>
-                `;
-            }
+        function showToast(message) {
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
         }
     </script>
 </body>
