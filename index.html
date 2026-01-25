@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>🏢 HR 考勤打卡系統</title>
+    
+    <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC", "Microsoft JhengHei", sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex; align-items: center; justify-content: center; padding: 20px;
+        }
+        .container {
+            background: white; border-radius: 25px; padding: 40px 30px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 450px; width: 100%; animation: slideUp 0.5s ease-out;
+        }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+        .header { text-align: center; margin-bottom: 30px; }
+        h1 { font-size: 28px; color: #333; margin-bottom: 10px; }
+        .subtitle { color: #666; font-size: 14px; }
+        .user-info { background: #f8f9fa; padding: 15px; border-radius: 12px; margin-bottom: 25px; display: none; }
+        .user-info.show { display: block; }
+        .user-name { font-weight: bold; color: #333; font-size: 16px; margin-bottom: 5px; }
+        .user-id { color: #666; font-size: 12px; }
+        
+        /* 相機預覽區 */
+        .camera-container {
+            position: relative; width: 100%; height: 300px; background: #000;
+            border-radius: 15px; overflow: hidden; margin-bottom: 20px; display: none;
+        }
+        .camera-container.show { display: block; }
+        #videoPreview {
+            width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); /* 鏡像翻轉 */
+        }
+        .camera-overlay {
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            border: 3px solid rgba(255, 255, 255, 0.5); border-radius: 15px; pointer-events: none;
+        }
+        .camera-guide {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 200px; height: 250px; border: 2px dashed rgba(255, 255, 255, 0.7);
+            border-radius: 100px; pointer-events: none;
+        }
+        .countdown {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            font-size: 100px; color: white; font-weight: bold;
+            text-shadow: 0 0 20px rgba(0, 0, 0, 0.8); display: none; z-index: 10;
+        }
+        .countdown.show { display: block; animation: countdownPulse 1s ease-in-out; }
+        @keyframes countdownPulse {
+            0% { transform: translate(-50%, -50%) scale(0.5); opacity: 0; }
+            50% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
+            100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+        }
+
+        #checkInBtn {
+            width: 100%; padding: 18px; font-size: 18px; font-weight: bold; color: white;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none; border-radius: 15px; cursor: pointer; transition: all 0.3s;
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        #checkInBtn:active { transform: scale(0.98); box-shadow: 0 3px 10px rgba(102, 126, 234, 0.3); }
+        #checkInBtn:disabled { background: #ccc; cursor: not-allowed; box-shadow: none; }
+
+        .status {
+            margin-top: 20px; padding: 15px; border-radius: 12px; text-align: center;
+            font-weight: 500; display: none; animation: fadeIn 0.3s;
+        }
+        .status.show { display: block; }
+        .status.success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .status.error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .status.info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        
+        .loading {
+            display: inline-block; width: 20px; height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3); border-top: 3px solid white;
+            border-radius: 50%; animation: spin 0.8s linear infinite;
+            vertical-align: middle; margin-right: 8px;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .details { margin-top: 10px; font-size: 13px; opacity: 0.9; }
+        .info-text { text-align: center; color: #999; font-size: 12px; margin-top: 15px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏢 考勤打卡系統</h1>
+            <p class="subtitle">GPS 定位 + 人臉辨識</p>
+        </div>
+
+        <div class="user-info" id="userInfo">
+            <div class="user-name" id="userName">載入中...</div>
+            <div class="user-id" id="userId"></div>
+        </div>
+
+        <div class="camera-container" id="cameraContainer">
+            <video id="videoPreview" autoplay playsinline muted></video> <div class="camera-overlay"></div>
+            <div class="camera-guide"></div>
+            <div class="countdown" id="countdown">3</div>
+        </div>
+
+        <button id="checkInBtn" onclick="startCheckIn()">
+            📍 立即打卡
+        </button>
+
+        <div class="status" id="statusMsg"></div>
+        <div class="info-text">
+            點擊按鈕後系統會自動偵測位置並拍照
+        </div>
+    </div>
+
+    <script>
+        // ========================================
+        // 設定區域 (已修正 ID 與 URL)
+        // ========================================
+        const CONFIG = {
+            // ✅ 已修正：使用您最新的正確 LIFF ID
+            LIFF_ID: '2008962829-bnsS1bbB', 
+            
+            // ✅ 已修正：修正 URL 拼字錯誤 (去掉多餘的 's')
+            SUPABASE_URL: 'https://nssuisyvlrqnqfxupklb.supabase.co',
+            
+            SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5zc3Vpc3l2bHJxbnFmeHVwa2xiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkyOTAwMzUsImV4cCI6MjA4NDg2NjAzNX0.q_B6v3gf1TOCuAq7z0xIw10wDueCSJn0p37VzdMfmbc',
+            
+            STORAGE_BUCKET: 'selfies',
+            ENABLE_COUNTDOWN: true,
+            COUNTDOWN_SECONDS: 3
+        };
+
+        const supabase = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+        let liffProfile = null;
+        let videoStream = null;
+
+        // ========================================
+        // 初始化 LIFF
+        // ========================================
+        window.addEventListener('load', async () => {
+            try {
+                // 嘗試初始化 LIFF
+                await liff.init({ liffId: CONFIG.LIFF_ID });
+                
+                // 處理登入邏輯
+                if (!liff.isLoggedIn()) {
+                    liff.login();
+                    return;
+                }
+
+                liffProfile = await liff.getProfile();
+                document.getElementById('userName').textContent = liffProfile.displayName;
+                document.getElementById('userId').textContent = `員工 ID: ${liffProfile.userId.substring(0, 10)}...`;
+                document.getElementById('userInfo').classList.add('show');
+                
+            } catch (error) {
+                console.error('LIFF 初始化失敗:', error);
+                // 顯示更友善的錯誤訊息，包含 LIFF ID 以便除錯
+                showStatus('error', `系統初始化失敗<br><small>${error.message}</small><br><small>LIFF ID: ${CONFIG.LIFF_ID}</small>`);
+            }
+        });
+
+        // ========================================
+        // 打卡主流程
+        // ========================================
+        async function startCheckIn() {
+            const btn = document.getElementById('checkInBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading"></span>準備中...';
+            hideStatus();
+
+            try {
+                // 1. 開啟相機
+                showStatus('info', '📷 正在開啟相機...');
+                await openCamera();
+
+                // 2. 倒數
+                if (CONFIG.ENABLE_COUNTDOWN) {
+                    await showCountdown();
+                }
+
+                // 3. 拍照
+                showStatus('info', '📸 正在拍照...');
+                const photoBlob = await capturePhoto();
+
+                // 4. 上傳
+                showStatus('info', '☁️ 正在上傳照片...');
+                const photoUrl = await uploadPhoto(photoBlob);
+
+                // 5. 定位
+                showStatus('info', '📡 正在取得 GPS 位置...');
+                const position = await getGPS();
+
+                // 6. 打卡
+                showStatus('info', '⏳ 正在寫入考勤紀錄...');
+                const result = await callCheckInAPI(position, photoUrl);
+
+                // 7. 成功
+                if (result.success) {
+                    showStatus('success', `
+                        ${result.message}<br>
+                        <div class="details">
+                            時間：${new Date(result.time).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' })}<br>
+                            距離：${result.distance} 公尺
+                            ${result.work_hours ? `<br>工時：${result.work_hours} 小時` : ''}
+                        </div>
+                    `);
+                    setTimeout(() => { if (liff.isInClient()) liff.closeWindow(); }, 3000);
+                } else {
+                    throw new Error(result.error);
+                }
+
+            } catch (error) {
+                console.error(error);
+                let errMsg = error.message || '打卡失敗';
+                // 如果是距離過遠，給予明確提示
+                if (errMsg.includes('距離公司太遠')) {
+                    showStatus('error', `❌ 打卡失敗<br>${errMsg}<br><small>請移動到公司範圍內再試</small>`);
+                } else {
+                    showStatus('error', `❌ 打卡失敗: ${errMsg}`);
+                }
+            } finally {
+                closeCamera();
+                btn.disabled = false;
+                btn.innerHTML = '📍 立即打卡';
+            }
+        }
+
+        // ========================================
+        // 相機功能
+        // ========================================
+        async function openCamera() {
+            try {
+                videoStream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
+                    audio: false
+                });
+                const video = document.getElementById('videoPreview');
+                video.srcObject = videoStream;
+                document.getElementById('cameraContainer').classList.add('show');
+                
+                // 確保影片載入並播放 (iOS Safari 需要)
+                return new Promise((resolve) => {
+                    video.onloadedmetadata = () => {
+                        video.play();
+                        resolve();
+                    };
+                });
+            } catch (error) {
+                throw new Error('無法開啟相機，請檢查瀏覽器權限。');
+            }
+        }
+
+        async function showCountdown() {
+            const countdownDiv = document.getElementById('countdown');
+            for (let i = CONFIG.COUNTDOWN_SECONDS; i > 0; i--) {
+                countdownDiv.textContent = i;
+                countdownDiv.classList.add('show');
+                countdownDiv.style.animation = 'none';
+                void countdownDiv.offsetWidth; // Trigger reflow
+                countdownDiv.style.animation = '';
+                await new Promise(r => setTimeout(r, 1000));
+            }
+            countdownDiv.classList.remove('show');
+        }
+
+        async function capturePhoto() {
+            const video = document.getElementById('videoPreview');
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.translate(canvas.width, 0);
+            ctx.scale(-1, 1);
+            ctx.drawImage(video, 0, 0);
+            return new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.8));
+        }
+
+        function closeCamera() {
+            if (videoStream) {
+                videoStream.getTracks().forEach(track => track.stop());
+                videoStream = null;
+            }
+            document.getElementById('cameraContainer').classList.remove('show');
+        }
+
+        // ========================================
+        // GPS 功能
+        // ========================================
+        async function getGPS() {
+            return new Promise((resolve, reject) => {
+                if (!navigator.geolocation) {
+                    reject(new Error('您的裝置不支援 GPS 定位'));
+                    return;
+                }
+                navigator.geolocation.getCurrentPosition(
+                    pos => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
+                    err => {
+                        let msg = 'GPS 定位失敗';
+                        if (err.code === 1) msg = '請允許瀏覽器存取您的位置'; // Permission Denied
+                        if (err.code === 2) msg = '無法偵測位置，請移動到空曠處'; // Position Unavailable
+                        if (err.code === 3) msg = 'GPS 定位逾時，請重試'; // Timeout
+                        reject(new Error(msg));
+                    },
+                    { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 } // timeout 改為 20秒
+                );
+            });
+        }
+
+        // ========================================
+        // Supabase 功能
+        // ========================================
+        async function uploadPhoto(photoBlob) {
+            const fileName = `${liffProfile.userId}_${Date.now()}.jpg`;
+            const { data, error } = await supabase.storage
+                .from(CONFIG.STORAGE_BUCKET)
+                .upload(fileName, photoBlob, { contentType: 'image/jpeg', upsert: false });
+
+            if (error) throw new Error('照片上傳失敗');
+            const { data: urlData } = supabase.storage.from(CONFIG.STORAGE_BUCKET).getPublicUrl(fileName);
+            return urlData.publicUrl;
+        }
+
+        async function callCheckInAPI(position, photoUrl) {
+            const { data, error } = await supabase.rpc('quick_check_in', {
+                p_line_user_id: liffProfile.userId,
+                p_latitude: position.latitude,
+                p_longitude: position.longitude,
+                p_photo_url: photoUrl,
+                p_device_id: navigator.userAgent.substring(0, 100)
+            });
+            if (error) throw new Error(error.message || '系統錯誤');
+            return data;
+        }
+
+        function showStatus(type, message) {
+            const statusDiv = document.getElementById('statusMsg');
+            statusDiv.className = `status ${type} show`;
+            statusDiv.innerHTML = message;
+        }
+        function hideStatus() {
+            document.getElementById('statusMsg').classList.remove('show');
+        }
+    </script>
+</body>
+</html>
