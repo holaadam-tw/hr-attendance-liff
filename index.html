@@ -22,8 +22,9 @@
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Microsoft JhengHei", sans-serif;
             background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
             min-height: 100vh; padding: 20px; color: var(--text-color);
+            padding-bottom: 50px; /* 避免底部被遮擋 */
         }
-        .container { max-width: 600px; margin: 0 auto; padding-bottom: 40px; }
+        .container { max-width: 600px; margin: 0 auto; }
         
         /* 頁面切換與動畫 */
         .page { display: none; animation: fadeIn 0.3s ease-out; }
@@ -113,6 +114,7 @@
         .btn-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4); }
         .btn-success { background: linear-gradient(135deg, #34d399 0%, #059669 100%); color: white; box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3); }
         .btn-secondary { background: #e5e7eb; color: #4b5563; }
+        .btn-danger { background: #ff4d4f; color: white; margin-top: 0; padding: 8px 15px; font-size: 14px; width: auto;}
 
         /* 便當與農曆 */
         .lunch-summary { background: #f0fdf4; border: 1px solid #d1fae5; border-radius: 12px; padding: 15px; margin-bottom: 20px; }
@@ -356,7 +358,7 @@
                 </div>
 
                 <div class="form-group" style="margin-top:30px; text-align:center;">
-                    <p style="color:#999; font-size:12px;">系統版本 v5.1</p>
+                    <p style="color:#999; font-size:12px;">系統版本 v6.0 (完整修正版)</p>
                 </div>
             </div>
         </div>
@@ -382,10 +384,10 @@
         let currentBindMode = 'id_card';
         let todayAttendance = null;
         
-        // ⭐ 新增全域變數：地點設定
+        // 全域變數：地點設定
         let officeLocations = [];
 
-        // ✅ 核心：取得台灣時間 YYYY-MM-DD
+        // 核心：取得台灣時間 YYYY-MM-DD
         function getTaiwanDate(offsetDays = 0) {
             const date = new Date();
             date.setDate(date.getDate() + offsetDays);
@@ -411,6 +413,7 @@
             document.getElementById('loadingPage').style.display = 'flex';
             
             try {
+                // 讀取員工資料 (包含 is_admin)
                 const { data, error } = await sb.from('employees').select('*').eq('line_user_id', liffProfile.userId).single();
                 document.getElementById('loadingPage').style.display = 'none';
 
@@ -419,7 +422,7 @@
                     updateUserInfo(data);
                     showPage('homePage');
                     preloadGPS();
-                    checkTodayAttendance(); // 檢查打卡狀態
+                    await checkTodayAttendance(); // 檢查打卡狀態
                 } else {
                     showPage('bindPage');
                 }
@@ -432,7 +435,7 @@
         function updateUserInfo(data) {
             document.getElementById('userName').textContent = data.name;
             document.getElementById('userDept').textContent = `${data.department || '-'} ${data.position || ''}`;
-            document.getElementById('userId').textContent = `ID: ${data.employee_number || data.employee_id}`;
+            document.getElementById('userId').textContent = `ID: ${data.employee_number}`;
             const avatar = document.getElementById('userAvatar');
             if(liffProfile.pictureUrl) {
                 avatar.style.backgroundImage = `url(${liffProfile.pictureUrl})`;
@@ -482,19 +485,20 @@
             }
         }
 
-        // ================= 打卡邏輯 (含多地點 & 記憶) =================
+        // ================= 打卡邏輯 =================
         async function checkTodayAttendance() {
+            if (!currentEmployee) return;
             try {
-                const today = getTaiwanDate(0); // ✅ 確保使用台灣日期
+                const today = getTaiwanDate(0);
                 const { data } = await sb.from('attendance')
                     .select('*')
-                    .eq('employee_id', currentEmployee.id)
+                    .eq('employee_id', currentEmployee.id) // 使用 UUID
                     .eq('date', today)
                     .single();
                 
                 todayAttendance = data;
                 updateCheckInButtons();
-            } catch(e) { console.error(e); }
+            } catch(e) { /* 無資料是正常的 */ }
         }
 
         function updateCheckInButtons() {
@@ -502,7 +506,6 @@
             const btnOut = document.getElementById('checkOutBtn');
             const statusBox = document.getElementById('checkInStatusBox');
             
-            // ✅ 讀取上次地點記憶
             const lastLoc = localStorage.getItem('last_location') || '公司';
 
             if (!todayAttendance) {
@@ -520,7 +523,6 @@
                 btnIn.classList.add('disabled');
                 btnOut.classList.remove('disabled');
                 const time = new Date(todayAttendance.check_in_time).toLocaleTimeString('zh-TW', {timeZone:'Asia/Taipei', hour:'2-digit', minute:'2-digit'});
-                // 嘗試解析地點名稱
                 const locName = todayAttendance.check_in_location?.includes('(') ? todayAttendance.check_in_location.split('(')[0] : lastLoc;
                 showStatus(statusBox, 'info', `🏢 上班中 @ ${locName} (${time})`);
             }
@@ -543,7 +545,10 @@
                     document.getElementById('captureBtn').disabled = false;
                     document.getElementById('checkInStatus').textContent = '✅ 相機就緒';
                 };
-            } catch(e) { alert('相機失敗'); }
+            } catch(e) { 
+                alert('相機啟動失敗，請確認已允許權限');
+                document.getElementById('checkInStatus').textContent = '❌ 相機啟動失敗';
+            }
         }
 
         async function captureAndCheckIn() {
@@ -561,41 +566,44 @@
                 ctx.drawImage(video, 0, 0);
                 const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.7));
 
-                // 2. 上傳
+                // 2. 上傳 (修復版)
                 showStatus(statusBox, 'info', '☁️ 上傳中...');
-                const fileName = `${currentEmployee.employee_id}_${Date.now()}.jpg`;
-                await sb.storage.from(CONFIG.BUCKET).upload(fileName, blob);
-                const { data: { publicUrl } } = sb.storage.from(CONFIG.BUCKET).getPublicUrl(fileName);
+                const fileName = `${currentEmployee.employee_number}_${Date.now()}.jpg`; // 使用員編
+                const { error: uploadError } = await sb.storage.from(CONFIG.BUCKET).upload(fileName, blob);
+                if (uploadError) throw uploadError;
+
+                const { data } = sb.storage.from(CONFIG.BUCKET).getPublicUrl(fileName);
+                const publicUrl = data.publicUrl;
 
                 // 3. 定位
                 showStatus(statusBox, 'info', '📍 定位中...');
                 let loc = cachedLocation || await getGPS();
 
                 // 4. 打卡
-                const { data, error } = await sb.rpc('quick_check_in', {
+                const { data: rpcData, error: rpcError } = await sb.rpc('quick_check_in', {
                     p_line_user_id: liffProfile.userId,
                     p_latitude: loc.latitude, p_longitude: loc.longitude,
                     p_photo_url: publicUrl, p_device_id: navigator.userAgent
                 });
 
-                if (error) throw error;
-                if (!data.success) throw new Error(data.error);
+                if (rpcError) throw rpcError;
+                if (!rpcData.success) throw new Error(rpcData.error);
 
-                // ✅ 成功：儲存地點記憶
-                if (data.location_name) localStorage.setItem('last_location', data.location_name);
+                if (rpcData.location_name) localStorage.setItem('last_location', rpcData.location_name);
 
-                const typeText = data.type === 'check_in' ? '上班' : '下班';
-                showToast(`✅ ${typeText}成功！@${data.location_name || '公司'}`);
+                const typeText = rpcData.type === 'check_in' ? '上班' : '下班';
+                showToast(`✅ ${typeText}成功！@${rpcData.location_name || '公司'}`);
                 
                 setTimeout(() => { cancelCheckIn(); checkTodayAttendance(); }, 1500);
 
             } catch (err) {
+                console.error(err);
                 showStatus(statusBox, 'error', err.message);
                 btn.disabled = false; btn.textContent = '📸 重試';
             }
         }
 
-        // ================= 便當 & 請假 & 查詢 (簡化邏輯) =================
+        // ================= 便當 & 請假 & 查詢 =================
         async function loadLunchSummary() {
             const dateStr = getTaiwanDate(1); // 明天
             document.getElementById('lunchDate').value = dateStr;
@@ -654,7 +662,7 @@
             `).join('');
         }
 
-        // ================= ⭐ 設定頁面邏輯 (新增部分) =================
+        // ================= 設定頁面邏輯 (完整整合版) =================
         async function loadSettings() {
             try {
                 const { data, error } = await sb
@@ -686,7 +694,7 @@
                         <div style="font-weight:bold;">${loc.name}</div>
                         <div style="font-size:11px;color:#999;">範圍: ${loc.radius}m</div>
                     </div>
-                    <button onclick="deleteLocation(${index})" style="background:#ff4d4f;color:white;border:none;border-radius:5px;padding:5px 10px;cursor:pointer;">刪除</button>
+                    <button onclick="deleteLocation(${index})" class="btn-danger">刪除</button>
                 </div>
             `).join('');
         }
@@ -714,7 +722,6 @@
 
             // 加入陣列
             officeLocations.push({ name, lat, lng, radius });
-            
             await saveLocationsToDB();
             
             // 清空表單
@@ -738,6 +745,14 @@
 
                 if (error) throw error;
                 
+                // 檢查業務邏輯是否成功
+                if (!data.success) {
+                    showToast('❌ ' + data.error);
+                    // 如果失敗，重新載入舊設定以保持同步
+                    loadSettings();
+                    return;
+                }
+                
                 showToast('✅ 設定已更新');
                 renderLocationList();
             } catch (err) {
@@ -755,13 +770,12 @@
                 {timeout:10000}
             );
         }
-        function getGPS() { return new Promise((res, rej) => navigator.geolocation.getCurrentPosition(p=>res({latitude:p.coords.latitude, longitude:p.coords.longitude}), e=>rej(e))); }
+        function getGPS() { return new Promise((res, rej) => navigator.geolocation.getCurrentPosition(p=>res({latitude:p.coords.latitude, longitude:p.coords.longitude}), e=>rej(e), {enableHighAccuracy: true})); }
         
         function showPage(id) { 
             document.querySelectorAll('.page').forEach(p=>p.classList.remove('active')); 
             document.getElementById(id).classList.add('active'); 
             
-            // ⭐ 頁面載入觸發
             if(id==='lunchPage') loadLunchSummary(); 
             if(id==='attendancePage') loadAttendanceRecords(); 
             if(id==='settingsPage') loadSettings(); // 載入設定
