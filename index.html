@@ -243,7 +243,7 @@
                     <div class="icon">📅</div><div class="label">班表查詢</div>
                 </div>
                 <div class="menu-item" onclick="showPage('settingsPage')">
-                    <div class="icon">⚙️</div><div class="label">設定</div>
+                    <div class="icon">⚙️</div><div class="label">系統設定</div>
                 </div>
             </div>
         </div>
@@ -312,8 +312,54 @@
             </div>
         </div>
 
-        <div id="salaryPage" class="page"><div class="checkin-page"><h2>💰 薪資查詢</h2><p class="status-box show info">功能開發中...</p><button class="btn btn-secondary" onclick="showPage('homePage')">返回</button></div></div>
-        <div id="settingsPage" class="page"><div class="checkin-page"><h2>⚙️ 設定</h2><p class="status-box show info">功能開發中...</p><button class="btn btn-secondary" onclick="showPage('homePage')">返回</button></div></div>
+        <div id="salaryPage" class="page">
+            <div class="checkin-page">
+                <h2>💰 薪資查詢</h2>
+                <p class="status-box show info">功能開發中...</p>
+                <button class="btn btn-secondary" onclick="showPage('homePage')">返回</button>
+            </div>
+        </div>
+
+        <div id="settingsPage" class="page">
+            <button class="btn btn-secondary" onclick="showPage('homePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
+            <div class="checkin-page">
+                <h2>⚙️ 系統設定</h2>
+                
+                <div class="lunch-summary">
+                    <h3 style="margin-bottom:10px;">📍 目前打卡地點</h3>
+                    <div id="locationList">
+                        <p style="color:#666;text-align:center;">載入中...</p>
+                    </div>
+                </div>
+
+                <div class="binding-card" style="margin-top: 20px;">
+                    <h3 style="margin-bottom:15px;">➕ 新增地點</h3>
+                    <div class="form-group">
+                        <label>地點名稱</label>
+                        <input type="text" id="newLocName" placeholder="例如：台北分店">
+                    </div>
+                    <div class="form-group">
+                        <label>打卡半徑 (公尺)</label>
+                        <input type="number" id="newLocRadius" value="300">
+                    </div>
+                    <div class="form-group">
+                        <label>座標 (緯度, 經度)</label>
+                        <div style="display:flex; gap:10px;">
+                            <input type="text" id="newLocLat" placeholder="緯度" readonly>
+                            <input type="text" id="newLocLng" placeholder="經度" readonly>
+                        </div>
+                        <button class="btn btn-primary" onclick="getCurrentGPSForSetting()" style="margin-top:10px; font-size:14px; padding:10px;">
+                            📍 抓取目前位置
+                        </button>
+                    </div>
+                    <button class="btn btn-success" onclick="addNewLocation()">💾 儲存新地點</button>
+                </div>
+
+                <div class="form-group" style="margin-top:30px; text-align:center;">
+                    <p style="color:#999; font-size:12px;">系統版本 v5.1</p>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -335,6 +381,9 @@
         let cachedLocation = null;
         let currentBindMode = 'id_card';
         let todayAttendance = null;
+        
+        // ⭐ 新增全域變數：地點設定
+        let officeLocations = [];
 
         // ✅ 核心：取得台灣時間 YYYY-MM-DD
         function getTaiwanDate(offsetDays = 0) {
@@ -605,6 +654,98 @@
             `).join('');
         }
 
+        // ================= ⭐ 設定頁面邏輯 (新增部分) =================
+        async function loadSettings() {
+            try {
+                const { data, error } = await sb
+                    .from('system_settings')
+                    .select('value')
+                    .eq('key', 'office_locations')
+                    .single();
+                
+                if (error && error.code !== 'PGRST116') throw error; // 忽略找不到的錯誤，用預設值
+                
+                officeLocations = data?.value || [];
+                renderLocationList();
+            } catch (err) {
+                console.error('載入設定失敗:', err);
+                document.getElementById('locationList').innerHTML = '<p>載入失敗</p>';
+            }
+        }
+
+        function renderLocationList() {
+            const listEl = document.getElementById('locationList');
+            if (officeLocations.length === 0) {
+                listEl.innerHTML = '<p style="color:#666;text-align:center;">尚未設定地點</p>';
+                return;
+            }
+
+            listEl.innerHTML = officeLocations.map((loc, index) => `
+                <div class="stat-row" style="align-items:center;">
+                    <div style="text-align:left;">
+                        <div style="font-weight:bold;">${loc.name}</div>
+                        <div style="font-size:11px;color:#999;">範圍: ${loc.radius}m</div>
+                    </div>
+                    <button onclick="deleteLocation(${index})" style="background:#ff4d4f;color:white;border:none;border-radius:5px;padding:5px 10px;cursor:pointer;">刪除</button>
+                </div>
+            `).join('');
+        }
+
+        function getCurrentGPSForSetting() {
+            showToast('📍 定位中...');
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    document.getElementById('newLocLat').value = pos.coords.latitude;
+                    document.getElementById('newLocLng').value = pos.coords.longitude;
+                    showToast('✅ 已填入座標');
+                },
+                (err) => showToast('定位失敗: ' + err.message),
+                { enableHighAccuracy: true }
+            );
+        }
+
+        async function addNewLocation() {
+            const name = document.getElementById('newLocName').value.trim();
+            const radius = parseInt(document.getElementById('newLocRadius').value);
+            const lat = parseFloat(document.getElementById('newLocLat').value);
+            const lng = parseFloat(document.getElementById('newLocLng').value);
+
+            if (!name || !lat || !lng) return showToast('⚠️ 資料不完整');
+
+            // 加入陣列
+            officeLocations.push({ name, lat, lng, radius });
+            
+            await saveLocationsToDB();
+            
+            // 清空表單
+            document.getElementById('newLocName').value = '';
+            document.getElementById('newLocLat').value = '';
+            document.getElementById('newLocLng').value = '';
+        }
+
+        async function deleteLocation(index) {
+            if (!confirm('確定要刪除此地點嗎？')) return;
+            officeLocations.splice(index, 1);
+            await saveLocationsToDB();
+        }
+
+        async function saveLocationsToDB() {
+            try {
+                const { data, error } = await sb.rpc('update_office_locations', {
+                    p_locations: officeLocations,
+                    p_line_user_id: liffProfile.userId
+                });
+
+                if (error) throw error;
+                
+                showToast('✅ 設定已更新');
+                renderLocationList();
+            } catch (err) {
+                console.error(err);
+                showToast('❌ 儲存失敗');
+            }
+        }
+
         // ================= 工具 =================
         function preloadGPS() {
             const el = document.getElementById('locationStatus');
@@ -615,7 +756,17 @@
             );
         }
         function getGPS() { return new Promise((res, rej) => navigator.geolocation.getCurrentPosition(p=>res({latitude:p.coords.latitude, longitude:p.coords.longitude}), e=>rej(e))); }
-        function showPage(id) { document.querySelectorAll('.page').forEach(p=>p.classList.remove('active')); document.getElementById(id).classList.add('active'); if(id==='lunchPage') loadLunchSummary(); if(id==='attendancePage') loadAttendanceRecords(); }
+        
+        function showPage(id) { 
+            document.querySelectorAll('.page').forEach(p=>p.classList.remove('active')); 
+            document.getElementById(id).classList.add('active'); 
+            
+            // ⭐ 頁面載入觸發
+            if(id==='lunchPage') loadLunchSummary(); 
+            if(id==='attendancePage') loadAttendanceRecords(); 
+            if(id==='settingsPage') loadSettings(); // 載入設定
+        }
+
         function showStatus(el, type, msg) { el.className=`status-box show ${type}`; el.textContent=msg; }
         function showToast(msg) { const t=document.createElement('div'); t.className='toast'; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(), 3000); }
     </script>
