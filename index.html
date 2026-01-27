@@ -6,7 +6,6 @@
     <title>🏢 員工服務中心</title>
     <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://unpkg.com/vconsole@latest/dist/vconsole.min.js"></script>
     
     <style>
         /* ================= UI 樣式區 ================= */
@@ -189,7 +188,7 @@
                     <button class="tab-btn inactive" id="tabCode" onclick="switchBindMode('code')">驗證碼驗證</button>
                 </div>
                 <div class="form-group">
-                    <label>員工編號 (ID) *</label>
+                    <label>員工工號 (ID) *</label>
                     <input type="text" id="bindEmpId" placeholder="例如：EMP001" autocomplete="off">
                 </div>
                 <div id="modeIdCard" class="form-group">
@@ -363,7 +362,10 @@
                 </div>
 
                 <div class="form-group" style="margin-top:30px; text-align:center;">
-                    <p style="color:#999; font-size:12px;">系統版本 v8.0 (地點自動辨識版)</p>
+                    <p style="color:#999; font-size:12px;">
+                        系統版本 v9.3.1 (Production Ready)<br>
+                        <span style="font-size:10px;">最後更新：2026-01-27</span>
+                    </p>
                 </div>
             </div>
         </div>
@@ -379,7 +381,14 @@
         };
 
         const sb = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
-        const vConsole = new window.VConsole();
+        
+        // VConsole 條件載入
+        if(location.search.includes('debug=true')) {
+            const script = document.createElement('script');
+            script.src = 'https://unpkg.com/vconsole@latest/dist/vconsole.min.js';
+            script.onload = () => new window.VConsole();
+            document.head.appendChild(script);
+        }
         
         let liffProfile = null;
         let currentEmployee = null;
@@ -388,7 +397,8 @@
         let cachedLocation = null;
         let currentBindMode = 'id_card';
         let todayAttendance = null;
-        let officeLocations = []; // 儲存地點列表
+        let officeLocations = []; 
+        let isProcessing = false; // 防止連點鎖
 
         // 核心：取得台灣時間 YYYY-MM-DD
         function getTaiwanDate(offsetDays = 0) {
@@ -399,7 +409,7 @@
 
         // 計算距離公式 (Haversine)
         function calculateDistance(lat1, lon1, lat2, lon2) {
-            const R = 6371e3; // 地球半徑 (公尺)
+            const R = 6371e3; 
             const φ1 = lat1 * Math.PI/180;
             const φ2 = lat2 * Math.PI/180;
             const Δφ = (lat2-lat1) * Math.PI/180;
@@ -432,10 +442,9 @@
             document.getElementById('loadingPage').style.display = 'flex';
             
             try {
-                // 1. 讀取員工資料
                 const { data, error } = await sb.from('employees').select('*').eq('line_user_id', liffProfile.userId).single();
                 
-                // 2. ⭐ 同步讀取地點設定 (修復首頁不顯示地點的問題)
+                // ⭐ 同步讀取地點設定
                 await loadSettings();
 
                 document.getElementById('loadingPage').style.display = 'none';
@@ -444,7 +453,7 @@
                     currentEmployee = data;
                     updateUserInfo(data);
                     showPage('homePage');
-                    preloadGPS(); // 這裡會觸發地點比對
+                    preloadGPS(); 
                     await checkTodayAttendance();
                 } else {
                     showPage('bindPage');
@@ -468,22 +477,19 @@
             }
         }
 
-        // ================= 地點與 GPS 邏輯 (v8.0 升級版) =================
+        // ================= 地點與 GPS 邏輯 =================
         
-        // 載入地點設定
         async function loadSettings() {
             try {
                 const { data, error } = await sb.from('system_settings').select('value').eq('key', 'office_locations').single();
                 if (!error && data) {
                     officeLocations = data.value || [];
                     console.log('📍 已載入地點:', officeLocations);
-                    // 如果在設定頁面，刷新列表
                     if(document.getElementById('settingsPage').classList.contains('active')) renderLocationList();
                 }
             } catch (e) { console.error('載入地點失敗', e); }
         }
 
-        // 預先定位並比對地點 (支援最近地點判斷)
         function preloadGPS() {
             const el = document.getElementById('locationStatus');
             el.className = 'location-status loading';
@@ -493,7 +499,6 @@
                 p => { 
                     cachedLocation = { latitude: p.coords.latitude, longitude: p.coords.longitude };
                     
-                    // ⭐ 優化：找到最近的地點
                     let foundLocation = null;
                     let minDistance = Infinity;
                     
@@ -505,7 +510,6 @@
                             loc.lng
                         );
                         
-                        // 在範圍內且距離更近
                         if (dist <= loc.radius && dist < minDistance) {
                             minDistance = dist;
                             foundLocation = loc.name;
@@ -527,7 +531,6 @@
             );
         }
 
-        // 取得 GPS (Promise版)
         function getGPS() { 
             return new Promise((res, rej) => {
                 navigator.geolocation.getCurrentPosition(
@@ -538,9 +541,12 @@
             });
         }
 
-        // ================= 打卡邏輯 =================
+        // ================= 打卡邏輯 (v9.3.1 參數修正版) =================
         async function captureAndCheckIn() {
-            if (!currentEmployee) return showToast('❌ 請重新登入');
+            if (!currentEmployee) {
+                showToast('❌ 員工資料未載入，請重新登入');
+                return;
+            }
 
             const btn = document.getElementById('captureBtn');
             const statusBox = document.getElementById('checkInStatus');
@@ -562,8 +568,11 @@
                 const { error: uploadError } = await sb.storage.from(CONFIG.BUCKET).upload(fileName, blob);
                 if (uploadError) throw uploadError;
 
+                // ✅ 修正：使用更安全的取值方式
                 const { data: urlData } = sb.storage.from(CONFIG.BUCKET).getPublicUrl(fileName);
-                const publicUrl = urlData.publicUrl;
+                const publicUrl = urlData?.publicUrl || urlData?.publicURL;
+
+                if (!publicUrl) throw new Error('無法取得照片網址');
 
                 // 3. 定位
                 showStatus(statusBox, 'info', '📍 定位中...');
@@ -589,11 +598,13 @@
             } catch (err) {
                 console.error(err);
                 showStatus(statusBox, 'error', `❌ 失敗: ${err.message}`);
-                btn.disabled = false; btn.textContent = '📸 重試';
+                // ✅ 修正：發生錯誤時重置按鈕
+                btn.disabled = false; 
+                btn.textContent = '📸 重試';
             }
         }
 
-        // ================= 其他功能 (綁定、查詢、設定) =================
+        // ================= 其他功能 =================
         function switchBindMode(mode) {
             currentBindMode = mode;
             document.getElementById('modeIdCard').classList.toggle('hidden', mode !== 'id_card');
@@ -612,7 +623,8 @@
 
             const params = {
                 p_line_user_id: liffProfile.userId,
-                p_employee_id: empId,
+                // ✅ 最終修正：與後端 bind_employee 參數一致
+                p_employee_number: empId, 
                 p_device_info: navigator.userAgent,
                 p_id_card_last_4: document.getElementById('modeIdCard').classList.contains('hidden') ? null : idLast4,
                 p_verification_code: document.getElementById('modeCode').classList.contains('hidden') ? null : code
@@ -683,11 +695,19 @@
 
         function startCheckIn() { 
             if (document.getElementById('checkInBtn').classList.contains('disabled')) return;
-            currentCheckInType='in'; showCheckInPage('📍 上班打卡'); 
+            if (isProcessing) return;
+            isProcessing = true;
+            currentCheckInType='in'; 
+            showCheckInPage('📍 上班打卡'); 
+            setTimeout(() => isProcessing = false, 1000);
         }
         function startCheckOut() { 
             if (document.getElementById('checkOutBtn').classList.contains('disabled')) return;
-            currentCheckInType='out'; showCheckInPage('👋 下班打卡'); 
+            if (isProcessing) return;
+            isProcessing = true;
+            currentCheckInType='out'; 
+            showCheckInPage('👋 下班打卡'); 
+            setTimeout(() => isProcessing = false, 1000);
         }
         function showCheckInPage(title) { document.getElementById('checkInTitle').textContent=title; showPage('checkInPage'); openCamera(); }
         function cancelCheckIn() { if(videoStream) videoStream.getTracks().forEach(t=>t.stop()); showPage('homePage'); }
@@ -706,7 +726,13 @@
                 };
             } catch(e) { 
                 console.error('相機錯誤', e);
-                document.getElementById('checkInStatus').textContent = '❌ 無法啟動相機';
+                let msg = '無法啟動相機';
+                if(e.name === 'NotAllowedError') msg = '請允許相機權限';
+                if(e.name === 'NotFoundError') msg = '找不到相機裝置';
+                
+                const status = document.getElementById('checkInStatus');
+                status.className = 'status-box show error';
+                status.innerHTML = `❌ ${msg}`;
             }
         }
 
@@ -737,7 +763,7 @@
                     showToast('✅ 已填入座標');
                 },
                 (err) => showToast('定位失敗: ' + err.message),
-                { enableHighAccuracy: true }
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
             );
         }
 
@@ -777,8 +803,7 @@
                 officeLocations = newLocations;
                 showToast('✅ 設定已更新');
                 renderLocationList();
-                // 重新觸發首頁定位比對，確保即時更新
-                preloadGPS();
+                preloadGPS(); 
             } catch (err) {
                 console.error(err);
                 showToast('❌ 儲存失敗');
@@ -859,7 +884,7 @@
             if(id==='lunchPage') loadLunchSummary(); 
             if(id==='attendancePage') loadAttendanceRecords(); 
             if(id==='settingsPage') renderLocationList();
-            if(id==='homePage') preloadGPS(); // 回首頁時重新定位
+            if(id==='homePage') preloadGPS();
         }
 
         function showStatus(el, type, msg) { el.className=`status-box show ${type}`; el.innerHTML=msg; }
