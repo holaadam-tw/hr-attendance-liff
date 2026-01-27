@@ -418,7 +418,7 @@
 
                 <div class="form-group" style="margin-top:30px; text-align:center;">
                     <p style="color:#999; font-size:12px;">
-                        系統版本 v9.4 (進階查詢版)<br>
+                        系統版本 v9.4.1 (修復版)<br>
                         <span style="font-size:10px;">最後更新：2026-01-27</span>
                     </p>
                 </div>
@@ -477,6 +477,27 @@
             return R * c;
         }
 
+        // ================= 頁面路由 =================
+        function showPage(id) {
+            document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            
+            if(id==='attendancePage') {
+                const now = new Date();
+                document.getElementById('attendanceYear').value = now.getFullYear();
+                document.getElementById('attendanceMonth').value = now.getMonth() + 1;
+                loadMonthlyAttendance();
+            }
+            if(id==='leavePage') loadLeaveHistory();
+            if(id==='salaryPage') {
+                document.getElementById('salaryYear').value = new Date().getFullYear();
+                loadAnnualSummary();
+            }
+            if(id==='lunchPage') loadLunchSummary();
+            if(id==='settingsPage') renderLocationList();
+            if(id==='homePage') preloadGPS();
+        }
+
         window.addEventListener('load', async () => {
             try {
                 console.log('🚀 系統初始化...');
@@ -531,7 +552,6 @@
         }
 
         // ================= 地點與 GPS 邏輯 =================
-        
         async function loadSettings() {
             try {
                 const { data, error } = await sb.from('system_settings').select('value').eq('key', 'office_locations').single();
@@ -1010,28 +1030,6 @@
                 msg.textContent = data.message;
             } catch (err) { console.error(err); }
         }
-
-        // 頁面路由與載入觸發
-        const originalShowPage = showPage;
-        showPage = function(id) {
-            document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-            document.getElementById(id).classList.add('active');
-            
-            if(id==='attendancePage') {
-                const now = new Date();
-                document.getElementById('attendanceYear').value = now.getFullYear();
-                document.getElementById('attendanceMonth').value = now.getMonth() + 1;
-                loadMonthlyAttendance();
-            }
-            if(id==='leavePage') loadLeaveHistory();
-            if(id==='salaryPage') {
-                document.getElementById('salaryYear').value = new Date().getFullYear();
-                loadAnnualSummary();
-            }
-            if(id==='lunchPage') loadLunchSummary();
-            if(id==='settingsPage') renderLocationList();
-            if(id==='homePage') preloadGPS();
-        };
 
         function showStatus(el, type, msg) { el.className=`status-box show ${type}`; el.innerHTML=msg; }
         function showToast(msg) { const t=document.createElement('div'); t.className='toast'; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(), 3000); }
