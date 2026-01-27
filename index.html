@@ -307,6 +307,13 @@
                 <div class="form-group"><label>原因</label><textarea id="leaveReason"></textarea></div>
                 <button class="btn btn-primary" onclick="submitLeave()">📤 提交申請</button>
                 <div id="leaveStatus" class="status-box"></div>
+                
+                <div style="margin-top:30px; padding-top:20px; border-top:2px dashed #e5e7eb;">
+                    <h3 style="margin-bottom:15px;">📋 我的請假記錄</h3>
+                    <div id="leaveHistoryList">
+                        <p style="text-align:center;color:#666;">載入中...</p>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -314,15 +321,63 @@
             <button class="btn btn-secondary" onclick="showPage('homePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
             <div class="checkin-page">
                 <h2>📊 考勤記錄</h2>
+                <div class="form-group">
+                    <label>查詢月份</label>
+                    <div style="display:flex; gap:10px;">
+                        <select id="attendanceYear" onchange="loadMonthlyAttendance()" style="flex:1;">
+                            <option value="2026">2026</option>
+                            <option value="2025">2025</option>
+                        </select>
+                        <select id="attendanceMonth" onchange="loadMonthlyAttendance()" style="flex:1;">
+                            <option value="1">1月</option>
+                            <option value="2">2月</option>
+                            <option value="3">3月</option>
+                            <option value="4">4月</option>
+                            <option value="5">5月</option>
+                            <option value="6">6月</option>
+                            <option value="7">7月</option>
+                            <option value="8">8月</option>
+                            <option value="9">9月</option>
+                            <option value="10">10月</option>
+                            <option value="11">11月</option>
+                            <option value="12">12月</option>
+                        </select>
+                    </div>
+                </div>
                 <div id="attendanceList" style="margin-top:15px;"></div>
             </div>
         </div>
 
         <div id="salaryPage" class="page">
+            <button class="btn btn-secondary" onclick="showPage('homePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
             <div class="checkin-page">
                 <h2>💰 薪資查詢</h2>
-                <p class="status-box show info">功能開發中...</p>
-                <button class="btn btn-secondary" onclick="showPage('homePage')">返回</button>
+                <div class="form-group">
+                    <label>查詢年度</label>
+                    <select id="salaryYear" onchange="loadAnnualSummary()">
+                        <option value="2026">2026</option>
+                        <option value="2025">2025</option>
+                    </select>
+                </div>
+                
+                <div class="lunch-summary" id="bonusCard" style="display:none;">
+                    <h3 style="margin-bottom:15px;">🎁 年終獎金資格</h3>
+                    <div class="stat-row"><span>到職日期</span><span id="bonusHireDate">-</span></div>
+                    <div class="stat-row"><span>實際工作月數</span><span id="bonusMonths">-</span></div>
+                    <div class="stat-row"><span>總出勤天數</span><span id="bonusDays">-</span></div>
+                    <div class="stat-row"><span>遲到次數</span><span id="bonusLate">-</span></div>
+                    <div class="stat-row"><span>累計工時</span><span id="bonusHours">-</span></div>
+                    <div class="stat-row"><span>平均每日工時</span><span id="bonusAvgHours">-</span></div>
+                    <div class="stat-row" style="border-top:2px solid #d1fae5; margin-top:10px; padding-top:10px; font-weight:bold;">
+                        <span>年終發放比例</span>
+                        <span id="bonusRatio" style="color:#059669; font-size:18px;">-</span>
+                    </div>
+                </div>
+                <div id="bonusMessage" class="status-box" style="display:none;"></div>
+                <div style="margin-top:20px;">
+                    <h3>📄 薪資單查詢</h3>
+                    <p class="status-box show info">功能開發中...</p>
+                </div>
             </div>
         </div>
 
@@ -363,7 +418,7 @@
 
                 <div class="form-group" style="margin-top:30px; text-align:center;">
                     <p style="color:#999; font-size:12px;">
-                        系統版本 v9.3.1 (Production Ready)<br>
+                        系統版本 v9.4 (進階查詢版)<br>
                         <span style="font-size:10px;">最後更新：2026-01-27</span>
                     </p>
                 </div>
@@ -382,7 +437,6 @@
 
         const sb = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
         
-        // VConsole 條件載入
         if(location.search.includes('debug=true')) {
             const script = document.createElement('script');
             script.src = 'https://unpkg.com/vconsole@latest/dist/vconsole.min.js';
@@ -398,7 +452,7 @@
         let currentBindMode = 'id_card';
         let todayAttendance = null;
         let officeLocations = []; 
-        let isProcessing = false; // 防止連點鎖
+        let isProcessing = false;
 
         // 核心：取得台灣時間 YYYY-MM-DD
         function getTaiwanDate(offsetDays = 0) {
@@ -444,7 +498,6 @@
             try {
                 const { data, error } = await sb.from('employees').select('*').eq('line_user_id', liffProfile.userId).single();
                 
-                // ⭐ 同步讀取地點設定
                 await loadSettings();
 
                 document.getElementById('loadingPage').style.display = 'none';
@@ -484,7 +537,6 @@
                 const { data, error } = await sb.from('system_settings').select('value').eq('key', 'office_locations').single();
                 if (!error && data) {
                     officeLocations = data.value || [];
-                    console.log('📍 已載入地點:', officeLocations);
                     if(document.getElementById('settingsPage').classList.contains('active')) renderLocationList();
                 }
             } catch (e) { console.error('載入地點失敗', e); }
@@ -541,7 +593,7 @@
             });
         }
 
-        // ================= 打卡邏輯 (v9.3.1 參數修正版) =================
+        // ================= 打卡邏輯 =================
         async function captureAndCheckIn() {
             if (!currentEmployee) {
                 showToast('❌ 員工資料未載入，請重新登入');
@@ -553,7 +605,6 @@
             btn.disabled = true; btn.textContent = '處理中...';
             
             try {
-                // 1. 拍照
                 const video = document.getElementById('video');
                 const canvas = document.getElementById('canvas');
                 canvas.width = video.videoWidth; canvas.height = video.videoHeight;
@@ -562,23 +613,19 @@
                 ctx.drawImage(video, 0, 0);
                 const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.7));
 
-                // 2. 上傳
                 showStatus(statusBox, 'info', '☁️ 上傳中...');
                 const fileName = `${currentEmployee.employee_number}_${Date.now()}.jpg`; 
                 const { error: uploadError } = await sb.storage.from(CONFIG.BUCKET).upload(fileName, blob);
                 if (uploadError) throw uploadError;
 
-                // ✅ 修正：使用更安全的取值方式
                 const { data: urlData } = sb.storage.from(CONFIG.BUCKET).getPublicUrl(fileName);
                 const publicUrl = urlData?.publicUrl || urlData?.publicURL;
 
                 if (!publicUrl) throw new Error('無法取得照片網址');
 
-                // 3. 定位
                 showStatus(statusBox, 'info', '📍 定位中...');
                 let loc = cachedLocation || await getGPS();
 
-                // 4. 打卡
                 const { data: rpcData, error: rpcError } = await sb.rpc('quick_check_in', {
                     p_line_user_id: liffProfile.userId,
                     p_latitude: loc.latitude, p_longitude: loc.longitude,
@@ -598,9 +645,7 @@
             } catch (err) {
                 console.error(err);
                 showStatus(statusBox, 'error', `❌ 失敗: ${err.message}`);
-                // ✅ 修正：發生錯誤時重置按鈕
-                btn.disabled = false; 
-                btn.textContent = '📸 重試';
+                btn.disabled = false; btn.textContent = '📸 重試';
             }
         }
 
@@ -623,7 +668,6 @@
 
             const params = {
                 p_line_user_id: liffProfile.userId,
-                // ✅ 最終修正：與後端 bind_employee 參數一致
                 p_employee_number: empId, 
                 p_device_info: navigator.userAgent,
                 p_id_card_last_4: document.getElementById('modeIdCard').classList.contains('hidden') ? null : idLast4,
@@ -661,7 +705,6 @@
                     } else {
                         console.error('❌ 檢查考勤錯誤:', error);
                         todayAttendance = null;
-                        showToast('⚠️ 無法查詢打卡狀態');
                     }
                 } else {
                     todayAttendance = data;
@@ -729,7 +772,6 @@
                 let msg = '無法啟動相機';
                 if(e.name === 'NotAllowedError') msg = '請允許相機權限';
                 if(e.name === 'NotFoundError') msg = '找不到相機裝置';
-                
                 const status = document.getElementById('checkInStatus');
                 status.className = 'status-box show error';
                 status.innerHTML = `❌ ${msg}`;
@@ -775,7 +817,6 @@
 
             if (!name || !lat || !lng) return showToast('⚠️ 資料不完整');
 
-            // ✅ 先不改本地陣列，直接嘗試儲存
             const newLocations = [...officeLocations, { name, lat, lng, radius }];
             await saveLocationsToDB(newLocations);
             
@@ -810,25 +851,26 @@
             }
         }
 
-        // ================= 補齊的輔助功能 =================
+        // ================= 進階查詢與輔助功能 (完整補齊) =================
         async function loadLunchSummary() {
             const dateStr = getTaiwanDate(1);
             document.getElementById('lunchDate').value = dateStr;
-            const { data } = await sb.rpc('get_lunch_summary', { p_date: dateStr });
-            if(data) {
-                document.getElementById('totalOrders').textContent = data.total_orders;
-                document.getElementById('vegCount').textContent = data.vegetarian_count;
-                document.getElementById('regularCount').textContent = data.regular_count;
-                if(data.is_lunar_vegetarian_day) {
-                    document.getElementById('lunarNotice').classList.add('show');
-                    document.getElementById('lunchVegetarian').checked = true;
+            try {
+                const { data } = await sb.rpc('get_lunch_summary', { p_date: dateStr });
+                if(data) {
+                    document.getElementById('totalOrders').textContent = data.total_orders || 0;
+                    document.getElementById('vegCount').textContent = data.vegetarian_count || 0;
+                    document.getElementById('regularCount').textContent = data.regular_count || 0;
+                    if(data.is_lunar_vegetarian_day) {
+                        document.getElementById('lunarNotice').classList.add('show');
+                        document.getElementById('lunchVegetarian').checked = true;
+                    }
                 }
-            }
+            } catch(e) { console.error('便當統計失敗', e); }
         }
 
         async function submitLunchOrder() {
             if (!currentEmployee) return showToast('❌ 請先登入');
-            
             const date = document.getElementById('lunchDate').value;
             const isVeg = document.getElementById('lunchVegetarian').checked;
             const notes = document.getElementById('lunchNotes').value;
@@ -848,44 +890,148 @@
             const start = document.getElementById('leaveStartDate').value;
             const end = document.getElementById('leaveEndDate').value;
             const reason = document.getElementById('leaveReason').value;
-            
             if(!start || !end || !reason) return showToast('請填寫完整');
             
             try {
                 const { error } = await sb.from('leave_requests').insert({
-                    employee_id: currentEmployee.id, leave_type: type, start_date: start, end_date: end, reason: reason
+                    employee_id: currentEmployee.id, leave_type: type, start_date: start, end_date: end, reason: reason, status: 'pending'
                 });
                 if(error) throw error;
-                showToast('✅ 申請成功'); setTimeout(() => showPage('homePage'), 1500);
+                showToast('✅ 申請成功'); 
+                loadLeaveHistory(); // 刷新歷史
+                document.getElementById('leaveStatus').className = 'status-box show success';
+                document.getElementById('leaveStatus').textContent = '✅ 申請已提交';
             } catch(e) { showToast('失敗:'+e.message); }
         }
 
-        async function loadAttendanceRecords() {
+        // 月度出勤查詢
+        async function loadMonthlyAttendance() {
             const list = document.getElementById('attendanceList');
-            if (!currentEmployee) {
-                list.innerHTML = '<p style="text-align:center;padding:20px;color:#666">請先登入</p>';
-                return;
-            }
-            const { data } = await sb.from('attendance').select('*').eq('employee_id', currentEmployee.id).order('date', {ascending:false}).limit(10);
-            if(!data || !data.length) { list.innerHTML = '<p style="text-align:center;padding:20px;color:#666">無記錄</p>'; return; }
+            const year = parseInt(document.getElementById('attendanceYear').value);
+            const month = parseInt(document.getElementById('attendanceMonth').value);
             
-            list.innerHTML = data.map(r => {
-                const checkIn = r.check_in_time ? new Date(r.check_in_time).toLocaleTimeString('zh-TW', {timeZone:'Asia/Taipei', hour:'2-digit', minute:'2-digit'}) : '-';
-                const checkOut = r.check_out_time ? new Date(r.check_out_time).toLocaleTimeString('zh-TW', {timeZone:'Asia/Taipei', hour:'2-digit', minute:'2-digit'}) : '-';
-                const badge = r.is_late ? '<span class="badge badge-warning">遲到</span>' : '<span class="badge badge-success">正常</span>';
-                return `<div class="attendance-item ${r.is_late?'late':'normal'}"><div class="date">${r.date} ${badge}</div><div class="details"><span>上班: ${checkIn}</span><span>下班: ${checkOut}</span></div></div>`;
-            }).join('');
+            if (!currentEmployee) return;
+            list.innerHTML = '<p style="text-align:center;">查詢中...</p>';
+            
+            try {
+                const { data, error } = await sb.rpc('get_monthly_attendance', {
+                    p_line_user_id: liffProfile.userId,
+                    p_year: year,
+                    p_month: month
+                });
+                
+                if (error) throw error;
+                if (!data || data.length === 0) {
+                    list.innerHTML = `<p style="text-align:center;">${year}年${month}月 無記錄</p>`;
+                    return;
+                }
+                
+                // 簡易統計
+                const totalDays = data.length;
+                const lateDays = data.filter(r => r.is_late).length;
+                const totalHours = data.reduce((sum, r) => sum + (parseFloat(r.total_work_hours) || 0), 0);
+                
+                let html = `
+                    <div class="lunch-summary" style="margin-bottom:15px;">
+                        <div class="stat-row"><span>出勤</span><span>${totalDays}天</span></div>
+                        <div class="stat-row"><span>遲到</span><span>${lateDays}次</span></div>
+                        <div class="stat-row"><span>工時</span><span>${totalHours.toFixed(1)}h</span></div>
+                    </div>
+                `;
+                
+                html += data.map(r => {
+                    const badge = r.is_late ? '<span class="badge badge-warning">遲到</span>' : '<span class="badge badge-success">正常</span>';
+                    const hours = r.total_work_hours ? `${parseFloat(r.total_work_hours).toFixed(1)}h` : '-';
+                    return `
+                        <div class="attendance-item ${r.is_late ? 'late' : 'normal'}">
+                            <div class="date">${r.date} ${badge} <span style="font-size:12px;">${hours}</span></div>
+                            <div class="details">
+                                <span>上班: ${r.check_in_time ? r.check_in_time.split(' ')[1].substr(0,5) : '-'}</span>
+                                <span>下班: ${r.check_out_time ? r.check_out_time.split(' ')[1].substr(0,5) : '-'}</span>
+                            </div>
+                            ${r.photo_url ? `<div style="margin-top:5px;"><a href="${r.photo_url}" target="_blank" style="font-size:12px;">📷 照片</a></div>` : ''}
+                        </div>
+                    `;
+                }).join('');
+                list.innerHTML = html;
+            } catch (err) { console.error(err); list.innerHTML = '查詢失敗'; }
         }
 
-        function showPage(id) { 
-            document.querySelectorAll('.page').forEach(p=>p.classList.remove('active')); 
-            document.getElementById(id).classList.add('active'); 
+        // 請假歷史
+        async function loadLeaveHistory() {
+            const list = document.getElementById('leaveHistoryList');
+            if (!currentEmployee) return;
+            try {
+                const { data } = await sb.rpc('get_leave_history', { p_line_user_id: liffProfile.userId, p_limit: 5 });
+                if (!data || data.length === 0) { list.innerHTML = '<p style="text-align:center;">尚無記錄</p>'; return; }
+                
+                const typeMap = { 'annual': '特休', 'sick': '病假', 'personal': '事假', 'compensatory': '補休' };
+                const statusMap = { 'pending': '⏳', 'approved': '✅', 'rejected': '❌' };
+                
+                list.innerHTML = data.map(r => `
+                    <div class="attendance-item">
+                        <div class="date">${typeMap[r.leave_type]} ${statusMap[r.status]}</div>
+                        <div class="details">
+                            <div>${r.start_date} ~ ${r.end_date}</div>
+                            <div style="color:#999;">${r.reason}</div>
+                        </div>
+                    </div>
+                `).join('');
+            } catch(e) { console.error(e); }
+        }
+
+        // 年終統計
+        async function loadAnnualSummary() {
+            const year = parseInt(document.getElementById('salaryYear').value);
+            const card = document.getElementById('bonusCard');
+            const msg = document.getElementById('bonusMessage');
+            if (!currentEmployee) return;
+
+            card.style.display = 'block';
+            msg.style.display = 'none';
             
-            if(id==='lunchPage') loadLunchSummary(); 
-            if(id==='attendancePage') loadAttendanceRecords(); 
+            try {
+                const { data, error } = await sb.rpc('get_annual_summary', { p_line_user_id: liffProfile.userId, p_year: year });
+                if (error) throw error;
+                
+                document.getElementById('bonusHireDate').textContent = data.hire_date || '-';
+                document.getElementById('bonusMonths').textContent = data.months_worked;
+                document.getElementById('bonusDays').textContent = data.total_attendance_days;
+                document.getElementById('bonusLate').textContent = data.late_count;
+                document.getElementById('bonusHours').textContent = data.total_work_hours;
+                document.getElementById('bonusAvgHours').textContent = data.avg_work_hours_per_day;
+                
+                const ratioEl = document.getElementById('bonusRatio');
+                ratioEl.textContent = data.bonus_eligible ? `${data.bonus_ratio} 個月` : '不符合';
+                ratioEl.style.color = data.bonus_eligible ? '#059669' : '#dc2626';
+                
+                msg.style.display = 'block';
+                msg.className = data.bonus_eligible ? 'status-box show success' : 'status-box show error';
+                msg.textContent = data.message;
+            } catch (err) { console.error(err); }
+        }
+
+        // 頁面路由與載入觸發
+        const originalShowPage = showPage;
+        showPage = function(id) {
+            document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            
+            if(id==='attendancePage') {
+                const now = new Date();
+                document.getElementById('attendanceYear').value = now.getFullYear();
+                document.getElementById('attendanceMonth').value = now.getMonth() + 1;
+                loadMonthlyAttendance();
+            }
+            if(id==='leavePage') loadLeaveHistory();
+            if(id==='salaryPage') {
+                document.getElementById('salaryYear').value = new Date().getFullYear();
+                loadAnnualSummary();
+            }
+            if(id==='lunchPage') loadLunchSummary();
             if(id==='settingsPage') renderLocationList();
             if(id==='homePage') preloadGPS();
-        }
+        };
 
         function showStatus(el, type, msg) { el.className=`status-box show ${type}`; el.innerHTML=msg; }
         function showToast(msg) { const t=document.createElement('div'); t.className='toast'; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(), 3000); }
