@@ -49,10 +49,18 @@
 
             <div id="todayStatus" class="status-box info" style="display:none;"></div>
 
-            <a href="checkin.html" class="btn btn-primary" style="padding:25px; margin-bottom:25px; display:flex; align-items:center; justify-content:center; gap:10px;">
-                <span style="font-size:32px;">📸</span>
-                <span style="font-size:20px;">打卡作業</span>
-            </a>
+            <div class="primary-actions">
+                <div class="primary-btn checkin" id="checkInBtn" onclick="startCheckIn()">
+                    <span class="badge-corner">AM</span>
+                    <div class="icon">☀️</div>
+                    <div class="label">上班打卡</div>
+                </div>
+                <div class="primary-btn checkout" id="checkOutBtn" onclick="startCheckOut()">
+                    <span class="badge-corner">PM</span>
+                    <div class="icon">🌙</div>
+                    <div class="label">下班打卡</div>
+                </div>
+            </div>
 
             <div class="menu-grid">
                 <a href="records.html#leave" class="menu-item">
@@ -80,7 +88,6 @@
     <script src="common.js"></script>
     <script>
         window.onload = () => initApp(async () => {
-            // 1. 處理公司代碼
             const urlParams = new URLSearchParams(window.location.search);
             const code = urlParams.get('company');
             if (code) {
@@ -91,16 +98,13 @@
                 }
             }
 
-            // 2. 檢查綁定狀態
             const { data, error } = await sb.rpc('check_user_status', { p_line_user_id: liffProfile.userId });
             document.getElementById('loading').style.display = 'none';
 
             if (data && data.bound) {
-                // 已綁定
                 document.getElementById('menuSection').classList.remove('hidden');
                 document.getElementById('userName').textContent = data.employee_name;
                 document.getElementById('userCompany').textContent = data.company_name;
-                // 這裡暫時無法取得 employee_number，可以透過另一個 RPC 補足
                 
                 if (liffProfile.pictureUrl) {
                     const avatar = document.getElementById('userAvatar');
@@ -108,17 +112,13 @@
                     avatar.textContent = '';
                 }
 
-                // 預先定位
                 navigator.geolocation.getCurrentPosition(
                     p => document.getElementById('gpsStatus').innerHTML = '✅ GPS 定位完成',
                     e => document.getElementById('gpsStatus').innerHTML = '❌ 無法取得 GPS'
                 );
 
-                // 檢查今日打卡
                 checkTodayStatus();
-
             } else {
-                // 未綁定
                 document.getElementById('bindSection').classList.remove('hidden');
                 const name = sessionStorage.getItem('company_name') || '預設公司';
                 document.getElementById('companyBanner').innerHTML = `🏢 您正在綁定：<b>${name}</b>`;
@@ -131,7 +131,6 @@
             const code = sessionStorage.getItem('target_company') || 'DEFAULT';
 
             if (!empId || !idCard) return showToast('請填寫完整資訊');
-
             showStatus('bindStatus', 'info', '驗證中...');
             
             const { data, error } = await sb.rpc('bind_employee_secure', {
@@ -153,20 +152,41 @@
         async function checkTodayStatus() {
             const { data } = await sb.rpc('get_today_attendance', { p_line_user_id: liffProfile.userId });
             const box = document.getElementById('todayStatus');
-            
+            const btnIn = document.getElementById('checkInBtn');
+            const btnOut = document.getElementById('checkOutBtn');
+
             if (data && data.success && data.has_record) {
-                box.style.display = 'block';
                 if (data.check_out_time) {
+                    box.style.display = 'block';
                     box.className = 'status-box success';
                     box.innerHTML = `✅ 今日完工 (工時 ${data.total_work_hours}h)`;
+                    btnIn.classList.add('disabled');
+                    btnOut.classList.add('disabled');
                 } else {
+                    box.style.display = 'block';
                     box.className = 'status-box info';
                     box.innerHTML = `🏢 上班中 (${data.check_in_time})`;
+                    btnIn.classList.add('disabled');
+                    btnOut.classList.remove('disabled');
                 }
             } else {
                 box.style.display = 'block';
                 box.innerHTML = '📍 今日尚未打卡';
+                btnIn.classList.remove('disabled');
+                btnOut.classList.add('disabled');
             }
+        }
+
+        function startCheckIn() {
+            if(document.getElementById('checkInBtn').classList.contains('disabled')) return;
+            sessionStorage.setItem('checkin_type', 'in');
+            window.location.href = 'checkin.html';
+        }
+
+        function startCheckOut() {
+            if(document.getElementById('checkOutBtn').classList.contains('disabled')) return;
+            sessionStorage.setItem('checkin_type', 'out');
+            window.location.href = 'checkin.html';
         }
     </script>
 </body>
