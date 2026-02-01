@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>員工服務中心</title>
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="loading" class="loading-screen">載入中...</div>
+
+    <div class="container">
+        <div id="bindSection" class="hidden">
+            <div class="card">
+                <div id="companyBanner"></div>
+                <h2 style="text-align:center;">🔐 員工綁定</h2>
+                <div class="form-group"><label>工號</label><input type="text" id="bindEmpId"></div>
+                <div class="form-group"><label>身分證後4碼</label><input type="tel" id="bindIdCard" maxlength="4"></div>
+                <button class="btn btn-primary" onclick="handleBind()">立即綁定</button>
+                <div id="bindStatus" class="status-box"></div>
+            </div>
+        </div>
+
+        <div id="menuSection" class="hidden">
+            <div class="user-card">
+                <div style="display:flex;align-items:center;gap:15px;">
+                    <div class="avatar" id="userAvatar">👤</div>
+                    <div>
+                        <h2 id="userName">...</h2>
+                        <p id="userCompany" style="font-size:12px;color:#667eea;"></p>
+                    </div>
+                </div>
+            </div>
+
+            <a href="checkin.html" class="btn btn-primary" style="display:block;text-align:center;margin-bottom:20px;">
+                <div style="font-size:30px;">📸</div> 打卡作業
+            </a>
+
+            <div class="menu-grid">
+                <a href="records.html#leave" class="menu-item"><div class="icon">📝</div><div class="label">我要請假</div></a>
+                <a href="records.html#attendance" class="menu-item"><div class="icon">📊</div><div class="label">考勤查詢</div></a>
+                <a href="services.html#lunch" class="menu-item"><div class="icon">🍱</div><div class="label">便當訂購</div></a>
+                <a href="records.html#salary" class="menu-item"><div class="icon">💰</div><div class="label">薪資查詢</div></a>
+                <a href="services.html#settings" class="menu-item"><div class="icon">⚙️</div><div class="label">系統設定</div></a>
+            </div>
+        </div>
+    </div>
+
+    <script src="common.js"></script>
+    <script>
+        window.onload = () => initApp(async () => {
+            // 處理綁定邏輯
+            const urlParams = new URLSearchParams(window.location.search);
+            const code = urlParams.get('company');
+            if (code) {
+                const { data } = await sb.rpc('get_company_info', { p_company_code: code });
+                if (data && data.success) {
+                    sessionStorage.setItem('target_company', data.code);
+                    sessionStorage.setItem('company_name', data.name);
+                }
+            }
+
+            // 檢查是否已綁定
+            const { data, error } = await sb.rpc('check_user_status', { p_line_user_id: liffProfile.userId });
+            document.getElementById('loading').style.display = 'none';
+
+            if (data && data.bound) {
+                // 已綁定 -> 顯示選單
+                document.getElementById('menuSection').classList.remove('hidden');
+                document.getElementById('userName').textContent = data.employee_name;
+                document.getElementById('userCompany').textContent = data.company_name;
+                if(liffProfile.pictureUrl) document.getElementById('userAvatar').style.backgroundImage = `url(${liffProfile.pictureUrl})`;
+            } else {
+                // 未綁定 -> 顯示綁定頁
+                document.getElementById('bindSection').classList.remove('hidden');
+                const name = sessionStorage.getItem('company_name') || '預設公司';
+                document.getElementById('companyBanner').innerHTML = `<div style="text-align:center;padding:10px;background:#e0f2fe;border-radius:8px;">🏢 ${name}</div>`;
+            }
+        });
+
+        async function handleBind() {
+            const empId = document.getElementById('bindEmpId').value;
+            const idCard = document.getElementById('bindIdCard').value;
+            const code = sessionStorage.getItem('target_company') || 'DEFAULT';
+            
+            const { data, error } = await sb.rpc('bind_employee_secure', {
+                p_company_code: code, p_employee_number: empId, p_id_card_last_4: idCard,
+                p_line_user_id: liffProfile.userId, p_device_info: navigator.userAgent
+            });
+
+            if (error || !data.success) showStatus('bindStatus', 'error', data?.error || '綁定失敗');
+            else {
+                alert('✅ 綁定成功');
+                location.reload();
+            }
+        }
+    </script>
+</body>
+</html>
