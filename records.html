@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>紀錄查詢</title>
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="style.css">
+    <style>.tab-content { display: none; } .tab-content.active { display: block; }</style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="btn btn-secondary" style="margin-bottom:15px;">← 返回首頁</a>
+        
+        <div style="display:flex; gap:5px; margin-bottom:20px;">
+            <button class="btn btn-secondary" onclick="switchTab('leave')">請假</button>
+            <button class="btn btn-secondary" onclick="switchTab('attendance')">考勤</button>
+            <button class="btn btn-secondary" onclick="switchTab('salary')">薪資</button>
+        </div>
+
+        <div id="leave" class="tab-content">
+            <div class="card">
+                <h3>📝 申請請假</h3>
+                <select id="leaveType"><option value="annual">特休</option><option value="sick">病假</option><option value="personal">事假</option></select>
+                <input type="date" id="leaveStart"><input type="date" id="leaveEnd">
+                <input type="text" id="leaveReason" placeholder="原因">
+                <button class="btn btn-primary" onclick="submitLeave()">提交申請</button>
+            </div>
+            <div class="card">
+                <h3>📋 歷史紀錄</h3>
+                <div id="leaveList">載入中...</div>
+            </div>
+        </div>
+
+        <div id="attendance" class="tab-content">
+            <div class="card">
+                <h3>📊 月度考勤</h3>
+                <div style="display:flex;gap:5px;">
+                    <select id="attYear"><option value="2026">2026</option></select>
+                    <select id="attMonth"><option value="1">1月</option><option value="2">2月</option></select>
+                    <button class="btn btn-primary" style="margin-top:0;width:auto;" onclick="loadAttendance()">查詢</button>
+                </div>
+                <div id="attList" style="margin-top:15px;"></div>
+            </div>
+        </div>
+
+        <div id="salary" class="tab-content">
+            <div class="card">
+                <h3>💰 年終與薪資</h3>
+                <select id="salaryYear" onchange="loadSalary()"><option value="2026">2026</option></select>
+                <div id="salaryResult" class="lunch-summary" style="display:none;margin-top:15px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="common.js"></script>
+    <script>
+        window.onload = () => initApp(() => {
+            const hash = window.location.hash.substring(1) || 'leave';
+            switchTab(hash);
+        });
+
+        function switchTab(id) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            if(id === 'leave') loadLeave();
+            if(id === 'salary') loadSalary();
+        }
+
+        // 請假邏輯
+        async function loadLeave() {
+            const { data } = await sb.rpc('get_leave_history', { p_line_user_id: liffProfile.userId });
+            const list = document.getElementById('leaveList');
+            if(!data || !data.length) list.innerHTML = '無紀錄';
+            else list.innerHTML = data.map(r => `<div class="attendance-item"><div class="date">${r.leave_type} (${r.status})</div><div>${r.start_date}~${r.end_date}</div></div>`).join('');
+        }
+        async function submitLeave() {
+            const type = document.getElementById('leaveType').value;
+            const start = document.getElementById('leaveStart').value;
+            const end = document.getElementById('leaveEnd').value;
+            const reason = document.getElementById('leaveReason').value;
+            if(!start) return alert('請輸入日期');
+            const { data, error } = await sb.rpc('submit_leave_request', {
+                p_line_user_id: liffProfile.userId, p_leave_type: type, p_start_date: start, p_end_date: end, p_reason: reason
+            });
+            if(data && data.success) { alert('✅ 已提交'); loadLeave(); }
+            else alert('失敗');
+        }
+
+        // 考勤邏輯
+        async function loadAttendance() {
+            const y = document.getElementById('attYear').value;
+            const m = document.getElementById('attMonth').value;
+            const { data } = await sb.rpc('get_monthly_attendance_v2', { p_line_user_id: liffProfile.userId, p_year: parseInt(y), p_month: parseInt(m) });
+            document.getElementById('attList').innerHTML = (data||[]).map(r => `<div class="attendance-item"><div class="date">${r.date}</div><div>${r.check_in_time||'--'} - ${r.check_out_time||'--'}</div></div>`).join('');
+        }
+
+        // 薪資邏輯
+        async function loadSalary() {
+            const y = document.getElementById('salaryYear').value;
+            const { data } = await sb.rpc('get_annual_summary', { p_line_user_id: liffProfile.userId, p_year: parseInt(y) });
+            if(data && data.success) {
+                const div = document.getElementById('salaryResult');
+                div.style.display = 'block';
+                div.innerHTML = `<div>到職日: ${data.hire_date}</div><div>年資: ${data.months_worked}月</div><div style="font-weight:bold;margin-top:10px;">資格: ${data.message}</div>`;
+            }
+        }
+    </script>
+</body>
+</html>
