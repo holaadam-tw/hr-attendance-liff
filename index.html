@@ -9,41 +9,70 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div id="loading" class="loading-screen">載入中...</div>
+    <div id="loading" class="loading-screen">
+        <div class="spinner"></div>
+        <p>系統載入中...</p>
+    </div>
 
-    <div class="container">
+    <div class="container fade-in">
         <div id="bindSection" class="hidden">
             <div class="card">
-                <div id="companyBanner"></div>
-                <h2 style="text-align:center;">🔐 員工綁定</h2>
-                <div class="form-group"><label>工號</label><input type="text" id="bindEmpId"></div>
-                <div class="form-group"><label>身分證後4碼</label><input type="tel" id="bindIdCard" maxlength="4"></div>
-                <button class="btn btn-primary" onclick="handleBind()">立即綁定</button>
-                <div id="bindStatus" class="status-box"></div>
+                <div id="companyBanner" class="status-box info" style="margin-bottom:20px;"></div>
+                <h2 style="text-align:center; margin-bottom:20px;">🔐 員工綁定</h2>
+                <div class="form-group">
+                    <label>員工工號 (ID)</label>
+                    <input type="text" id="bindEmpId" placeholder="例如：EMP001">
+                </div>
+                <div class="form-group">
+                    <label>身分證後 4 碼</label>
+                    <input type="tel" id="bindIdCard" maxlength="4" placeholder="例如：1234">
+                </div>
+                <button class="btn btn-primary" onclick="handleBind()">🔗 立即綁定</button>
+                <div id="bindStatus" class="status-box" style="margin-top:15px;"></div>
             </div>
         </div>
 
         <div id="menuSection" class="hidden">
             <div class="user-card">
-                <div style="display:flex;align-items:center;gap:15px;">
-                    <div class="avatar" id="userAvatar">👤</div>
-                    <div>
-                        <h2 id="userName">...</h2>
-                        <p id="userCompany" style="font-size:12px;color:#667eea;"></p>
+                <div class="user-info">
+                    <div class="avatar" id="userAvatar" style="background-image: none;">👤</div>
+                    <div class="user-details">
+                        <h2 id="userName">載入中...</h2>
+                        <p id="userCompany">...</p>
+                        <p id="userId" style="font-size:11px; opacity:0.7;">ID: -</p>
                     </div>
+                </div>
+                <div id="gpsStatus" class="status-box info" style="margin-top:15px; margin-bottom:0; font-size:12px; padding:8px;">
+                    📍 正在定位...
                 </div>
             </div>
 
-            <a href="checkin.html" class="btn btn-primary" style="display:block;text-align:center;margin-bottom:20px;">
-                <div style="font-size:30px;">📸</div> 打卡作業
+            <div id="todayStatus" class="status-box info" style="display:none;"></div>
+
+            <a href="checkin.html" class="btn btn-primary" style="padding:25px; margin-bottom:25px; display:flex; align-items:center; justify-content:center; gap:10px;">
+                <span style="font-size:32px;">📸</span>
+                <span style="font-size:20px;">打卡作業</span>
             </a>
 
             <div class="menu-grid">
-                <a href="records.html#leave" class="menu-item"><div class="icon">📝</div><div class="label">我要請假</div></a>
-                <a href="records.html#attendance" class="menu-item"><div class="icon">📊</div><div class="label">考勤查詢</div></a>
-                <a href="services.html#lunch" class="menu-item"><div class="icon">🍱</div><div class="label">便當訂購</div></a>
-                <a href="records.html#salary" class="menu-item"><div class="icon">💰</div><div class="label">薪資查詢</div></a>
-                <a href="services.html#settings" class="menu-item"><div class="icon">⚙️</div><div class="label">系統設定</div></a>
+                <a href="records.html#leave" class="menu-item">
+                    <div class="icon">📝</div><div class="label">我要請假</div>
+                </a>
+                <a href="records.html#attendance" class="menu-item">
+                    <div class="icon">📊</div><div class="label">考勤查詢</div>
+                </a>
+                <a href="services.html#lunch" class="menu-item">
+                    <div class="icon">🍱</div><div class="label">便當訂購</div>
+                </a>
+                <a href="records.html#salary" class="menu-item">
+                    <div class="icon">💰</div><div class="label">薪資查詢</div>
+                </a>
+                <a href="services.html#settings" class="menu-item">
+                    <div class="icon">⚙️</div><div class="label">系統設定</div>
+                </a>
+                <div class="menu-item" onclick="showToast('敬請期待')">
+                    <div class="icon">📅</div><div class="label">班表查詢</div>
+                </div>
             </div>
         </div>
     </div>
@@ -51,7 +80,7 @@
     <script src="common.js"></script>
     <script>
         window.onload = () => initApp(async () => {
-            // 處理綁定邏輯
+            // 1. 處理公司代碼
             const urlParams = new URLSearchParams(window.location.search);
             const code = urlParams.get('company');
             if (code) {
@@ -62,21 +91,37 @@
                 }
             }
 
-            // 檢查是否已綁定
+            // 2. 檢查綁定狀態
             const { data, error } = await sb.rpc('check_user_status', { p_line_user_id: liffProfile.userId });
             document.getElementById('loading').style.display = 'none';
 
             if (data && data.bound) {
-                // 已綁定 -> 顯示選單
+                // 已綁定
                 document.getElementById('menuSection').classList.remove('hidden');
                 document.getElementById('userName').textContent = data.employee_name;
                 document.getElementById('userCompany').textContent = data.company_name;
-                if(liffProfile.pictureUrl) document.getElementById('userAvatar').style.backgroundImage = `url(${liffProfile.pictureUrl})`;
+                // 這裡暫時無法取得 employee_number，可以透過另一個 RPC 補足
+                
+                if (liffProfile.pictureUrl) {
+                    const avatar = document.getElementById('userAvatar');
+                    avatar.style.backgroundImage = `url(${liffProfile.pictureUrl})`;
+                    avatar.textContent = '';
+                }
+
+                // 預先定位
+                navigator.geolocation.getCurrentPosition(
+                    p => document.getElementById('gpsStatus').innerHTML = '✅ GPS 定位完成',
+                    e => document.getElementById('gpsStatus').innerHTML = '❌ 無法取得 GPS'
+                );
+
+                // 檢查今日打卡
+                checkTodayStatus();
+
             } else {
-                // 未綁定 -> 顯示綁定頁
+                // 未綁定
                 document.getElementById('bindSection').classList.remove('hidden');
                 const name = sessionStorage.getItem('company_name') || '預設公司';
-                document.getElementById('companyBanner').innerHTML = `<div style="text-align:center;padding:10px;background:#e0f2fe;border-radius:8px;">🏢 ${name}</div>`;
+                document.getElementById('companyBanner').innerHTML = `🏢 您正在綁定：<b>${name}</b>`;
             }
         });
 
@@ -84,16 +129,43 @@
             const empId = document.getElementById('bindEmpId').value;
             const idCard = document.getElementById('bindIdCard').value;
             const code = sessionStorage.getItem('target_company') || 'DEFAULT';
+
+            if (!empId || !idCard) return showToast('請填寫完整資訊');
+
+            showStatus('bindStatus', 'info', '驗證中...');
             
             const { data, error } = await sb.rpc('bind_employee_secure', {
-                p_company_code: code, p_employee_number: empId, p_id_card_last_4: idCard,
-                p_line_user_id: liffProfile.userId, p_device_info: navigator.userAgent
+                p_company_code: code,
+                p_employee_number: empId,
+                p_id_card_last_4: idCard,
+                p_line_user_id: liffProfile.userId,
+                p_device_info: navigator.userAgent
             });
 
-            if (error || !data.success) showStatus('bindStatus', 'error', data?.error || '綁定失敗');
-            else {
-                alert('✅ 綁定成功');
-                location.reload();
+            if (error || !data.success) {
+                showStatus('bindStatus', 'error', data?.error || '綁定失敗');
+            } else {
+                showStatus('bindStatus', 'success', '✅ 綁定成功！');
+                setTimeout(() => location.reload(), 1500);
+            }
+        }
+
+        async function checkTodayStatus() {
+            const { data } = await sb.rpc('get_today_attendance', { p_line_user_id: liffProfile.userId });
+            const box = document.getElementById('todayStatus');
+            
+            if (data && data.success && data.has_record) {
+                box.style.display = 'block';
+                if (data.check_out_time) {
+                    box.className = 'status-box success';
+                    box.innerHTML = `✅ 今日完工 (工時 ${data.total_work_hours}h)`;
+                } else {
+                    box.className = 'status-box info';
+                    box.innerHTML = `🏢 上班中 (${data.check_in_time})`;
+                }
+            } else {
+                box.style.display = 'block';
+                box.innerHTML = '📍 今日尚未打卡';
             }
         }
     </script>
