@@ -3,232 +3,1036 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>🏢 員工打卡系統</title>
+    <title>🏢 員工服務中心</title>
     <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
     <style>
-        :root { --primary: #0284c7; --bg: #f0f9ff; }
-        body { font-family: sans-serif; background: var(--bg); padding: 20px; color: #333; }
-        .page { display: none; } .page.active { display: block; }
-        .card { background: white; padding: 20px; border-radius: 16px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 15px; }
-        .btn { width: 100%; padding: 14px; background: var(--primary); color: white; border: none; border-radius: 12px; font-size: 16px; font-weight: bold; margin-top: 10px; cursor: pointer; }
-        .btn:disabled { opacity: 0.6; }
-        input { width: 100%; padding: 12px; margin-top: 5px; border: 1px solid #ccc; border-radius: 8px; box-sizing: border-box; }
-        .company-banner { background: #e0f2fe; color: #075985; padding: 12px; border-radius: 8px; text-align: center; margin-bottom: 20px; font-weight: bold; border: 1px solid #bae6fd; }
-        .list-item { border-bottom: 1px solid #eee; padding: 10px 0; display: flex; justify-content: space-between; }
+        /* ================= UI 樣式區 ================= */
+        :root {
+            --primary-color: #667eea;
+            --secondary-color: #764ba2;
+            --bg-color: #f3f4f6;
+            --text-color: #333;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Microsoft JhengHei", sans-serif;
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            min-height: 100vh; padding: 20px; color: var(--text-color);
+            padding-bottom: 50px; 
+        }
+        .container { max-width: 600px; margin: 0 auto; }
+        
+        /* 頁面切換與動畫 */
+        .page { display: none; animation: fadeIn 0.3s ease-out; }
+        .page.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* 卡片通用樣式 */
+        .card, .user-card, .checkin-page {
+            background: white; border-radius: 20px; padding: 25px; 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15); margin-bottom: 20px;
+        }
+
+        /* 綁定頁面 */
+        .bind-header { text-align: center; margin-bottom: 20px; }
+        .bind-header .logo { font-size: 50px; display: block; margin-bottom: 10px; }
+        
+        .tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+        .tab-btn { flex: 1; padding: 12px; border: none; border-radius: 12px; cursor: pointer; font-weight: bold; transition: all 0.2s; }
+        .tab-btn.active { background: var(--primary-color); color: white; box-shadow: 0 4px 6px rgba(102, 126, 234, 0.25); }
+        .tab-btn.inactive { background: #e5e7eb; color: #6b7280; }
+
+        /* 首頁用戶資訊 */
+        .user-info { display: flex; align-items: center; gap: 15px; }
+        .avatar {
+            width: 64px; height: 64px; border-radius: 50%;
+            background: linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 28px; color: white; border: 3px solid white; box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .user-details h2 { font-size: 20px; margin-bottom: 4px; color: #1f2937; }
+        .user-details p { font-size: 13px; color: #6b7280; }
+
+        /* GPS 狀態列 */
+        .location-status {
+            display: flex; align-items: center; gap: 8px; margin-top: 15px;
+            padding: 10px 15px; border-radius: 12px; font-size: 13px; font-weight: 500;
+            transition: all 0.3s;
+        }
+        .location-status.loading { background: #fffbeb; color: #92400e; }
+        .location-status.ready { background: #d1fae5; color: #065f46; }
+        .location-status .dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            background: currentColor; animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(1.2); } 100% { opacity: 1; transform: scale(1); } }
+
+        /* 主要打卡按鈕 */
+        .primary-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 25px; }
+        .primary-btn {
+            background: white; border-radius: 16px; padding: 20px 15px; text-align: center;
+            cursor: pointer; transition: transform 0.1s, box-shadow 0.3s; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05); position: relative; overflow: hidden;
+        }
+        .primary-btn:active { transform: scale(0.96); }
+        .primary-btn.checkin { border-bottom: 4px solid var(--primary-color); }
+        .primary-btn.checkout { border-bottom: 4px solid #f472b6; }
+        .primary-btn.disabled { opacity: 0.6; cursor: not-allowed; filter: grayscale(1); }
+        .primary-btn .icon { font-size: 36px; margin-bottom: 8px; display: block; }
+        .primary-btn .label { font-size: 16px; font-weight: 700; color: #374151; }
+        .primary-btn .badge-corner {
+            position: absolute; top: 8px; right: 8px; font-size: 10px; 
+            background: #f3f4f6; padding: 2px 6px; border-radius: 4px; color: #6b7280;
+        }
+
+        /* 九宮格選單 */
+        .menu-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px; }
+        .menu-item {
+            background: rgba(255,255,255,0.9); border-radius: 16px; padding: 15px 5px; text-align: center;
+            cursor: pointer; transition: all 0.2s; backdrop-filter: blur(5px);
+        }
+        .menu-item:active { background: rgba(255,255,255,1); transform: scale(0.95); }
+        .menu-item .icon { font-size: 28px; margin-bottom: 5px; display: block; }
+        .menu-item .label { font-size: 12px; font-weight: 600; color: #4b5563; }
+
+        /* 表單元素 */
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; margin-bottom: 8px; font-weight: 600; color: #4b5563; font-size: 14px; }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%; padding: 14px; border: 2px solid #e5e7eb; border-radius: 12px; font-size: 16px;
+            transition: border-color 0.3s; background: #f9fafb;
+        }
+        .form-group input:focus { outline: none; border-color: var(--primary-color); background: white; }
+        .form-group textarea { min-height: 100px; resize: vertical; }
+
+        /* 按鈕 */
+        .btn { width: 100%; padding: 16px; border: none; border-radius: 12px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        .btn-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4); }
+        .btn-success { background: linear-gradient(135deg, #34d399 0%, #059669 100%); color: white; box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3); }
+        .btn-secondary { background: #e5e7eb; color: #4b5563; }
+        .btn-danger { background: #ff4d4f; color: white; margin-top: 0; padding: 8px 15px; font-size: 14px; width: auto;}
+
+        /* 便當與農曆 */
+        .lunch-summary { background: #f0fdf4; border: 1px solid #d1fae5; border-radius: 12px; padding: 15px; margin-bottom: 20px; }
+        .stat-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed #a7f3d0; }
+        .stat-row:last-child { border-bottom: none; }
+        .lunar-notice { background: #fff7ed; border-left: 4px solid #f59e0b; padding: 12px; margin-bottom: 15px; border-radius: 8px; font-size: 13px; color: #92400e; display: none; }
+        .lunar-notice.show { display: block; }
+
+        /* 狀態訊息 */
+        .status-box { background: white; border-radius: 12px; padding: 15px; margin-bottom: 20px; text-align: center; font-size: 14px; display: none; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        .status-box.show { display: block; animation: fadeIn 0.3s; }
+        .status-box.success { border-left: 5px solid #10b981; color: #065f46; }
+        .status-box.error { border-left: 5px solid #ef4444; color: #7f1d1d; }
+        .status-box.info { border-left: 5px solid #3b82f6; color: #1e3a8a; }
+
+        /* 相機 */
+        .camera-container {
+            position: relative; width: 100%; aspect-ratio: 3/4; margin: 0 auto 20px;
+            border-radius: 16px; overflow: hidden; background: #000; display: none;
+        }
+        .camera-container.show { display: block; }
+        #video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+        
+        /* 考勤列表與 Badge */
+        .attendance-item {
+            background: white; border-radius: 12px; padding: 15px; margin-bottom: 12px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05); border-left: 4px solid #ddd;
+        }
+        .attendance-item.late { border-left-color: #ef4444; }
+        .attendance-item.normal { border-left-color: #10b981; }
+        .attendance-item .date { font-weight: bold; margin-bottom: 5px; display: flex; justify-content: space-between; }
+        .attendance-item .details { font-size: 13px; color: #6b7280; display: flex; justify-content: space-between; }
+        
+        /* Badge 樣式 */
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+        .badge-warning { background: #fef3c7; color: #92400e; }
+        .badge-success { background: #d1fae5; color: #065f46; }
+
+        /* 工具類 */
+        .hidden { display: none !important; }
+        .loading-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--primary-color); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; color: white; }
+        .spinner { border: 4px solid rgba(255,255,255,0.3); border-top: 4px solid white; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 15px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Toast */
+        .toast {
+            position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
+            background: rgba(17, 24, 39, 0.9); color: white; padding: 12px 24px;
+            border-radius: 50px; font-size: 14px; z-index: 10000;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            animation: fadeInOut 3s forwards;
+        }
+        @keyframes fadeInOut { 0% { opacity: 0; transform: translate(-50%, -20px); } 10% { opacity: 1; transform: translate(-50%, 0); } 90% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; transform: translate(-50%, -20px); } }
     </style>
 </head>
 <body>
-    <div id="loading" style="position:fixed; inset:0; background:rgba(0,0,0,0.5); color:white; display:flex; justify-content:center; align-items:center; z-index:999;">載入中...</div>
+    <div id="loadingPage" class="loading-screen">
+        <div class="spinner"></div>
+        <p>系統載入中...</p>
+    </div>
 
     <div class="container">
         <div id="bindPage" class="page">
             <div class="card">
-                <div id="companyBanner"></div>
-                <h2 style="text-align:center;">🔐 員工綁定</h2>
-                <label>工號</label><input type="text" id="bindEmpId" placeholder="例如：EMP001">
-                <label style="margin-top:10px; display:block;">身分證後4碼</label><input type="tel" id="bindIdCard" maxlength="4">
-                <button class="btn" onclick="handleBind()">立即綁定</button>
+                <div class="bind-header">
+                    <span class="logo">🔐</span>
+                    <h2>員工身分綁定</h2>
+                    <p>初次使用請驗證身分</p>
+                </div>
+                <div class="tabs">
+                    <button class="tab-btn active" id="tabIdCard" onclick="switchBindMode('id_card')">身分證驗證</button>
+                    <button class="tab-btn inactive" id="tabCode" onclick="switchBindMode('code')">驗證碼驗證</button>
+                </div>
+                <div class="form-group">
+                    <label>員工工號 (ID) *</label>
+                    <input type="text" id="bindEmpId" placeholder="例如：EMP001" autocomplete="off">
+                </div>
+                <div id="modeIdCard" class="form-group">
+                    <label>身分證後 4 碼 *</label>
+                    <input type="tel" id="bindIdLast4" maxlength="4" placeholder="例如：1234" autocomplete="off">
+                </div>
+                <div id="modeCode" class="form-group hidden">
+                    <label>一次性驗證碼 *</label>
+                    <input type="text" id="bindCode" placeholder="請輸入 HR 提供的驗證碼" autocomplete="off">
+                </div>
+                <button class="btn btn-primary" onclick="handleBind()">🔗 立即綁定</button>
+                <div id="bindStatus" class="status-box"></div>
             </div>
         </div>
 
         <div id="homePage" class="page">
-            <div class="card">
-                <h2 id="userName">你好</h2>
-                <p id="userCompany" style="color:#666;"></p>
+            <div class="user-card">
+                <div class="user-info">
+                    <div class="avatar" id="userAvatar">?</div>
+                    <div class="user-details">
+                        <h2 id="userName">載入中...</h2>
+                        <p id="userDept">-</p>
+                        <p id="userId" style="font-size: 11px; opacity: 0.7;">ID: -</p>
+                    </div>
+                </div>
+                <div class="location-status loading" id="locationStatus">
+                    <div class="dot"></div><span>正在取得定位...</span>
+                </div>
             </div>
-            <button class="btn" onclick="showPage('checkInPage')">📸 打卡</button>
-            <button class="btn" onclick="showPage('historyPage')" style="background:#64748b;">📊 查詢考勤</button>
+
+            <div id="checkInStatusBox" class="status-box info"></div>
+
+            <div class="primary-actions">
+                <div class="primary-btn checkin" id="checkInBtn" onclick="startCheckIn()">
+                    <span class="badge-corner">AM</span>
+                    <div class="icon">☀️</div><div class="label">上班打卡</div>
+                </div>
+                <div class="primary-btn checkout" id="checkOutBtn" onclick="startCheckOut()">
+                    <span class="badge-corner">PM</span>
+                    <div class="icon">🌙</div><div class="label">下班打卡</div>
+                </div>
+            </div>
+
+            <div class="menu-grid">
+                <div class="menu-item" onclick="showPage('leavePage')">
+                    <div class="icon">📝</div><div class="label">我要請假</div>
+                </div>
+                <div class="menu-item" onclick="showPage('attendancePage')">
+                    <div class="icon">📊</div><div class="label">考勤查詢</div>
+                </div>
+                <div class="menu-item" onclick="showPage('lunchPage')">
+                    <div class="icon">🍱</div><div class="label">便當訂購</div>
+                </div>
+                <div class="menu-item" onclick="showPage('salaryPage')">
+                    <div class="icon">💰</div><div class="label">薪資查詢</div>
+                </div>
+                <div class="menu-item" onclick="showToast('功能開發中')">
+                    <div class="icon">📅</div><div class="label">班表查詢</div>
+                </div>
+                <div class="menu-item" onclick="showPage('settingsPage')">
+                    <div class="icon">⚙️</div><div class="label">系統設定</div>
+                </div>
+            </div>
         </div>
 
         <div id="checkInPage" class="page">
-            <div class="card">
-                <h2 style="text-align:center;">📍 打卡</h2>
-                <video id="video" autoplay playsinline style="width:100%; background:black; border-radius:12px;"></video>
-                <canvas id="canvas" style="display:none;"></canvas>
-                <button id="captureBtn" class="btn" onclick="executeCheckIn()">拍照並打卡</button>
-                <button class="btn" onclick="showPage('homePage')" style="background:#94a3b8;">取消</button>
+            <button class="btn btn-secondary" onclick="cancelCheckIn()" style="width:auto;margin-bottom:10px;">← 返回</button>
+            <div class="checkin-page">
+                <h2 id="checkInTitle" style="text-align: center;">📍 上班打卡</h2>
+                <div id="checkInStatus" class="status-box show info">準備開啟相機...</div>
+                
+                <div class="camera-container" id="cameraContainer">
+                    <video id="video" autoplay playsinline muted></video>
+                    <canvas id="canvas" class="hidden"></canvas>
+                </div>
+
+                <button class="btn btn-primary" id="captureBtn" onclick="captureAndCheckIn()" disabled>📸 拍照並打卡</button>
             </div>
         </div>
 
-        <div id="historyPage" class="page">
-            <div class="card">
-                <h2>📊 本月考勤</h2>
-                <div id="historyList">載入中...</div>
-                <button class="btn" onclick="showPage('homePage')" style="background:#94a3b8;">返回</button>
+        <div id="lunchPage" class="page">
+            <button class="btn btn-secondary" onclick="showPage('homePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
+            <div class="checkin-page">
+                <h2>🍱 便當訂購</h2>
+                <div class="lunar-notice" id="lunarNotice">🌙 明天是農曆初一/十五，建議訂購素食</div>
+                
+                <div class="lunch-summary">
+                    <h3 style="margin-bottom:10px;">📊 明日統計</h3>
+                    <div class="stat-row"><span>總數</span><span id="totalOrders">0</span></div>
+                    <div class="stat-row"><span>🥗 素食</span><span id="vegCount">0</span></div>
+                    <div class="stat-row"><span>🍖 葷食</span><span id="regularCount">0</span></div>
+                </div>
+
+                <div class="form-group"><label>訂購日期</label><input type="date" id="lunchDate"></div>
+                <div class="form-group"><label><input type="checkbox" id="lunchVegetarian"> 我要訂素食便當</label></div>
+                <div class="form-group"><label>備註 (選填)</label><input type="text" id="lunchNotes" placeholder="例：不要飯"></div>
+                <button class="btn btn-success" onclick="submitLunchOrder()">✅ 確認訂購</button>
+            </div>
+        </div>
+
+        <div id="leavePage" class="page">
+            <button class="btn btn-secondary" onclick="showPage('homePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
+            <div class="checkin-page">
+                <h2>📝 請假申請</h2>
+                <div class="form-group">
+                    <label>假別</label>
+                    <select id="leaveType">
+                        <option value="annual">特休假</option>
+                        <option value="sick">病假</option>
+                        <option value="personal">事假</option>
+                        <option value="compensatory">補休</option>
+                    </select>
+                </div>
+                <div class="form-group"><label>開始日期</label><input type="date" id="leaveStartDate"></div>
+                <div class="form-group"><label>結束日期</label><input type="date" id="leaveEndDate"></div>
+                <div class="form-group"><label>原因</label><textarea id="leaveReason"></textarea></div>
+                <button class="btn btn-primary" onclick="submitLeave()">📤 提交申請</button>
+                <div id="leaveStatus" class="status-box"></div>
+                
+                <div style="margin-top:30px; padding-top:20px; border-top:2px dashed #e5e7eb;">
+                    <h3 style="margin-bottom:15px;">📋 我的請假記錄</h3>
+                    <div id="leaveHistoryList">
+                        <p style="text-align:center;color:#666;">載入中...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="attendancePage" class="page">
+            <button class="btn btn-secondary" onclick="showPage('homePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
+            <div class="checkin-page">
+                <h2>📊 考勤記錄</h2>
+                <div class="form-group">
+                    <label>查詢月份</label>
+                    <div style="display:flex; gap:10px;">
+                        <select id="attendanceYear" onchange="loadMonthlyAttendance()" style="flex:1;">
+                            <option value="2026">2026</option>
+                            <option value="2025">2025</option>
+                        </select>
+                        <select id="attendanceMonth" onchange="loadMonthlyAttendance()" style="flex:1;">
+                            <option value="1">1月</option>
+                            <option value="2">2月</option>
+                            <option value="3">3月</option>
+                            <option value="4">4月</option>
+                            <option value="5">5月</option>
+                            <option value="6">6月</option>
+                            <option value="7">7月</option>
+                            <option value="8">8月</option>
+                            <option value="9">9月</option>
+                            <option value="10">10月</option>
+                            <option value="11">11月</option>
+                            <option value="12">12月</option>
+                        </select>
+                    </div>
+                </div>
+                <div id="attendanceList" style="margin-top:15px;"></div>
+            </div>
+        </div>
+
+        <div id="salaryPage" class="page">
+            <button class="btn btn-secondary" onclick="showPage('homePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
+            <div class="checkin-page">
+                <h2>💰 薪資查詢</h2>
+                <div class="form-group">
+                    <label>查詢年度</label>
+                    <select id="salaryYear" onchange="loadAnnualSummary()">
+                        <option value="2026">2026</option>
+                        <option value="2025">2025</option>
+                    </select>
+                </div>
+                
+                <div class="lunch-summary" id="bonusCard" style="display:none;">
+                    <h3 style="margin-bottom:15px;">🎁 年終獎金資格</h3>
+                    <div class="stat-row"><span>到職日期</span><span id="bonusHireDate">-</span></div>
+                    <div class="stat-row"><span>實際工作月數</span><span id="bonusMonths">-</span></div>
+                    <div class="stat-row"><span>總出勤天數</span><span id="bonusDays">-</span></div>
+                    <div class="stat-row"><span>遲到次數</span><span id="bonusLate">-</span></div>
+                    <div class="stat-row"><span>累計工時</span><span id="bonusHours">-</span></div>
+                    <div class="stat-row"><span>平均每日工時</span><span id="bonusAvgHours">-</span></div>
+                    <div class="stat-row" style="border-top:2px solid #d1fae5; margin-top:10px; padding-top:10px; font-weight:bold;">
+                        <span>年終發放比例</span>
+                        <span id="bonusRatio" style="color:#059669; font-size:18px;">-</span>
+                    </div>
+                </div>
+                <div id="bonusMessage" class="status-box" style="display:none;"></div>
+                <div style="margin-top:20px;">
+                    <h3>📄 薪資單查詢</h3>
+                    <p class="status-box show info">功能開發中...</p>
+                </div>
+            </div>
+        </div>
+
+        <div id="settingsPage" class="page">
+            <button class="btn btn-secondary" onclick="showPage('homePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
+            <div class="checkin-page">
+                <h2>⚙️ 系統設定</h2>
+                
+                <div class="lunch-summary">
+                    <h3 style="margin-bottom:10px;">📍 目前打卡地點</h3>
+                    <div id="locationList">
+                        <p style="color:#666;text-align:center;">載入中...</p>
+                    </div>
+                </div>
+
+                <div class="binding-card" style="margin-top: 20px;">
+                    <h3 style="margin-bottom:15px;">➕ 新增地點</h3>
+                    <div class="form-group">
+                        <label>地點名稱</label>
+                        <input type="text" id="newLocName" placeholder="例如：台北分店">
+                    </div>
+                    <div class="form-group">
+                        <label>打卡半徑 (公尺)</label>
+                        <input type="number" id="newLocRadius" value="300">
+                    </div>
+                    <div class="form-group">
+                        <label>座標 (緯度, 經度)</label>
+                        <div style="display:flex; gap:10px;">
+                            <input type="text" id="newLocLat" placeholder="緯度" readonly>
+                            <input type="text" id="newLocLng" placeholder="經度" readonly>
+                        </div>
+                        <button class="btn btn-primary" onclick="getCurrentGPSForSetting()" style="margin-top:10px; font-size:14px; padding:10px;">
+                            📍 抓取目前位置
+                        </button>
+                    </div>
+                    <button class="btn btn-success" onclick="addNewLocation()">💾 儲存新地點</button>
+                </div>
+
+                <div class="form-group" style="margin-top:30px; text-align:center;">
+                    <p style="color:#999; font-size:12px;">
+                        系統版本 v9.4.1 (修復版)<br>
+                        <span style="font-size:10px;">最後更新：2026-01-27</span>
+                    </p>
+                </div>
             </div>
         </div>
     </div>
 
     <script>
+        // ================= 設定與初始化 =================
         const CONFIG = {
             LIFF_ID: '2008962829-bnsS1bbB',
             SUPABASE_URL: 'https://nssuisyvlrqnqfxupklb.supabase.co',
             SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5zc3Vpc3l2bHJxbnFmeHVwa2xiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkyOTAwMzUsImV4cCI6MjA4NDg2NjAzNX0.q_B6v3gf1TOCuAq7z0xIw10wDueCSJn0p37VzdMfmbc',
             BUCKET: 'selfies'
         };
+
         const sb = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+        
+        if(location.search.includes('debug=true')) {
+            const script = document.createElement('script');
+            script.src = 'https://unpkg.com/vconsole@latest/dist/vconsole.min.js';
+            script.onload = () => new window.VConsole();
+            document.head.appendChild(script);
+        }
+        
         let liffProfile = null;
+        let currentEmployee = null;
+        let videoStream = null;
+        let currentCheckInType = 'in';
+        let cachedLocation = null;
+        let currentBindMode = 'id_card';
+        let todayAttendance = null;
+        let officeLocations = []; 
+        let isProcessing = false;
 
-        window.onload = async () => {
+        // 核心：取得台灣時間 YYYY-MM-DD
+        function getTaiwanDate(offsetDays = 0) {
+            const date = new Date();
+            date.setDate(date.getDate() + offsetDays);
+            return date.toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' });
+        }
+
+        // 計算距離公式 (Haversine)
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371e3; 
+            const φ1 = lat1 * Math.PI/180;
+            const φ2 = lat2 * Math.PI/180;
+            const Δφ = (lat2-lat1) * Math.PI/180;
+            const Δλ = (lon2-lon1) * Math.PI/180;
+
+            const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+                      Math.cos(φ1) * Math.cos(φ2) *
+                      Math.sin(Δλ/2) * Math.sin(Δλ/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+            return R * c;
+        }
+
+        // ================= 頁面路由 =================
+        function showPage(id) {
+            document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            
+            if(id==='attendancePage') {
+                const now = new Date();
+                document.getElementById('attendanceYear').value = now.getFullYear();
+                document.getElementById('attendanceMonth').value = now.getMonth() + 1;
+                loadMonthlyAttendance();
+            }
+            if(id==='leavePage') loadLeaveHistory();
+            if(id==='salaryPage') {
+                document.getElementById('salaryYear').value = new Date().getFullYear();
+                loadAnnualSummary();
+            }
+            if(id==='lunchPage') loadLunchSummary();
+            if(id==='settingsPage') renderLocationList();
+            if(id==='homePage') preloadGPS();
+        }
+
+        window.addEventListener('load', async () => {
             try {
-                // 1. 處理網址參數與公司資訊
-                const urlParams = new URLSearchParams(window.location.search);
-                const code = urlParams.get('company');
-                
-                if (code) {
-                    // 如果有代碼，向後端查詢公司名稱
-                    const { data } = await sb.rpc('get_company_info', { p_company_code: code });
-                    if (data && data.success) {
-                        localStorage.setItem('target_company', code);
-                        localStorage.setItem('company_name', data.name);
-                    }
-                }
-
-                // 2. LIFF 初始化
+                console.log('🚀 系統初始化...');
                 await liff.init({ liffId: CONFIG.LIFF_ID });
                 if (!liff.isLoggedIn()) { liff.login(); return; }
-                liffProfile = await liff.getProfile();
                 
-                // 3. 檢查登入狀態
-                await checkLogin();
-            } catch (e) {
-                console.error(e);
-                alert('系統初始化失敗');
+                liffProfile = await liff.getProfile();
+                await checkUserStatus(); 
+
+            } catch (error) {
+                alert('初始化失敗: ' + error.message);
             }
-        };
+        });
 
-        async function checkLogin() {
-            const { data, error } = await sb.rpc('check_user_status', {
-                p_line_user_id: liffProfile.userId
-            });
+        // ================= 核心邏輯 =================
+        async function checkUserStatus() {
+            document.getElementById('loadingPage').style.display = 'flex';
+            
+            try {
+                const { data, error } = await sb.from('employees').select('*').eq('line_user_id', liffProfile.userId).single();
+                
+                await loadSettings();
 
-            document.getElementById('loading').style.display = 'none';
+                document.getElementById('loadingPage').style.display = 'none';
 
-            if (error) {
-                alert('系統錯誤: ' + error.message);
-                return;
-            }
-
-            if (data && data.bound) {
-                document.getElementById('userName').textContent = `你好，${data.employee_name}`;
-                document.getElementById('userCompany').textContent = data.company_name;
-                showPage('homePage');
-            } else {
-                // 未綁定，顯示綁定頁
-                const code = localStorage.getItem('target_company') || 'DEFAULT';
-                const name = localStorage.getItem('company_name') || '預設公司';
-                document.getElementById('companyBanner').innerHTML = `🏢 您正在綁定：<br>${name}`;
+                if (data) {
+                    currentEmployee = data;
+                    updateUserInfo(data);
+                    showPage('homePage');
+                    preloadGPS(); 
+                    await checkTodayAttendance();
+                } else {
+                    showPage('bindPage');
+                }
+            } catch (err) {
+                document.getElementById('loadingPage').style.display = 'none';
                 showPage('bindPage');
             }
         }
 
-        async function handleBind() {
-            const empId = document.getElementById('bindEmpId').value.trim();
-            const idCard = document.getElementById('bindIdCard').value.trim();
-            const code = localStorage.getItem('target_company') || 'DEFAULT';
-
-            if(!empId || !idCard) return alert('請填寫完整資訊');
-
-            const { data, error } = await sb.rpc('bind_employee_secure', {
-                p_company_code: code,
-                p_employee_number: empId,
-                p_id_card_last_4: idCard,
-                p_line_user_id: liffProfile.userId,
-                p_device_info: navigator.userAgent
-            });
-
-            if(error || !data.success) alert('綁定失敗: ' + (data?.error || error?.message || '未知錯誤'));
-            else {
-                alert(`✅ 綁定成功！歡迎 ${data.employee_name}`);
-                location.reload();
+        function updateUserInfo(data) {
+            document.getElementById('userName').textContent = data.name;
+            document.getElementById('userDept').textContent = `${data.department || '-'} ${data.position || ''}`;
+            document.getElementById('userId').textContent = `ID: ${data.employee_number}`;
+            const avatar = document.getElementById('userAvatar');
+            if(liffProfile.pictureUrl) {
+                avatar.style.backgroundImage = `url(${liffProfile.pictureUrl})`;
+                avatar.style.backgroundSize = 'cover'; avatar.textContent='';
+            } else {
+                avatar.textContent = data.name.charAt(0);
             }
         }
 
-        async function executeCheckIn() {
+        // ================= 地點與 GPS 邏輯 =================
+        async function loadSettings() {
+            try {
+                const { data, error } = await sb.from('system_settings').select('value').eq('key', 'office_locations').single();
+                if (!error && data) {
+                    officeLocations = data.value || [];
+                    if(document.getElementById('settingsPage').classList.contains('active')) renderLocationList();
+                }
+            } catch (e) { console.error('載入地點失敗', e); }
+        }
+
+        function preloadGPS() {
+            const el = document.getElementById('locationStatus');
+            el.className = 'location-status loading';
+            el.innerHTML = '<div class="dot"></div><span>正在定位...</span>';
+
+            navigator.geolocation.getCurrentPosition(
+                p => { 
+                    cachedLocation = { latitude: p.coords.latitude, longitude: p.coords.longitude };
+                    
+                    let foundLocation = null;
+                    let minDistance = Infinity;
+                    
+                    for (const loc of officeLocations) {
+                        const dist = calculateDistance(
+                            cachedLocation.latitude, 
+                            cachedLocation.longitude, 
+                            loc.lat, 
+                            loc.lng
+                        );
+                        
+                        if (dist <= loc.radius && dist < minDistance) {
+                            minDistance = dist;
+                            foundLocation = loc.name;
+                        }
+                    }
+
+                    el.className = 'location-status ready';
+                    if (foundLocation) {
+                        el.innerHTML = `<div class="dot" style="background:#10b981;"></div><span>📍 您在：${foundLocation}</span>`;
+                    } else {
+                        el.innerHTML = `<div class="dot" style="background:#f59e0b;"></div><span>⚠️ 未在打卡範圍內</span>`;
+                    }
+                },
+                e => { 
+                    el.className = 'location-status';
+                    el.innerHTML = '<span>❌ 定位失敗，請檢查權限</span>'; 
+                },
+                { timeout: 10000, enableHighAccuracy: true }
+            );
+        }
+
+        function getGPS() { 
+            return new Promise((res, rej) => {
+                navigator.geolocation.getCurrentPosition(
+                    p => res({latitude:p.coords.latitude, longitude:p.coords.longitude}), 
+                    e => rej(e), 
+                    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                );
+            });
+        }
+
+        // ================= 打卡邏輯 =================
+        async function captureAndCheckIn() {
+            if (!currentEmployee) {
+                showToast('❌ 員工資料未載入，請重新登入');
+                return;
+            }
+
             const btn = document.getElementById('captureBtn');
+            const statusBox = document.getElementById('checkInStatus');
             btn.disabled = true; btn.textContent = '處理中...';
             
             try {
-                // 拍照
                 const video = document.getElementById('video');
                 const canvas = document.getElementById('canvas');
                 canvas.width = video.videoWidth; canvas.height = video.videoHeight;
-                canvas.getContext('2d').drawImage(video, 0, 0);
-                const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.5));
+                const ctx = canvas.getContext('2d');
+                ctx.translate(canvas.width, 0); ctx.scale(-1, 1);
+                ctx.drawImage(video, 0, 0);
+                const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.7));
 
-                // 上傳
-                const fileName = `${liffProfile.userId}_${Date.now()}.jpg`;
+                showStatus(statusBox, 'info', '☁️ 上傳中...');
+                const fileName = `${currentEmployee.employee_number}_${Date.now()}.jpg`; 
                 const { error: uploadError } = await sb.storage.from(CONFIG.BUCKET).upload(fileName, blob);
-                if(uploadError) throw new Error('照片上傳失敗');
+                if (uploadError) throw uploadError;
 
                 const { data: urlData } = sb.storage.from(CONFIG.BUCKET).getPublicUrl(fileName);
-                const photoUrl = urlData?.publicUrl || urlData?.publicURL;
+                const publicUrl = urlData?.publicUrl || urlData?.publicURL;
 
-                // 定位與打卡
-                navigator.geolocation.getCurrentPosition(async (pos) => {
-                    const { data, error } = await sb.rpc('quick_check_in_v2', {
-                        p_line_user_id: liffProfile.userId,
-                        p_latitude: pos.coords.latitude,
-                        p_longitude: pos.coords.longitude,
-                        p_photo_url: photoUrl,
-                        p_device_id: navigator.userAgent
-                    });
+                if (!publicUrl) throw new Error('無法取得照片網址');
 
-                    if(error || !data.success) alert('打卡失敗: ' + (data?.error || error?.message));
-                    else {
-                        alert('✅ ' + data.message);
-                        showPage('homePage');
-                    }
-                    btn.disabled = false; btn.textContent = '拍照並打卡';
-                }, (err) => {
-                    alert('無法取得位置: ' + err.message);
-                    btn.disabled = false;
-                }, { timeout: 10000 });
+                showStatus(statusBox, 'info', '📍 定位中...');
+                let loc = cachedLocation || await getGPS();
 
-            } catch(e) {
-                console.error(e);
-                alert('錯誤: ' + e.message);
-                btn.disabled = false; btn.textContent = '拍照並打卡';
+                const { data: rpcData, error: rpcError } = await sb.rpc('quick_check_in', {
+                    p_line_user_id: liffProfile.userId,
+                    p_latitude: loc.latitude, p_longitude: loc.longitude,
+                    p_photo_url: publicUrl, p_device_id: navigator.userAgent
+                });
+
+                if (rpcError) throw rpcError;
+                if (!rpcData.success) throw new Error(rpcData.error);
+
+                if (rpcData.location_name) localStorage.setItem('last_location', rpcData.location_name);
+
+                const typeText = rpcData.type === 'check_in' ? '上班' : '下班';
+                showToast(`✅ ${typeText}成功！@${rpcData.location_name || '公司'}`);
+                
+                setTimeout(() => { cancelCheckIn(); checkTodayAttendance(); }, 1500);
+
+            } catch (err) {
+                console.error(err);
+                showStatus(statusBox, 'error', `❌ 失敗: ${err.message}`);
+                btn.disabled = false; btn.textContent = '📸 重試';
             }
         }
 
-        async function startCamera() {
+        // ================= 其他功能 =================
+        function switchBindMode(mode) {
+            currentBindMode = mode;
+            document.getElementById('modeIdCard').classList.toggle('hidden', mode !== 'id_card');
+            document.getElementById('modeCode').classList.toggle('hidden', mode !== 'code');
+            document.getElementById('tabIdCard').className = mode === 'id_card' ? 'tab-btn active' : 'tab-btn inactive';
+            document.getElementById('tabCode').className = mode === 'code' ? 'tab-btn active' : 'tab-btn inactive';
+        }
+
+        async function handleBind() {
+            const empId = document.getElementById('bindEmpId').value.trim();
+            const idLast4 = document.getElementById('bindIdLast4').value.trim();
+            const code = document.getElementById('bindCode').value.trim();
+            const statusBox = document.getElementById('bindStatus');
+
+            if (!empId) return showStatus(statusBox, 'error', '請輸入員編');
+
+            const params = {
+                p_line_user_id: liffProfile.userId,
+                p_employee_number: empId, 
+                p_device_info: navigator.userAgent,
+                p_id_card_last_4: document.getElementById('modeIdCard').classList.contains('hidden') ? null : idLast4,
+                p_verification_code: document.getElementById('modeCode').classList.contains('hidden') ? null : code
+            };
+
+            showStatus(statusBox, 'info', '驗證中...');
+            try {
+                const { data, error } = await sb.rpc('bind_employee', params);
+                if (error) throw error;
+                if (data.success) {
+                    showStatus(statusBox, 'success', '✅ 綁定成功！');
+                    setTimeout(checkUserStatus, 1500);
+                } else {
+                    showStatus(statusBox, 'error', data.error);
+                }
+            } catch (err) {
+                showStatus(statusBox, 'error', err.message);
+            }
+        }
+
+        async function checkTodayAttendance() {
+            if (!currentEmployee) return;
+            try {
+                const today = getTaiwanDate(0);
+                const { data, error } = await sb.from('attendance')
+                    .select('*')
+                    .eq('employee_id', currentEmployee.id)
+                    .eq('date', today)
+                    .single();
+                
+                if (error) {
+                    if (error.code === 'PGRST116') {
+                        todayAttendance = null; 
+                    } else {
+                        console.error('❌ 檢查考勤錯誤:', error);
+                        todayAttendance = null;
+                    }
+                } else {
+                    todayAttendance = data;
+                }
+                updateCheckInButtons();
+            } catch(e) { console.error(e); }
+        }
+
+        function updateCheckInButtons() {
+            const btnIn = document.getElementById('checkInBtn');
+            const btnOut = document.getElementById('checkOutBtn');
+            const statusBox = document.getElementById('checkInStatusBox');
+            const lastLoc = localStorage.getItem('last_location') || '公司';
+
+            if (!todayAttendance) {
+                btnIn.classList.remove('disabled');
+                btnOut.classList.add('disabled');
+                showStatus(statusBox, 'info', `📍 上次打卡地點：${lastLoc}`);
+            } else if (todayAttendance.check_out_time) {
+                btnIn.classList.add('disabled');
+                btnOut.classList.add('disabled');
+                showStatus(statusBox, 'success', `✅ 今日完工 (工時 ${todayAttendance.total_work_hours?.toFixed(1)}h)`);
+            } else {
+                btnIn.classList.add('disabled');
+                btnOut.classList.remove('disabled');
+                const time = new Date(todayAttendance.check_in_time).toLocaleTimeString('zh-TW', {timeZone:'Asia/Taipei', hour:'2-digit', minute:'2-digit'});
+                const locName = todayAttendance.check_in_location?.includes('(') ? todayAttendance.check_in_location.split('(')[0] : lastLoc;
+                showStatus(statusBox, 'info', `🏢 上班中 @ ${locName} (${time})`);
+            }
+        }
+
+        function startCheckIn() { 
+            if (document.getElementById('checkInBtn').classList.contains('disabled')) return;
+            if (isProcessing) return;
+            isProcessing = true;
+            currentCheckInType='in'; 
+            showCheckInPage('📍 上班打卡'); 
+            setTimeout(() => isProcessing = false, 1000);
+        }
+        function startCheckOut() { 
+            if (document.getElementById('checkOutBtn').classList.contains('disabled')) return;
+            if (isProcessing) return;
+            isProcessing = true;
+            currentCheckInType='out'; 
+            showCheckInPage('👋 下班打卡'); 
+            setTimeout(() => isProcessing = false, 1000);
+        }
+        function showCheckInPage(title) { document.getElementById('checkInTitle').textContent=title; showPage('checkInPage'); openCamera(); }
+        function cancelCheckIn() { if(videoStream) videoStream.getTracks().forEach(t=>t.stop()); showPage('homePage'); }
+
+        async function openCamera() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
-                document.getElementById('video').srcObject = stream;
-            } catch (err) {
-                alert('無法開啟相機，請檢查權限');
-                showPage('homePage');
+                const video = document.getElementById('video');
+                video.srcObject = stream;
+                videoStream = stream;
+                video.onloadedmetadata = () => {
+                    video.play();
+                    document.getElementById('cameraContainer').classList.add('show');
+                    document.getElementById('captureBtn').disabled = false;
+                    document.getElementById('checkInStatus').textContent = '✅ 相機就緒';
+                };
+            } catch(e) { 
+                console.error('相機錯誤', e);
+                let msg = '無法啟動相機';
+                if(e.name === 'NotAllowedError') msg = '請允許相機權限';
+                if(e.name === 'NotFoundError') msg = '找不到相機裝置';
+                const status = document.getElementById('checkInStatus');
+                status.className = 'status-box show error';
+                status.innerHTML = `❌ ${msg}`;
             }
         }
 
-        async function loadHistory() {
-            const date = new Date();
-            const { data } = await sb.rpc('get_monthly_attendance_v2', {
-                p_line_user_id: liffProfile.userId,
-                p_year: date.getFullYear(),
-                p_month: date.getMonth() + 1
-            });
+        // ================= 設定頁面功能 =================
+        function renderLocationList() {
+            const listEl = document.getElementById('locationList');
+            if (officeLocations.length === 0) {
+                listEl.innerHTML = '<p style="color:#666;text-align:center;">尚未設定地點</p>';
+                return;
+            }
+            listEl.innerHTML = officeLocations.map((loc, index) => `
+                <div class="stat-row" style="align-items:center;">
+                    <div style="text-align:left;">
+                        <div style="font-weight:bold;">${loc.name}</div>
+                        <div style="font-size:11px;color:#999;">範圍: ${loc.radius}m</div>
+                    </div>
+                    <button onclick="deleteLocation(${index})" class="btn-danger">刪除</button>
+                </div>
+            `).join('');
+        }
+
+        function getCurrentGPSForSetting() {
+            showToast('📍 定位中...');
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    document.getElementById('newLocLat').value = pos.coords.latitude;
+                    document.getElementById('newLocLng').value = pos.coords.longitude;
+                    showToast('✅ 已填入座標');
+                },
+                (err) => showToast('定位失敗: ' + err.message),
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+            );
+        }
+
+        async function addNewLocation() {
+            const name = document.getElementById('newLocName').value.trim();
+            const radius = parseInt(document.getElementById('newLocRadius').value);
+            const lat = parseFloat(document.getElementById('newLocLat').value);
+            const lng = parseFloat(document.getElementById('newLocLng').value);
+
+            if (!name || !lat || !lng) return showToast('⚠️ 資料不完整');
+
+            const newLocations = [...officeLocations, { name, lat, lng, radius }];
+            await saveLocationsToDB(newLocations);
             
-            const list = document.getElementById('historyList');
-            if(!data || data.length === 0) list.innerHTML = '無記錄';
-            else {
+            document.getElementById('newLocName').value = '';
+            document.getElementById('newLocLat').value = '';
+            document.getElementById('newLocLng').value = '';
+        }
+
+        async function deleteLocation(index) {
+            if (!confirm('確定要刪除此地點嗎？')) return;
+            const newLocations = officeLocations.filter((_, i) => i !== index);
+            await saveLocationsToDB(newLocations);
+        }
+
+        async function saveLocationsToDB(newLocations) {
+            try {
+                const { data, error } = await sb.rpc('update_office_locations', {
+                    p_locations: newLocations,
+                    p_line_user_id: liffProfile.userId
+                });
+
+                if (error) throw error;
+                if (!data.success) { showToast('❌ ' + data.error); return; }
+                
+                officeLocations = newLocations;
+                showToast('✅ 設定已更新');
+                renderLocationList();
+                preloadGPS(); 
+            } catch (err) {
+                console.error(err);
+                showToast('❌ 儲存失敗');
+            }
+        }
+
+        // ================= 進階查詢與輔助功能 (完整補齊) =================
+        async function loadLunchSummary() {
+            const dateStr = getTaiwanDate(1);
+            document.getElementById('lunchDate').value = dateStr;
+            try {
+                const { data } = await sb.rpc('get_lunch_summary', { p_date: dateStr });
+                if(data) {
+                    document.getElementById('totalOrders').textContent = data.total_orders || 0;
+                    document.getElementById('vegCount').textContent = data.vegetarian_count || 0;
+                    document.getElementById('regularCount').textContent = data.regular_count || 0;
+                    if(data.is_lunar_vegetarian_day) {
+                        document.getElementById('lunarNotice').classList.add('show');
+                        document.getElementById('lunchVegetarian').checked = true;
+                    }
+                }
+            } catch(e) { console.error('便當統計失敗', e); }
+        }
+
+        async function submitLunchOrder() {
+            if (!currentEmployee) return showToast('❌ 請先登入');
+            const date = document.getElementById('lunchDate').value;
+            const isVeg = document.getElementById('lunchVegetarian').checked;
+            const notes = document.getElementById('lunchNotes').value;
+            try {
+                const { data, error } = await sb.rpc('order_lunch', {
+                    p_line_user_id: liffProfile.userId,
+                    p_order_date: date, p_is_vegetarian: isVeg, p_special_requirements: notes
+                });
+                if(error) throw error;
+                showToast('✅ 訂購成功'); loadLunchSummary();
+            } catch(e) { showToast('失敗:'+e.message); }
+        }
+
+        async function submitLeave() {
+            if (!currentEmployee) return showToast('❌ 請先登入');
+            const type = document.getElementById('leaveType').value;
+            const start = document.getElementById('leaveStartDate').value;
+            const end = document.getElementById('leaveEndDate').value;
+            const reason = document.getElementById('leaveReason').value;
+            if(!start || !end || !reason) return showToast('請填寫完整');
+            
+            try {
+                const { error } = await sb.from('leave_requests').insert({
+                    employee_id: currentEmployee.id, leave_type: type, start_date: start, end_date: end, reason: reason, status: 'pending'
+                });
+                if(error) throw error;
+                showToast('✅ 申請成功'); 
+                loadLeaveHistory(); // 刷新歷史
+                document.getElementById('leaveStatus').className = 'status-box show success';
+                document.getElementById('leaveStatus').textContent = '✅ 申請已提交';
+            } catch(e) { showToast('失敗:'+e.message); }
+        }
+
+        // 月度出勤查詢
+        async function loadMonthlyAttendance() {
+            const list = document.getElementById('attendanceList');
+            const year = parseInt(document.getElementById('attendanceYear').value);
+            const month = parseInt(document.getElementById('attendanceMonth').value);
+            
+            if (!currentEmployee) return;
+            list.innerHTML = '<p style="text-align:center;">查詢中...</p>';
+            
+            try {
+                const { data, error } = await sb.rpc('get_monthly_attendance', {
+                    p_line_user_id: liffProfile.userId,
+                    p_year: year,
+                    p_month: month
+                });
+                
+                if (error) throw error;
+                if (!data || data.length === 0) {
+                    list.innerHTML = `<p style="text-align:center;">${year}年${month}月 無記錄</p>`;
+                    return;
+                }
+                
+                // 簡易統計
+                const totalDays = data.length;
+                const lateDays = data.filter(r => r.is_late).length;
+                const totalHours = data.reduce((sum, r) => sum + (parseFloat(r.total_work_hours) || 0), 0);
+                
+                let html = `
+                    <div class="lunch-summary" style="margin-bottom:15px;">
+                        <div class="stat-row"><span>出勤</span><span>${totalDays}天</span></div>
+                        <div class="stat-row"><span>遲到</span><span>${lateDays}次</span></div>
+                        <div class="stat-row"><span>工時</span><span>${totalHours.toFixed(1)}h</span></div>
+                    </div>
+                `;
+                
+                html += data.map(r => {
+                    const badge = r.is_late ? '<span class="badge badge-warning">遲到</span>' : '<span class="badge badge-success">正常</span>';
+                    const hours = r.total_work_hours ? `${parseFloat(r.total_work_hours).toFixed(1)}h` : '-';
+                    return `
+                        <div class="attendance-item ${r.is_late ? 'late' : 'normal'}">
+                            <div class="date">${r.date} ${badge} <span style="font-size:12px;">${hours}</span></div>
+                            <div class="details">
+                                <span>上班: ${r.check_in_time ? r.check_in_time.split(' ')[1].substr(0,5) : '-'}</span>
+                                <span>下班: ${r.check_out_time ? r.check_out_time.split(' ')[1].substr(0,5) : '-'}</span>
+                            </div>
+                            ${r.photo_url ? `<div style="margin-top:5px;"><a href="${r.photo_url}" target="_blank" style="font-size:12px;">📷 照片</a></div>` : ''}
+                        </div>
+                    `;
+                }).join('');
+                list.innerHTML = html;
+            } catch (err) { console.error(err); list.innerHTML = '查詢失敗'; }
+        }
+
+        // 請假歷史
+        async function loadLeaveHistory() {
+            const list = document.getElementById('leaveHistoryList');
+            if (!currentEmployee) return;
+            try {
+                const { data } = await sb.rpc('get_leave_history', { p_line_user_id: liffProfile.userId, p_limit: 5 });
+                if (!data || data.length === 0) { list.innerHTML = '<p style="text-align:center;">尚無記錄</p>'; return; }
+                
+                const typeMap = { 'annual': '特休', 'sick': '病假', 'personal': '事假', 'compensatory': '補休' };
+                const statusMap = { 'pending': '⏳', 'approved': '✅', 'rejected': '❌' };
+                
                 list.innerHTML = data.map(r => `
-                    <div class="list-item">
-                        <span>${r.date}</span>
-                        <span>${r.check_in_time || '--'} - ${r.check_out_time || '--'}</span>
+                    <div class="attendance-item">
+                        <div class="date">${typeMap[r.leave_type]} ${statusMap[r.status]}</div>
+                        <div class="details">
+                            <div>${r.start_date} ~ ${r.end_date}</div>
+                            <div style="color:#999;">${r.reason}</div>
+                        </div>
                     </div>
                 `).join('');
-            }
+            } catch(e) { console.error(e); }
         }
 
-        function showPage(id) {
-            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-            document.getElementById(id).classList.add('active');
-            if(id === 'checkInPage') startCamera();
-            if(id === 'historyPage') loadHistory();
+        // 年終統計
+        async function loadAnnualSummary() {
+            const year = parseInt(document.getElementById('salaryYear').value);
+            const card = document.getElementById('bonusCard');
+            const msg = document.getElementById('bonusMessage');
+            if (!currentEmployee) return;
+
+            card.style.display = 'block';
+            msg.style.display = 'none';
+            
+            try {
+                const { data, error } = await sb.rpc('get_annual_summary', { p_line_user_id: liffProfile.userId, p_year: year });
+                if (error) throw error;
+                
+                document.getElementById('bonusHireDate').textContent = data.hire_date || '-';
+                document.getElementById('bonusMonths').textContent = data.months_worked;
+                document.getElementById('bonusDays').textContent = data.total_attendance_days;
+                document.getElementById('bonusLate').textContent = data.late_count;
+                document.getElementById('bonusHours').textContent = data.total_work_hours;
+                document.getElementById('bonusAvgHours').textContent = data.avg_work_hours_per_day;
+                
+                const ratioEl = document.getElementById('bonusRatio');
+                ratioEl.textContent = data.bonus_eligible ? `${data.bonus_ratio} 個月` : '不符合';
+                ratioEl.style.color = data.bonus_eligible ? '#059669' : '#dc2626';
+                
+                msg.style.display = 'block';
+                msg.className = data.bonus_eligible ? 'status-box show success' : 'status-box show error';
+                msg.textContent = data.message;
+            } catch (err) { console.error(err); }
         }
+
+        function showStatus(el, type, msg) { el.className=`status-box show ${type}`; el.innerHTML=msg; }
+        function showToast(msg) { const t=document.createElement('div'); t.className='toast'; t.textContent=msg; document.body.appendChild(t); setTimeout(()=>t.remove(), 3000); }
     </script>
 </body>
 </html>
