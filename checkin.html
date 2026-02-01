@@ -9,11 +9,11 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="container">
+    <div class="container fade-in">
         <a href="index.html" class="btn btn-secondary" style="margin-bottom:15px;">← 返回首頁</a>
         
         <div class="card">
-            <h2 style="text-align: center;">📍 GPS 打卡</h2>
+            <h2 style="text-align: center;" id="pageTitle">📍 打卡</h2>
             <div id="statusInfo" class="status-box info show">正在啟動相機...</div>
             
             <div class="camera-container show">
@@ -30,13 +30,12 @@
         let videoStream = null;
 
         window.onload = () => initApp(async () => {
+            // 讀取是上班還是下班
+            const type = sessionStorage.getItem('checkin_type');
+            const title = type === 'out' ? '🌙 下班打卡' : '☀️ 上班打卡';
+            document.getElementById('pageTitle').textContent = title;
+
             startCamera();
-            // 檢查今日狀態
-            const { data } = await sb.rpc('get_today_attendance', { p_line_user_id: liffProfile.userId });
-            if(data && data.success && data.has_record) {
-                if(data.check_out_time) showStatus('statusInfo', 'success', '今日已完成打卡');
-                else showStatus('statusInfo', 'info', `上班: ${data.check_in_time} (請打下班卡)`);
-            }
         });
 
         async function startCamera() {
@@ -44,8 +43,10 @@
                 videoStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
                 document.getElementById('video').srcObject = videoStream;
                 document.getElementById('captureBtn').disabled = false;
+                document.getElementById('statusInfo').className = 'status-box success';
+                document.getElementById('statusInfo').textContent = '✅ 相機已就緒';
             } catch (err) {
-                showStatus('statusInfo', 'error', '無法開啟相機');
+                showStatus('statusInfo', 'error', '無法開啟相機，請檢查權限');
             }
         }
 
@@ -54,20 +55,17 @@
             btn.disabled = true; btn.textContent = '處理中...';
             
             try {
-                // 1. 拍照
                 const video = document.getElementById('video');
                 const canvas = document.getElementById('canvas');
                 canvas.width = video.videoWidth; canvas.height = video.videoHeight;
                 canvas.getContext('2d').drawImage(video, 0, 0);
                 const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.5));
 
-                // 2. 上傳
                 const fileName = `${liffProfile.userId}_${Date.now()}.jpg`;
                 const { error: upErr } = await sb.storage.from(CONFIG.BUCKET).upload(fileName, blob);
                 if(upErr) throw new Error('上傳失敗');
                 const { data: urlData } = sb.storage.from(CONFIG.BUCKET).getPublicUrl(fileName);
 
-                // 3. 定位並打卡
                 navigator.geolocation.getCurrentPosition(async (pos) => {
                     const { data, error } = await sb.rpc('quick_check_in_v2', {
                         p_line_user_id: liffProfile.userId,
