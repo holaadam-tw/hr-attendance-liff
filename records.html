@@ -10,7 +10,7 @@
     <style>.tab-content { display: none; } .tab-content.active { display: block; }</style>
 </head>
 <body>
-    <div class="container">
+    <div class="container fade-in">
         <a href="index.html" class="btn btn-secondary" style="margin-bottom:15px;">← 返回首頁</a>
         
         <div style="display:flex; gap:5px; margin-bottom:20px;">
@@ -68,7 +68,6 @@
             if(id === 'salary') loadSalary();
         }
 
-        // 請假邏輯
         async function loadLeave() {
             const { data } = await sb.rpc('get_leave_history', { p_line_user_id: liffProfile.userId });
             const list = document.getElementById('leaveList');
@@ -88,7 +87,6 @@
             else alert('失敗');
         }
 
-        // 考勤邏輯
         async function loadAttendance() {
             const y = document.getElementById('attYear').value;
             const m = document.getElementById('attMonth').value;
@@ -96,7 +94,6 @@
             document.getElementById('attList').innerHTML = (data||[]).map(r => `<div class="attendance-item"><div class="date">${r.date}</div><div>${r.check_in_time||'--'} - ${r.check_out_time||'--'}</div></div>`).join('');
         }
 
-        // 薪資邏輯
         async function loadSalary() {
             const y = document.getElementById('salaryYear').value;
             const { data } = await sb.rpc('get_annual_summary', { p_line_user_id: liffProfile.userId, p_year: parseInt(y) });
