@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>其他服務</title>
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="style.css">
+    <style>.tab-content { display: none; } .tab-content.active { display: block; }</style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html" class="btn btn-secondary" style="margin-bottom:15px;">← 返回首頁</a>
+        
+        <div style="display:flex; gap:5px; margin-bottom:20px;">
+            <button class="btn btn-secondary" onclick="switchTab('lunch')">🍱 便當</button>
+            <button class="btn btn-secondary" onclick="switchTab('settings')">⚙️ 設定</button>
+        </div>
+
+        <div id="lunch" class="tab-content">
+            <div class="card">
+                <h3>🍱 明日午餐</h3>
+                <div class="lunch-summary">
+                    <div class="stat-row"><span>訂購總數</span><span id="totalOrders">-</span></div>
+                </div>
+                <input type="date" id="lunchDate">
+                <div style="margin:10px 0;"><label><input type="checkbox" id="isVeg"> 素食</label></div>
+                <input type="text" id="lunchNotes" placeholder="備註">
+                <button class="btn btn-success" onclick="orderLunch()">送出訂單</button>
+            </div>
+        </div>
+
+        <div id="settings" class="tab-content">
+            <div class="card">
+                <h3>📍 打卡點管理</h3>
+                <div id="locList" style="margin-bottom:15px;">載入中...</div>
+                <input type="text" id="locName" placeholder="名稱">
+                <button class="btn btn-primary" onclick="addLocation()">➕ 新增目前位置</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="common.js"></script>
+    <script>
+        window.onload = () => initApp(() => {
+            const hash = window.location.hash.substring(1) || 'lunch';
+            switchTab(hash);
+        });
+
+        function switchTab(id) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            if(id === 'lunch') loadLunch();
+            if(id === 'settings') loadSettings();
+        }
+
+        async function loadLunch() {
+            document.getElementById('lunchDate').value = getTaiwanDate(1);
+            const { data } = await sb.rpc('get_lunch_summary', { p_date: getTaiwanDate(1) });
+            if(data) document.getElementById('totalOrders').textContent = data.total_orders;
+        }
+
+        async function orderLunch() {
+            const date = document.getElementById('lunchDate').value;
+            const veg = document.getElementById('isVeg').checked;
+            const note = document.getElementById('lunchNotes').value;
+            const { data, error } = await sb.rpc('order_lunch', { p_line_user_id: liffProfile.userId, p_order_date: date, p_is_vegetarian: veg, p_special_requirements: note });
+            if(data && data.success) alert('✅ 訂購成功'); else alert('失敗');
+        }
+
+        async function loadSettings() {
+            const { data } = await sb.rpc('get_office_locations', { p_line_user_id: liffProfile.userId });
+            const list = document.getElementById('locList');
+            if(data && data.locations.length) list.innerHTML = data.locations.map(l => `<div>📍 ${l.name}</div>`).join('');
+            else list.innerHTML = '無地點';
+        }
+
+        function addLocation() {
+            const name = document.getElementById('locName').value;
+            if(!name) return alert('請輸入名稱');
+            navigator.geolocation.getCurrentPosition(async (pos) => {
+                const { data } = await sb.rpc('add_office_location', {
+                    p_line_user_id: liffProfile.userId, p_name: name,
+                    p_latitude: pos.coords.latitude, p_longitude: pos.coords.longitude, p_radius: 300
+                });
+                if(data && data.success) { alert('✅ 成功'); loadSettings(); }
+            });
+        }
+    </script>
+</body>
+</html>
