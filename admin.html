@@ -691,7 +691,7 @@
                 const { data, error } = await sb.from('leave_requests')
                     .select(`
                         *,
-                        employees!inner(name, employee_number, department)
+                        employees!leave_requests_employee_id_fkey(name, employee_number, department)
                     `)
                     .eq('status', status)
                     .order('created_at', { ascending: false });
