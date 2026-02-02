@@ -30,12 +30,24 @@ BEGIN
         RETURN json_build_object('error', '員工資料未找到');
     END IF;
     
-    -- 計算工作月數（從到職日到年底）
+    -- 計算工作月數（從到職日到今天）
     IF v_hire_date IS NOT NULL THEN
-        v_months_worked := EXTRACT(MONTH FROM AGE(DATE(p_year || '-12-31'), v_hire_date)) + 
-                          EXTRACT(YEAR FROM AGE(DATE(p_year || '-12-31'), v_hire_date)) * 12;
-        IF v_hire_date > DATE(p_year || '-12-31') THEN
+        IF v_hire_date > CURRENT_DATE THEN
             v_months_worked := 0;
+        ELSE
+            -- 精確計算到今天為止的月份數
+            v_months_worked := (
+                EXTRACT(YEAR FROM AGE(CURRENT_DATE, v_hire_date)) * 12 +
+                EXTRACT(MONTH FROM AGE(CURRENT_DATE, v_hire_date))
+            );
+            -- 如果還沒到完整月份，不計算
+            IF EXTRACT(DAY FROM CURRENT_DATE) < EXTRACT(DAY FROM v_hire_date) THEN
+                v_months_worked := v_months_worked - 1;
+            END IF;
+            -- 確保不為負數
+            IF v_months_worked < 0 THEN
+                v_months_worked := 0;
+            END IF;
         END IF;
     ELSE
         v_months_worked := 12;

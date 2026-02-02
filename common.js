@@ -461,11 +461,10 @@ async function loadAnnualSummary() {
         if (error) throw error;
         if (data.error) throw new Error(data.error);
         
-        // 更新狀態卡片
-        const isEligible = data.bonus_status === '符合資格';
-        statusCard.className = isEligible ? 'status-card success' : 'status-card error';
-        document.getElementById('statusResult').textContent = isEligible ? '✅ 符合資格' : '❌ 已取消';
-        document.getElementById('statusReason').textContent = data.bonus_status;
+        // 更新狀態卡片 - 隱藏符合/不符合文字
+        statusCard.className = 'status-card';
+        document.getElementById('statusResult').textContent = '📊 年度考勤統計';
+        document.getElementById('statusReason').textContent = '';
         
         // 更新統計資料
         const bonusHireDateEl = document.getElementById('bonusHireDate');
@@ -477,7 +476,14 @@ async function loadAnnualSummary() {
         const bonusHoursEl = document.getElementById('bonusHours');
         const bonusAvgHoursEl = document.getElementById('bonusAvgHours');
         
-        if (bonusHireDateEl) bonusHireDateEl.textContent = data.hire_date || '-';
+        if (bonusHireDateEl) {
+            bonusHireDateEl.value = data.hire_date || '2026-01-01';
+            // 當日期改變時重新計算年資
+            bonusHireDateEl.addEventListener('change', () => {
+                calculateAndUpdateMonthsWorked(bonusHireDateEl.value, bonusMonthsEl);
+            });
+        }
+        
         if (bonusMonthsEl) bonusMonthsEl.textContent = `${data.months_worked} 個月`;
         if (bonusDaysEl) bonusDaysEl.textContent = `${data.total_attendance_days} 天`;
         if (attendanceRateEl) attendanceRateEl.textContent = `${data.attendance_rate}%`;
@@ -597,6 +603,33 @@ function showToast(msg) {
     t.textContent=msg; 
     document.body.appendChild(t); 
     setTimeout(()=>t.remove(), 3000); 
+}
+
+// 前端計算年資（從到職日到今天）
+function calculateAndUpdateMonthsWorked(hireDate, targetElement) {
+    if (!hireDate || !targetElement) return;
+    
+    const hire = new Date(hireDate);
+    const today = new Date();
+    
+    // 如果到職日期在未來，年資為 0
+    if (hire > today) {
+        targetElement.textContent = '0 個月';
+        return;
+    }
+    
+    // 計算完整月份數
+    let months = (today.getFullYear() - hire.getFullYear()) * 12 + (today.getMonth() - hire.getMonth());
+    
+    // 如果今天的日期小於到職日期的日期，減去一個月
+    if (today.getDate() < hire.getDate()) {
+        months--;
+    }
+    
+    // 確保不為負數
+    months = Math.max(0, months);
+    
+    targetElement.textContent = `${months} 個月`;
 }
 
 // 檢查是否為管理員
