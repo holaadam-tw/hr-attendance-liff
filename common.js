@@ -448,7 +448,6 @@ async function loadAnnualSummary() {
     // 顯示載入狀態
     statusCard.style.display = 'block';
     statusCard.className = 'status-card';
-    document.getElementById('statusTitle').textContent = '🎁 年終獎金資格';
     document.getElementById('statusResult').textContent = '計算中...';
     document.getElementById('statusReason').textContent = '正在分析您的年度考勤資料...';
     statsGrid.style.display = 'none';
