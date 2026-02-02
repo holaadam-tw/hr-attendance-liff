@@ -136,9 +136,14 @@
             <div class="checkin-page">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
                     <h2>👥 員工管理</h2>
-                    <button class="btn btn-primary" onclick="showJoinQRCode()" style="font-size:14px; padding:8px 16px;">
-                        📱 顯示加入公司 QR Code
-                    </button>
+                    <div style="display:flex; gap:10px;">
+                        <button class="btn btn-success" onclick="showAddEmployeeModal()" style="font-size:14px; padding:8px 16px;">
+                            ➕ 新增員工
+                        </button>
+                        <button class="btn btn-primary" onclick="showJoinQRCode()" style="font-size:14px; padding:8px 16px;">
+                            📱 顯示加入公司 QR Code
+                        </button>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label>搜尋員工</label>
@@ -146,6 +151,65 @@
                 </div>
                 <div id="employeeList">
                     <p style="text-align:center;color:#666;">載入中...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 新增員工 Modal -->
+        <div id="addEmployeeModal" class="modal" style="display:none;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>➕ 新增員工</h3>
+                    <button class="modal-close" onclick="closeAddEmployeeModal()">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <form id="addEmployeeForm">
+                        <div class="form-group">
+                            <label>姓名 *</label>
+                            <input type="text" id="newEmployeeName" required placeholder="請輸入員工姓名">
+                        </div>
+                        <div class="form-group">
+                            <label>工號 *</label>
+                            <input type="text" id="newEmployeeNumber" required placeholder="例如：E001">
+                        </div>
+                        <div class="form-group">
+                            <label>部門</label>
+                            <select id="newEmployeeDepartment">
+                                <option value="管理部">管理部</option>
+                                <option value="業務部">業務部</option>
+                                <option value="技術部">技術部</option>
+                                <option value="人事部">人事部</option>
+                                <option value="財務部">財務部</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>職位</label>
+                            <input type="text" id="newEmployeePosition" placeholder="例如：專員">
+                        </div>
+                        <div class="form-group">
+                            <label>驗證碼 *</label>
+                            <input type="text" id="newEmployeeCode" required placeholder="身分證後4碼或自訂驗證碼">
+                            <small style="color:#666; font-size:12px; display:block; margin-top:5px;">
+                                💡 建議使用身分證後4碼，員工綁定時需要輸入此驗證碼
+                            </small>
+                        </div>
+                        <div class="form-group">
+                            <label>到職日期</label>
+                            <input type="date" id="newEmployeeHireDate">
+                        </div>
+                        <div class="form-group">
+                            <label>角色權限</label>
+                            <select id="newEmployeeRole">
+                                <option value="user">一般員工</option>
+                                <option value="manager">主管</option>
+                                <option value="admin">管理員</option>
+                            </select>
+                        </div>
+                        <div style="display:flex; gap:10px; margin-top:20px;">
+                            <button type="submit" class="btn btn-success" style="flex:1;">💾 儲存員工</button>
+                            <button type="button" class="btn btn-secondary" onclick="closeAddEmployeeModal()" style="flex:1;">取消</button>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>
@@ -395,6 +459,56 @@
             renderLocationList(); // 使用 common.js 中的函數
         }
 
+        // 顯示新增員工 Modal
+        function showAddEmployeeModal() {
+            const modal = document.getElementById('addEmployeeModal');
+            modal.style.display = 'flex';
+            
+            // 設定今天為預設到職日期
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('newEmployeeHireDate').value = today;
+        }
+
+        // 關閉新增員工 Modal
+        function closeAddEmployeeModal() {
+            const modal = document.getElementById('addEmployeeModal');
+            modal.style.display = 'none';
+            
+            // 清空表單
+            document.getElementById('addEmployeeForm').reset();
+        }
+
+        // 新增員工表單提交
+        document.getElementById('addEmployeeForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const employeeData = {
+                name: document.getElementById('newEmployeeName').value,
+                employee_number: document.getElementById('newEmployeeNumber').value,
+                department: document.getElementById('newEmployeeDepartment').value,
+                position: document.getElementById('newEmployeePosition').value || '員工',
+                id_card_last_4: document.getElementById('newEmployeeCode').value,
+                hire_date: document.getElementById('newEmployeeHireDate').value,
+                role: document.getElementById('newEmployeeRole').value,
+                is_active: true,
+                created_at: new Date().toISOString()
+            };
+            
+            try {
+                const { data, error } = await sb.from('employees').insert([employeeData]);
+                
+                if (error) throw error;
+                
+                showToast('✅ 員工新增成功！');
+                closeAddEmployeeModal();
+                loadEmployeeList(); // 重新載入員工列表
+                
+            } catch (err) {
+                console.error('新增員工失敗:', err);
+                showToast('❌ 新增員工失敗: ' + err.message);
+            }
+        });
+
         // 顯示加入公司的 QR Code
         function showJoinQRCode() {
             const modal = document.getElementById('qrModal');
@@ -448,25 +562,45 @@
 
                 let html = '';
                 data.forEach(emp => {
-                    const roleBadge = emp.role === 'admin' ? 
-                        '<span class="badge badge-warning">管理員</span>' : 
-                        '<span class="badge badge-success">員工</span>';
+                    const roleColors = {
+                        'admin': '#ef4444',
+                        'manager': '#f59e0b', 
+                        'user': '#10b981'
+                    };
+                    const roleNames = {
+                        'admin': '管理員',
+                        'manager': '主管',
+                        'user': '一般員工'
+                    };
                     
                     html += `
                         <div class="attendance-item">
                             <div class="date">
-                                ${emp.name} ${roleBadge}
+                                ${emp.name} - ${emp.employee_number}
+                                <span style="background:${roleColors[emp.role]};color:white;padding:2px 8px;border-radius:12px;font-size:11px;margin-left:8px;">
+                                    ${roleNames[emp.role]}
+                                </span>
                             </div>
                             <div class="details">
-                                <span>${emp.employee_number}</span>
-                                <span>${emp.department || '-'}</span>
+                                <span>${emp.department} - ${emp.position}</span>
+                                <span>驗證碼: ${emp.id_card_last_4 || '未設定'}</span>
                             </div>
                             <div style="font-size:12px;color:#666;margin-top:5px;">
-                                ${emp.position || '-'} | 到職: ${emp.hire_date || '-'}
+                                到職: ${emp.hire_date || '未設定'} | ${emp.line_user_id ? '✅ 已綁定' : '❌ 未綁定'}
                             </div>
-                            <div style="margin-top:5px;">
-                                <button class="btn-danger" onclick="changeEmployeeRole('${emp.id}', '${emp.name}', '${emp.role}')" style="font-size:12px;padding:5px 10px;">
-                                    ${emp.role === 'admin' ? '取消管理員' : '設為管理員'}
+                            ${emp.line_user_id ? `
+                                <div style="margin-top:5px;display:flex;gap:5px;">
+                                    <button class="btn-success" onclick="updateEmployeeRole('${emp.id}', 'admin')" style="flex:1;font-size:11px;padding:3px 8px;">
+                                        設為管理員
+                                    </button>
+                                    <button class="btn-warning" onclick="updateEmployeeRole('${emp.id}', 'manager')" style="flex:1;font-size:11px;padding:3px 8px;">
+                                        設為主管
+                                    </button>
+                                    <button class="btn-secondary" onclick="updateEmployeeRole('${emp.id}', 'user')" style="flex:1;font-size:11px;padding:3px 8px;">
+                                        設為員工
+                                    </button>
+                                </div>
+                            ` : ''}
                                 </button>
                             </div>
                         </div>
