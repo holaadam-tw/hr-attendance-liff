@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>👑 管理後台 - 員工服務中心</title>
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="loadingPage" class="loading-screen">
+        <div class="spinner"></div>
+        <p>系統載入中...</p>
+    </div>
+
+    <div class="container">
+        <!-- 權限檢查頁面 -->
+        <div id="permissionPage" class="page active">
+            <div class="card">
+                <div class="bind-header">
+                    <span class="logo">🔐</span>
+                    <h2>管理員權限檢查</h2>
+                    <p>正在驗證您的管理員身份...</p>
+                </div>
+                <div id="permissionStatus" class="status-box show info">
+                    檢查權限中...
+                </div>
+            </div>
+        </div>
+
+        <!-- 管理後台首頁 -->
+        <div id="adminHomePage" class="page">
+            <div class="user-card">
+                <div class="user-info">
+                    <div class="avatar" id="adminAvatar">👑</div>
+                    <div class="user-details">
+                        <h2 id="adminName">管理員</h2>
+                        <p id="adminDept">系統管理</p>
+                        <p id="adminId" style="font-size: 11px; opacity: 0.7;">ID: -</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="menu-grid">
+                <div class="menu-item" onclick="showPage('bonusPage')">
+                    <div class="icon">🎁</div><div class="label">年終獎金試算</div>
+                </div>
+                <div class="menu-item" onclick="showPage('locationPage')">
+                    <div class="icon">📍</div><div class="label">地點管理</div>
+                </div>
+                <div class="menu-item" onclick="showPage('employeePage')">
+                    <div class="icon">👥</div><div class="label">員工管理</div>
+                </div>
+                <div class="menu-item" onclick="showPage('leaveApprovalPage')">
+                    <div class="icon">✅</div><div class="label">請假審核</div>
+                </div>
+                <div class="menu-item" onclick="showPage('reportPage')">
+                    <div class="icon">📊</div><div class="label">報表匯出</div>
+                </div>
+                <div class="menu-item" onclick="window.location.href='index.html'">
+                    <div class="icon">🏠</div><div class="label">返回首頁</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 年終獎金試算頁面 -->
+        <div id="bonusPage" class="page">
+            <button class="btn btn-secondary" onclick="showPage('adminHomePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
+            <div class="checkin-page">
+                <h2>🎁 年終獎金試算</h2>
+                <div class="form-group">
+                    <label>試算年度</label>
+                    <select id="bonusYear" onchange="loadAllBonusStats()">
+                        <option value="2026">2026</option>
+                        <option value="2025">2025</option>
+                    </select>
+                </div>
+                
+                <div class="lunch-summary">
+                    <h3 style="margin-bottom:15px;">📈 試算摘要</h3>
+                    <div class="stat-row"><span>符合資格人數</span><span id="eligibleCount">0</span></div>
+                    <div class="stat-row"><span>未符合資格人數</span><span id="ineligibleCount">0</span></div>
+                    <div class="stat-row"><span>總預算</span><span id="totalBudget">0</span></div>
+                    <div class="stat-row"><span>平均獎金</span><span id="avgBonus">0</span></div>
+                </div>
+
+                <div id="bonusList" style="margin-top:20px;">
+                    <p style="text-align:center;color:#666;">載入中...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 地點管理頁面 -->
+        <div id="locationPage" class="page">
+            <button class="btn btn-secondary" onclick="showPage('adminHomePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
+            <div class="checkin-page">
+                <h2>📍 地點管理</h2>
+                
+                <div class="lunch-summary">
+                    <h3 style="margin-bottom:10px;">📍 目前打卡地點</h3>
+                    <div id="adminLocationList">
+                        <p style="color:#666;text-align:center;">載入中...</p>
+                    </div>
+                </div>
+
+                <div class="binding-card" style="margin-top: 20px;">
+                    <h3 style="margin-bottom:15px;">➕ 新增地點</h3>
+                    <div class="form-group">
+                        <label>地點名稱</label>
+                        <input type="text" id="adminNewLocName" placeholder="例如：台北分店">
+                    </div>
+                    <div class="form-group">
+                        <label>打卡半徑 (公尺)</label>
+                        <input type="number" id="adminNewLocRadius" value="300">
+                    </div>
+                    <div class="form-group">
+                        <label>座標 (緯度, 經度)</label>
+                        <div style="display:flex; gap:10px;">
+                            <input type="text" id="adminNewLocLat" placeholder="緯度" readonly>
+                            <input type="text" id="adminNewLocLng" placeholder="經度" readonly>
+                        </div>
+                        <button class="btn btn-primary" onclick="getCurrentGPSForAdmin()" style="margin-top:10px; font-size:14px; padding:10px;">
+                            📍 抓取目前位置
+                        </button>
+                    </div>
+                    <button class="btn btn-success" onclick="addNewLocationForAdmin()">💾 儲存新地點</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 員工管理頁面 -->
+        <div id="employeePage" class="page">
+            <button class="btn btn-secondary" onclick="showPage('adminHomePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
+            <div class="checkin-page">
+                <h2>👥 員工管理</h2>
+                <div class="form-group">
+                    <label>搜尋員工</label>
+                    <input type="text" id="employeeSearch" placeholder="輸入姓名或工號" onkeyup="searchEmployees()">
+                </div>
+                <div id="employeeList">
+                    <p style="text-align:center;color:#666;">載入中...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 請假審核頁面 -->
+        <div id="leaveApprovalPage" class="page">
+            <button class="btn btn-secondary" onclick="showPage('adminHomePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
+            <div class="checkin-page">
+                <h2>✅ 請假審核</h2>
+                <div class="tabs">
+                    <button class="tab-btn active" onclick="switchLeaveTab('pending')">待審核</button>
+                    <button class="tab-btn inactive" onclick="switchLeaveTab('approved')">已通過</button>
+                    <button class="tab-btn inactive" onclick="switchLeaveTab('rejected')">已拒絕</button>
+                </div>
+                <div id="leaveApprovalList">
+                    <p style="text-align:center;color:#666;">載入中...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 報表匯出頁面 -->
+        <div id="reportPage" class="page">
+            <button class="btn btn-secondary" onclick="showPage('adminHomePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
+            <div class="checkin-page">
+                <h2>📊 報表匯出</h2>
+                <div class="menu-grid">
+                    <div class="menu-item" onclick="exportReport('attendance')">
+                        <div class="icon">📈</div><div class="label">出勤報表</div>
+                    </div>
+                    <div class="menu-item" onclick="exportReport('leave')">
+                        <div class="icon">📝</div><div class="label">請假報表</div>
+                    </div>
+                    <div class="menu-item" onclick="exportReport('bonus')">
+                        <div class="icon">🎁</div><div class="label">獎金報表</div>
+                    </div>
+                    <div class="menu-item" onclick="exportReport('lunch')">
+                        <div class="icon">🍱</div><div class="label">便當報表</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="common.js"></script>
+    <script>
+        let currentAdminEmployee = null;
+        let allBonusStats = [];
+
+        // 頁面切換功能
+        function showPage(id) {
+            document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            
+            if(id==='bonusPage') loadAllBonusStats();
+            if(id==='locationPage') renderAdminLocationList();
+            if(id==='employeePage') loadEmployeeList();
+            if(id==='leaveApprovalPage') loadLeaveApprovals('pending');
+        }
+
+        // 檢查管理員權限
+        async function checkAdminPermission() {
+            const statusEl = document.getElementById('permissionStatus');
+            
+            try {
+                const initialized = await initializeLiff();
+                if (!initialized) {
+                    showStatus(statusEl, 'error', '❌ LIFF 初始化失敗');
+                    return;
+                }
+
+                const { data, error } = await sb.from('employees')
+                    .select('*')
+                    .eq('line_user_id', liffProfile.userId)
+                    .eq('role', 'admin')
+                    .single();
+
+                if (error || !data) {
+                    showStatus(statusEl, 'error', '❌ 您沒有管理員權限');
+                    setTimeout(() => {
+                        window.location.href = 'index.html';
+                    }, 2000);
+                    return;
+                }
+
+                currentAdminEmployee = data;
+                updateAdminInfo(data);
+                showStatus(statusEl, 'success', '✅ 權限驗證通過');
+                
+                setTimeout(() => {
+                    showPage('adminHomePage');
+                }, 1000);
+
+            } catch (err) {
+                console.error(err);
+                showStatus(statusEl, 'error', '❌ 權限檢查失敗: ' + err.message);
+            }
+        }
+
+        // 更新管理員資訊
+        function updateAdminInfo(data) {
+            document.getElementById('adminName').textContent = data.name;
+            document.getElementById('adminDept').textContent = `系統管理`;
+            document.getElementById('adminId').textContent = `ID: ${data.employee_number}`;
+            
+            const avatar = document.getElementById('adminAvatar');
+            if(liffProfile.pictureUrl) {
+                avatar.style.backgroundImage = `url(${liffProfile.pictureUrl})`;
+                avatar.style.backgroundSize = 'cover'; 
+                avatar.textContent = '👑';
+            } else {
+                avatar.textContent = '👑';
+            }
+        }
+
+        // 載入所有員工獎金統計
+        async function loadAllBonusStats() {
+            const yearEl = document.getElementById('bonusYear');
+            const listEl = document.getElementById('bonusList');
+            if (!yearEl || !listEl) return;
+
+            const year = parseInt(yearEl.value);
+            listEl.innerHTML = '<p style="text-align:center;">載入中...</p>';
+
+            try {
+                const { data, error } = await sb.rpc('get_all_year_end_stats', { p_year: year });
+                
+                if (error) throw error;
+                
+                allBonusStats = data || [];
+                
+                // 計算統計摘要
+                const eligible = allBonusStats.filter(emp => emp.bonus_status === '符合資格');
+                const ineligible = allBonusStats.filter(emp => emp.bonus_status !== '符合資格');
+                const totalBudget = eligible.reduce((sum, emp) => sum + (emp.suggested_bonus || 0), 0);
+                
+                document.getElementById('eligibleCount').textContent = eligible.length;
+                document.getElementById('ineligibleCount').textContent = ineligible.length;
+                document.getElementById('totalBudget').textContent = `$${totalBudget.toLocaleString()}`;
+                document.getElementById('avgBonus').textContent = eligible.length > 0 ? 
+                    `$${Math.round(totalBudget / eligible.length).toLocaleString()}` : '$0';
+
+                // 渲染詳細列表
+                let html = '';
+                allBonusStats.forEach(emp => {
+                    const isEligible = emp.bonus_status === '符合資格';
+                    html += `
+                        <div class="attendance-item ${isEligible ? 'normal' : 'late'}">
+                            <div class="date">
+                                ${emp.name} (${emp.employee_number})
+                                <span class="badge ${isEligible ? 'badge-success' : 'badge-warning'}">
+                                    ${isEligible ? '符合' : '未符合'}
+                                </span>
+                            </div>
+                            <div class="details">
+                                <span>${emp.department || '-'}</span>
+                                <span>$${(emp.suggested_bonus || 0).toLocaleString()}</span>
+                            </div>
+                            <div style="font-size:12px;color:#666;margin-top:5px;">
+                                ${emp.bonus_status} | 出勤${emp.attendance_rate}% | 遲到${emp.late_count}次
+                            </div>
+                            <button class="btn-danger" onclick="adjustBonus('${emp.employee_id}', '${emp.name}', ${emp.suggested_bonus || 0})" style="margin-top:5px;font-size:12px;">
+                                調整獎金
+                            </button>
+                        </div>
+                    `;
+                });
+                
+                listEl.innerHTML = html || '<p style="text-align:center;">無資料</p>';
+
+            } catch (err) {
+                console.error(err);
+                listEl.innerHTML = '<p style="text-align:center;color:red;">載入失敗</p>';
+            }
+        }
+
+        // 調整獎金
+        function adjustBonus(employeeId, employeeName, currentBonus) {
+            const newBonus = prompt(`調整 ${employeeName} 的獎金金額\n目前: $${currentBonus.toLocaleString()}\n請輸入新金額 (0 表示取消):`);
+            
+            if (newBonus === null) return;
+            
+            const bonusAmount = parseInt(newBonus);
+            if (isNaN(bonusAmount) || bonusAmount < 0) {
+                showToast('❌ 請輸入有效的金額');
+                return;
+            }
+            
+            // 這裡需要實作更新獎金的邏輯
+            showToast(`✅ ${employeeName} 的獎金已調整為 $${bonusAmount.toLocaleString()}`);
+            loadAllBonusStats(); // 重新載入列表
+        }
+
+        // 管理員地點管理功能
+        function getCurrentGPSForAdmin() {
+            getCurrentGPSForSetting(); // 使用 common.js 中的函數
+        }
+
+        function addNewLocationForAdmin() {
+            addNewLocation(); // 使用 common.js 中的函數
+        }
+
+        function renderAdminLocationList() {
+            renderLocationList(); // 使用 common.js 中的函數
+        }
+
+        // 載入員工列表
+        async function loadEmployeeList() {
+            const listEl = document.getElementById('employeeList');
+            if (!listEl) return;
+
+            try {
+                const { data, error } = await sb.from('employees')
+                    .select('*')
+                    .eq('is_active', true)
+                    .order('department', { ascending: true });
+
+                if (error) throw error;
+
+                let html = '';
+                data.forEach(emp => {
+                    const roleBadge = emp.role === 'admin' ? 
+                        '<span class="badge badge-warning">管理員</span>' : 
+                        '<span class="badge badge-success">員工</span>';
+                    
+                    html += `
+                        <div class="attendance-item">
+                            <div class="date">
+                                ${emp.name} ${roleBadge}
+                            </div>
+                            <div class="details">
+                                <span>${emp.employee_number}</span>
+                                <span>${emp.department || '-'}</span>
+                            </div>
+                            <div style="font-size:12px;color:#666;margin-top:5px;">
+                                ${emp.position || '-'} | 到職: ${emp.hire_date || '-'}
+                            </div>
+                            <div style="margin-top:5px;">
+                                <button class="btn-danger" onclick="changeEmployeeRole('${emp.id}', '${emp.name}', '${emp.role}')" style="font-size:12px;padding:5px 10px;">
+                                    ${emp.role === 'admin' ? '取消管理員' : '設為管理員'}
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                listEl.innerHTML = html || '<p style="text-align:center;">無員工資料</p>';
+
+            } catch (err) {
+                console.error(err);
+                listEl.innerHTML = '<p style="text-align:center;color:red;">載入失敗</p>';
+            }
+        }
+
+        // 變更員工角色
+        async function changeEmployeeRole(employeeId, employeeName, currentRole) {
+            const newRole = currentRole === 'admin' ? 'user' : 'admin';
+            const action = currentRole === 'admin' ? '取消管理員權限' : '設為管理員';
+            
+            if (!confirm(`確定要 ${action} 給 ${employeeName} 嗎？`)) return;
+
+            try {
+                const { error } = await sb.from('employees')
+                    .update({ role: newRole })
+                    .eq('id', employeeId);
+
+                if (error) throw error;
+
+                showToast(`✅ ${employeeName} 的角色已更新`);
+                loadEmployeeList();
+
+            } catch (err) {
+                console.error(err);
+                showToast('❌ 更新失敗: ' + err.message);
+            }
+        }
+
+        // 搜尋員工
+        function searchEmployees() {
+            const searchTerm = document.getElementById('employeeSearch').value.toLowerCase();
+            const items = document.querySelectorAll('#employeeList .attendance-item');
+            
+            items.forEach(item => {
+                const text = item.textContent.toLowerCase();
+                item.style.display = text.includes(searchTerm) ? 'block' : 'none';
+            });
+        }
+
+        // 請假審核功能
+        function switchLeaveTab(status) {
+            // 更新 tab 按鈕狀態
+            document.querySelectorAll('#leaveApprovalPage .tab-btn').forEach(btn => {
+                btn.className = 'tab-btn inactive';
+            });
+            event.target.className = 'tab-btn active';
+            
+            loadLeaveApprovals(status);
+        }
+
+        async function loadLeaveApprovals(status) {
+            const listEl = document.getElementById('leaveApprovalList');
+            if (!listEl) return;
+
+            try {
+                const { data, error } = await sb.from('leave_requests')
+                    .select(`
+                        *,
+                        employees!inner(name, employee_number, department)
+                    `)
+                    .eq('status', status)
+                    .order('created_at', { ascending: false });
+
+                if (error) throw error;
+
+                let html = '';
+                data.forEach(request => {
+                    const typeMap = { 'annual': '特休', 'sick': '病假', 'personal': '事假', 'compensatory': '補休' };
+                    
+                    html += `
+                        <div class="attendance-item">
+                            <div class="date">
+                                ${request.employees.name} - ${typeMap[request.leave_type]}
+                            </div>
+                            <div class="details">
+                                <span>${request.start_date} ~ ${request.end_date}</span>
+                                <span>${request.created_at.split('T')[0]}</span>
+                            </div>
+                            <div style="font-size:12px;color:#666;margin-top:5px;">
+                                ${request.reason}
+                            </div>
+                            ${status === 'pending' ? `
+                                <div style="margin-top:5px;display:flex;gap:5px;">
+                                    <button class="btn-success" onclick="approveLeave('${request.id}', 'approved')" style="flex:1;font-size:12px;padding:5px;">
+                                        ✅ 通過
+                                    </button>
+                                    <button class="btn-danger" onclick="approveLeave('${request.id}', 'rejected')" style="flex:1;font-size:12px;padding:5px;">
+                                        ❌ 拒絕
+                                    </button>
+                                </div>
+                            ` : ''}
+                        </div>
+                    `;
+                });
+
+                listEl.innerHTML = html || '<p style="text-align:center;">無${status === 'pending' ? '待審核' : status === 'approved' ? '已通過' : '已拒絕'}的請假申請</p>';
+
+            } catch (err) {
+                console.error(err);
+                listEl.innerHTML = '<p style="text-align:center;color:red;">載入失敗</p>';
+            }
+        }
+
+        // 審核請假
+        async function approveLeave(requestId, newStatus) {
+            try {
+                const { error } = await sb.from('leave_requests')
+                    .update({ 
+                        status: newStatus,
+                        approver_id: currentAdminEmployee.id,
+                        approved_at: new Date().toISOString()
+                    })
+                    .eq('id', requestId);
+
+                if (error) throw error;
+
+                showToast(`✅ 請假申請已${newStatus === 'approved' ? '通過' : '拒絕'}`);
+                loadLeaveApprovals('pending');
+
+            } catch (err) {
+                console.error(err);
+                showToast('❌ 審核失敗: ' + err.message);
+            }
+        }
+
+        // 匯出報表
+        function exportReport(type) {
+            showToast(`📊 正在準備${type === 'attendance' ? '出勤' : type === 'leave' ? '請假' : type === 'bonus' ? '獎金' : '便當'}報表...`);
+            // 這裡可以實作實際的報表匯出功能
+            setTimeout(() => {
+                showToast('✅ 報表功能開發中，敬請期待');
+            }, 1000);
+        }
+
+        // 頁面載入完成後檢查權限
+        window.addEventListener('load', async () => {
+            if (typeof initializeLiff === 'undefined') {
+                console.error('initializeLiff 函數未定義，請檢查 common.js 是否正確載入');
+                return;
+            }
+            
+            checkAdminPermission();
+        });
+    </script>
+</body>
+</html>

@@ -89,20 +89,48 @@
                     </select>
                 </div>
                 
-                <div class="lunch-summary" id="bonusCard" style="display:none;">
-                    <h3 style="margin-bottom:15px;">🎁 年終獎金資格</h3>
-                    <div class="stat-row"><span>到職日期</span><span id="bonusHireDate">-</span></div>
-                    <div class="stat-row"><span>實際工作月數</span><span id="bonusMonths">-</span></div>
-                    <div class="stat-row"><span>總出勤天數</span><span id="bonusDays">-</span></div>
-                    <div class="stat-row"><span>遲到次數</span><span id="bonusLate">-</span></div>
-                    <div class="stat-row"><span>累計工時</span><span id="bonusHours">-</span></div>
-                    <div class="stat-row"><span>平均每日工時</span><span id="bonusAvgHours">-</span></div>
-                    <div class="stat-row" style="border-top:2px solid #d1fae5; margin-top:10px; padding-top:10px; font-weight:bold;">
-                        <span>年終發放比例</span>
-                        <span id="bonusRatio" style="color:#059669; font-size:18px;">-</span>
+                <!-- 年度成績單狀態卡片 -->
+                <div id="yearEndStatusCard" class="status-card" style="display:none; margin-bottom:20px;">
+                    <h3 id="statusTitle">🎁 年終獎金資格</h3>
+                    <h1 id="statusResult" style="margin:10px 0;">計算中...</h1>
+                    <p id="statusReason" style="margin:0; opacity:0.8;"></p>
+                </div>
+
+                <!-- 詳細統計資料 -->
+                <div class="stats-grid" id="statsGrid" style="display:none;">
+                    <div class="stat-item">
+                        <label>📅 到職日期</label>
+                        <span id="bonusHireDate">-</span>
+                    </div>
+                    <div class="stat-item">
+                        <label>⏳ 實際年資</label>
+                        <span id="bonusMonths">-</span>
+                    </div>
+                    <div class="stat-item">
+                        <label>🏃 總出勤天數</label>
+                        <span id="bonusDays">-</span>
+                    </div>
+                    <div class="stat-item">
+                        <label>📈 出席率</label>
+                        <span id="attendanceRate">-</span>
+                    </div>
+                    <div class="stat-item">
+                        <label>⏰ 遲到次數</label>
+                        <span id="bonusLate" style="color:red;">-</span>
+                    </div>
+                    <div class="stat-item">
+                        <label>📉 遲到率</label>
+                        <span id="lateRate">-</span>
+                    </div>
+                    <div class="stat-item">
+                        <label>⏱️ 累計工時</label>
+                        <span id="bonusHours">-</span>
+                    </div>
+                    <div class="stat-item">
+                        <label>📊 平均每日工時</label>
+                        <span id="bonusAvgHours">-</span>
                     </div>
                 </div>
-                <div id="bonusMessage" class="status-box" style="display:none;"></div>
                 <div style="margin-top:20px;">
                     <h3>📄 薪資單查詢</h3>
                     <p class="status-box show info">功能開發中...</p>

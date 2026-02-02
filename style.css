@@ -148,12 +148,54 @@ body {
 .spinner { border: 4px solid rgba(255,255,255,0.3); border-top: 4px solid white; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 15px; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* Toast */
-.toast {
-    position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
-    background: rgba(17, 24, 39, 0.9); color: white; padding: 12px 24px;
-    border-radius: 50px; font-size: 14px; z-index: 10000;
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-    animation: fadeInOut 3s forwards;
+/* 年度成績單樣式 */
+.status-card {
+    background: white; border-radius: 20px; padding: 25px; 
+    box-shadow: 0 10px 30px rgba(0,0,0,0.15); margin-bottom: 20px;
+    text-align: center; border: 2px solid #e5e7eb;
 }
-@keyframes fadeInOut { 0% { opacity: 0; transform: translate(-50%, -20px); } 10% { opacity: 1; transform: translate(-50%, 0); } 90% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; transform: translate(-50%, -20px); } }
+
+.status-card.success {
+    border-color: #10b981; background: linear-gradient(135deg, #d1fae5 0%, #ecfdf5 100%);
+}
+
+.status-card.error {
+    border-color: #ef4444; background: linear-gradient(135deg, #fee2e2 0%, #fef2f2 100%);
+}
+
+.status-card.warning {
+    border-color: #f59e0b; background: linear-gradient(135deg, #fef3c7 0%, #fffbeb 100%);
+}
+
+.stats-grid {
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px;
+    background: white; border-radius: 20px; padding: 25px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+}
+
+.stat-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 0; border-bottom: 1px solid #f3f4f6;
+}
+
+.stat-item:last-child {
+    border-bottom: none;
+}
+
+.stat-item label {
+    font-weight: 600; color: #6b7280; font-size: 14px;
+}
+
+.stat-item span {
+    font-weight: bold; color: #1f2937; font-size: 15px;
+}
+
+@media (max-width: 480px) {
+    .stats-grid {
+        grid-template-columns: 1fr; gap: 10px;
+    }
+    
+    .stat-item {
+        flex-direction: column; align-items: flex-start; gap: 5px;
+    }
+}

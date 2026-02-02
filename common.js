@@ -438,44 +438,68 @@ async function loadMonthlyAttendance() {
 // 年終統計
 async function loadAnnualSummary() {
     const yearEl = document.getElementById('salaryYear');
-    const card = document.getElementById('bonusCard');
-    const msg = document.getElementById('bonusMessage');
+    const statusCard = document.getElementById('yearEndStatusCard');
+    const statsGrid = document.getElementById('statsGrid');
     
-    if (!yearEl || !card || !msg || !currentEmployee) return;
+    if (!yearEl || !statusCard || !statsGrid || !currentEmployee) return;
 
     const year = parseInt(yearEl.value);
-    card.style.display = 'block';
-    msg.style.display = 'none';
+    
+    // 顯示載入狀態
+    statusCard.style.display = 'block';
+    statusCard.className = 'status-card';
+    document.getElementById('statusTitle').textContent = '🎁 年終獎金資格';
+    document.getElementById('statusResult').textContent = '計算中...';
+    document.getElementById('statusReason').textContent = '正在分析您的年度考勤資料...';
+    statsGrid.style.display = 'none';
     
     try {
-        const { data, error } = await sb.rpc('get_annual_summary', { p_line_user_id: liffProfile.userId, p_year: year });
-        if (error) throw error;
+        const { data, error } = await sb.rpc('get_my_year_end_stats', { 
+            p_line_user_id: liffProfile.userId, 
+            p_year: year 
+        });
         
+        if (error) throw error;
+        if (data.error) throw new Error(data.error);
+        
+        // 更新狀態卡片
+        const isEligible = data.bonus_status === '符合資格';
+        statusCard.className = isEligible ? 'status-card success' : 'status-card error';
+        document.getElementById('statusResult').textContent = isEligible ? '✅ 符合資格' : '❌ 已取消';
+        document.getElementById('statusReason').textContent = data.bonus_status;
+        
+        // 更新統計資料
         const bonusHireDateEl = document.getElementById('bonusHireDate');
         const bonusMonthsEl = document.getElementById('bonusMonths');
         const bonusDaysEl = document.getElementById('bonusDays');
+        const attendanceRateEl = document.getElementById('attendanceRate');
         const bonusLateEl = document.getElementById('bonusLate');
+        const lateRateEl = document.getElementById('lateRate');
         const bonusHoursEl = document.getElementById('bonusHours');
         const bonusAvgHoursEl = document.getElementById('bonusAvgHours');
-        const bonusRatioEl = document.getElementById('bonusRatio');
         
         if (bonusHireDateEl) bonusHireDateEl.textContent = data.hire_date || '-';
-        if (bonusMonthsEl) bonusMonthsEl.textContent = data.months_worked;
-        if (bonusDaysEl) bonusDaysEl.textContent = data.total_attendance_days;
-        if (bonusLateEl) bonusLateEl.textContent = data.late_count;
-        if (bonusHoursEl) bonusHoursEl.textContent = data.total_work_hours;
-        if (bonusAvgHoursEl) bonusAvgHoursEl.textContent = data.avg_work_hours_per_day;
-        
-        if (bonusRatioEl) {
-            bonusRatioEl.textContent = data.bonus_eligible ? `${data.bonus_ratio} 個月` : '不符合';
-            bonusRatioEl.style.color = data.bonus_eligible ? '#059669' : '#dc2626';
+        if (bonusMonthsEl) bonusMonthsEl.textContent = `${data.months_worked} 個月`;
+        if (bonusDaysEl) bonusDaysEl.textContent = `${data.total_attendance_days} 天`;
+        if (attendanceRateEl) attendanceRateEl.textContent = `${data.attendance_rate}%`;
+        if (bonusLateEl) {
+            bonusLateEl.textContent = `${data.late_count} 次`;
+            bonusLateEl.style.color = data.late_count > 5 ? '#ef4444' : '#1f2937';
         }
+        if (lateRateEl) {
+            lateRateEl.textContent = `${data.late_rate}%`;
+            lateRateEl.style.color = data.late_rate > 5 ? '#ef4444' : '#1f2937';
+        }
+        if (bonusHoursEl) bonusHoursEl.textContent = `${data.total_work_hours} 小時`;
+        if (bonusAvgHoursEl) bonusAvgHoursEl.textContent = `${data.avg_daily_hours} 小時`;
         
-        msg.style.display = 'block';
-        msg.className = data.bonus_eligible ? 'status-box show success' : 'status-box show error';
-        msg.textContent = data.message;
+        statsGrid.style.display = 'grid';
+        
     } catch (err) { 
         console.error(err); 
+        statusCard.className = 'status-card error';
+        document.getElementById('statusResult').textContent = '❌ 載入失敗';
+        document.getElementById('statusReason').textContent = err.message;
     }
 }
 
@@ -574,6 +598,107 @@ function showToast(msg) {
     t.textContent=msg; 
     document.body.appendChild(t); 
     setTimeout(()=>t.remove(), 3000); 
+}
+
+// 檢查是否為管理員
+async function checkIsAdmin() {
+    if (!liffProfile) return false;
+    
+    try {
+        const { data, error } = await sb.from('employees')
+            .select('role')
+            .eq('line_user_id', liffProfile.userId)
+            .eq('is_active', true)
+            .single();
+        
+        if (error || !data) return false;
+        return data.role === 'admin';
+    } catch (err) {
+        console.error('檢查管理員權限失敗:', err);
+        return false;
+    }
+}
+
+// 取得管理員資訊
+async function getAdminInfo() {
+    if (!liffProfile) return null;
+    
+    try {
+        const { data, error } = await sb.from('employees')
+            .select('*')
+            .eq('line_user_id', liffProfile.userId)
+            .eq('role', 'admin')
+            .eq('is_active', true)
+            .single();
+        
+        if (error || !data) return null;
+        return data;
+    } catch (err) {
+        console.error('取得管理員資訊失敗:', err);
+        return null;
+    }
+}
+
+// 管理員專用：更新員工角色
+async function updateEmployeeRole(employeeId, newRole) {
+    try {
+        const { error } = await sb.from('employees')
+            .update({ role: newRole })
+            .eq('id', employeeId);
+        
+        if (error) throw error;
+        return { success: true };
+    } catch (err) {
+        console.error('更新員工角色失敗:', err);
+        return { success: false, error: err.message };
+    }
+}
+
+// 管理員專用：手動調整獎金
+async function adjustEmployeeBonus(employeeId, year, bonusAmount, reason) {
+    try {
+        const { error } = await sb.from('annual_bonus')
+            .upsert({
+                employee_id: employeeId,
+                year: year,
+                final_bonus: bonusAmount,
+                manager_adjustment: bonusAmount,
+                ai_recommendation: reason,
+                is_approved: true,
+                updated_at: new Date().toISOString()
+            });
+        
+        if (error) throw error;
+        return { success: true };
+    } catch (err) {
+        console.error('調整獎金失敗:', err);
+        return { success: false, error: err.message };
+    }
+}
+
+// 管理員專用：審核請假
+async function approveLeaveRequest(requestId, status, approverId, rejectionReason = null) {
+    try {
+        const updateData = {
+            status: status,
+            approver_id: approverId,
+            approved_at: new Date().toISOString()
+        };
+        
+        if (status === 'rejected' && rejectionReason) {
+            updateData.rejection_reason = rejectionReason;
+        }
+        
+        const { error } = await sb.from('leave_requests')
+            .update(updateData)
+            .eq('id', requestId);
+        
+        if (error) throw error;
+        return { success: true };
+    } catch (err) {
+        console.error('審核請假失敗:', err);
+        return { success: false, error: err.message };
+    }
 }
 
 // 頁面載入時初始化

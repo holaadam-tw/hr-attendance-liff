@@ -90,6 +90,10 @@
                 <div class="menu-item" onclick="window.location.href='services.html#settings'">
                     <div class="icon">⚙️</div><div class="label">系統設定</div>
                 </div>
+                <!-- 管理員專用入口 - 動態顯示 -->
+                <div class="menu-item admin-only" id="adminEntry" style="display:none;" onclick="window.location.href='admin.html'">
+                    <div class="icon">👑</div><div class="label">管理後台</div>
+                </div>
             </div>
         </div>
     </div>
@@ -132,6 +136,15 @@
                 if (isLoggedIn) {
                     showPage('homePage');
                     preloadGPS();
+                    
+                    // 檢查是否為管理員，如果是則顯示管理後台入口
+                    const isAdmin = await checkIsAdmin();
+                    if (isAdmin) {
+                        const adminEntry = document.getElementById('adminEntry');
+                        if (adminEntry) {
+                            adminEntry.style.display = 'block';
+                        }
+                    }
                 } else {
                     showPage('bindPage');
                 }
