@@ -8,6 +8,25 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <link rel="stylesheet" href="style.css">
+    
+    <!-- 強制角色標籤顏色樣式 -->
+    <style>
+        .role-admin {
+            background: #dc2626 !important;
+            color: white !important;
+            border: 2px solid #dc2626 !important;
+        }
+        .role-manager {
+            background: #d97706 !important;
+            color: white !important;
+            border: 2px solid #d97706 !important;
+        }
+        .role-user {
+            background: #059669 !important;
+            color: white !important;
+            border: 2px solid #059669 !important;
+        }
+    </style>
 </head>
 <body>
     <div id="loadingPage" class="loading-screen">
@@ -579,16 +598,13 @@
                             <div class="date">
                                 <div style="display:flex; align-items:center; flex-wrap:wrap;">
                                     <span>${emp.name} - ${emp.employee_number}</span>
-                                    <span style="
-                                        background: ${emp.role === 'admin' ? '#dc2626' : emp.role === 'manager' ? '#d97706' : '#059669'} !important;
-                                        color: white !important;
+                                    <span class="role-${emp.role}" style="
                                         padding: 3px 10px !important;
                                         border-radius: 15px !important;
                                         font-size: 11px !important;
                                         margin-left: 8px !important;
                                         display: inline-block !important;
                                         font-weight: bold !important;
-                                        border: 2px solid ${emp.role === 'admin' ? '#dc2626' : emp.role === 'manager' ? '#d97706' : '#059669'} !important;
                                     ">
                                         ${roleNames[emp.role] || '未知'}
                                     </span>
@@ -603,22 +619,13 @@
                             </div>
                             ${emp.line_user_id ? `
                                 <div style="margin-top:8px;display:flex;gap:5px;">
-                                    <button class="btn-success" onclick="updateEmployeeRole('${emp.id}', 'admin')" style="
-                                        flex:1;font-size:11px;padding:5px 8px;
-                                        ${emp.role === 'admin' ? 'background:#dc2626 !important; border-color:#dc2626 !important;' : ''}
-                                    ">
+                                    <button class="btn-success ${emp.role === 'admin' ? 'role-admin' : ''}" onclick="updateEmployeeRole('${emp.id}', 'admin')" style="flex:1;font-size:11px;padding:5px 8px;">
                                         🔴 設為管理員
                                     </button>
-                                    <button class="btn-warning" onclick="updateEmployeeRole('${emp.id}', 'manager')" style="
-                                        flex:1;font-size:11px;padding:5px 8px;
-                                        ${emp.role === 'manager' ? 'background:#d97706 !important; border-color:#d97706 !important;' : ''}
-                                    ">
+                                    <button class="btn-warning ${emp.role === 'manager' ? 'role-manager' : ''}" onclick="updateEmployeeRole('${emp.id}', 'manager')" style="flex:1;font-size:11px;padding:5px 8px;">
                                         🟡 設為主管
                                     </button>
-                                    <button class="btn-secondary" onclick="updateEmployeeRole('${emp.id}', 'user')" style="
-                                        flex:1;font-size:11px;padding:5px 8px;
-                                        ${emp.role === 'user' ? 'background:#059669 !important; border-color:#059669 !important;' : ''}
-                                    ">
+                                    <button class="btn-secondary ${emp.role === 'user' ? 'role-user' : ''}" onclick="updateEmployeeRole('${emp.id}', 'user')" style="flex:1;font-size:11px;padding:5px 8px;">
                                         🟢 設為員工
                                     </button>
                                 </div>
