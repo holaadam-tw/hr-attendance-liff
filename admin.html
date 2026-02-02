@@ -204,26 +204,44 @@
             const statusEl = document.getElementById('permissionStatus');
             
             try {
+                console.log('🔍 開始檢查管理員權限...');
+                
                 const initialized = await initializeLiff();
+                console.log('📱 LIFF 初始化結果:', initialized);
+                
                 if (!initialized) {
                     showStatus(statusEl, 'error', '❌ LIFF 初始化失敗');
                     return;
                 }
 
+                console.log('👤 LIFF Profile:', liffProfile);
+                console.log('🔑 LINE User ID:', liffProfile?.userId);
+
                 const { data, error } = await sb.from('employees')
                     .select('*')
                     .eq('line_user_id', liffProfile.userId)
                     .eq('role', 'admin')
+                    .eq('is_active', true)
                     .single();
 
+                console.log('📊 資料庫查詢結果:', { data, error });
+
                 if (error || !data) {
-                    showStatus(statusEl, 'error', '❌ 您沒有管理員權限');
+                    console.error('❌ 權限檢查失敗:', error);
+                    showStatus(statusEl, 'error', '❌ 您沒有管理員權限<br>錯誤: ' + (error?.message || '找不到員工資料'));
+                    
+                    // 顯示詳細資訊
+                    setTimeout(() => {
+                        showStatus(statusEl, 'info', '🔍 詳細資訊:<br>LINE ID: ' + (liffProfile?.userId || '未知') + '<br>請確認資料庫中的 role 欄位為 admin');
+                    }, 2000);
+                    
                     setTimeout(() => {
                         window.location.href = 'index.html';
-                    }, 2000);
+                    }, 5000);
                     return;
                 }
 
+                console.log('✅ 權限驗證通過:', data);
                 currentAdminEmployee = data;
                 updateAdminInfo(data);
                 showStatus(statusEl, 'success', '✅ 權限驗證通過');
@@ -233,7 +251,7 @@
                 }, 1000);
 
             } catch (err) {
-                console.error(err);
+                console.error('💥 權限檢查異常:', err);
                 showStatus(statusEl, 'error', '❌ 權限檢查失敗: ' + err.message);
             }
         }
