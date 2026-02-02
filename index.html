@@ -120,6 +120,12 @@
 
         // 頁面載入完成後檢查用戶狀態
         window.addEventListener('load', async () => {
+            // 確保 common.js 中的函數已載入
+            if (typeof initializeLiff === 'undefined') {
+                console.error('initializeLiff 函數未定義，請檢查 common.js 是否正確載入');
+                return;
+            }
+            
             const initialized = await initializeLiff();
             if (initialized) {
                 const isLoggedIn = await checkUserStatus();
