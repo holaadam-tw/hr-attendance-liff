@@ -2,92 +2,155 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>打卡作業</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>📍 打卡 - 員工服務中心</title>
     <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="container fade-in">
-        <a href="index.html" class="btn btn-secondary" style="margin-bottom:15px;">← 返回首頁</a>
-        
-        <div class="card">
-            <h2 style="text-align: center;" id="pageTitle">📍 打卡</h2>
-            <div id="statusInfo" class="status-box info show">正在啟動相機...</div>
-            
-            <div class="camera-container show">
-                <video id="video" autoplay playsinline muted></video>
-                <canvas id="canvas" class="hidden"></canvas>
+    <div id="loadingPage" class="loading-screen">
+        <div class="spinner"></div>
+        <p>系統載入中...</p>
+    </div>
+
+    <div class="container">
+        <div id="checkInPage" class="page active">
+            <button class="btn btn-secondary" onclick="window.location.href='index.html'" style="width:auto;margin-bottom:10px;">← 返回</button>
+            <div class="checkin-page">
+                <h2 id="checkInTitle" style="text-align: center;">📍 上班打卡</h2>
+                <div id="checkInStatus" class="status-box show info">準備開啟相機...</div>
+                
+                <div class="camera-container" id="cameraContainer">
+                    <video id="video" autoplay playsinline muted></video>
+                    <canvas id="canvas" class="hidden"></canvas>
+                </div>
+
+                <button class="btn btn-primary" id="captureBtn" onclick="captureAndCheckIn()" disabled>📸 拍照並打卡</button>
             </div>
-            
-            <button id="captureBtn" class="btn btn-primary" onclick="executeCheckIn()" disabled>📸 拍照並打卡</button>
         </div>
     </div>
 
     <script src="common.js"></script>
     <script>
-        let videoStream = null;
+        let currentCheckInType = 'in';
 
-        window.onload = () => initApp(async () => {
-            // 讀取是上班還是下班
-            const type = sessionStorage.getItem('checkin_type');
-            const title = type === 'out' ? '🌙 下班打卡' : '☀️ 上班打卡';
-            document.getElementById('pageTitle').textContent = title;
-
-            startCamera();
-        });
-
-        async function startCamera() {
-            try {
-                videoStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
-                document.getElementById('video').srcObject = videoStream;
-                document.getElementById('captureBtn').disabled = false;
-                document.getElementById('statusInfo').className = 'status-box success';
-                document.getElementById('statusInfo').textContent = '✅ 相機已就緒';
-            } catch (err) {
-                showStatus('statusInfo', 'error', '無法開啟相機，請檢查權限');
+        // 拍照打卡功能
+        async function captureAndCheckIn() {
+            if (!currentEmployee) {
+                showToast('❌ 員工資料未載入，請重新登入');
+                return;
             }
-        }
 
-        async function executeCheckIn() {
             const btn = document.getElementById('captureBtn');
-            btn.disabled = true; btn.textContent = '處理中...';
+            const statusBox = document.getElementById('checkInStatus');
+            btn.disabled = true; 
+            btn.textContent = '處理中...';
             
             try {
                 const video = document.getElementById('video');
                 const canvas = document.getElementById('canvas');
-                canvas.width = video.videoWidth; canvas.height = video.videoHeight;
-                canvas.getContext('2d').drawImage(video, 0, 0);
-                const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.5));
+                canvas.width = video.videoWidth; 
+                canvas.height = video.videoHeight;
+                const ctx = canvas.getContext('2d');
+                ctx.translate(canvas.width, 0); 
+                ctx.scale(-1, 1);
+                ctx.drawImage(video, 0, 0);
+                const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.7));
 
-                const fileName = `${liffProfile.userId}_${Date.now()}.jpg`;
-                const { error: upErr } = await sb.storage.from(CONFIG.BUCKET).upload(fileName, blob);
-                if(upErr) throw new Error('上傳失敗');
+                showStatus(statusBox, 'info', '☁️ 上傳中...');
+                const fileName = `${currentEmployee.employee_number}_${Date.now()}.jpg`; 
+                const { error: uploadError } = await sb.storage.from(CONFIG.BUCKET).upload(fileName, blob);
+                if (uploadError) throw uploadError;
+
                 const { data: urlData } = sb.storage.from(CONFIG.BUCKET).getPublicUrl(fileName);
+                const publicUrl = urlData?.publicUrl || urlData?.publicURL;
 
-                navigator.geolocation.getCurrentPosition(async (pos) => {
-                    const { data, error } = await sb.rpc('quick_check_in_v2', {
-                        p_line_user_id: liffProfile.userId,
-                        p_latitude: pos.coords.latitude,
-                        p_longitude: pos.coords.longitude,
-                        p_photo_url: urlData.publicUrl,
-                        p_device_id: navigator.userAgent
-                    });
+                if (!publicUrl) throw new Error('無法取得照片網址');
 
-                    if(error || !data.success) alert('打卡失敗: ' + (data?.error || error?.message));
-                    else {
-                        alert('✅ ' + data.message);
-                        window.location.href = 'index.html';
-                    }
-                    btn.disabled = false;
-                }, (err) => {
-                    alert('定位失敗'); btn.disabled = false;
+                showStatus(statusBox, 'info', '📍 定位中...');
+                let loc = cachedLocation || await getGPS();
+
+                const { data: rpcData, error: rpcError } = await sb.rpc('quick_check_in', {
+                    p_line_user_id: liffProfile.userId,
+                    p_latitude: loc.latitude, 
+                    p_longitude: loc.longitude,
+                    p_photo_url: publicUrl, 
+                    p_device_id: navigator.userAgent
                 });
-            } catch(e) {
-                alert('錯誤: ' + e.message); btn.disabled = false;
+
+                if (rpcError) throw rpcError;
+                if (!rpcData.success) throw new Error(rpcData.error);
+
+                if (rpcData.location_name) localStorage.setItem('last_location', rpcData.location_name);
+
+                const typeText = currentCheckInType === 'in' ? '上班' : '下班';
+                showToast(`✅ ${typeText}成功！@${rpcData.location_name || '公司'}`);
+                
+                setTimeout(() => { 
+                    window.location.href = 'index.html'; 
+                }, 1500);
+
+            } catch (err) {
+                console.error(err);
+                showStatus(statusBox, 'error', `❌ 失敗: ${err.message}`);
+                btn.disabled = false; 
+                btn.textContent = '📸 重試';
             }
         }
+
+        // 開啟相機
+        async function openCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+                const video = document.getElementById('video');
+                video.srcObject = stream;
+                videoStream = stream;
+                video.onloadedmetadata = () => {
+                    video.play();
+                    document.getElementById('cameraContainer').classList.add('show');
+                    document.getElementById('captureBtn').disabled = false;
+                    document.getElementById('checkInStatus').textContent = '✅ 相機就緒';
+                };
+            } catch(e) { 
+                console.error('相機錯誤', e);
+                let msg = '無法啟動相機';
+                if(e.name === 'NotAllowedError') msg = '請允許相機權限';
+                if(e.name === 'NotFoundError') msg = '找不到相機裝置';
+                const status = document.getElementById('checkInStatus');
+                status.className = 'status-box show error';
+                status.innerHTML = `❌ ${msg}`;
+            }
+        }
+
+        // 頁面載入完成後初始化
+        window.addEventListener('load', async () => {
+            // 取得 URL 參數
+            const urlParams = new URLSearchParams(window.location.search);
+            currentCheckInType = urlParams.get('type') || 'in';
+            
+            const titleEl = document.getElementById('checkInTitle');
+            if (titleEl) {
+                titleEl.textContent = currentCheckInType === 'in' ? '📍 上班打卡' : '👋 下班打卡';
+            }
+
+            const initialized = await initializeLiff();
+            if (initialized) {
+                const isLoggedIn = await checkUserStatus();
+                if (isLoggedIn) {
+                    openCamera();
+                } else {
+                    window.location.href = 'index.html';
+                }
+            }
+        });
+
+        // 頁面離開時關閉相機
+        window.addEventListener('beforeunload', () => {
+            if(videoStream) {
+                videoStream.getTracks().forEach(t=>t.stop());
+            }
+        });
     </script>
 </body>
 </html>

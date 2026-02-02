@@ -1,4 +1,4 @@
-/* style.css */
+/* ================= UI 樣式區 ================= */
 :root {
     --primary-color: #667eea;
     --secondary-color: #764ba2;
@@ -7,133 +7,153 @@
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
-
 body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Microsoft JhengHei", sans-serif;
     background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
-    min-height: 100vh;
-    padding: 20px;
-    color: var(--text-color);
-    padding-bottom: 50px;
+    min-height: 100vh; padding: 20px; color: var(--text-color);
+    padding-bottom: 50px; 
 }
-
 .container { max-width: 600px; margin: 0 auto; }
 
-/* 動畫與隱藏 */
-.hidden { display: none !important; }
-.fade-in { animation: fadeIn 0.3s ease-out; }
+/* 頁面切換與動畫 */
+.page { display: none; animation: fadeIn 0.3s ease-out; }
+.page.active { display: block; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-/* 卡片與區塊 */
+/* 卡片通用樣式 */
 .card, .user-card, .checkin-page {
-    background: white; border-radius: 20px; padding: 25px;
+    background: white; border-radius: 20px; padding: 25px; 
     box-shadow: 0 10px 30px rgba(0,0,0,0.15); margin-bottom: 20px;
 }
 
-/* 用戶資訊 */
+/* 綁定頁面 */
+.bind-header { text-align: center; margin-bottom: 20px; }
+.bind-header .logo { font-size: 50px; display: block; margin-bottom: 10px; }
+
+.tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+.tab-btn { flex: 1; padding: 12px; border: none; border-radius: 12px; cursor: pointer; font-weight: bold; transition: all 0.2s; }
+.tab-btn.active { background: var(--primary-color); color: white; box-shadow: 0 4px 6px rgba(102, 126, 234, 0.25); }
+.tab-btn.inactive { background: #e5e7eb; color: #6b7280; }
+
+/* 首頁用戶資訊 */
 .user-info { display: flex; align-items: center; gap: 15px; }
 .avatar {
     width: 64px; height: 64px; border-radius: 50%;
     background: linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%);
     display: flex; align-items: center; justify-content: center;
-    font-size: 28px; color: white; border: 3px solid white;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-    background-size: cover; background-position: center;
+    font-size: 28px; color: white; border: 3px solid white; box-shadow: 0 2px 10px rgba(0,0,0,0.1);
 }
-.user-details h2 { font-size: 20px; margin-bottom: 4px; color: #1f2937; margin-top: 0; }
-.user-details p { font-size: 13px; color: #6b7280; margin: 0; }
+.user-details h2 { font-size: 20px; margin-bottom: 4px; color: #1f2937; }
+.user-details p { font-size: 13px; color: #6b7280; }
 
-/* 雙按鈕打卡區塊 */
-.primary-actions { 
-    display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 25px; 
+/* GPS 狀態列 */
+.location-status {
+    display: flex; align-items: center; gap: 8px; margin-top: 15px;
+    padding: 10px 15px; border-radius: 12px; font-size: 13px; font-weight: 500;
+    transition: all 0.3s;
 }
+.location-status.loading { background: #fffbeb; color: #92400e; }
+.location-status.ready { background: #d1fae5; color: #065f46; }
+.location-status .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: currentColor; animation: pulse 1.5s infinite;
+}
+@keyframes pulse { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(1.2); } 100% { opacity: 1; transform: scale(1); } }
+
+/* 主要打卡按鈕 */
+.primary-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 25px; }
 .primary-btn {
     background: white; border-radius: 16px; padding: 20px 15px; text-align: center;
     cursor: pointer; transition: transform 0.1s, box-shadow 0.3s; 
     box-shadow: 0 4px 6px rgba(0,0,0,0.05); position: relative; overflow: hidden;
-    color: #374151;
 }
 .primary-btn:active { transform: scale(0.96); }
 .primary-btn.checkin { border-bottom: 4px solid var(--primary-color); }
 .primary-btn.checkout { border-bottom: 4px solid #f472b6; }
-.primary-btn.disabled { opacity: 0.6; cursor: not-allowed; filter: grayscale(1); background: #f3f4f6; }
+.primary-btn.disabled { opacity: 0.6; cursor: not-allowed; filter: grayscale(1); }
 .primary-btn .icon { font-size: 36px; margin-bottom: 8px; display: block; }
-.primary-btn .label { font-size: 16px; font-weight: 700; }
-.badge-corner {
+.primary-btn .label { font-size: 16px; font-weight: 700; color: #374151; }
+.primary-btn .badge-corner {
     position: absolute; top: 8px; right: 8px; font-size: 10px; 
-    background: #f3f4f6; padding: 2px 6px; border-radius: 4px; 
-    color: #6b7280; font-weight: bold;
+    background: #f3f4f6; padding: 2px 6px; border-radius: 4px; color: #6b7280;
 }
 
-/* 一般按鈕 */
-.btn {
-    width: 100%; padding: 16px; border: none; border-radius: 12px;
-    font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px;
-    text-align: center; text-decoration: none; display: block;
-}
-.btn-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
-.btn-success { background: linear-gradient(135deg, #34d399 0%, #059669 100%); color: white; }
-.btn-secondary { background: #e5e7eb; color: #4b5563; }
-.btn:disabled { opacity: 0.6; cursor: not-allowed; }
-
-/* 選單 */
+/* 九宮格選單 */
 .menu-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px; }
 .menu-item {
-    background: rgba(255,255,255,0.9); border-radius: 16px; padding: 15px 5px;
-    text-align: center; cursor: pointer; text-decoration: none; color: #333;
-    transition: all 0.2s; backdrop-filter: blur(5px);
+    background: rgba(255,255,255,0.9); border-radius: 16px; padding: 15px 5px; text-align: center;
+    cursor: pointer; transition: all 0.2s; backdrop-filter: blur(5px);
 }
-.menu-item:active { transform: scale(0.95); background: white; }
+.menu-item:active { background: rgba(255,255,255,1); transform: scale(0.95); }
 .menu-item .icon { font-size: 28px; margin-bottom: 5px; display: block; }
 .menu-item .label { font-size: 12px; font-weight: 600; color: #4b5563; }
 
-/* 表單與輸入 */
-.form-group { margin-bottom: 15px; }
+/* 表單元素 */
+.form-group { margin-bottom: 20px; }
 .form-group label { display: block; margin-bottom: 8px; font-weight: 600; color: #4b5563; font-size: 14px; }
-input, select, textarea {
-    width: 100%; padding: 14px; border: 2px solid #e5e7eb; border-radius: 12px;
-    font-size: 16px; background: #f9fafb; margin-bottom: 10px; box-sizing: border-box;
+.form-group input, .form-group select, .form-group textarea {
+    width: 100%; padding: 14px; border: 2px solid #e5e7eb; border-radius: 12px; font-size: 16px;
+    transition: border-color 0.3s; background: #f9fafb;
 }
+.form-group input:focus { outline: none; border-color: var(--primary-color); background: white; }
+.form-group textarea { min-height: 100px; resize: vertical; }
 
-/* 狀態框 */
-.status-box { padding: 12px; border-radius: 12px; margin-bottom: 15px; text-align: center; font-size: 14px; }
-.status-box.info { background: #e0f2fe; color: #075985; border: 1px solid #bae6fd; }
-.status-box.success { background: #d1fae5; color: #065f46; border: 1px solid #10b981; }
-.status-box.error { background: #fee2e2; color: #991b1b; border: 1px solid #ef4444; }
+/* 按鈕 */
+.btn { width: 100%; padding: 16px; border: none; border-radius: 12px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+.btn-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4); }
+.btn-success { background: linear-gradient(135deg, #34d399 0%, #059669 100%); color: white; box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3); }
+.btn-secondary { background: #e5e7eb; color: #4b5563; }
+.btn-danger { background: #ff4d4f; color: white; margin-top: 0; padding: 8px 15px; font-size: 14px; width: auto;}
 
-/* 列表 */
+/* 便當與農曆 */
+.lunch-summary { background: #f0fdf4; border: 1px solid #d1fae5; border-radius: 12px; padding: 15px; margin-bottom: 20px; }
+.stat-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed #a7f3d0; }
+.stat-row:last-child { border-bottom: none; }
+.lunar-notice { background: #fff7ed; border-left: 4px solid #f59e0b; padding: 12px; margin-bottom: 15px; border-radius: 8px; font-size: 13px; color: #92400e; display: none; }
+.lunar-notice.show { display: block; }
+
+/* 狀態訊息 */
+.status-box { background: white; border-radius: 12px; padding: 15px; margin-bottom: 20px; text-align: center; font-size: 14px; display: none; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+.status-box.show { display: block; animation: fadeIn 0.3s; }
+.status-box.success { border-left: 5px solid #10b981; color: #065f46; }
+.status-box.error { border-left: 5px solid #ef4444; color: #7f1d1d; }
+.status-box.info { border-left: 5px solid #3b82f6; color: #1e3a8a; }
+
+/* 相機 */
+.camera-container {
+    position: relative; width: 100%; aspect-ratio: 3/4; margin: 0 auto 20px;
+    border-radius: 16px; overflow: hidden; background: #000; display: none;
+}
+.camera-container.show { display: block; }
+#video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
+
+/* 考勤列表與 Badge */
 .attendance-item {
     background: white; border-radius: 12px; padding: 15px; margin-bottom: 12px;
     box-shadow: 0 2px 5px rgba(0,0,0,0.05); border-left: 4px solid #ddd;
 }
 .attendance-item.late { border-left-color: #ef4444; }
 .attendance-item.normal { border-left-color: #10b981; }
-.attendance-item .date { font-weight: bold; display: flex; justify-content: space-between; margin-bottom: 5px; }
-.attendance-item .details { font-size: 13px; color: #666; }
+.attendance-item .date { font-weight: bold; margin-bottom: 5px; display: flex; justify-content: space-between; }
+.attendance-item .details { font-size: 13px; color: #6b7280; display: flex; justify-content: space-between; }
 
-/* 其他 */
-.loading-screen {
-    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-    background: var(--primary-color); display: flex; flex-direction: column;
-    align-items: center; justify-content: center; z-index: 9999; color: white;
-}
-.spinner {
-    border: 4px solid rgba(255,255,255,0.3); border-top: 4px solid white;
-    border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 15px;
-}
+/* Badge 樣式 */
+.badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+.badge-warning { background: #fef3c7; color: #92400e; }
+.badge-success { background: #d1fae5; color: #065f46; }
+
+/* 工具類 */
+.hidden { display: none !important; }
+.loading-screen { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--primary-color); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 9999; color: white; }
+.spinner { border: 4px solid rgba(255,255,255,0.3); border-top: 4px solid white; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 15px; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* Toast */
 .toast {
     position: fixed; top: 20px; left: 50%; transform: translateX(-50%);
-    background: rgba(17, 24, 39, 0.95); color: white; padding: 12px 24px;
+    background: rgba(17, 24, 39, 0.9); color: white; padding: 12px 24px;
     border-radius: 50px; font-size: 14px; z-index: 10000;
     box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
     animation: fadeInOut 3s forwards;
 }
 @keyframes fadeInOut { 0% { opacity: 0; transform: translate(-50%, -20px); } 10% { opacity: 1; transform: translate(-50%, 0); } 90% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; transform: translate(-50%, -20px); } }
-.camera-container { position: relative; width: 100%; aspect-ratio: 3/4; border-radius: 16px; overflow: hidden; background: #000; margin-bottom: 15px; }
-#video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
-.lunch-summary { background: #f0fdf4; border: 1px solid #d1fae5; border-radius: 12px; padding: 15px; margin-bottom: 20px; }
-.stat-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px dashed #a7f3d0; }
-.badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
-.badge-warning { background: #fef3c7; color: #92400e; }
-.badge-success { background: #d1fae5; color: #065f46; }
