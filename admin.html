@@ -577,10 +577,22 @@
                     html += `
                         <div class="attendance-item">
                             <div class="date">
-                                ${emp.name} - ${emp.employee_number}
-                                <span style="background:${roleColors[emp.role] || '#6b7280'};color:white;padding:2px 8px;border-radius:12px;font-size:11px;margin-left:8px;display:inline-block;">
-                                    ${roleNames[emp.role] || '未知'}
-                                </span>
+                                <div style="display:flex; align-items:center; flex-wrap:wrap;">
+                                    <span>${emp.name} - ${emp.employee_number}</span>
+                                    <span style="
+                                        background: ${emp.role === 'admin' ? '#dc2626' : emp.role === 'manager' ? '#d97706' : '#059669'} !important;
+                                        color: white !important;
+                                        padding: 3px 10px !important;
+                                        border-radius: 15px !important;
+                                        font-size: 11px !important;
+                                        margin-left: 8px !important;
+                                        display: inline-block !important;
+                                        font-weight: bold !important;
+                                        border: 2px solid ${emp.role === 'admin' ? '#dc2626' : emp.role === 'manager' ? '#d97706' : '#059669'} !important;
+                                    ">
+                                        ${roleNames[emp.role] || '未知'}
+                                    </span>
+                                </div>
                             </div>
                             <div class="details">
                                 <span>${emp.department} - ${emp.position}</span>
@@ -590,15 +602,24 @@
                                 到職: ${emp.hire_date || '未設定'} | ${emp.line_user_id ? '✅ 已綁定' : '❌ 未綁定'}
                             </div>
                             ${emp.line_user_id ? `
-                                <div style="margin-top:5px;display:flex;gap:5px;">
-                                    <button class="btn-success" onclick="updateEmployeeRole('${emp.id}', 'admin')" style="flex:1;font-size:11px;padding:3px 8px;background:${emp.role === 'admin' ? '#059669' : ''};">
-                                        設為管理員
+                                <div style="margin-top:8px;display:flex;gap:5px;">
+                                    <button class="btn-success" onclick="updateEmployeeRole('${emp.id}', 'admin')" style="
+                                        flex:1;font-size:11px;padding:5px 8px;
+                                        ${emp.role === 'admin' ? 'background:#dc2626 !important; border-color:#dc2626 !important;' : ''}
+                                    ">
+                                        🔴 設為管理員
                                     </button>
-                                    <button class="btn-warning" onclick="updateEmployeeRole('${emp.id}', 'manager')" style="flex:1;font-size:11px;padding:3px 8px;background:${emp.role === 'manager' ? '#d97706' : ''};">
-                                        設為主管
+                                    <button class="btn-warning" onclick="updateEmployeeRole('${emp.id}', 'manager')" style="
+                                        flex:1;font-size:11px;padding:5px 8px;
+                                        ${emp.role === 'manager' ? 'background:#d97706 !important; border-color:#d97706 !important;' : ''}
+                                    ">
+                                        🟡 設為主管
                                     </button>
-                                    <button class="btn-secondary" onclick="updateEmployeeRole('${emp.id}', 'user')" style="flex:1;font-size:11px;padding:3px 8px;background:${emp.role === 'user' ? '#4b5563' : ''};">
-                                        設為員工
+                                    <button class="btn-secondary" onclick="updateEmployeeRole('${emp.id}', 'user')" style="
+                                        flex:1;font-size:11px;padding:5px 8px;
+                                        ${emp.role === 'user' ? 'background:#059669 !important; border-color:#059669 !important;' : ''}
+                                    ">
+                                        🟢 設為員工
                                     </button>
                                 </div>
                             ` : ''}
