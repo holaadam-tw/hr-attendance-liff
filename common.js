@@ -65,7 +65,7 @@ async function checkUserStatus() {
     document.getElementById('loadingPage').style.display = 'flex';
     
     try {
-        const { data, error } = await sb.from('employees').select('*').eq('line_user_id', liffProfile.userId).single();
+        const { data, error } = await sb.from('employees').select('*').eq('line_user_id', liffProfile.userId).maybeSingle();
         
         await loadSettings();
 
@@ -110,7 +110,7 @@ function updateUserInfo(data) {
 // 載入系統設定
 async function loadSettings() {
     try {
-        const { data, error } = await sb.from('system_settings').select('value').eq('key', 'office_locations').single();
+        const { data, error } = await sb.from('system_settings').select('value').eq('key', 'office_locations').maybeSingle();
         if (!error && data) {
             officeLocations = data.value || [];
         }
@@ -641,7 +641,7 @@ async function checkIsAdmin() {
             .select('role')
             .eq('line_user_id', liffProfile.userId)
             .eq('is_active', true)
-            .single();
+            .maybeSingle();
         
         if (error || !data) return false;
         return data.role === 'admin';
@@ -661,7 +661,7 @@ async function getAdminInfo() {
             .eq('line_user_id', liffProfile.userId)
             .eq('role', 'admin')
             .eq('is_active', true)
-            .single();
+            .maybeSingle();
         
         if (error || !data) return null;
         return data;
