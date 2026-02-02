@@ -183,15 +183,11 @@ async function checkTodayAttendance() {
             .select('*')
             .eq('employee_id', currentEmployee.id)
             .eq('date', today)
-            .single();
+            .maybeSingle();
         
         if (error) {
-            if (error.code === 'PGRST116') {
-                todayAttendance = null; 
-            } else {
-                console.error('❌ 檢查考勤錯誤:', error);
-                todayAttendance = null;
-            }
+            console.error('❌ 檢查考勤錯誤:', error);
+            todayAttendance = null;
         } else {
             todayAttendance = data;
         }
