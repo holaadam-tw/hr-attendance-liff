@@ -628,6 +628,13 @@
                 });
 
                 listEl.innerHTML = html || '<p style="text-align:center;">無員工資料</p>';
+                
+                // 強制重新渲染頁面
+                setTimeout(() => {
+                    listEl.style.display = 'none';
+                    listEl.offsetHeight; // 觸發重排
+                    listEl.style.display = 'block';
+                }, 100);
 
             } catch (err) {
                 console.error(err);

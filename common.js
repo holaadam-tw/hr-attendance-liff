@@ -258,16 +258,21 @@ async function handleBind() {
     try {
         const { data, error } = await sb.rpc('bind_employee', params);
         if (error) throw error;
-        if (data.success) {
+        
+        console.log('綁定回應:', data); // 除錯用
+        
+        if (data && data.success) {
             showStatus(statusBox, 'success', '✅ 綁定成功！');
             setTimeout(() => {
                 window.location.href = 'index.html';
             }, 1500);
         } else {
-            showStatus(statusBox, 'error', data.error);
+            const errorMsg = (data && data.error) ? data.error : '綁定失敗，請檢查資料';
+            showStatus(statusBox, 'error', errorMsg);
         }
     } catch (err) {
-        showStatus(statusBox, 'error', err.message);
+        console.error('綁定錯誤:', err); // 除錯用
+        showStatus(statusBox, 'error', err.message || '綁定失敗，請稍後再試');
     }
 }
 
