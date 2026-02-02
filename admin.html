@@ -501,7 +501,12 @@
                     `;
                 });
 
-                listEl.innerHTML = html || '<p style="text-align:center;">無${status === 'pending' ? '待審核' : status === 'approved' ? '已通過' : '已拒絕'}的請假申請</p>';
+                // 確定狀態文字
+                let statusText = '待審核';
+                if (status === 'approved') statusText = '已通過';
+                if (status === 'rejected') statusText = '已拒絕';
+                
+                listEl.innerHTML = html || `<p style="text-align:center;">無${statusText}的請假申請</p>`;
 
             } catch (err) {
                 console.error(err);
