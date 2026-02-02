@@ -6,6 +6,7 @@
     <title>👑 管理後台 - 員工服務中心</title>
     <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -133,13 +134,44 @@
         <div id="employeePage" class="page">
             <button class="btn btn-secondary" onclick="showPage('adminHomePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
             <div class="checkin-page">
-                <h2>👥 員工管理</h2>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                    <h2>👥 員工管理</h2>
+                    <button class="btn btn-primary" onclick="showJoinQRCode()" style="font-size:14px; padding:8px 16px;">
+                        📱 顯示加入公司 QR Code
+                    </button>
+                </div>
                 <div class="form-group">
                     <label>搜尋員工</label>
                     <input type="text" id="employeeSearch" placeholder="輸入姓名或工號" onkeyup="searchEmployees()">
                 </div>
                 <div id="employeeList">
                     <p style="text-align:center;color:#666;">載入中...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- QR Code Modal -->
+        <div id="qrModal" class="modal" style="display:none;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>📱 員工加入公司 QR Code</h3>
+                    <button class="modal-close" onclick="closeQRModal()">&times;</button>
+                </div>
+                <div class="modal-body" style="text-align:center;">
+                    <div id="qrcode" style="margin:20px auto; display:inline-block;"></div>
+                    <div style="margin-top:20px; padding:15px; background:#f3f4f6; border-radius:8px;">
+                        <p style="margin:0; font-size:14px; color:#666;">公司代碼</p>
+                        <p style="margin:5px 0; font-size:18px; font-weight:bold; color:#1f2937;">HR_SYSTEM_001</p>
+                        <p style="margin:5px 0; font-size:12px; color:#9ca3af;">無法掃碼時請手動輸入此代碼</p>
+                    </div>
+                    <div style="margin-top:15px; padding:10px; background:#fef3c7; border-radius:8px; border-left:4px solid #f59e0b;">
+                        <p style="margin:0; font-size:13px; color:#92400e;">
+                            <strong>使用說明：</strong><br>
+                            1. 員工掃描此 QR Code<br>
+                            2. 輸入工號和驗證碼<br>
+                            3. 完成綁定即可使用系統
+                        </p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -362,6 +394,44 @@
         function renderAdminLocationList() {
             renderLocationList(); // 使用 common.js 中的函數
         }
+
+        // 顯示加入公司的 QR Code
+        function showJoinQRCode() {
+            const modal = document.getElementById('qrModal');
+            const qrcodeDiv = document.getElementById('qrcode');
+            
+            // 清空之前的 QR Code
+            qrcodeDiv.innerHTML = '';
+            
+            // 生成 QR Code
+            const liffUrl = `https://liff.line.me/2008962829-bnsS1bbB?type=bind&company=HR_SYSTEM_001`;
+            
+            new QRCode(qrcodeDiv, {
+                text: liffUrl,
+                width: 200,
+                height: 200,
+                colorDark: "#1f2937",
+                colorLight: "#ffffff",
+                correctLevel: QRCode.CorrectLevel.H
+            });
+            
+            // 顯示 Modal
+            modal.style.display = 'flex';
+        }
+
+        // 關閉 QR Code Modal
+        function closeQRModal() {
+            const modal = document.getElementById('qrModal');
+            modal.style.display = 'none';
+        }
+
+        // 點擊 Modal 背景關閉
+        document.addEventListener('click', function(event) {
+            const modal = document.getElementById('qrModal');
+            if (event.target === modal) {
+                closeQRModal();
+            }
+        });
 
         // 載入員工列表
         async function loadEmployeeList() {

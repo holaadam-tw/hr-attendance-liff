@@ -122,6 +122,49 @@
             setTimeout(() => isProcessing = false, 1000);
         }
 
+        // 檢查 LIFF 啟動參數
+        function checkLiffParams() {
+            // 檢查 LIFF 啟動參數
+            if (liff && liff.isInClient()) {
+                const liffParams = liff.getContext();
+                if (liffParams && liffParams.type && liffParams.type === 'utim') {
+                    const urlParams = new URLSearchParams(liffParams.utm);
+                    const company = urlParams.get('company');
+                    if (company) {
+                        sessionStorage.setItem('company_code', company);
+                        console.log('🏢 從 LIFF 參數取得公司代碼:', company);
+                    }
+                }
+            }
+            
+            // 檢查網址參數（適用於外部瀏覽器）
+            const urlParams = new URLSearchParams(window.location.search);
+            const company = urlParams.get('company');
+            if (company) {
+                sessionStorage.setItem('company_code', company);
+                console.log('🏢 從網址參數取得公司代碼:', company);
+            }
+            
+            // 自動填入公司代碼到綁定表單
+            const savedCompany = sessionStorage.getItem('company_code');
+            if (savedCompany) {
+                const companyInput = document.getElementById('companyCode');
+                if (companyInput) {
+                    companyInput.value = savedCompany;
+                    companyInput.readOnly = true;
+                    companyInput.style.backgroundColor = '#f3f4f6';
+                    
+                    // 顯示提示
+                    const hint = document.createElement('small');
+                    hint.style.color = '#10b981';
+                    hint.style.display = 'block';
+                    hint.style.marginTop = '5px';
+                    hint.textContent = '✅ 公司代碼已自動填入';
+                    companyInput.parentNode.appendChild(hint);
+                }
+            }
+        }
+
         // 頁面載入完成後檢查用戶狀態
         window.addEventListener('load', async () => {
             // 確保 common.js 中的函數已載入
@@ -132,6 +175,9 @@
             
             const initialized = await initializeLiff();
             if (initialized) {
+                // 檢查 LIFF 啟動參數
+                checkLiffParams();
+                
                 const isLoggedIn = await checkUserStatus();
                 if (isLoggedIn) {
                     showPage('homePage');
