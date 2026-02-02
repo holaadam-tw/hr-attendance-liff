@@ -491,6 +491,7 @@
                 hire_date: document.getElementById('newEmployeeHireDate').value,
                 role: document.getElementById('newEmployeeRole').value,
                 is_active: true,
+                company_id: '8a669e2c-7521-43e9-9300-5c004c57e9db', // 使用現有的 company_id
                 created_at: new Date().toISOString()
             };
             
@@ -601,8 +602,6 @@
                                     </button>
                                 </div>
                             ` : ''}
-                                </button>
-                            </div>
                         </div>
                     `;
                 });
@@ -635,6 +634,30 @@
             } catch (err) {
                 console.error(err);
                 showToast('❌ 更新失敗: ' + err.message);
+            }
+        }
+
+        // 更新員工角色
+        async function updateEmployeeRole(employeeId, newRole) {
+            try {
+                const { data, error } = await sb.from('employees')
+                    .update({ role: newRole })
+                    .eq('id', employeeId);
+                
+                if (error) throw error;
+                
+                const roleNames = {
+                    'admin': '管理員',
+                    'manager': '主管',
+                    'user': '一般員工'
+                };
+                
+                showToast(`✅ 已將員工設為${roleNames[newRole]}`);
+                loadEmployeeList(); // 重新載入員工列表
+                
+            } catch (err) {
+                console.error('更新員工角色失敗:', err);
+                showToast('❌ 更新角色失敗: ' + err.message);
             }
         }
 
