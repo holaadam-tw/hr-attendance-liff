@@ -111,6 +111,7 @@
             if (initialized) {
                 const isLoggedIn = await checkUserStatus();
                 if (isLoggedIn) {
+                    initBottomNav();
                     showPage(pageId);
                 } else {
                     window.location.href = 'index.html';
@@ -119,7 +120,7 @@
         });
     </script>
     <!-- 底部導航列 -->
-    <nav class="bottom-nav">
+    <nav class="bottom-nav" style="display:none;">
         <a class="nav-item" onclick="window.location.href='index.html'">
             <span class="nav-icon">🏠</span><span class="nav-label">首頁</span>
         </a>

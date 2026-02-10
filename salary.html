@@ -124,11 +124,77 @@
             </div>
 
             <button class="download-btn" onclick="showToast('📄 PDF 下載功能開發中')">📄 下載薪資單 PDF</button>
+
+            <!-- 計算公式說明 -->
+            <div class="card" style="padding:16px; margin-top:16px;">
+                <div style="font-size:14px;font-weight:800;color:var(--dark);margin-bottom:12px;">📐 薪資計算說明</div>
+                
+                <div style="font-size:13px;color:var(--gray);line-height:1.8;">
+                    <div style="margin-bottom:12px;">
+                        <b style="color:var(--dark);">💰 基本薪資</b><br>
+                        月薪制員工為固定月薪
+                    </div>
+
+                    <div style="margin-bottom:12px;">
+                        <b style="color:var(--dark);">⏰ 加班費計算（依勞基法 §24）</b><br>
+                        <span style="display:block;margin-left:8px;">• 平日前 2 小時：時薪 × <b>1.34</b> 倍</span>
+                        <span style="display:block;margin-left:8px;">• 平日後 2 小時：時薪 × <b>1.67</b> 倍</span>
+                        <span style="display:block;margin-left:8px;">• 休息日前 2 小時：時薪 × <b>1.34</b> 倍</span>
+                        <span style="display:block;margin-left:8px;">• 休息日 2-8 小時：時薪 × <b>1.67</b> 倍</span>
+                        <span style="display:block;margin-left:8px;">• 國定假日：時薪 × <b>2.0</b> 倍</span>
+                        <span style="display:block;margin-left:8px;color:var(--info);">📝 時薪 = 月薪 ÷ 30 ÷ 8</span>
+                    </div>
+
+                    <div style="margin-bottom:12px;">
+                        <b style="color:var(--dark);">🏆 全勤獎金</b><br>
+                        當月無遲到、無缺勤、無事假才發放
+                    </div>
+
+                    <div style="margin-bottom:12px;">
+                        <b style="color:var(--dark);">🌙 夜班津貼</b><br>
+                        中班 NT$ 200/天、晚班 NT$ 400/天
+                    </div>
+                </div>
+            </div>
+
+            <!-- 勞健保說明 -->
+            <div class="card" style="padding:16px; margin-top:12px;">
+                <div style="font-size:14px;font-weight:800;color:var(--dark);margin-bottom:12px;">🏥 勞健保費用說明</div>
+                
+                <div style="font-size:13px;color:var(--gray);line-height:1.8;">
+                    <div style="margin-bottom:12px;">
+                        <b style="color:var(--dark);">勞工保險（勞保）</b><br>
+                        <span style="display:block;margin-left:8px;">• 費率：12.5%（2025 年）</span>
+                        <span style="display:block;margin-left:8px;">• 勞工自付比例：<b>20%</b></span>
+                        <span style="display:block;margin-left:8px;color:var(--info);">📝 自付額 = 投保級距 × 12.5% × 20%</span>
+                    </div>
+
+                    <div style="margin-bottom:12px;">
+                        <b style="color:var(--dark);">全民健康保險（健保）</b><br>
+                        <span style="display:block;margin-left:8px;">• 費率：5.17%（2025 年）</span>
+                        <span style="display:block;margin-left:8px;">• 勞工自付比例：<b>30%</b></span>
+                        <span style="display:block;margin-left:8px;color:var(--info);">📝 自付額 = 投保級距 × 5.17% × 30%</span>
+                    </div>
+
+                    <div style="margin-bottom:12px;">
+                        <b style="color:var(--dark);">勞工退休金（勞退）</b><br>
+                        <span style="display:block;margin-left:8px;">• 雇主提繳：月薪 × <b>6%</b>（不從薪資扣）</span>
+                        <span style="display:block;margin-left:8px;">• 勞工自提：月薪 × <b>0~6%</b>（可免稅）</span>
+                        <span style="display:block;margin-left:8px;color:var(--success);">💡 自提金額可從當年所得稅中扣除</span>
+                    </div>
+
+                    <div style="margin-bottom:4px;">
+                        <b style="color:var(--dark);">所得稅預扣</b><br>
+                        <span style="display:block;margin-left:8px;">• 依薪資級距預扣 5%</span>
+                        <span style="display:block;margin-left:8px;color:var(--gray);">實際稅額以年度報稅結算為準</span>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
     <!-- 底部導航列 -->
-    <nav class="bottom-nav">
+    <nav class="bottom-nav" style="display:none;">
         <a class="nav-item" onclick="window.location.href='index.html'">
             <span class="nav-icon">🏠</span><span class="nav-label">首頁</span>
         </a>
@@ -231,13 +297,14 @@
                 { label: '夜班津貼', value: salary.night_allowance },
             ].filter(i => i.value > 0);
 
-            // Deduct items
+            // Deduct items with formulas
             const deductItems = [
-                { label: '勞健保扣除', value: salary.labor_insurance + salary.health_insurance },
-                { label: '勞退自提 6%', value: salary.pension_self },
-                { label: '預扣所得稅', value: salary.income_tax },
-                { label: '事假扣款', value: salary.personal_leave_deduction },
-                { label: '遲到扣款', value: salary.late_deduction },
+                { label: '勞保自付', value: salary.labor_insurance, desc: '投保級距 × 12.5% × 20%' },
+                { label: '健保自付', value: salary.health_insurance, desc: '投保級距 × 5.17% × 30%' },
+                { label: '勞退自提', value: salary.pension_self || 0, desc: '月薪 × 6%' },
+                { label: '預扣所得稅', value: salary.income_tax || 0, desc: '總收入 × 5%' },
+                { label: '事假扣款', value: salary.personal_leave_deduction || 0, desc: '日薪 × 事假天數' },
+                { label: '遲到扣款', value: salary.late_deduction || 0 },
             ].filter(i => i.value > 0);
 
             const totalIncome = incomeItems.reduce((s, i) => s + i.value, 0);
@@ -269,9 +336,12 @@
                 `<div class="detail-row"><span class="dl">${i.label}</span><span class="dv">${formatNT(i.value)}</span></div>`
             ).join('');
 
-            // Deduct rows
+            // Deduct rows (with formula)
             document.getElementById('deductRows').innerHTML = deductItems.map(i =>
-                `<div class="detail-row"><span class="dl">${i.label}</span><span class="dv deduct">-${formatNT(i.value)}</span></div>`
+                `<div class="detail-row">
+                    <span class="dl">${i.label}${i.desc ? `<br><span style="font-size:11px;color:#94A3B8;">${i.desc}</span>` : ''}</span>
+                    <span class="dv deduct">-${formatNT(i.value)}</span>
+                </div>`
             ).join('');
         }
 
@@ -334,6 +404,7 @@
                 const isLoggedIn = await checkUserStatus();
                 if (isLoggedIn) {
                     document.getElementById('loadingPage').style.display = 'none';
+                    initBottomNav();
                     loadSalary();
                 } else {
                     window.location.href = 'index.html';

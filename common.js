@@ -452,12 +452,27 @@ async function loadMonthlyAttendance() {
         const totalDays = data.length;
         const lateDays = data.filter(r => r.is_late).length;
         const totalHours = data.reduce((sum, r) => sum + (parseFloat(r.total_work_hours) || 0), 0);
+
+        // 查詢當月請假天數
+        let leaveDays = 0;
+        try {
+            const monthStart = `${year}-${String(month).padStart(2,'0')}-01`;
+            const monthEnd = new Date(year, month, 0).toISOString().split('T')[0];
+            const { data: leaveData } = await sb.from('leave_requests')
+                .select('days, leave_type')
+                .eq('employee_id', currentEmployee.id)
+                .eq('status', 'approved')
+                .gte('start_date', monthStart)
+                .lte('start_date', monthEnd);
+            if (leaveData) leaveDays = leaveData.reduce((s, r) => s + (parseFloat(r.days) || 0), 0);
+        } catch(e) {}
         
         let html = `
             <div class="lunch-summary" style="margin-bottom:15px;">
-                <div class="stat-row"><span>📅 出勤</span><span>${totalDays} 天</span></div>
-                <div class="stat-row"><span>⏰ 遲到</span><span style="color:${lateDays > 0 ? '#ef4444' : '#1f2937'}">${lateDays} 次</span></div>
-                <div class="stat-row"><span>⏱️ 總工時</span><span>${totalHours.toFixed(1)} h</span></div>
+                <div class="stat-row"><span>📅 出勤</span><span><b>${totalDays}</b> 天</span></div>
+                <div class="stat-row"><span>⏰ 遲到</span><span style="color:${lateDays > 0 ? '#ef4444' : '#1f2937'}"><b>${lateDays}</b> 次</span></div>
+                <div class="stat-row"><span>📝 請假</span><span><b>${leaveDays}</b> 天</span></div>
+                <div class="stat-row"><span>⏱️ 總工時</span><span><b>${totalHours.toFixed(1)}</b> h</span></div>
             </div>
         `;
         
@@ -467,9 +482,10 @@ async function loadMonthlyAttendance() {
                 : '<span class="badge badge-success">正常</span>';
             const hours = r.total_work_hours ? `${parseFloat(r.total_work_hours).toFixed(1)}h` : '-';
             
-            // [BUG FIX] 安全解析時間，避免 split 失敗
+            // 安全解析時間
             let checkInTime = '-';
             let checkOutTime = '-';
+            let lateMinutes = '';
             try {
                 if (r.check_in_time) {
                     const parts = r.check_in_time.split(' ');
@@ -478,6 +494,16 @@ async function loadMonthlyAttendance() {
                 if (r.check_out_time) {
                     const parts = r.check_out_time.split(' ');
                     checkOutTime = parts.length > 1 ? parts[1].substring(0,5) : r.check_out_time.substring(0,5);
+                }
+                // 計算遲到時間（假設上班時間 08:00）
+                if (r.is_late && r.check_in_time) {
+                    const inTime = new Date(r.check_in_time);
+                    const scheduled = new Date(inTime);
+                    scheduled.setHours(8, 0, 0, 0); // 預設 08:00
+                    const diffMin = Math.round((inTime - scheduled) / 60000);
+                    if (diffMin > 0) {
+                        lateMinutes = `<span style="font-size:11px;color:#ef4444;margin-left:4px;">遲到 ${diffMin} 分鐘</span>`;
+                    }
                 }
             } catch(e) {}
             
@@ -488,7 +514,7 @@ async function loadMonthlyAttendance() {
                         <span>${badge} <span style="font-size:12px;color:#6b7280;">${hours}</span></span>
                     </div>
                     <div class="details">
-                        <span>上班: ${checkInTime}</span>
+                        <span>上班: ${checkInTime}${lateMinutes}</span>
                         <span>下班: ${checkOutTime}</span>
                     </div>
                     ${r.photo_url ? `<div style="margin-top:5px;"><a href="${r.photo_url}" target="_blank" style="font-size:12px;color:#667eea;">📷 查看照片</a></div>` : ''}
@@ -773,9 +799,91 @@ async function approveLeaveRequest(requestId, status, approverId, rejectionReaso
     }
 }
 
+// ===== 底部導航列（管理員限定） =====
+// 所有頁面的 bottom-nav 預設 display:none，登入後由此函數判斷
+async function initBottomNav() {
+    const nav = document.querySelector('.bottom-nav');
+    if (!nav) return;
+    
+    try {
+        const isAdmin = await checkIsAdmin();
+        if (isAdmin) {
+            nav.style.display = 'flex';
+        } else {
+            nav.style.display = 'none';
+            // 移除 bottom padding（非管理員不需要留空間）
+            document.querySelector('.container')?.style.setProperty('padding-bottom', '16px');
+        }
+    } catch(e) {
+        nav.style.display = 'none';
+    }
+}
+
+// ===== 功能顯示設定 =====
+// 管理員可在 system_settings 中設定哪些功能對員工可見
+// key: 'feature_visibility', value: { schedule: true, salary: true, leave: true, lunch: true, attendance: true }
+const DEFAULT_FEATURES = {
+    schedule: true,     // 班表查詢
+    salary: true,       // 薪資查詢
+    leave: true,        // 請假申請
+    lunch: true,        // 便當訂購
+    attendance: true,   // 考勤查詢
+    bonus: true         // 年終獎金
+};
+
+async function getFeatureVisibility() {
+    try {
+        const { data } = await sb.from('system_settings')
+            .select('value')
+            .eq('key', 'feature_visibility')
+            .maybeSingle();
+        
+        if (data?.value) {
+            return { ...DEFAULT_FEATURES, ...data.value };
+        }
+    } catch(e) {}
+    return DEFAULT_FEATURES;
+}
+
+// 根據設定隱藏首頁選單項目
+async function applyFeatureVisibility() {
+    const features = await getFeatureVisibility();
+    
+    // 首頁選單項目對應
+    const menuMap = {
+        'records.html': 'leave',
+        'services.html': 'lunch',
+        'records.html#attendance': 'attendance'
+    };
+    
+    document.querySelectorAll('.menu-item').forEach(item => {
+        const onclick = item.getAttribute('onclick') || '';
+        for (const [url, feature] of Object.entries(menuMap)) {
+            if (onclick.includes(url) && !features[feature]) {
+                item.style.display = 'none';
+            }
+        }
+    });
+    
+    // 底部導航對應
+    const navMap = {
+        'schedule.html': 'schedule',
+        'salary.html': 'salary'
+    };
+    
+    document.querySelectorAll('.nav-item').forEach(item => {
+        const onclick = item.getAttribute('onclick') || '';
+        for (const [url, feature] of Object.entries(navMap)) {
+            if (onclick.includes(url) && !features[feature]) {
+                item.style.display = 'none';
+            }
+        }
+    });
+}
+
 // ===== Debug 模式 =====
 // [BUG FIX] 移除 window.addEventListener('load') — 各頁面自行處理初始化
-// 之前這裡有一個重複的 load 事件監聽器會導致雙重初始化
+// 之前這裡有一個重複的 load 事件監聯器會導致雙重初始化
 if (location.search.includes('debug=true')) {
     const script = document.createElement('script');
     script.src = 'https://unpkg.com/vconsole@latest/dist/vconsole.min.js';
