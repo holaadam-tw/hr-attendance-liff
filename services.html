@@ -22,17 +22,49 @@
                 <h2>🍱 便當訂購</h2>
                 <div class="lunar-notice" id="lunarNotice">🌙 明天是農曆初一/十五，建議訂購素食</div>
                 
+                <!-- 截止時間提醒 -->
+                <div id="lunchDeadline" style="padding:10px 14px;border-radius:10px;margin-bottom:12px;font-size:13px;font-weight:700;"></div>
+
+                <!-- 我的今日訂單 -->
+                <div id="myOrderCard" style="display:none;background:#fff;border-radius:14px;padding:16px;box-shadow:0 2px 8px rgba(0,0,0,0.06);margin-bottom:16px;">
+                    <div style="font-size:14px;font-weight:800;color:#0F172A;margin-bottom:10px;">📋 我的訂單</div>
+                    <div id="myOrderContent" style="font-size:13px;"></div>
+                    <div id="myOrderActions" style="margin-top:12px;display:flex;gap:8px;"></div>
+                </div>
+                
                 <div class="lunch-summary">
-                    <h3 style="margin-bottom:10px;">📊 明日統計</h3>
+                    <h3 style="margin-bottom:10px;">📊 今日統計</h3>
                     <div class="stat-row"><span>總數</span><span id="totalOrders">0</span></div>
                     <div class="stat-row"><span>🥗 素食</span><span id="vegCount">0</span></div>
                     <div class="stat-row"><span>🍖 葷食</span><span id="regularCount">0</span></div>
                 </div>
 
-                <div class="form-group"><label>訂購日期</label><input type="date" id="lunchDate"></div>
-                <div class="form-group"><label><input type="checkbox" id="lunchVegetarian"> 我要訂素食便當</label></div>
-                <div class="form-group"><label>備註 (選填)</label><input type="text" id="lunchNotes" placeholder="例：不要飯"></div>
-                <button class="btn btn-success" onclick="submitLunchOrder()">✅ 確認訂購</button>
+                <!-- 訂購表單 -->
+                <div id="lunchForm">
+                    <div class="form-group"><label>訂購日期</label><input type="date" id="lunchDate"></div>
+                    
+                    <!-- 便當選擇卡片 -->
+                    <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px;">
+                        <div class="lunch-choice" onclick="selectLunchType('regular')" style="display:flex;align-items:center;gap:12px;padding:14px;border:2px solid #E5E7EB;border-radius:14px;cursor:pointer;transition:all 0.2s;">
+                            <span style="font-size:28px;">🍖</span>
+                            <div style="flex:1;"><b style="font-size:14px;">葷食便當</b><br><span style="font-size:11px;color:#94A3B8;">今日主菜由餐廳安排</span></div>
+                            <div class="lunch-check" id="lunchCheckRegular" style="width:22px;height:22px;border:2px solid #CBD5E1;border-radius:50%;transition:all 0.2s;"></div>
+                        </div>
+                        <div class="lunch-choice" onclick="selectLunchType('vegetarian')" style="display:flex;align-items:center;gap:12px;padding:14px;border:2px solid #E5E7EB;border-radius:14px;cursor:pointer;transition:all 0.2s;">
+                            <span style="font-size:28px;">🥗</span>
+                            <div style="flex:1;"><b style="font-size:14px;">素食便當</b><br><span style="font-size:11px;color:#94A3B8;">健康蔬食料理</span></div>
+                            <div class="lunch-check" id="lunchCheckVeg" style="width:22px;height:22px;border:2px solid #CBD5E1;border-radius:50%;transition:all 0.2s;"></div>
+                        </div>
+                        <div class="lunch-choice" onclick="selectLunchType('none')" style="display:flex;align-items:center;gap:12px;padding:14px;border:2px solid #E5E7EB;border-radius:14px;cursor:pointer;transition:all 0.2s;">
+                            <span style="font-size:28px;">💰</span>
+                            <div style="flex:1;"><b style="font-size:14px;">不訂購</b><br><span style="font-size:11px;color:#059669;">可獲得 NT$ 50 午餐補助</span></div>
+                            <div class="lunch-check" id="lunchCheckNone" style="width:22px;height:22px;border:2px solid #CBD5E1;border-radius:50%;transition:all 0.2s;"></div>
+                        </div>
+                    </div>
+
+                    <div class="form-group"><label>備註 (選填)</label><input type="text" id="lunchNotes" placeholder="例：不要飯"></div>
+                    <button class="btn btn-success" id="lunchSubmitBtn" onclick="submitLunchOrderNew()" disabled style="opacity:0.5;">請先選擇便當類型</button>
+                </div>
             </div>
         </div>
 
@@ -89,8 +121,156 @@
             document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
             document.getElementById(id).classList.add('active');
             
-            if(id==='lunchPage') loadLunchSummary();
+            if(id==='lunchPage') { loadLunchSummary(); checkMyOrder(); checkDeadline(); }
             if(id==='settingsPage') renderLocationList();
+        }
+
+        // ===== 便當訂購 =====
+        let selectedLunchType = null;
+        let myCurrentOrder = null;
+        const LUNCH_DEADLINE_HOUR = 10; // 10:00 截止
+
+        function checkDeadline() {
+            const el = document.getElementById('lunchDeadline');
+            const now = new Date();
+            const h = now.getHours();
+            if (h >= LUNCH_DEADLINE_HOUR) {
+                el.style.background = '#FEF2F2'; el.style.color = '#DC2626';
+                el.innerHTML = `⏰ 今日訂購已截止（${LUNCH_DEADLINE_HOUR}:00 前可訂購）<br><span style="font-size:11px;opacity:0.7;">明日訂單請明天再來</span>`;
+                // 鎖定表單
+                document.getElementById('lunchForm').style.opacity = '0.4';
+                document.getElementById('lunchForm').style.pointerEvents = 'none';
+            } else {
+                const remain = LUNCH_DEADLINE_HOUR - h - 1;
+                const mins = 60 - now.getMinutes();
+                el.style.background = '#ECFDF5'; el.style.color = '#059669';
+                el.innerHTML = `✅ 訂購中 — 截止時間 ${LUNCH_DEADLINE_HOUR}:00（剩 ${remain > 0 ? remain + '小時' : ''}${mins}分鐘）`;
+                document.getElementById('lunchForm').style.opacity = '1';
+                document.getElementById('lunchForm').style.pointerEvents = 'auto';
+            }
+        }
+
+        async function checkMyOrder() {
+            const card = document.getElementById('myOrderCard');
+            const content = document.getElementById('myOrderContent');
+            const actions = document.getElementById('myOrderActions');
+            if (!currentEmployee || !card) return;
+            
+            const todayStr = new Date().toISOString().split('T')[0];
+            try {
+                const { data } = await sb.from('lunch_orders')
+                    .select('*')
+                    .eq('employee_id', currentEmployee.id)
+                    .eq('order_date', todayStr)
+                    .maybeSingle();
+                
+                myCurrentOrder = data;
+                if (!data) { card.style.display = 'none'; return; }
+                
+                card.style.display = 'block';
+                const isVeg = data.is_vegetarian;
+                const isCancelled = data.status === 'cancelled';
+                const emoji = isCancelled ? '💰' : (isVeg ? '🥗' : '🍖');
+                const label = isCancelled ? '不訂購（補助 $50）' : (isVeg ? '素食便當' : '葷食便當');
+                const statusColor = isCancelled ? '#EA580C' : '#059669';
+                
+                content.innerHTML = `
+                    <div style="display:flex;align-items:center;gap:10px;padding:10px;background:#F8FAFC;border-radius:10px;">
+                        <span style="font-size:28px;">${emoji}</span>
+                        <div style="flex:1;">
+                            <div style="font-weight:700;">${label}</div>
+                            <div style="font-size:11px;color:#94A3B8;">訂購日期：${data.order_date}${data.notes ? ' · ' + data.notes : ''}</div>
+                        </div>
+                        <span style="font-size:11px;font-weight:700;color:${statusColor};">${isCancelled ? '已取消' : '已訂購'}</span>
+                    </div>
+                `;
+                
+                // 截止前可修改
+                const now = new Date();
+                if (now.getHours() < LUNCH_DEADLINE_HOUR) {
+                    actions.innerHTML = `
+                        <button onclick="modifyLunchOrder('vegetarian')" style="flex:1;padding:10px;border:2px solid #059669;border-radius:10px;background:#ECFDF5;color:#059669;font-weight:700;font-size:12px;cursor:pointer;">🥗 改素食</button>
+                        <button onclick="modifyLunchOrder('regular')" style="flex:1;padding:10px;border:2px solid #2563EB;border-radius:10px;background:#EFF6FF;color:#2563EB;font-weight:700;font-size:12px;cursor:pointer;">🍖 改葷食</button>
+                        <button onclick="cancelLunchOrder()" style="flex:1;padding:10px;border:2px solid #DC2626;border-radius:10px;background:#FEF2F2;color:#DC2626;font-weight:700;font-size:12px;cursor:pointer;">❌ 取消</button>
+                    `;
+                } else {
+                    actions.innerHTML = '<span style="font-size:12px;color:#94A3B8;">⏰ 已過截止時間，無法修改</span>';
+                }
+            } catch(e) { console.error(e); }
+        }
+
+        function selectLunchType(type) {
+            selectedLunchType = type;
+            document.querySelectorAll('.lunch-choice').forEach(c => { c.style.borderColor = '#E5E7EB'; c.style.background = '#fff'; });
+            document.querySelectorAll('.lunch-check').forEach(c => { c.style.borderColor = '#CBD5E1'; c.style.background = 'transparent'; c.innerHTML = ''; });
+            
+            const choices = document.querySelectorAll('.lunch-choice');
+            const checks = { regular: 'lunchCheckRegular', vegetarian: 'lunchCheckVeg', none: 'lunchCheckNone' };
+            const idx = { regular:0, vegetarian:1, none:2 }[type];
+            
+            if (choices[idx]) { choices[idx].style.borderColor = '#4F46E5'; choices[idx].style.background = '#F5F3FF'; }
+            const ck = document.getElementById(checks[type]);
+            if (ck) { ck.style.borderColor = '#4F46E5'; ck.style.background = '#4F46E5'; ck.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" style="margin:2px;"><path fill="white" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>'; }
+            
+            const btn = document.getElementById('lunchSubmitBtn');
+            btn.disabled = false; btn.style.opacity = '1';
+            const labels = { regular: '✅ 確認訂購葷食便當', vegetarian: '✅ 確認訂購素食便當', none: '✅ 確認不訂購（補助 $50）' };
+            btn.textContent = labels[type];
+        }
+
+        async function submitLunchOrderNew() {
+            if (!selectedLunchType || !currentEmployee) return;
+            const dateEl = document.getElementById('lunchDate');
+            if (!dateEl?.value) return showToast('請選擇日期');
+            
+            const msgs = { regular:'確定訂購「葷食便當」？', vegetarian:'確定訂購「素食便當」？', none:'確定不訂購便當？\n將獲得 NT$ 50 午餐補助' };
+            if (!confirm(msgs[selectedLunchType])) return;
+            
+            try {
+                await sb.from('lunch_orders').upsert({
+                    employee_id: currentEmployee.id,
+                    order_date: dateEl.value,
+                    is_vegetarian: selectedLunchType === 'vegetarian',
+                    status: selectedLunchType === 'none' ? 'cancelled' : 'ordered',
+                    notes: document.getElementById('lunchNotes')?.value || (selectedLunchType === 'none' ? '不訂購，補助NT$50' : '')
+                }, { onConflict: 'employee_id,order_date' });
+                
+                showToast(selectedLunchType === 'none' ? '💰 已取消訂購（補助$50）' : '✅ 訂購成功！');
+                checkMyOrder();
+                loadLunchSummary();
+            } catch(e) { showToast('❌ 訂購失敗：' + friendlyError(e)); }
+        }
+
+        async function modifyLunchOrder(newType) {
+            if (!myCurrentOrder) return;
+            const label = newType === 'vegetarian' ? '素食' : '葷食';
+            if (!confirm(`確定改為「${label}便當」？`)) return;
+            
+            try {
+                await sb.from('lunch_orders').update({
+                    is_vegetarian: newType === 'vegetarian',
+                    status: 'ordered',
+                    notes: ''
+                }).eq('id', myCurrentOrder.id);
+                
+                showToast(`✅ 已改為${label}便當`);
+                checkMyOrder(); loadLunchSummary();
+            } catch(e) { showToast('❌ 修改失敗'); }
+        }
+
+        async function cancelLunchOrder() {
+            if (!myCurrentOrder) return;
+            if (!confirm('確定取消訂購？\n將獲得 NT$ 50 午餐補助')) return;
+            
+            try {
+                await sb.from('lunch_orders').update({
+                    status: 'cancelled',
+                    notes: '取消訂購，補助NT$50'
+                }).eq('id', myCurrentOrder.id);
+                
+                showToast('💰 已取消（補助$50）');
+                checkMyOrder(); loadLunchSummary();
+            } catch(e) { showToast('❌ 取消失敗'); }
         }
 
         // 頁面載入完成後初始化

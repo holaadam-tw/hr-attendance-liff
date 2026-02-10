@@ -61,6 +61,12 @@
                 <div class="menu-item" onclick="showPage('leaveApprovalPage')">
                     <div class="icon">✅</div><div class="label">請假審核</div>
                 </div>
+                <div class="menu-item" onclick="showPage('makeupApprovalPage')">
+                    <div class="icon">🔧</div><div class="label">補打卡審核</div>
+                </div>
+                <div class="menu-item" onclick="showPage('announcementPage')">
+                    <div class="icon">📢</div><div class="label">公告管理</div>
+                </div>
                 <div class="menu-item" onclick="showPage('reportPage')">
                     <div class="icon">📊</div><div class="label">報表匯出</div>
                 </div>
@@ -265,6 +271,57 @@
                 <div id="leaveApprovalList">
                     <p style="text-align:center;color:#666;">載入中...</p>
                 </div>
+            </div>
+        </div>
+
+        <!-- ====== 補打卡審核 ====== -->
+        <div id="makeupApprovalPage" class="page">
+            <button class="btn btn-secondary" onclick="showPage('adminHomePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
+            <div class="checkin-page">
+                <h2>🔧 補打卡審核</h2>
+                <div class="tabs">
+                    <button class="tab-btn active" onclick="switchMakeupTab('pending')">待審核</button>
+                    <button class="tab-btn inactive" onclick="switchMakeupTab('approved')">已通過</button>
+                    <button class="tab-btn inactive" onclick="switchMakeupTab('rejected')">已拒絕</button>
+                </div>
+                <div id="makeupApprovalList"><p style="text-align:center;color:#666;">載入中...</p></div>
+            </div>
+        </div>
+
+        <!-- ====== 公告管理 ====== -->
+        <div id="announcementPage" class="page">
+            <button class="btn btn-secondary" onclick="showPage('adminHomePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
+            <div class="checkin-page">
+                <h2>📢 公告管理</h2>
+                <p style="color:#94A3B8;font-size:12px;margin-bottom:16px;">發布的公告會顯示在員工首頁上方</p>
+
+                <!-- 新增公告表單 -->
+                <div style="background:#fff;border-radius:14px;padding:16px;box-shadow:0 2px 8px rgba(0,0,0,0.06);margin-bottom:16px;">
+                    <div style="font-size:14px;font-weight:800;color:#0F172A;margin-bottom:12px;">➕ 發布新公告</div>
+                    <div class="form-group">
+                        <label>類型</label>
+                        <select id="annType">
+                            <option value="info">📢 一般通知</option>
+                            <option value="warning">⚠️ 注意事項</option>
+                            <option value="urgent">🚨 緊急通知</option>
+                            <option value="event">🎉 活動公告</option>
+                        </select>
+                    </div>
+                    <div class="form-group"><label>標題</label><input type="text" id="annTitle" placeholder="例：下週一停電通知"></div>
+                    <div class="form-group"><label>內容 (選填)</label><textarea id="annContent" placeholder="公告詳細內容..."></textarea></div>
+                    <div class="form-group">
+                        <label>到期日 (選填，留空永久顯示)</label>
+                        <input type="date" id="annExpire">
+                    </div>
+                    <div class="form-group">
+                        <label style="display:flex;align-items:center;gap:8px;"><input type="checkbox" id="annPinned"> 📌 置頂</label>
+                    </div>
+                    <button class="btn btn-primary" onclick="publishAnnouncement()">📤 發布公告</button>
+                </div>
+
+                <!-- 現有公告列表 -->
+                <div style="font-size:14px;font-weight:800;color:#0F172A;margin-bottom:12px;">📋 現有公告</div>
+                <div id="announcementList"><p style="text-align:center;color:#999;">載入中...</p></div>
             </div>
         </div>
 
@@ -489,6 +546,8 @@
             if (id === 'locationPage') renderLocationList();
             if (id === 'employeePage') loadEmployeeList();
             if (id === 'leaveApprovalPage') loadLeaveApprovals('pending');
+            if (id === 'makeupApprovalPage') loadMakeupApprovals('pending');
+            if (id === 'announcementPage') loadAnnouncementList();
             if (id === 'featurePage') loadFeatureSettings();
             if (id === 'staffMgrPage') { loadShiftMgr(); loadMaxLeaveSetting(); loadStaffOverview(); }
         }
@@ -1348,6 +1407,215 @@
             } catch(e) { console.error(e); showToast('❌ 複製失敗'); }
         }
 
+
+        // ===== 補打卡審核 =====
+        function switchMakeupTab(status) {
+            document.querySelectorAll('#makeupApprovalPage .tab-btn').forEach(btn => {
+                btn.className = 'tab-btn ' + (btn.textContent.includes(status === 'pending' ? '待審' : status === 'approved' ? '已通過' : '已拒絕') ? 'active' : 'inactive');
+            });
+            loadMakeupApprovals(status);
+        }
+
+        async function loadMakeupApprovals(status) {
+            const listEl = document.getElementById('makeupApprovalList');
+            if (!listEl) return;
+            listEl.innerHTML = '<p style="text-align:center;color:#666;">載入中...</p>';
+
+            try {
+                const { data } = await sb.from('makeup_punch_requests')
+                    .select('*, employees(name, department, employee_number)')
+                    .eq('status', status)
+                    .order('created_at', { ascending: false })
+                    .limit(20);
+
+                if (!data || data.length === 0) {
+                    const labels = { pending:'待審核', approved:'已通過', rejected:'已拒絕' };
+                    listEl.innerHTML = `<p style="text-align:center;color:#999;">無${labels[status]}的補打卡申請</p>`;
+                    return;
+                }
+
+                const typeMap = { clock_in:'☀️ 上班', clock_out:'🌙 下班' };
+                listEl.innerHTML = data.map(r => `
+                    <div style="background:#fff;border-radius:14px;padding:14px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,0.06);">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                            <span style="font-weight:800;font-size:14px;">${r.employees?.name || '?'}</span>
+                            <span style="font-size:11px;color:#94A3B8;">${r.employees?.department || ''} · ${r.employees?.employee_number || ''}</span>
+                        </div>
+                        <div style="display:flex;gap:8px;margin-bottom:8px;font-size:13px;">
+                            <span style="padding:4px 10px;background:#EFF6FF;border-radius:8px;color:#2563EB;font-weight:700;">📅 ${r.punch_date}</span>
+                            <span style="padding:4px 10px;background:#F5F3FF;border-radius:8px;color:#7C3AED;font-weight:700;">${typeMap[r.punch_type] || r.punch_type} ${r.punch_time || ''}</span>
+                        </div>
+                        <div style="font-size:12px;color:#64748B;margin-bottom:8px;">${r.reason || ''}</div>
+                        ${status === 'pending' ? `
+                            <div style="display:flex;gap:8px;">
+                                <button onclick="approveMakeupPunch('${r.id}','approved')" style="flex:1;padding:10px;border:none;border-radius:10px;background:#ECFDF5;color:#059669;font-weight:700;font-size:13px;cursor:pointer;">✅ 通過</button>
+                                <button onclick="rejectMakeupPunchPrompt('${r.id}')" style="flex:1;padding:10px;border:none;border-radius:10px;background:#FEF2F2;color:#DC2626;font-weight:700;font-size:13px;cursor:pointer;">❌ 拒絕</button>
+                            </div>
+                        ` : ''}
+                        ${r.status === 'approved' ? '<div style="font-size:11px;color:#059669;margin-top:4px;">✅ 已自動寫入出勤記錄</div>' : ''}
+                        ${r.rejection_reason ? `<div style="font-size:11px;color:#DC2626;margin-top:4px;">❌ ${r.rejection_reason}</div>` : ''}
+                    </div>
+                `).join('');
+            } catch(e) {
+                console.error(e);
+                listEl.innerHTML = '<p style="text-align:center;color:#ef4444;">載入失敗</p>';
+            }
+        }
+
+        async function approveMakeupPunch(id, status) {
+            try {
+                const { data: req } = await sb.from('makeup_punch_requests').select('*').eq('id', id).single();
+                
+                await sb.from('makeup_punch_requests').update({
+                    status: status,
+                    approver_id: currentAdminEmployee?.id,
+                    approved_at: new Date().toISOString()
+                }).eq('id', id);
+
+                // 通過後自動寫入 attendance
+                if (status === 'approved' && req) {
+                    const col = req.punch_type === 'clock_in' ? 'check_in_time' : 'check_out_time';
+                    const timeVal = `${req.punch_date}T${req.punch_time}:00`;
+                    
+                    // 先查是否已有當天記錄
+                    const { data: existing } = await sb.from('attendance')
+                        .select('id')
+                        .eq('employee_id', req.employee_id)
+                        .eq('date', req.punch_date)
+                        .maybeSingle();
+                    
+                    if (existing) {
+                        await sb.from('attendance').update({
+                            [col]: timeVal,
+                            is_manual: true,
+                            notes: `補打卡 - ${req.reason || ''}`
+                        }).eq('id', existing.id);
+                    } else {
+                        await sb.from('attendance').insert({
+                            employee_id: req.employee_id,
+                            date: req.punch_date,
+                            [col]: timeVal,
+                            is_manual: true,
+                            status: 'present',
+                            notes: `補打卡 - ${req.reason || ''}`
+                        });
+                    }
+                    
+                    // 通知員工
+                    sendUserNotify(req.employee_id, `✅ 您的補打卡申請已通過\n📅 ${req.punch_date} ${req.punch_type === 'clock_in' ? '上班' : '下班'} ${req.punch_time}`);
+                }
+
+                showToast(status === 'approved' ? '✅ 已通過並寫入出勤' : '❌ 已拒絕');
+                loadMakeupApprovals('pending');
+            } catch(e) {
+                console.error(e);
+                showToast('❌ 審核失敗: ' + friendlyError(e));
+            }
+        }
+
+        function rejectMakeupPunchPrompt(id) {
+            const reason = prompt('請輸入拒絕原因（選填）：');
+            if (reason === null) return;
+            rejectMakeupPunch(id, reason);
+        }
+
+        async function rejectMakeupPunch(id, reason) {
+            try {
+                await sb.from('makeup_punch_requests').update({
+                    status: 'rejected',
+                    rejection_reason: reason || '不符合規定',
+                    approver_id: currentAdminEmployee?.id,
+                    approved_at: new Date().toISOString()
+                }).eq('id', id);
+                showToast('❌ 已拒絕');
+                loadMakeupApprovals('pending');
+            } catch(e) { showToast('❌ 操作失敗'); }
+        }
+
+        // ===== 公告管理 =====
+        async function publishAnnouncement() {
+            const title = document.getElementById('annTitle')?.value;
+            const content = document.getElementById('annContent')?.value;
+            const type = document.getElementById('annType')?.value;
+            const expire = document.getElementById('annExpire')?.value;
+            const pinned = document.getElementById('annPinned')?.checked;
+            
+            if (!title) return showToast('❌ 請輸入標題');
+            
+            try {
+                // 讀取現有公告
+                const { data: existing } = await sb.from('system_settings')
+                    .select('value').eq('key', 'announcements').maybeSingle();
+                
+                const items = existing?.value?.items || [];
+                items.unshift({
+                    id: Date.now().toString(),
+                    title, content, type, pinned,
+                    expire_date: expire || null,
+                    created_at: new Date().toISOString(),
+                    created_by: currentAdminEmployee?.name || 'admin'
+                });
+                
+                if (existing) {
+                    await sb.from('system_settings').update({ value: { items }, updated_at: new Date().toISOString() }).eq('key', 'announcements');
+                } else {
+                    await sb.from('system_settings').insert({ key: 'announcements', value: { items }, description: '公告系統' });
+                }
+                
+                showToast('📢 公告已發布');
+                document.getElementById('annTitle').value = '';
+                document.getElementById('annContent').value = '';
+                document.getElementById('annExpire').value = '';
+                document.getElementById('annPinned').checked = false;
+                loadAnnouncementList();
+            } catch(e) { showToast('❌ 發布失敗：' + friendlyError(e)); }
+        }
+
+        async function loadAnnouncementList() {
+            const el = document.getElementById('announcementList');
+            if (!el) return;
+            
+            try {
+                const { data } = await sb.from('system_settings')
+                    .select('value').eq('key', 'announcements').maybeSingle();
+                
+                const items = data?.value?.items || [];
+                if (items.length === 0) { el.innerHTML = '<p style="text-align:center;color:#999;">尚無公告</p>'; return; }
+                
+                const typeIcon = { info:'📢', warning:'⚠️', urgent:'🚨', event:'🎉' };
+                const typeColor = { info:'#2563EB', warning:'#EA580C', urgent:'#DC2626', event:'#7C3AED' };
+                const typeBg = { info:'#EFF6FF', warning:'#FFF7ED', urgent:'#FEF2F2', event:'#F5F3FF' };
+                
+                el.innerHTML = items.map(a => `
+                    <div style="background:${typeBg[a.type] || '#F1F5F9'};border-radius:12px;padding:14px;margin-bottom:10px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                            <span style="font-weight:800;color:${typeColor[a.type] || '#64748B'};">${typeIcon[a.type] || '📌'} ${a.title}</span>
+                            <button onclick="deleteAnnouncement('${a.id}')" style="background:none;border:none;font-size:14px;cursor:pointer;padding:4px;">🗑️</button>
+                        </div>
+                        ${a.content ? `<div style="font-size:12px;color:#64748B;margin-bottom:4px;">${a.content}</div>` : ''}
+                        <div style="font-size:10px;color:#94A3B8;">
+                            ${a.pinned ? '📌 置頂 · ' : ''}
+                            ${a.expire_date ? '到期：' + a.expire_date + ' · ' : '永久 · '}
+                            ${a.created_by || ''} · ${a.created_at ? new Date(a.created_at).toLocaleDateString() : ''}
+                        </div>
+                    </div>
+                `).join('');
+            } catch(e) { el.innerHTML = '<p style="text-align:center;color:#ef4444;">載入失敗</p>'; }
+        }
+
+        async function deleteAnnouncement(id) {
+            if (!confirm('確定刪除此公告？')) return;
+            try {
+                const { data } = await sb.from('system_settings')
+                    .select('value').eq('key', 'announcements').maybeSingle();
+                if (!data?.value?.items) return;
+                
+                const items = data.value.items.filter(a => a.id !== id);
+                await sb.from('system_settings').update({ value: { items }, updated_at: new Date().toISOString() }).eq('key', 'announcements');
+                showToast('🗑️ 已刪除');
+                loadAnnouncementList();
+            } catch(e) { showToast('❌ 刪除失敗'); }
+        }
 
         // 匯出報表
         function exportReport(type) {

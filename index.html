@@ -67,6 +67,9 @@
 
             <!-- 今日資訊卡 -->
             <div class="card" style="padding:16px;">
+                <!-- 公告橫幅 -->
+                <div id="announcementBanner" style="display:none;margin-bottom:12px;"></div>
+
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
                     <span style="font-size:14px;font-weight:700;color:#0F172A;">📋 今日資訊</span>
                     <span id="todayDate" style="font-size:12px;color:#64748B;"></span>
@@ -296,6 +299,7 @@
                     loadEmployeeType();
                     initBottomNav();
                     applyFeatureVisibility();
+                    loadAnnouncements();
                     
                     const isAdmin = await checkIsAdmin();
                     if (isAdmin) {

@@ -87,11 +87,19 @@
             try {
                 const video = document.getElementById('video');
                 const canvas = document.getElementById('canvas');
-                canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+                
+                // ===== 圖片壓縮：縮放至 max 800x600 =====
+                const vw = video.videoWidth, vh = video.videoHeight;
+                const MAX_W = 800, MAX_H = 600;
+                let cw = vw, ch = vh;
+                if (cw > MAX_W) { ch = Math.round(ch * MAX_W / cw); cw = MAX_W; }
+                if (ch > MAX_H) { cw = Math.round(cw * MAX_H / ch); ch = MAX_H; }
+                canvas.width = cw; canvas.height = ch;
                 const ctx = canvas.getContext('2d');
-                ctx.translate(canvas.width, 0); ctx.scale(-1, 1);
-                ctx.drawImage(video, 0, 0);
-                const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.7));
+                ctx.translate(cw, 0); ctx.scale(-1, 1);
+                ctx.drawImage(video, 0, 0, cw, ch);
+                const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.6));
+                console.log(`📸 壓縮: ${vw}x${vh} → ${cw}x${ch}, ${(blob.size/1024).toFixed(0)}KB`);
 
                 showStatus(statusBox, 'info', '☁️ 上傳中...');
                 const fileName = `${currentEmployee.employee_number}_${Date.now()}.jpg`; 
@@ -102,8 +110,22 @@
                 const publicUrl = urlData?.publicUrl || urlData?.publicURL;
                 if (!publicUrl) throw new Error('無法取得照片網址');
 
+                // ===== GPS 精度檢查 =====
                 showStatus(statusBox, 'info', '📍 定位中...');
                 let loc = cachedLocation || await getGPS();
+                
+                if (loc.accuracy !== undefined) {
+                    if (loc.accuracy < 5) {
+                        showStatus(statusBox, 'warning', '⚠️ GPS 精度異常（過於精確），請關閉模擬定位 App 後重試');
+                        btn.disabled = false; btn.textContent = '📸 重試';
+                        return;
+                    }
+                    if (loc.accuracy > 500) {
+                        showStatus(statusBox, 'warning', '⚠️ GPS 訊號太弱（精度 >500m），請到戶外或窗邊重試');
+                        btn.disabled = false; btn.textContent = '📸 重試';
+                        return;
+                    }
+                }
 
                 const { data: rpcData, error: rpcError } = await sb.rpc('quick_check_in', {
                     p_line_user_id: liffProfile.userId,

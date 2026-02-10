@@ -176,7 +176,7 @@ function preloadGPS() {
 
     navigator.geolocation.getCurrentPosition(
         p => { 
-            cachedLocation = { latitude: p.coords.latitude, longitude: p.coords.longitude };
+            cachedLocation = { latitude: p.coords.latitude, longitude: p.coords.longitude, accuracy: p.coords.accuracy };
             
             let foundLocation = null;
             let minDistance = Infinity;
@@ -210,7 +210,7 @@ function preloadGPS() {
 function getGPS() { 
     return new Promise((res, rej) => {
         navigator.geolocation.getCurrentPosition(
-            p => res({ latitude: p.coords.latitude, longitude: p.coords.longitude }), 
+            p => res({ latitude: p.coords.latitude, longitude: p.coords.longitude, accuracy: p.coords.accuracy }), 
             e => rej(e), 
             { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
         );
@@ -531,6 +531,156 @@ async function loadLeaveHistory() {
         console.error(e); 
         list.innerHTML = '<p style="text-align:center;color:#ef4444;">載入失敗</p>';
     }
+}
+
+// ===== 補打卡申請 =====
+async function submitMakeupPunch() {
+    if (!currentEmployee) return showToast('❌ 請先登入');
+    const date = document.getElementById('mpDate')?.value;
+    const type = document.getElementById('mpType')?.value; // clock_in / clock_out
+    const time = document.getElementById('mpTime')?.value;
+    const reasonType = document.getElementById('mpReasonType')?.value;
+    const reasonText = document.getElementById('mpReasonText')?.value;
+    
+    if (!date || !time || !reasonType) return showToast('❌ 請填寫完整');
+    
+    const reason = `[${{'forgot':'忘記打卡','field':'外出公務','phone_dead':'手機沒電','system_error':'系統故障','other':'其他'}[reasonType] || reasonType}] ${reasonText || ''}`.trim();
+    
+    const statusEl = document.getElementById('mpStatus');
+    
+    try {
+        const { error } = await sb.from('makeup_punch_requests').insert({
+            employee_id: currentEmployee.id,
+            punch_date: date,
+            punch_type: type,
+            punch_time: time,
+            reason: reason,
+            status: 'pending'
+        });
+        if (error) throw error;
+        
+        showToast('✅ 補打卡申請已提交');
+        if (statusEl) { statusEl.className = 'status-box show success'; statusEl.innerHTML = '✅ 申請已提交，等待審核'; }
+        loadMakeupHistory();
+        
+        // 通知管理員
+        sendAdminNotify(`🔔 ${currentEmployee.name} 申請補打卡\n📅 ${date} ${type === 'clock_in' ? '上班' : '下班'} ${time}\n📝 ${reason}`);
+        
+        // 清空表單
+        if (document.getElementById('mpReasonText')) document.getElementById('mpReasonText').value = '';
+    } catch(e) {
+        console.error(e);
+        showToast('❌ 申請失敗：' + friendlyError(e));
+    }
+}
+
+async function loadMakeupHistory() {
+    const list = document.getElementById('makeupHistoryList');
+    if (!currentEmployee || !list) return;
+    
+    try {
+        const { data } = await sb.from('makeup_punch_requests')
+            .select('*')
+            .eq('employee_id', currentEmployee.id)
+            .order('created_at', { ascending: false })
+            .limit(10);
+        
+        if (!data || data.length === 0) {
+            list.innerHTML = '<p style="text-align:center;color:#999;font-size:13px;">尚無補打卡記錄</p>';
+            return;
+        }
+        
+        const statusMap = { 'pending': '⏳ 待審', 'approved': '✅ 通過', 'rejected': '❌ 拒絕' };
+        const statusColor = { 'pending': '#F59E0B', 'approved': '#059669', 'rejected': '#DC2626' };
+        const typeMap = { 'clock_in': '上班', 'clock_out': '下班' };
+        
+        list.innerHTML = data.map(r => `
+            <div class="attendance-item" style="border-left:3px solid ${statusColor[r.status] || '#ccc'};">
+                <div class="date">
+                    <span>${r.punch_date} ${typeMap[r.punch_type] || ''} ${r.punch_time || ''}</span>
+                    <span class="badge ${r.status === 'approved' ? 'badge-success' : r.status === 'rejected' ? 'badge-danger' : 'badge-warning'}">
+                        ${statusMap[r.status] || r.status}
+                    </span>
+                </div>
+                <div style="font-size:12px;color:#666;margin-top:4px;">${r.reason || ''}</div>
+                ${r.status === 'approved' ? '<div style="font-size:11px;color:#059669;margin-top:2px;">✅ 已寫入出勤記錄</div>' : ''}
+                ${r.status === 'rejected' && r.rejection_reason ? 
+                    `<div style="font-size:12px;color:#DC2626;margin-top:4px;padding:6px 8px;background:#FEF2F2;border-radius:6px;">❌ ${r.rejection_reason}</div>` : ''}
+            </div>
+        `).join('');
+    } catch(e) {
+        console.error(e);
+        list.innerHTML = '<p style="text-align:center;color:#ef4444;">載入失敗</p>';
+    }
+}
+
+// ===== LINE Notify 推播 =====
+async function sendAdminNotify(message) {
+    try {
+        const { data: setting } = await sb.from('system_settings')
+            .select('value').eq('key', 'line_notify_token').maybeSingle();
+        if (!setting?.value?.token) return;
+        
+        // 透過 Supabase Edge Function 發送（避免 CORS）
+        await sb.functions.invoke('send-line-notify', {
+            body: { token: setting.value.token, message }
+        });
+    } catch(e) {
+        console.log('LINE Notify 發送失敗（非必要）', e);
+    }
+}
+
+async function sendUserNotify(employeeId, message) {
+    try {
+        const { data: emp } = await sb.from('employees')
+            .select('line_user_id').eq('id', employeeId).maybeSingle();
+        if (!emp?.line_user_id) return;
+        
+        await sb.functions.invoke('send-line-notify', {
+            body: { userId: emp.line_user_id, message }
+        });
+    } catch(e) { console.log('推播失敗', e); }
+}
+
+// ===== 公告系統 =====
+async function loadAnnouncements() {
+    const el = document.getElementById('announcementBanner');
+    if (!el) return;
+    
+    try {
+        const todayStr = new Date().toISOString().split('T')[0];
+        const { data } = await sb.from('system_settings')
+            .select('value').eq('key', 'announcements').maybeSingle();
+        
+        if (!data?.value?.items || data.value.items.length === 0) {
+            el.style.display = 'none';
+            return;
+        }
+        
+        // 過濾有效公告（未過期）
+        const active = data.value.items.filter(a => !a.expire_date || a.expire_date >= todayStr);
+        if (active.length === 0) { el.style.display = 'none'; return; }
+        
+        const pinned = active.filter(a => a.pinned);
+        const normal = active.filter(a => !a.pinned);
+        const sorted = [...pinned, ...normal];
+        
+        el.style.display = 'block';
+        el.innerHTML = sorted.map(a => {
+            const typeStyle = {
+                'info': { bg: '#EFF6FF', color: '#2563EB', icon: '📢' },
+                'warning': { bg: '#FFF7ED', color: '#EA580C', icon: '⚠️' },
+                'urgent': { bg: '#FEF2F2', color: '#DC2626', icon: '🚨' },
+                'event': { bg: '#F5F3FF', color: '#7C3AED', icon: '🎉' }
+            }[a.type] || { bg: '#F1F5F9', color: '#64748B', icon: '📌' };
+            
+            return `<div style="padding:10px 14px;background:${typeStyle.bg};border-radius:10px;margin-bottom:8px;font-size:13px;color:${typeStyle.color};line-height:1.5;">
+                <div style="font-weight:800;">${typeStyle.icon} ${a.title}</div>
+                ${a.content ? `<div style="font-size:12px;opacity:0.8;margin-top:2px;">${a.content}</div>` : ''}
+                ${a.expire_date ? `<div style="font-size:10px;opacity:0.5;margin-top:2px;">有效至 ${a.expire_date}</div>` : ''}
+            </div>`;
+        }).join('');
+    } catch(e) { el.style.display = 'none'; }
 }
 
 // ===== 月度出勤查詢 =====

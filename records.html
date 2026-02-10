@@ -55,6 +55,13 @@
     <div id="loadingPage" class="loading-screen"><div class="spinner"></div><p>系統載入中...</p></div>
 
     <div class="container">
+        <!-- 頁面導航 -->
+        <div style="display:flex;gap:4px;padding:10px 16px 0;background:transparent;">
+            <button class="recTab" onclick="showPage('leavePage')" style="flex:1;padding:10px 6px;border:none;border-radius:10px 10px 0 0;font-weight:700;font-size:12px;background:#fff;color:#4F46E5;cursor:pointer;">📝 請假</button>
+            <button class="recTab" onclick="showPage('makeupPunchPage')" style="flex:1;padding:10px 6px;border:none;border-radius:10px 10px 0 0;font-weight:700;font-size:12px;background:#E5E7EB;color:#94A3B8;cursor:pointer;">🔧 補打卡</button>
+            <button class="recTab" onclick="showPage('attendancePage')" style="flex:1;padding:10px 6px;border:none;border-radius:10px 10px 0 0;font-weight:700;font-size:12px;background:#E5E7EB;color:#94A3B8;cursor:pointer;">📊 考勤</button>
+        </div>
+
         <!-- 請假頁面 -->
         <div id="leavePage" class="page active">
             <button class="btn btn-secondary" onclick="window.location.href='index.html'" style="width:auto;margin-bottom:10px;">← 返回</button>
@@ -78,6 +85,66 @@
                 <div style="margin-top:30px; padding-top:20px; border-top:2px dashed #e5e7eb;">
                     <h3 style="margin-bottom:15px;">📋 我的請假記錄</h3>
                     <div id="leaveHistoryList"><p style="text-align:center;color:#666;">載入中...</p></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ====== 補打卡申請 ====== -->
+        <div id="makeupPunchPage" class="page">
+            <button class="btn btn-secondary" onclick="window.location.href='index.html'" style="width:auto;margin-bottom:10px;">← 返回</button>
+            <div class="checkin-page">
+                <h2>🔧 補打卡申請</h2>
+                <p style="color:#94A3B8;font-size:12px;margin-bottom:16px;">忘記打卡？系統異常？在這裡申請補打卡，審核通過後自動寫入出勤記錄。</p>
+
+                <div class="form-group">
+                    <label>補打卡日期</label>
+                    <input type="date" id="mpDate">
+                </div>
+
+                <div class="form-group">
+                    <label>打卡類型</label>
+                    <div style="display:flex;gap:8px;">
+                        <label style="flex:1;display:flex;align-items:center;gap:8px;padding:12px;border:2px solid #E5E7EB;border-radius:10px;cursor:pointer;transition:all 0.2s;" onclick="selectMpType('clock_in',this)">
+                            <input type="radio" name="mpType" value="clock_in" id="mpTypeIn" checked style="display:none;">
+                            <span style="font-size:20px;">☀️</span>
+                            <span style="font-weight:700;font-size:13px;">上班打卡</span>
+                        </label>
+                        <label style="flex:1;display:flex;align-items:center;gap:8px;padding:12px;border:2px solid #E5E7EB;border-radius:10px;cursor:pointer;transition:all 0.2s;" onclick="selectMpType('clock_out',this)">
+                            <input type="radio" name="mpType" value="clock_out" id="mpTypeOut" style="display:none;">
+                            <span style="font-size:20px;">🌙</span>
+                            <span style="font-weight:700;font-size:13px;">下班打卡</span>
+                        </label>
+                    </div>
+                    <input type="hidden" id="mpType" value="clock_in">
+                </div>
+
+                <div class="form-group">
+                    <label>實際打卡時間</label>
+                    <input type="time" id="mpTime">
+                </div>
+
+                <div class="form-group">
+                    <label>原因</label>
+                    <select id="mpReasonType">
+                        <option value="forgot">忘記打卡</option>
+                        <option value="field">外出公務</option>
+                        <option value="phone_dead">手機沒電</option>
+                        <option value="system_error">系統故障</option>
+                        <option value="other">其他</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>補充說明 (選填)</label>
+                    <textarea id="mpReasonText" placeholder="例：當天忘記帶手機"></textarea>
+                </div>
+
+                <button class="btn btn-primary" onclick="submitMakeupPunch()">📤 提交補打卡申請</button>
+                <div id="mpStatus" class="status-box"></div>
+
+                <div style="margin-top:30px;padding-top:20px;border-top:2px dashed #e5e7eb;">
+                    <h3 style="margin-bottom:15px;">📋 補打卡記錄</h3>
+                    <div id="makeupHistoryList"><p style="text-align:center;color:#666;">載入中...</p></div>
                 </div>
             </div>
         </div>
@@ -160,9 +227,34 @@
         function showPage(id) {
             document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
             document.getElementById(id).classList.add('active');
+            // Tab 高亮
+            const tabs = document.querySelectorAll('.recTab');
+            if (tabs.length) {
+                tabs.forEach(t => { t.style.background = '#E5E7EB'; t.style.color = '#94A3B8'; });
+                const idx = { leavePage:0, makeupPunchPage:1, attendancePage:2 }[id];
+                if (idx !== undefined && tabs[idx]) { tabs[idx].style.background = '#fff'; tabs[idx].style.color = '#4F46E5'; }
+            }
             if (id === 'attendancePage') { attYear = new Date().getFullYear(); attMonth = new Date().getMonth(); loadAttCal(); }
             if (id === 'leavePage') loadLeaveHistory();
+            if (id === 'makeupPunchPage') { loadMakeupHistory(); initMpDate(); }
             if (id === 'salaryPage') { document.getElementById('salaryYear').value = new Date().getFullYear(); loadAnnualSummary(); }
+        }
+
+        // 補打卡類型選擇
+        function selectMpType(type, el) {
+            document.getElementById('mpType').value = type;
+            el.closest('.form-group').querySelectorAll('label[onclick]').forEach(l => {
+                l.style.borderColor = '#E5E7EB'; l.style.background = '#fff';
+            });
+            el.style.borderColor = '#4F46E5'; el.style.background = '#F5F3FF';
+        }
+        function initMpDate() {
+            const mpDate = document.getElementById('mpDate');
+            if (mpDate && !mpDate.value) {
+                const y = new Date(); y.setDate(y.getDate() - 1);
+                mpDate.value = y.toISOString().split('T')[0];
+                mpDate.max = new Date().toISOString().split('T')[0];
+            }
         }
 
         function changeAttMonth(d) {
@@ -357,7 +449,7 @@
         window.addEventListener('load', async () => {
             if (typeof initializeLiff === 'undefined') return;
             const hash = window.location.hash || '#leave';
-            let pid = hash==='#attendance'?'attendancePage':hash==='#salary'?'salaryPage':'leavePage';
+            let pid = hash==='#attendance'?'attendancePage':hash==='#salary'?'salaryPage':hash==='#makeup'?'makeupPunchPage':'leavePage';
             const ok = await initializeLiff();
             if (ok) { const li = await checkUserStatus(); if(li){initBottomNav();showPage(pid);}else window.location.href='index.html'; }
         });
