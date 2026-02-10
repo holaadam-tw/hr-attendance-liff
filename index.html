@@ -15,6 +15,7 @@
     </div>
 
     <div class="container">
+        <!-- 綁定頁面 -->
         <div id="bindPage" class="page active">
             <div class="card">
                 <div class="bind-header">
@@ -43,7 +44,9 @@
             </div>
         </div>
 
+        <!-- 首頁 -->
         <div id="homePage" class="page">
+            <!-- 用戶卡片 -->
             <div class="user-card">
                 <div class="user-info">
                     <div class="avatar" id="userAvatar">?</div>
@@ -52,51 +55,97 @@
                         <p id="userDept">-</p>
                         <p id="userId" style="font-size: 11px; opacity: 0.7;">ID: -</p>
                     </div>
+                    <span class="user-status-badge" id="userStatusBadge" style="background:#D1FAE5;color:#065F46;">-</span>
                 </div>
                 <div class="location-status loading" id="locationStatus">
                     <div class="dot"></div><span>正在取得定位...</span>
                 </div>
             </div>
 
-            <div id="checkInStatusBox" class="status-box info"></div>
-
-            <div class="primary-actions">
-                <div class="primary-btn checkin" id="checkInBtn" onclick="startCheckIn()">
-                    <span class="badge-corner">AM</span>
-                    <div class="icon">☀️</div><div class="label">上班打卡</div>
+            <!-- 今日資訊卡 -->
+            <div class="card" style="padding:16px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                    <span style="font-size:14px;font-weight:700;color:#0F172A;">📋 今日資訊</span>
+                    <span id="todayDate" style="font-size:12px;color:#64748B;"></span>
                 </div>
-                <div class="primary-btn checkout" id="checkOutBtn" onclick="startCheckOut()">
-                    <span class="badge-corner">PM</span>
-                    <div class="icon">🌙</div><div class="label">下班打卡</div>
+                <div class="today-info">
+                    <div class="today-info-item" id="todayShiftCard" style="background:#DBEAFE;">
+                        <div class="today-info-label" style="color:#1E40AF;">今日班別</div>
+                        <div class="today-info-value" id="todayShift" style="color:#1E40AF;">早班</div>
+                        <div class="today-info-sub" style="color:#1E40AF;">08:00 - 17:00</div>
+                    </div>
+                    <div class="today-info-item" id="todayCheckinCard" style="background:#D1FAE5;">
+                        <div class="today-info-label" style="color:#065F46;">上班打卡</div>
+                        <div class="today-info-value" id="todayCheckinTime" style="color:#059669;">--:--</div>
+                        <div class="today-info-sub" id="todayCheckinStatus" style="color:#065F46;">尚未打卡</div>
+                    </div>
+                    <div class="today-info-item" style="background:#F1F5F9;">
+                        <div class="today-info-label" style="color:#64748B;">下班打卡</div>
+                        <div class="today-info-value" id="todayCheckoutTime" style="color:#64748B;">--:--</div>
+                        <div class="today-info-sub" id="todayCheckoutStatus" style="color:#64748B;">尚未打卡</div>
+                    </div>
                 </div>
             </div>
 
+            <div id="checkInStatusBox" class="status-box info"></div>
+
+            <!-- 打卡按鈕 -->
+            <div class="primary-actions">
+                <div class="primary-btn checkin" id="checkInBtn" onclick="startCheckIn()">
+                    <div class="icon">☀️</div>
+                    <div class="label">上班打卡</div>
+                    <span class="badge-corner">AM</span>
+                </div>
+                <div class="primary-btn checkout" id="checkOutBtn" onclick="startCheckOut()">
+                    <div class="icon">🌙</div>
+                    <div class="label">下班打卡</div>
+                    <span class="badge-corner">PM</span>
+                </div>
+            </div>
+
+            <!-- 精簡選單（移除與底部導航重複的項目）-->
             <div class="menu-grid">
                 <div class="menu-item" onclick="window.location.href='records.html'">
                     <div class="icon">📝</div><div class="label">我要請假</div>
                 </div>
-                <div class="menu-item" onclick="window.location.href='records.html#attendance'">
-                    <div class="icon">📊</div><div class="label">考勤查詢</div>
-                </div>
                 <div class="menu-item" onclick="window.location.href='services.html'">
                     <div class="icon">🍱</div><div class="label">便當訂購</div>
                 </div>
-                <div class="menu-item" onclick="window.location.href='records.html#salary'">
-                    <div class="icon">💰</div><div class="label">薪資查詢</div>
+                <div class="menu-item" onclick="window.location.href='records.html#attendance'">
+                    <div class="icon">📊</div><div class="label">考勤查詢</div>
                 </div>
-                <div class="menu-item" onclick="showToast('功能開發中')">
-                    <div class="icon">📅</div><div class="label">班表查詢</div>
-                </div>
-                <div class="menu-item" onclick="window.location.href='services.html#settings'">
-                    <div class="icon">⚙️</div><div class="label">系統設定</div>
-                </div>
-                <!-- 管理員專用入口 -->
+                <!-- 管理員專用 -->
                 <div class="menu-item admin-only" id="adminEntry" style="display:none;" onclick="window.location.href='admin.html'">
+                    <span class="menu-badge"></span>
                     <div class="icon">👑</div><div class="label">管理後台</div>
                 </div>
             </div>
         </div>
     </div>
+
+    <!-- 底部導航列 -->
+    <nav class="bottom-nav" id="bottomNav" style="display:none;">
+        <a class="nav-item active" onclick="goPage('index.html')">
+            <span class="nav-icon">🏠</span>
+            <span class="nav-label">首頁</span>
+        </a>
+        <a class="nav-item" onclick="goPage('schedule.html')">
+            <span class="nav-icon">📅</span>
+            <span class="nav-label">班表</span>
+        </a>
+        <a class="nav-item" onclick="startCheckIn()">
+            <span class="nav-icon">📍</span>
+            <span class="nav-label">打卡</span>
+        </a>
+        <a class="nav-item" onclick="goPage('salary.html')">
+            <span class="nav-icon">💰</span>
+            <span class="nav-label">薪資</span>
+        </a>
+        <a class="nav-item" onclick="goPage('services.html#settings')">
+            <span class="nav-icon">⚙️</span>
+            <span class="nav-label">設定</span>
+        </a>
+    </nav>
 
     <script src="common.js"></script>
     <script>
@@ -105,8 +154,12 @@
             document.getElementById(id).classList.add('active');
         }
 
+        function goPage(url) {
+            window.location.href = url;
+        }
+
         function startCheckIn() { 
-            if (document.getElementById('checkInBtn').classList.contains('disabled')) return;
+            if (document.getElementById('checkInBtn')?.classList.contains('disabled')) return;
             if (isProcessing) return;
             isProcessing = true;
             window.location.href = 'checkin.html?type=in';
@@ -114,25 +167,78 @@
         }
 
         function startCheckOut() { 
-            if (document.getElementById('checkOutBtn').classList.contains('disabled')) return;
+            if (document.getElementById('checkOutBtn')?.classList.contains('disabled')) return;
             if (isProcessing) return;
             isProcessing = true;
             window.location.href = 'checkin.html?type=out';
             setTimeout(() => isProcessing = false, 1000);
         }
 
+        // 更新今日資訊
+        function updateTodayInfo() {
+            const now = new Date();
+            const days = ['日', '一', '二', '三', '四', '五', '六'];
+            const dateStr = `${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')} 週${days[now.getDay()]}`;
+            const el = document.getElementById('todayDate');
+            if (el) el.textContent = dateStr;
+        }
+
+        // 載入今日打卡狀態
+        async function loadTodayStatus() {
+            if (!currentEmployee || !liffProfile) return;
+            try {
+                const today = new Date().toISOString().split('T')[0];
+                const { data } = await sb.from('attendance')
+                    .select('check_in_time, check_out_time, status')
+                    .eq('employee_id', currentEmployee.id)
+                    .eq('date', today)
+                    .maybeSingle();
+
+                const badgeEl = document.getElementById('userStatusBadge');
+
+                if (data?.check_in_time) {
+                    const inTime = new Date(data.check_in_time);
+                    const timeStr = `${String(inTime.getHours()).padStart(2,'0')}:${String(inTime.getMinutes()).padStart(2,'0')}`;
+                    document.getElementById('todayCheckinTime').textContent = timeStr;
+                    
+                    const isLate = data.status === 'late';
+                    document.getElementById('todayCheckinStatus').textContent = isLate ? '⚠️ 遲到' : '✅ 準時';
+                    document.getElementById('todayCheckinCard').style.background = isLate ? '#FEE2E2' : '#D1FAE5';
+                    document.getElementById('todayCheckinTime').style.color = isLate ? '#EF4444' : '#059669';
+                    
+                    if (badgeEl) {
+                        badgeEl.textContent = '✅ 已打卡';
+                        badgeEl.style.background = '#D1FAE5';
+                        badgeEl.style.color = '#065F46';
+                    }
+                } else {
+                    if (badgeEl) {
+                        badgeEl.textContent = '⏳ 未打卡';
+                        badgeEl.style.background = '#FEF3C7';
+                        badgeEl.style.color = '#92400E';
+                    }
+                }
+
+                if (data?.check_out_time) {
+                    const outTime = new Date(data.check_out_time);
+                    const timeStr = `${String(outTime.getHours()).padStart(2,'0')}:${String(outTime.getMinutes()).padStart(2,'0')}`;
+                    document.getElementById('todayCheckoutTime').textContent = timeStr;
+                    document.getElementById('todayCheckoutStatus').textContent = '✅ 已下班';
+                }
+            } catch(e) { console.error('載入今日狀態失敗', e); }
+        }
+
         function checkLiffParams() {
-            if (liff && liff.isInClient()) {
-                try {
+            try {
+                if (liff && liff.isInClient()) {
                     const liffParams = liff.getContext();
                     if (liffParams?.type === 'utim' && liffParams.utm) {
                         const urlParams = new URLSearchParams(liffParams.utm);
                         const company = urlParams.get('company');
                         if (company) sessionStorage.setItem('company_code', company);
                     }
-                } catch(e) {}
-            }
-            
+                }
+            } catch(e) {}
             const urlParams = new URLSearchParams(window.location.search);
             const company = urlParams.get('company');
             if (company) sessionStorage.setItem('company_code', company);
@@ -151,7 +257,10 @@
                 const isLoggedIn = await checkUserStatus();
                 if (isLoggedIn) {
                     showPage('homePage');
+                    document.getElementById('bottomNav').style.display = 'flex';
+                    updateTodayInfo();
                     preloadGPS();
+                    loadTodayStatus();
                     
                     const isAdmin = await checkIsAdmin();
                     if (isAdmin) {

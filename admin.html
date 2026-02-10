@@ -280,6 +280,30 @@
         </div>
     </div>
 
+    <!-- 底部導航列 -->
+    <nav class="bottom-nav" id="bottomNav" style="display:none;">
+        <a class="nav-item" onclick="window.location.href='index.html'">
+            <span class="nav-icon">🏠</span>
+            <span class="nav-label">首頁</span>
+        </a>
+        <a class="nav-item" onclick="window.location.href='schedule.html'">
+            <span class="nav-icon">📅</span>
+            <span class="nav-label">班表</span>
+        </a>
+        <a class="nav-item" onclick="window.location.href='checkin.html?type=in'">
+            <span class="nav-icon">📍</span>
+            <span class="nav-label">打卡</span>
+        </a>
+        <a class="nav-item active">
+            <span class="nav-icon">👑</span>
+            <span class="nav-label">管理</span>
+        </a>
+        <a class="nav-item" onclick="window.location.href='services.html#settings'">
+            <span class="nav-icon">⚙️</span>
+            <span class="nav-label">設定</span>
+        </a>
+    </nav>
+
     <script src="common.js"></script>
     <script>
         let currentAdminEmployee = null;
@@ -341,7 +365,10 @@
                 await loadSettings();
                 
                 showStatus(statusEl, 'success', '✅ 權限驗證通過');
-                setTimeout(() => { showPage('adminHomePage'); }, 800);
+                setTimeout(() => { 
+                    showPage('adminHomePage');
+                    document.getElementById('bottomNav').style.display = 'flex';
+                }, 800);
 
             } catch (err) {
                 console.error('權限檢查異常:', err);
@@ -551,15 +578,12 @@
                                 到職: ${emp.hire_date || '未設定'} · ${emp.line_user_id ? '✅ 已綁定' : '⏳ 未綁定'}
                             </div>
                             ${emp.line_user_id ? `
-                                <div style="margin-top:8px;display:flex;gap:6px;">
-                                    <button class="btn-danger ${emp.role === 'admin' ? '' : ''}" onclick="updateEmployeeRoleAdmin('${emp.id}', 'admin', '${emp.name}')" style="flex:1;font-size:11px;padding:6px;">
-                                        🔴 管理員
+                                <div style="margin-top:8px;display:flex;gap:8px;">
+                                    <button class="btn-success-sm" onclick="updateEmployeeRoleAdmin('${emp.id}', 'admin', '${emp.name}')" style="flex:1;padding:8px 12px;border:none;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;${emp.role === 'admin' ? 'opacity:0.4;pointer-events:none;' : ''}">
+                                        設為管理員
                                     </button>
-                                    <button class="btn-warning" onclick="updateEmployeeRoleAdmin('${emp.id}', 'manager', '${emp.name}')" style="flex:1;font-size:11px;padding:6px;">
-                                        🟡 主管
-                                    </button>
-                                    <button class="btn-secondary" onclick="updateEmployeeRoleAdmin('${emp.id}', 'user', '${emp.name}')" style="flex:1;font-size:11px;padding:6px;margin-top:0;">
-                                        🟢 員工
+                                    <button class="btn-danger" onclick="updateEmployeeRoleAdmin('${emp.id}', 'user', '${emp.name}')" style="flex:1;padding:8px 12px;border-radius:10px;font-size:12px;font-weight:700;${emp.role !== 'admin' ? 'opacity:0.4;pointer-events:none;' : ''}">
+                                        取消管理員
                                     </button>
                                 </div>
                             ` : ''}

@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>📅 班表查詢 - 員工服務中心</title>
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .cal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .cal-header h2 { font-size: 18px; font-weight: 800; color: var(--dark); margin: 0; }
+        .cal-nav { display: flex; align-items: center; gap: 12px; }
+        .cal-nav button { background: none; border: none; font-size: 20px; cursor: pointer; padding: 6px 10px; border-radius: 8px; transition: background 0.2s; }
+        .cal-nav button:active { background: var(--gray-light); }
+        .cal-nav span { font-size: 16px; font-weight: 700; color: var(--dark); min-width: 120px; text-align: center; }
+
+        .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 20px; }
+        .cal-weekday { text-align: center; font-size: 12px; font-weight: 700; color: var(--gray); padding: 8px 0; }
+        .cal-day {
+            text-align: center; padding: 10px 4px; border-radius: 12px; font-size: 14px;
+            font-weight: 600; cursor: pointer; transition: all 0.15s; position: relative;
+            min-height: 44px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+        }
+        .cal-day:active { transform: scale(0.92); }
+        .cal-day.empty { cursor: default; }
+        .cal-day.today { background: var(--primary); color: white; font-weight: 800; box-shadow: 0 4px 12px var(--primary-shadow); }
+        .cal-day.selected { background: var(--primary-ghost); color: var(--primary); border: 2px solid var(--primary-light); }
+        .cal-day.has-shift::after {
+            content: ''; position: absolute; bottom: 4px; left: 50%; transform: translateX(-50%);
+            width: 6px; height: 6px; border-radius: 50%;
+        }
+        .cal-day.shift-DAY::after { background: var(--info); }
+        .cal-day.shift-SWING::after { background: var(--warning); }
+        .cal-day.shift-NIGHT::after { background: #8B5CF6; }
+        .cal-day.shift-OFF { color: var(--gray); opacity: 0.5; }
+        .cal-day.other-month { color: #CBD5E1; }
+
+        .shift-list { display: flex; flex-direction: column; gap: 12px; }
+        .shift-day-card {
+            background: var(--white); border-radius: 14px; padding: 14px 16px;
+            box-shadow: var(--shadow-sm);
+        }
+        .shift-day-label { font-size: 13px; font-weight: 700; color: var(--gray); margin-bottom: 10px; }
+        .shift-day-label.today-label { color: var(--primary); }
+        .shift-items { display: flex; gap: 10px; flex-wrap: wrap; }
+        .shift-chip {
+            padding: 10px 16px; border-radius: 12px; font-size: 13px; font-weight: 700;
+            display: flex; flex-direction: column; gap: 2px; min-width: 120px;
+        }
+        .shift-chip.DAY { background: var(--info-bg); color: var(--info-text); }
+        .shift-chip.SWING { background: var(--warning-bg); color: var(--warning-text); }
+        .shift-chip.NIGHT { background: #EDE9FE; color: #5B21B6; }
+        .shift-chip.OFF { background: var(--gray-light); color: var(--gray); }
+        .shift-chip.FLEX { background: var(--success-bg); color: var(--success-text); }
+        .shift-chip-name { font-size: 15px; font-weight: 800; }
+        .shift-chip-time { font-size: 11px; opacity: 0.8; }
+
+        .swap-btn {
+            width: 100%; padding: 14px; border-radius: 14px;
+            border: 2px dashed var(--primary-light); background: var(--primary-ghost);
+            color: var(--primary); font-weight: 700; font-size: 14px;
+            cursor: pointer; margin-top: 16px; transition: all 0.2s;
+        }
+        .swap-btn:active { transform: scale(0.98); background: #E0E7FF; }
+    </style>
+</head>
+<body>
+    <div id="loadingPage" class="loading-screen">
+        <div class="spinner"></div>
+        <p>系統載入中...</p>
+    </div>
+
+    <div class="container">
+        <div id="schedulePage" class="page active">
+            <div class="card">
+                <div class="cal-header">
+                    <h2>📅 班表查詢</h2>
+                </div>
+
+                <!-- 月曆導航 -->
+                <div class="cal-nav" style="justify-content:center; margin-bottom:16px;">
+                    <button onclick="changeMonth(-1)">◀</button>
+                    <span id="calMonthLabel">2026年 2月</span>
+                    <button onclick="changeMonth(1)">▶</button>
+                </div>
+
+                <!-- 月曆格 -->
+                <div class="cal-grid" id="calGrid">
+                    <div class="cal-weekday">日</div>
+                    <div class="cal-weekday">一</div>
+                    <div class="cal-weekday">二</div>
+                    <div class="cal-weekday">三</div>
+                    <div class="cal-weekday">四</div>
+                    <div class="cal-weekday">五</div>
+                    <div class="cal-weekday">六</div>
+                </div>
+            </div>
+
+            <!-- 當週/選中日期的班別 -->
+            <div id="shiftListContainer">
+                <div class="shift-list" id="shiftList">
+                    <p style="text-align:center;color:var(--gray);padding:20px;">載入中...</p>
+                </div>
+            </div>
+
+            <button class="swap-btn" onclick="showToast('🔄 換班功能開發中')">🔄 申請換班</button>
+
+            <!-- 班別說明 -->
+            <div class="card" style="padding:14px; margin-top:16px;">
+                <div style="font-size:12px; font-weight:700; color:var(--dark); margin-bottom:10px;">班別說明</div>
+                <div style="display:flex; flex-wrap:wrap; gap:10px;">
+                    <span style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--gray);">
+                        <span style="width:12px;height:12px;border-radius:4px;background:var(--info-bg);border:1px solid var(--info);"></span> 早班
+                    </span>
+                    <span style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--gray);">
+                        <span style="width:12px;height:12px;border-radius:4px;background:var(--warning-bg);border:1px solid var(--warning);"></span> 中班
+                    </span>
+                    <span style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--gray);">
+                        <span style="width:12px;height:12px;border-radius:4px;background:#EDE9FE;border:1px solid #8B5CF6;"></span> 晚班
+                    </span>
+                    <span style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--gray);">
+                        <span style="width:12px;height:12px;border-radius:4px;background:var(--gray-light);border:1px solid var(--gray);"></span> 休
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 底部導航列 -->
+    <nav class="bottom-nav">
+        <a class="nav-item" onclick="window.location.href='index.html'">
+            <span class="nav-icon">🏠</span><span class="nav-label">首頁</span>
+        </a>
+        <a class="nav-item active">
+            <span class="nav-icon">📅</span><span class="nav-label">班表</span>
+        </a>
+        <a class="nav-item" onclick="window.location.href='checkin.html?type=in'">
+            <span class="nav-icon">📍</span><span class="nav-label">打卡</span>
+        </a>
+        <a class="nav-item" onclick="window.location.href='salary.html'">
+            <span class="nav-icon">💰</span><span class="nav-label">薪資</span>
+        </a>
+        <a class="nav-item" onclick="window.location.href='services.html#settings'">
+            <span class="nav-icon">⚙️</span><span class="nav-label">設定</span>
+        </a>
+    </nav>
+
+    <script src="common.js"></script>
+    <script>
+        let currentYear = new Date().getFullYear();
+        let currentMonth = new Date().getMonth(); // 0-indexed
+        let scheduleData = {}; // { '2026-02-10': { shift: 'DAY', name: '早班', time: '08:00-17:00' } }
+        let selectedDate = null;
+
+        // Demo data (will be replaced by Supabase query when shift_types/schedules tables exist)
+        function generateDemoSchedule(year, month) {
+            const data = {};
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            const shifts = [
+                { code: 'DAY', name: '早班', time: '08:00 - 17:00' },
+                { code: 'DAY', name: '早班', time: '08:00 - 17:00' },
+                { code: 'SWING', name: '晚班', time: '13:00 - 22:00' },
+                { code: 'SWING', name: '晚班', time: '13:00 - 22:00' },
+                { code: 'NIGHT', name: '夜班', time: '22:00 - 07:00' },
+                { code: 'OFF', name: '休息', time: '休息日' },
+                { code: 'OFF', name: '休息', time: '休息日' },
+            ];
+
+            for (let d = 1; d <= daysInMonth; d++) {
+                const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                const shift = shifts[(d - 1) % 7];
+                data[dateStr] = shift;
+            }
+            return data;
+        }
+
+        // Load schedule from Supabase (fallback to demo)
+        async function loadSchedule() {
+            try {
+                if (typeof sb !== 'undefined' && currentEmployee) {
+                    const { data, error } = await sb.rpc('get_employee_schedule', {
+                        p_line_user_id: liffProfile.userId,
+                        p_year: currentYear,
+                        p_month: currentMonth + 1
+                    });
+
+                    if (!error && data && data.length > 0) {
+                        scheduleData = {};
+                        data.forEach(item => {
+                            scheduleData[item.date] = {
+                                code: item.shift_code || 'DAY',
+                                name: item.shift_name || '早班',
+                                time: item.is_off_day ? '休息日' : `${item.start_time?.substr(0,5) || '08:00'} - ${item.end_time?.substr(0,5) || '17:00'}`
+                            };
+                        });
+                        renderCalendar();
+                        renderShiftList();
+                        return;
+                    }
+                }
+            } catch (e) {
+                console.log('使用示範班表:', e.message);
+            }
+
+            // Fallback to demo
+            scheduleData = generateDemoSchedule(currentYear, currentMonth);
+            renderCalendar();
+            renderShiftList();
+        }
+
+        function renderCalendar() {
+            const grid = document.getElementById('calGrid');
+            // Clear old days but keep weekday headers
+            const weekdays = grid.querySelectorAll('.cal-weekday');
+            grid.innerHTML = '';
+            weekdays.forEach(w => grid.appendChild(w));
+
+            const label = document.getElementById('calMonthLabel');
+            label.textContent = `${currentYear}年 ${currentMonth + 1}月`;
+
+            const firstDay = new Date(currentYear, currentMonth, 1).getDay();
+            const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+            const today = new Date();
+            const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+            // Previous month padding
+            const prevDays = new Date(currentYear, currentMonth, 0).getDate();
+            for (let i = firstDay - 1; i >= 0; i--) {
+                const el = document.createElement('div');
+                el.className = 'cal-day empty other-month';
+                el.textContent = prevDays - i;
+                grid.appendChild(el);
+            }
+
+            // Current month
+            for (let d = 1; d <= daysInMonth; d++) {
+                const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                const shift = scheduleData[dateStr];
+                const el = document.createElement('div');
+
+                let classes = 'cal-day';
+                if (dateStr === todayStr) classes += ' today';
+                if (dateStr === selectedDate) classes += ' selected';
+                if (shift) {
+                    classes += ` has-shift shift-${shift.code}`;
+                }
+                el.className = classes;
+                el.textContent = d;
+                el.onclick = () => selectDate(dateStr);
+                grid.appendChild(el);
+            }
+
+            // Next month padding
+            const totalCells = grid.children.length;
+            const remaining = (7 - (totalCells % 7)) % 7;
+            for (let i = 1; i <= remaining; i++) {
+                const el = document.createElement('div');
+                el.className = 'cal-day empty other-month';
+                el.textContent = i;
+                grid.appendChild(el);
+            }
+        }
+
+        function selectDate(dateStr) {
+            selectedDate = dateStr;
+            renderCalendar();
+            renderShiftList();
+        }
+
+        function renderShiftList() {
+            const list = document.getElementById('shiftList');
+            const today = new Date();
+            const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+            // Show upcoming 7 days from selected date or today
+            const startDate = selectedDate ? new Date(selectedDate) : new Date(currentYear, currentMonth, today.getMonth() === currentMonth ? today.getDate() : 1);
+            const days = ['日', '一', '二', '三', '四', '五', '六'];
+            let html = '';
+
+            for (let i = 0; i < 7; i++) {
+                const d = new Date(startDate);
+                d.setDate(d.getDate() + i);
+                const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                const shift = scheduleData[dateStr];
+                if (!shift) continue;
+
+                const isToday = dateStr === todayStr;
+                const dateLabel = `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')} 週${days[d.getDay()]}`;
+
+                html += `
+                    <div class="shift-day-card" ${isToday ? 'style="border-left:4px solid var(--primary);"' : ''}>
+                        <div class="shift-day-label ${isToday ? 'today-label' : ''}">${dateLabel}${isToday ? ' ：' : '：'}</div>
+                        <div class="shift-items">
+                            <div class="shift-chip ${shift.code}">
+                                <span class="shift-chip-name">${shift.name}</span>
+                                <span class="shift-chip-time">${shift.time}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            list.innerHTML = html || '<p style="text-align:center;color:var(--gray);padding:20px;">此期間無排班資料</p>';
+        }
+
+        function changeMonth(delta) {
+            currentMonth += delta;
+            if (currentMonth < 0) { currentMonth = 11; currentYear--; }
+            if (currentMonth > 11) { currentMonth = 0; currentYear++; }
+            selectedDate = null;
+            loadSchedule();
+        }
+
+        window.addEventListener('load', async () => {
+            if (typeof initializeLiff === 'undefined') {
+                // No common.js, show demo
+                loadSchedule();
+                return;
+            }
+
+            const initialized = await initializeLiff();
+            if (initialized) {
+                const isLoggedIn = await checkUserStatus();
+                if (isLoggedIn) {
+                    document.getElementById('loadingPage').style.display = 'none';
+                    loadSchedule();
+                } else {
+                    window.location.href = 'index.html';
+                }
+            } else {
+                document.getElementById('loadingPage').style.display = 'none';
+                loadSchedule();
+            }
+        });
+    </script>
+</body>
+</html>

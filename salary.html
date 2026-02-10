@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>💰 薪資明細 - 員工服務中心</title>
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .salary-month-nav {
+            display: flex; align-items: center; justify-content: center; gap: 16px; margin-bottom: 20px;
+        }
+        .salary-month-nav button {
+            background: none; border: none; font-size: 20px; cursor: pointer;
+            padding: 6px 10px; border-radius: 8px; transition: background 0.2s;
+        }
+        .salary-month-nav button:active { background: var(--gray-light); }
+        .salary-month-nav span { font-size: 16px; font-weight: 700; color: var(--dark); min-width: 100px; text-align: center; }
+
+        /* Donut chart */
+        .chart-container { display: flex; justify-content: center; margin-bottom: 20px; position: relative; }
+        .donut-center {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            text-align: center;
+        }
+        .donut-center .amount { font-size: 20px; font-weight: 900; color: var(--dark); }
+        .donut-center .label { font-size: 11px; color: var(--gray); font-weight: 600; }
+
+        /* Legend */
+        .chart-legend { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-bottom: 20px; }
+        .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--gray); }
+        .legend-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+
+        /* Detail rows */
+        .detail-section { margin-bottom: 16px; }
+        .detail-section-title {
+            font-size: 13px; font-weight: 700; color: var(--dark); margin-bottom: 8px;
+            display: flex; align-items: center; gap: 6px;
+        }
+        .detail-section-title .dot { width: 4px; height: 16px; border-radius: 2px; }
+        .detail-row {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 11px 0; border-bottom: 1px solid var(--gray-light); font-size: 14px;
+        }
+        .detail-row:last-child { border-bottom: none; }
+        .detail-row .dl { color: var(--gray); }
+        .detail-row .dv { font-weight: 700; color: var(--dark); }
+        .detail-row .dv.income { color: var(--success); }
+        .detail-row .dv.deduct { color: var(--danger); }
+        .detail-total {
+            display: flex; justify-content: space-between; padding: 12px 0; font-size: 15px; font-weight: 800;
+            border-top: 2px solid var(--gray-light); margin-top: 4px;
+        }
+
+        .download-btn {
+            width: 100%; padding: 14px; border-radius: 14px; border: none;
+            background: var(--primary-gradient); color: #fff; font-weight: 700;
+            font-size: 14px; cursor: pointer; box-shadow: 0 4px 16px var(--primary-shadow);
+            margin-top: 8px; transition: all 0.2s;
+        }
+        .download-btn:active { transform: scale(0.98); }
+    </style>
+</head>
+<body>
+    <div id="loadingPage" class="loading-screen">
+        <div class="spinner"></div>
+        <p>系統載入中...</p>
+    </div>
+
+    <div class="container">
+        <div id="salaryPage" class="page active">
+            <div class="card">
+                <h2 style="text-align:center;font-size:18px;font-weight:800;color:var(--dark);margin-bottom:16px;">💰 薪資明細</h2>
+
+                <!-- 月份導航 -->
+                <div class="salary-month-nav">
+                    <button onclick="changeSalaryMonth(-1)">◀</button>
+                    <span id="salaryMonthLabel">2026年 1月</span>
+                    <button onclick="changeSalaryMonth(1)">▶</button>
+                </div>
+
+                <!-- 淨薪資標頭 -->
+                <div style="background:var(--primary-gradient);border-radius:16px;padding:20px;text-align:center;margin-bottom:20px;">
+                    <div style="font-size:12px;color:rgba(255,255,255,0.7);font-weight:600;">實發薪資</div>
+                    <div id="netSalary" style="font-size:36px;font-weight:900;color:#fff;margin-top:6px;letter-spacing:-1px;">NT$ 45,000</div>
+                    <div id="paidDate" style="font-size:12px;color:rgba(255,255,255,0.6);margin-top:4px;">尚未發放</div>
+                </div>
+
+                <!-- 圓餅圖 -->
+                <div class="chart-container">
+                    <canvas id="donutChart" width="200" height="200"></canvas>
+                    <div class="donut-center">
+                        <div class="label">總收入</div>
+                        <div class="amount" id="chartTotal">NT$ 77,000</div>
+                    </div>
+                </div>
+                <div class="chart-legend" id="chartLegend"></div>
+            </div>
+
+            <!-- 收入明細 -->
+            <div class="card">
+                <div class="detail-section">
+                    <div class="detail-section-title">
+                        <span class="dot" style="background:var(--success);"></span> 收入明細
+                    </div>
+                    <div id="incomeRows"></div>
+                    <div class="detail-total">
+                        <span style="color:var(--success);">收入合計</span>
+                        <span id="totalIncome" style="color:var(--success);">NT$ 77,000</span>
+                    </div>
+                </div>
+
+                <div class="detail-section">
+                    <div class="detail-section-title">
+                        <span class="dot" style="background:var(--danger);"></span> 扣款明細
+                    </div>
+                    <div id="deductRows"></div>
+                    <div class="detail-total">
+                        <span style="color:var(--danger);">扣款合計</span>
+                        <span id="totalDeduct" style="color:var(--danger);">-NT$ 2,000</span>
+                    </div>
+                </div>
+            </div>
+
+            <button class="download-btn" onclick="showToast('📄 PDF 下載功能開發中')">📄 下載薪資單 PDF</button>
+        </div>
+    </div>
+
+    <!-- 底部導航列 -->
+    <nav class="bottom-nav">
+        <a class="nav-item" onclick="window.location.href='index.html'">
+            <span class="nav-icon">🏠</span><span class="nav-label">首頁</span>
+        </a>
+        <a class="nav-item" onclick="window.location.href='schedule.html'">
+            <span class="nav-icon">📅</span><span class="nav-label">班表</span>
+        </a>
+        <a class="nav-item" onclick="window.location.href='checkin.html?type=in'">
+            <span class="nav-icon">📍</span><span class="nav-label">打卡</span>
+        </a>
+        <a class="nav-item active">
+            <span class="nav-icon">💰</span><span class="nav-label">薪資</span>
+        </a>
+        <a class="nav-item" onclick="window.location.href='services.html#settings'">
+            <span class="nav-icon">⚙️</span><span class="nav-label">設定</span>
+        </a>
+    </nav>
+
+    <script src="common.js"></script>
+    <script>
+        let salaryYear = 2026;
+        let salaryMonth = 0; // 0-indexed, January
+
+        // Demo salary data
+        const demoSalary = {
+            base_salary: 45000,
+            overtime_pay: 10000,
+            meal_allowance: 2400,
+            position_allowance: 5000,
+            full_attendance_bonus: 2000,
+            night_allowance: 800,
+            labor_insurance: 1042,
+            health_insurance: 826,
+            pension_self: 2100,
+            income_tax: 894,
+            personal_leave_deduction: 0,
+            late_deduction: 0,
+            status: 'confirmed',
+            confirmed_at: '2026-02-05'
+        };
+
+        const CHART_COLORS = [
+            '#4F46E5', // 基本薪資 - 紫
+            '#F59E0B', // 職務加給 - 黃
+            '#10B981', // 加班費 - 綠
+            '#3B82F6', // 全勤獎金 - 藍
+            '#EF4444', // 勞健保扣除 - 紅
+            '#8B5CF6', // 伙食津貼 - 淡紫
+            '#EC4899', // 夜班津貼 - 粉
+        ];
+
+        function formatNT(n) {
+            return 'NT$ ' + Math.abs(n).toLocaleString();
+        }
+
+        function drawDonut(data) {
+            const canvas = document.getElementById('donutChart');
+            const ctx = canvas.getContext('2d');
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = 200 * dpr;
+            canvas.height = 200 * dpr;
+            canvas.style.width = '200px';
+            canvas.style.height = '200px';
+            ctx.scale(dpr, dpr);
+
+            const cx = 100, cy = 100, outerR = 90, innerR = 58;
+            const total = data.reduce((s, d) => s + d.value, 0);
+            let startAngle = -Math.PI / 2;
+
+            // Draw segments
+            data.forEach((d, i) => {
+                const sliceAngle = (d.value / total) * Math.PI * 2;
+                const endAngle = startAngle + sliceAngle;
+
+                ctx.beginPath();
+                ctx.arc(cx, cy, outerR, startAngle, endAngle);
+                ctx.arc(cx, cy, innerR, endAngle, startAngle, true);
+                ctx.closePath();
+                ctx.fillStyle = CHART_COLORS[i % CHART_COLORS.length];
+                ctx.fill();
+
+                startAngle = endAngle;
+            });
+
+            // Center circle (white)
+            ctx.beginPath();
+            ctx.arc(cx, cy, innerR - 1, 0, Math.PI * 2);
+            ctx.fillStyle = '#fff';
+            ctx.fill();
+        }
+
+        function renderSalary(salary) {
+            // Income items
+            const incomeItems = [
+                { label: '基本薪資', value: salary.base_salary },
+                { label: '職務加給', value: salary.position_allowance },
+                { label: '加班費', value: salary.overtime_pay },
+                { label: '全勤獎金', value: salary.full_attendance_bonus },
+                { label: '伙食津貼', value: salary.meal_allowance },
+                { label: '夜班津貼', value: salary.night_allowance },
+            ].filter(i => i.value > 0);
+
+            // Deduct items
+            const deductItems = [
+                { label: '勞健保扣除', value: salary.labor_insurance + salary.health_insurance },
+                { label: '勞退自提 6%', value: salary.pension_self },
+                { label: '預扣所得稅', value: salary.income_tax },
+                { label: '事假扣款', value: salary.personal_leave_deduction },
+                { label: '遲到扣款', value: salary.late_deduction },
+            ].filter(i => i.value > 0);
+
+            const totalIncome = incomeItems.reduce((s, i) => s + i.value, 0);
+            const totalDeduct = deductItems.reduce((s, i) => s + i.value, 0);
+            const netSalary = totalIncome - totalDeduct;
+
+            // Update header
+            document.getElementById('netSalary').textContent = formatNT(netSalary);
+            document.getElementById('chartTotal').textContent = formatNT(totalIncome);
+            document.getElementById('totalIncome').textContent = formatNT(totalIncome);
+            document.getElementById('totalDeduct').textContent = '-' + formatNT(totalDeduct);
+
+            if (salary.status === 'confirmed' || salary.status === 'paid') {
+                document.getElementById('paidDate').textContent = `已於 ${salary.confirmed_at} 確認`;
+            }
+
+            // Donut chart
+            const chartData = incomeItems.map(i => ({ label: i.label, value: i.value }));
+            drawDonut(chartData);
+
+            // Legend
+            const legendEl = document.getElementById('chartLegend');
+            legendEl.innerHTML = chartData.map((d, i) =>
+                `<span class="legend-item"><span class="legend-dot" style="background:${CHART_COLORS[i]}"></span>${d.label}</span>`
+            ).join('');
+
+            // Income rows
+            document.getElementById('incomeRows').innerHTML = incomeItems.map(i =>
+                `<div class="detail-row"><span class="dl">${i.label}</span><span class="dv">${formatNT(i.value)}</span></div>`
+            ).join('');
+
+            // Deduct rows
+            document.getElementById('deductRows').innerHTML = deductItems.map(i =>
+                `<div class="detail-row"><span class="dl">${i.label}</span><span class="dv deduct">-${formatNT(i.value)}</span></div>`
+            ).join('');
+        }
+
+        async function loadSalary() {
+            const label = document.getElementById('salaryMonthLabel');
+            label.textContent = `${salaryYear}年 ${salaryMonth + 1}月`;
+
+            try {
+                if (typeof sb !== 'undefined' && currentEmployee) {
+                    const { data, error } = await sb.from('payroll')
+                        .select('*')
+                        .eq('employee_id', currentEmployee.id)
+                        .eq('year', salaryYear)
+                        .eq('month', salaryMonth + 1)
+                        .maybeSingle();
+
+                    if (!error && data) {
+                        renderSalary(data);
+                        return;
+                    }
+                }
+            } catch (e) {
+                console.log('使用示範薪資:', e.message);
+            }
+
+            // Demo fallback
+            renderSalary(demoSalary);
+        }
+
+        function changeSalaryMonth(delta) {
+            salaryMonth += delta;
+            if (salaryMonth < 0) { salaryMonth = 11; salaryYear--; }
+            if (salaryMonth > 11) { salaryMonth = 0; salaryYear++; }
+            loadSalary();
+        }
+
+        window.addEventListener('load', async () => {
+            if (typeof initializeLiff === 'undefined') {
+                loadSalary();
+                return;
+            }
+
+            const initialized = await initializeLiff();
+            if (initialized) {
+                const isLoggedIn = await checkUserStatus();
+                if (isLoggedIn) {
+                    document.getElementById('loadingPage').style.display = 'none';
+                    loadSalary();
+                } else {
+                    window.location.href = 'index.html';
+                }
+            } else {
+                document.getElementById('loadingPage').style.display = 'none';
+                loadSalary();
+            }
+        });
+    </script>
+</body>
+</html>

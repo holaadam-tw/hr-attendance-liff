@@ -16,44 +16,80 @@
 
     <div class="container">
         <div id="checkInPage" class="page active">
-            <button class="btn btn-secondary" onclick="window.location.href='index.html'" style="width:auto;margin-bottom:10px;">← 返回</button>
+            <button class="btn btn-secondary" onclick="window.location.href='index.html'" style="width:auto;margin-bottom:10px;margin-top:0;">← 返回</button>
             <div class="checkin-page">
-                <h2 id="checkInTitle" style="text-align: center;">📍 上班打卡</h2>
-                <div id="checkInStatus" class="status-box show info">準備開啟相機...</div>
+                <h2 id="checkInTitle" style="text-align:center;font-size:18px;font-weight:800;color:#0F172A;">📍 上班打卡</h2>
+                <div id="checkInStatus" class="status-box show info" style="margin-top:12px;">準備開啟相機...</div>
                 
+                <!-- 班別資訊 -->
+                <div id="shiftInfo" style="display:flex;justify-content:space-between;align-items:center;background:#DBEAFE;border-radius:12px;padding:14px;margin-bottom:16px;">
+                    <div>
+                        <div style="font-size:12px;color:#1E40AF;font-weight:600;">今日班別：早班</div>
+                        <div style="font-size:13px;color:#1E40AF;margin-top:2px;">08:00 - 17:00</div>
+                    </div>
+                    <div id="currentTime" style="font-size:24px;font-weight:900;color:#1E40AF;">--:--</div>
+                </div>
+
                 <div class="camera-container" id="cameraContainer">
                     <video id="video" autoplay playsinline muted></video>
                     <canvas id="canvas" class="hidden"></canvas>
+                    <div class="camera-overlay" id="cameraOverlay" style="display:none;">
+                        <span id="overlayLocation">📍 定位中...</span>
+                        <span id="overlayStatus" style="color:#10B981;">-</span>
+                    </div>
                 </div>
 
-                <button class="btn btn-primary" id="captureBtn" onclick="captureAndCheckIn()" disabled>📸 拍照並打卡</button>
+                <button class="btn btn-primary" id="captureBtn" onclick="captureAndCheckIn()" disabled style="font-size:16px;padding:16px;border-radius:16px;">📸 拍照並打卡</button>
             </div>
         </div>
     </div>
+
+    <!-- 底部導航列 -->
+    <nav class="bottom-nav">
+        <a class="nav-item" onclick="window.location.href='index.html'">
+            <span class="nav-icon">🏠</span><span class="nav-label">首頁</span>
+        </a>
+        <a class="nav-item" onclick="window.location.href='schedule.html'">
+            <span class="nav-icon">📅</span><span class="nav-label">班表</span>
+        </a>
+        <a class="nav-item active">
+            <span class="nav-icon">📍</span><span class="nav-label">打卡</span>
+        </a>
+        <a class="nav-item" onclick="window.location.href='salary.html'">
+            <span class="nav-icon">💰</span><span class="nav-label">薪資</span>
+        </a>
+        <a class="nav-item" onclick="window.location.href='services.html#settings'">
+            <span class="nav-icon">⚙️</span><span class="nav-label">設定</span>
+        </a>
+    </nav>
 
     <script src="common.js"></script>
     <script>
         let currentCheckInType = 'in';
 
+        // 更新時鐘
+        function updateClock() {
+            const now = new Date();
+            const timeStr = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+            const el = document.getElementById('currentTime');
+            if (el) el.textContent = timeStr;
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
         async function captureAndCheckIn() {
-            if (!currentEmployee) {
-                showToast('❌ 員工資料未載入，請重新登入');
-                return;
-            }
+            if (!currentEmployee) { showToast('❌ 員工資料未載入'); return; }
 
             const btn = document.getElementById('captureBtn');
             const statusBox = document.getElementById('checkInStatus');
-            btn.disabled = true; 
-            btn.textContent = '處理中...';
+            btn.disabled = true; btn.textContent = '處理中...';
             
             try {
                 const video = document.getElementById('video');
                 const canvas = document.getElementById('canvas');
-                canvas.width = video.videoWidth; 
-                canvas.height = video.videoHeight;
+                canvas.width = video.videoWidth; canvas.height = video.videoHeight;
                 const ctx = canvas.getContext('2d');
-                ctx.translate(canvas.width, 0); 
-                ctx.scale(-1, 1);
+                ctx.translate(canvas.width, 0); ctx.scale(-1, 1);
                 ctx.drawImage(video, 0, 0);
                 const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.7));
 
@@ -71,10 +107,8 @@
 
                 const { data: rpcData, error: rpcError } = await sb.rpc('quick_check_in', {
                     p_line_user_id: liffProfile.userId,
-                    p_latitude: loc.latitude, 
-                    p_longitude: loc.longitude,
-                    p_photo_url: publicUrl, 
-                    p_device_id: navigator.userAgent
+                    p_latitude: loc.latitude, p_longitude: loc.longitude,
+                    p_photo_url: publicUrl, p_device_id: navigator.userAgent
                 });
 
                 if (rpcError) throw rpcError;
@@ -84,14 +118,12 @@
 
                 const typeText = currentCheckInType === 'in' ? '上班' : '下班';
                 showToast(`✅ ${typeText}成功！@${rpcData.location_name || '公司'}`);
-                
                 setTimeout(() => { window.location.href = 'index.html'; }, 1500);
 
             } catch (err) {
                 console.error(err);
                 showStatus(statusBox, 'error', `❌ 失敗: ${friendlyError(err)}`);
-                btn.disabled = false; 
-                btn.textContent = '📸 重試';
+                btn.disabled = false; btn.textContent = '📸 重試';
             }
         }
 
@@ -106,6 +138,15 @@
                     document.getElementById('cameraContainer').classList.add('show');
                     document.getElementById('captureBtn').disabled = false;
                     document.getElementById('checkInStatus').textContent = '✅ 相機就緒';
+                    
+                    // 顯示 overlay
+                    const overlay = document.getElementById('cameraOverlay');
+                    if (overlay) overlay.style.display = 'flex';
+                    
+                    const lastLoc = localStorage.getItem('last_location');
+                    if (lastLoc) {
+                        document.getElementById('overlayLocation').textContent = `📍 ${lastLoc}`;
+                    }
                 };
             } catch(e) { 
                 console.error('相機錯誤', e);
@@ -117,18 +158,13 @@
         }
 
         window.addEventListener('load', async () => {
-            if (typeof initializeLiff === 'undefined') {
-                console.error('common.js 未正確載入');
-                return;
-            }
+            if (typeof initializeLiff === 'undefined') return;
             
             const urlParams = new URLSearchParams(window.location.search);
             currentCheckInType = urlParams.get('type') || 'in';
             
             const titleEl = document.getElementById('checkInTitle');
-            if (titleEl) {
-                titleEl.textContent = currentCheckInType === 'in' ? '📍 上班打卡' : '👋 下班打卡';
-            }
+            if (titleEl) titleEl.textContent = currentCheckInType === 'in' ? '📍 上班打卡' : '👋 下班打卡';
 
             const initialized = await initializeLiff();
             if (initialized) {
@@ -142,9 +178,7 @@
         });
 
         window.addEventListener('beforeunload', () => {
-            if (videoStream) {
-                videoStream.getTracks().forEach(t => t.stop());
-            }
+            if (videoStream) videoStream.getTracks().forEach(t => t.stop());
         });
     </script>
 </body>
