@@ -24,7 +24,8 @@ async function initializeLiff() {
         console.log('🚀 系統初始化...');
         await liff.init({ liffId: CONFIG.LIFF_ID });
         if (!liff.isLoggedIn()) { 
-            liff.login(); 
+            // [BUG FIX] 登入後導回當前頁面，而非只回 index.html
+            liff.login({ redirectUri: window.location.href }); 
             return false;
         }
         
