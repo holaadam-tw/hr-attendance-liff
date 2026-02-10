@@ -394,17 +394,34 @@ async function loadLeaveHistory() {
     const list = document.getElementById('leaveHistoryList');
     if (!currentEmployee || !list) return;
     try {
-        const { data } = await sb.rpc('get_leave_history', { p_line_user_id: liffProfile.userId, p_limit: 5 });
-        if (!data || data.length === 0) { 
+        // 先嘗試 RPC，如果失敗直接查表（包含 rejected）
+        let records = [];
+        try {
+            const { data } = await sb.rpc('get_leave_history', { p_line_user_id: liffProfile.userId, p_limit: 10 });
+            if (data) records = data;
+        } catch(e) {}
+        
+        // 如果 RPC 沒有資料，直接查表（含 rejected）
+        if (records.length === 0) {
+            const { data } = await sb.from('leave_requests')
+                .select('*')
+                .eq('employee_id', currentEmployee.id)
+                .order('created_at', { ascending: false })
+                .limit(10);
+            if (data) records = data;
+        }
+        
+        if (!records || records.length === 0) { 
             list.innerHTML = '<p style="text-align:center;color:#999;">尚無記錄</p>'; 
             return; 
         }
         
         const typeMap = { 'annual': '特休', 'sick': '病假', 'personal': '事假', 'compensatory': '補休' };
         const statusMap = { 'pending': '⏳ 待審', 'approved': '✅ 通過', 'rejected': '❌ 拒絕' };
+        const statusColor = { 'pending': '#F59E0B', 'approved': '#059669', 'rejected': '#DC2626' };
         
-        list.innerHTML = data.map(r => `
-            <div class="attendance-item">
+        list.innerHTML = records.map(r => `
+            <div class="attendance-item" style="border-left:3px solid ${statusColor[r.status] || '#ccc'};">
                 <div class="date">
                     <span>${typeMap[r.leave_type] || r.leave_type}</span>
                     <span class="badge ${r.status === 'approved' ? 'badge-success' : r.status === 'rejected' ? 'badge-danger' : 'badge-warning'}">
@@ -413,8 +430,13 @@ async function loadLeaveHistory() {
                 </div>
                 <div class="details">
                     <span>${r.start_date} ~ ${r.end_date}</span>
+                    <span>${r.days || 1} 天</span>
                 </div>
-                <div style="font-size:12px;color:#999;margin-top:4px;">${r.reason || ''}</div>
+                <div style="font-size:12px;color:#666;margin-top:4px;">${r.reason || ''}</div>
+                ${r.status === 'rejected' && r.rejection_reason ? 
+                    `<div style="font-size:12px;color:#DC2626;margin-top:4px;padding:6px 8px;background:#FEF2F2;border-radius:6px;">
+                        ❌ 拒絕原因：${r.rejection_reason}
+                    </div>` : ''}
             </div>
         `).join('');
     } catch(e) { 

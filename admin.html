@@ -8,6 +8,11 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <link rel="stylesheet" href="style.css">
+    <style>
+        #lcTable th, #lcTable td, #smTable th, #smTable td { border: 1px solid #F1F5F9; }
+        #smTable td:hover { filter: brightness(0.92); }
+        #lcTable th, #smTable th { position: sticky; top: 0; background: #fff; z-index: 1; }
+    </style>
 </head>
 <body>
     <div id="loadingPage" class="loading-screen">
@@ -58,6 +63,12 @@
                 </div>
                 <div class="menu-item" onclick="showPage('reportPage')">
                     <div class="icon">📊</div><div class="label">報表匯出</div>
+                </div>
+                <div class="menu-item" onclick="showPage('leaveCalPage')">
+                    <div class="icon">🗓️</div><div class="label">休假管理</div>
+                </div>
+                <div class="menu-item" onclick="showPage('shiftMgrPage')">
+                    <div class="icon">📋</div><div class="label">排班管理</div>
                 </div>
                 <div class="menu-item" onclick="showPage('featurePage')">
                     <div class="icon">🎛️</div><div class="label">功能管理</div>
@@ -328,6 +339,92 @@
                 <p style="color:#94A3B8;font-size:12px;margin-top:16px;text-align:center;">💡 底部導航列（首頁/班表/打卡/薪資/管理）為管理員專屬，不受此設定影響</p>
             </div>
         </div>
+
+        <!-- ====== ④ 休假管理月表 ====== -->
+        <div id="leaveCalPage" class="page">
+            <button class="btn btn-secondary" onclick="showPage('adminHomePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
+            <div class="checkin-page">
+                <h2>🗓️ 員工休假管理</h2>
+                <p style="color:#6b7280;font-size:13px;margin-bottom:12px;">一覽全員休假狀態，方便安排工作</p>
+                
+                <div style="display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:16px;">
+                    <button onclick="changeLeaveCal(-1)" style="background:none;border:none;font-size:20px;cursor:pointer;padding:6px 10px;border-radius:8px;">◀</button>
+                    <span id="lcMonthLabel" style="font-size:16px;font-weight:700;min-width:120px;text-align:center;">-</span>
+                    <button onclick="changeLeaveCal(1)" style="background:none;border:none;font-size:20px;cursor:pointer;padding:6px 10px;border-radius:8px;">▶</button>
+                </div>
+
+                <!-- 統計 -->
+                <div style="display:flex;gap:8px;margin-bottom:16px;">
+                    <div style="flex:1;text-align:center;padding:10px;background:#EFF6FF;border-radius:12px;">
+                        <div style="font-size:20px;font-weight:900;color:#2563EB;" id="lcTotal">0</div>
+                        <div style="font-size:10px;font-weight:600;color:#2563EB;">總請假人次</div>
+                    </div>
+                    <div style="flex:1;text-align:center;padding:10px;background:#ECFDF5;border-radius:12px;">
+                        <div style="font-size:20px;font-weight:900;color:#059669;" id="lcAvail">0</div>
+                        <div style="font-size:10px;font-weight:600;color:#059669;">今日可用人力</div>
+                    </div>
+                </div>
+
+                <!-- 月表格 -->
+                <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
+                    <table id="lcTable" style="width:100%;border-collapse:collapse;font-size:11px;min-width:600px;">
+                        <thead id="lcHead"></thead>
+                        <tbody id="lcBody"></tbody>
+                    </table>
+                </div>
+
+                <!-- 圖例 -->
+                <div style="display:flex;gap:12px;justify-content:center;margin-top:12px;flex-wrap:wrap;">
+                    <span style="font-size:11px;display:flex;align-items:center;gap:4px;"><span style="width:14px;height:14px;background:#DBEAFE;border-radius:3px;display:inline-block;"></span>特休</span>
+                    <span style="font-size:11px;display:flex;align-items:center;gap:4px;"><span style="width:14px;height:14px;background:#FEE2E2;border-radius:3px;display:inline-block;"></span>病假</span>
+                    <span style="font-size:11px;display:flex;align-items:center;gap:4px;"><span style="width:14px;height:14px;background:#FEF3C7;border-radius:3px;display:inline-block;"></span>事假</span>
+                    <span style="font-size:11px;display:flex;align-items:center;gap:4px;"><span style="width:14px;height:14px;background:#E0E7FF;border-radius:3px;display:inline-block;"></span>補休</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ====== ⑤ 排班管理 ====== -->
+        <div id="shiftMgrPage" class="page">
+            <button class="btn btn-secondary" onclick="showPage('adminHomePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
+            <div class="checkin-page">
+                <h2>📋 排班管理</h2>
+                <p style="color:#6b7280;font-size:13px;margin-bottom:12px;">安排員工班別，點擊格子切換班別</p>
+                
+                <div style="display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:12px;">
+                    <button onclick="changeShiftWeek(-1)" style="background:none;border:none;font-size:20px;cursor:pointer;padding:6px 10px;border-radius:8px;">◀</button>
+                    <span id="smWeekLabel" style="font-size:15px;font-weight:700;min-width:180px;text-align:center;">-</span>
+                    <button onclick="changeShiftWeek(1)" style="background:none;border:none;font-size:20px;cursor:pointer;padding:6px 10px;border-radius:8px;">▶</button>
+                </div>
+
+                <!-- 班別圖例 -->
+                <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;justify-content:center;">
+                    <span style="font-size:11px;padding:4px 10px;background:#DBEAFE;color:#1E40AF;border-radius:8px;font-weight:700;">☀️ 早班</span>
+                    <span style="font-size:11px;padding:4px 10px;background:#FEF3C7;color:#92400E;border-radius:8px;font-weight:700;">🌤️ 中班</span>
+                    <span style="font-size:11px;padding:4px 10px;background:#EDE9FE;color:#6D28D9;border-radius:8px;font-weight:700;">🌙 晚班</span>
+                    <span style="font-size:11px;padding:4px 10px;background:#ECFDF5;color:#059669;border-radius:8px;font-weight:700;">🏖️ 休假</span>
+                    <span style="font-size:11px;padding:4px 10px;background:#F1F5F9;color:#64748B;border-radius:8px;font-weight:700;">⬜ 未排</span>
+                </div>
+
+                <!-- 排班表格 -->
+                <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
+                    <table id="smTable" style="width:100%;border-collapse:collapse;font-size:12px;min-width:500px;">
+                        <thead id="smHead"></thead>
+                        <tbody id="smBody"></tbody>
+                    </table>
+                </div>
+
+                <!-- 快速操作 -->
+                <div style="margin-top:16px;display:flex;gap:8px;">
+                    <button onclick="saveSchedule()" style="flex:1;padding:14px;border:none;border-radius:12px;background:linear-gradient(135deg,#4F46E5,#7C3AED);color:#fff;font-weight:700;font-size:14px;cursor:pointer;">
+                        💾 儲存排班
+                    </button>
+                    <button onclick="copyLastWeek()" style="padding:14px 20px;border:2px solid #E5E7EB;border-radius:12px;background:#fff;font-weight:700;font-size:14px;cursor:pointer;">
+                        📋 複製上週
+                    </button>
+                </div>
+                <div id="smSaveStatus" style="margin-top:10px;text-align:center;font-size:13px;display:none;"></div>
+            </div>
+        </div>
     </div>
     <nav class="bottom-nav" id="bottomNav" style="display:none;">
         <a class="nav-item" onclick="window.location.href='index.html'">
@@ -367,6 +464,8 @@
             if (id === 'employeePage') loadEmployeeList();
             if (id === 'leaveApprovalPage') loadLeaveApprovals('pending');
             if (id === 'featurePage') loadFeatureSettings();
+            if (id === 'leaveCalPage') loadLeaveCal();
+            if (id === 'shiftMgrPage') loadShiftMgr();
         }
 
         // ===== 功能管理 =====
@@ -824,6 +923,262 @@
             } catch (err) {
                 console.error(err);
                 showToast('❌ 審核失敗: ' + friendlyError(err));
+            }
+        }
+
+        // ===== ④ 休假管理月表 =====
+        let lcYear, lcMonth;
+        (function() { const n = new Date(); lcYear = n.getFullYear(); lcMonth = n.getMonth(); })();
+
+        function changeLeaveCal(d) {
+            lcMonth += d;
+            if (lcMonth < 0) { lcMonth = 11; lcYear--; }
+            if (lcMonth > 11) { lcMonth = 0; lcYear++; }
+            loadLeaveCal();
+        }
+
+        async function loadLeaveCal() {
+            document.getElementById('lcMonthLabel').textContent = `${lcYear}年 ${lcMonth + 1}月`;
+            const dim = new Date(lcYear, lcMonth + 1, 0).getDate();
+            const ms = `${lcYear}-${String(lcMonth + 1).padStart(2, '0')}-01`;
+            const me = `${lcYear}-${String(lcMonth + 1).padStart(2, '0')}-${dim}`;
+
+            let employees = [], leaves = [];
+            try {
+                const { data: emps } = await sb.from('employees').select('id, name, department').eq('status', 'active').order('department').order('name');
+                employees = emps || [];
+                const { data: lvs } = await sb.from('leave_requests').select('employee_id, start_date, end_date, leave_type, status')
+                    .in('status', ['approved', 'pending'])
+                    .or(`start_date.lte.${me},end_date.gte.${ms}`);
+                leaves = lvs || [];
+            } catch (e) { console.error(e); }
+
+            // Build date headers
+            const wd = ['日', '一', '二', '三', '四', '五', '六'];
+            let headHtml = '<tr><th style="position:sticky;left:0;background:#fff;z-index:2;padding:6px 8px;min-width:70px;text-align:left;border-bottom:2px solid #E5E7EB;">姓名</th>';
+            for (let d = 1; d <= dim; d++) {
+                const dt = new Date(lcYear, lcMonth, d);
+                const isWeekend = dt.getDay() === 0 || dt.getDay() === 6;
+                const bgc = isWeekend ? '#F1F5F9' : '#fff';
+                headHtml += `<th style="padding:4px 2px;min-width:28px;text-align:center;border-bottom:2px solid #E5E7EB;background:${bgc};font-size:10px;">
+                    <div>${d}</div><div style="color:#94A3B8;font-size:9px;">${wd[dt.getDay()]}</div>
+                </th>`;
+            }
+            headHtml += '</tr>';
+            document.getElementById('lcHead').innerHTML = headHtml;
+
+            // Build rows
+            const typeColor = { annual: '#DBEAFE', sick: '#FEE2E2', personal: '#FEF3C7', compensatory: '#E0E7FF' };
+            const typeEmoji = { annual: '🏖', sick: '🤒', personal: '📋', compensatory: '💤' };
+            let totalLeaves = 0;
+            const todayStr = new Date().toISOString().split('T')[0];
+            let todayAvail = employees.length;
+
+            let bodyHtml = '';
+            employees.forEach(emp => {
+                const empLeaves = leaves.filter(l => l.employee_id === emp.id);
+                bodyHtml += `<tr><td style="position:sticky;left:0;background:#fff;z-index:1;padding:6px 8px;font-weight:700;font-size:12px;white-space:nowrap;border-bottom:1px solid #F1F5F9;">${emp.name}</td>`;
+                
+                for (let d = 1; d <= dim; d++) {
+                    const ds = `${lcYear}-${String(lcMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                    const dt = new Date(lcYear, lcMonth, d);
+                    const isWeekend = dt.getDay() === 0 || dt.getDay() === 6;
+
+                    // Find leave for this day
+                    const lv = empLeaves.find(l => ds >= l.start_date && ds <= (l.end_date || l.start_date));
+
+                    if (lv) {
+                        totalLeaves++;
+                        if (ds === todayStr) todayAvail--;
+                        const bg = typeColor[lv.leave_type] || '#F1F5F9';
+                        const emoji = typeEmoji[lv.leave_type] || '📝';
+                        const pending = lv.status === 'pending' ? 'opacity:0.5;' : '';
+                        bodyHtml += `<td style="text-align:center;background:${bg};border-bottom:1px solid #F1F5F9;${pending}font-size:10px;cursor:default;" title="${emp.name} ${lv.leave_type}${lv.status === 'pending' ? ' (待審)' : ''}">${emoji}</td>`;
+                    } else if (isWeekend) {
+                        bodyHtml += `<td style="background:#F8FAFC;border-bottom:1px solid #F1F5F9;"></td>`;
+                    } else {
+                        bodyHtml += `<td style="border-bottom:1px solid #F1F5F9;"></td>`;
+                    }
+                }
+                bodyHtml += '</tr>';
+            });
+
+            document.getElementById('lcBody').innerHTML = bodyHtml;
+            document.getElementById('lcTotal').textContent = totalLeaves;
+            document.getElementById('lcAvail').textContent = Math.max(0, todayAvail);
+        }
+
+        // ===== ⑤ 排班管理 =====
+        let smWeekStart;
+        (function() {
+            const n = new Date();
+            const dow = n.getDay();
+            smWeekStart = new Date(n);
+            smWeekStart.setDate(n.getDate() - dow + 1); // Monday
+            smWeekStart.setHours(0, 0, 0, 0);
+        })();
+
+        let smEmployees = [];
+        let smScheduleData = {}; // { 'empId_YYYY-MM-DD': 'morning' | 'afternoon' | 'night' | 'off' | null }
+        const SHIFT_TYPES = [null, 'morning', 'afternoon', 'night', 'off'];
+        const SHIFT_DISPLAY = {
+            null: { label: '⬜', bg: '#F8FAFC', color: '#94A3B8' },
+            morning: { label: '☀️', bg: '#DBEAFE', color: '#1E40AF' },
+            afternoon: { label: '🌤️', bg: '#FEF3C7', color: '#92400E' },
+            night: { label: '🌙', bg: '#EDE9FE', color: '#6D28D9' },
+            off: { label: '🏖️', bg: '#ECFDF5', color: '#059669' }
+        };
+
+        function changeShiftWeek(d) {
+            smWeekStart.setDate(smWeekStart.getDate() + d * 7);
+            loadShiftMgr();
+        }
+
+        function getWeekDates() {
+            const dates = [];
+            for (let i = 0; i < 7; i++) {
+                const d = new Date(smWeekStart);
+                d.setDate(d.getDate() + i);
+                dates.push(d);
+            }
+            return dates;
+        }
+
+        async function loadShiftMgr() {
+            const dates = getWeekDates();
+            const startStr = dates[0].toISOString().split('T')[0];
+            const endStr = dates[6].toISOString().split('T')[0];
+            document.getElementById('smWeekLabel').textContent = `${startStr} ~ ${endStr}`;
+
+            try {
+                const { data: emps } = await sb.from('employees').select('id, name, department').eq('status', 'active').order('name');
+                smEmployees = emps || [];
+                
+                const { data: scheds } = await sb.from('schedules').select('employee_id, date, shift_type_id, shift_types(name, code)')
+                    .gte('date', startStr).lte('date', endStr);
+                
+                smScheduleData = {};
+                (scheds || []).forEach(s => {
+                    const code = s.shift_types?.code || s.shift_types?.name || 'morning';
+                    smScheduleData[`${s.employee_id}_${s.date}`] = code;
+                });
+            } catch (e) { console.error(e); }
+
+            renderShiftTable();
+        }
+
+        function renderShiftTable() {
+            const dates = getWeekDates();
+            const wd = ['日', '一', '二', '三', '四', '五', '六'];
+
+            let headHtml = '<tr><th style="position:sticky;left:0;background:#fff;z-index:2;padding:8px;min-width:70px;text-align:left;border-bottom:2px solid #E5E7EB;">姓名</th>';
+            dates.forEach(d => {
+                const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+                headHtml += `<th style="padding:6px 4px;min-width:46px;text-align:center;border-bottom:2px solid #E5E7EB;background:${isWeekend ? '#F1F5F9' : '#fff'};">
+                    <div style="font-size:12px;">${d.getDate()}</div>
+                    <div style="font-size:10px;color:#94A3B8;">週${wd[d.getDay()]}</div>
+                </th>`;
+            });
+            headHtml += '</tr>';
+            document.getElementById('smHead').innerHTML = headHtml;
+
+            let bodyHtml = '';
+            smEmployees.forEach(emp => {
+                bodyHtml += `<tr><td style="position:sticky;left:0;background:#fff;z-index:1;padding:8px;font-weight:700;font-size:12px;white-space:nowrap;border-bottom:1px solid #F1F5F9;">${emp.name}</td>`;
+                
+                dates.forEach(d => {
+                    const ds = d.toISOString().split('T')[0];
+                    const key = `${emp.id}_${ds}`;
+                    const shift = smScheduleData[key] || null;
+                    const disp = SHIFT_DISPLAY[shift] || SHIFT_DISPLAY[null];
+                    
+                    bodyHtml += `<td onclick="cycleShift('${key}')" style="text-align:center;padding:8px 4px;cursor:pointer;border-bottom:1px solid #F1F5F9;background:${disp.bg};font-size:16px;transition:all 0.15s;user-select:none;" title="${emp.name} ${ds}">${disp.label}</td>`;
+                });
+                bodyHtml += '</tr>';
+            });
+            document.getElementById('smBody').innerHTML = bodyHtml;
+        }
+
+        function cycleShift(key) {
+            const current = smScheduleData[key] || null;
+            const idx = SHIFT_TYPES.indexOf(current);
+            const next = SHIFT_TYPES[(idx + 1) % SHIFT_TYPES.length];
+            smScheduleData[key] = next;
+            renderShiftTable();
+        }
+
+        async function saveSchedule() {
+            const statusEl = document.getElementById('smSaveStatus');
+            statusEl.style.display = 'block';
+            statusEl.style.color = '#F59E0B';
+            statusEl.textContent = '⏳ 儲存中...';
+
+            try {
+                // Get shift_types mapping
+                const { data: shiftTypes } = await sb.from('shift_types').select('id, code, name');
+                const stMap = {};
+                (shiftTypes || []).forEach(st => { stMap[st.code || st.name] = st.id; });
+
+                const upserts = [];
+                for (const [key, shift] of Object.entries(smScheduleData)) {
+                    if (!shift) continue;
+                    const [empId, date] = key.split('_');
+                    const stId = stMap[shift];
+                    if (!stId) continue;
+                    upserts.push({ employee_id: empId, date: date, shift_type_id: stId });
+                }
+
+                if (upserts.length > 0) {
+                    const { error } = await sb.from('schedules').upsert(upserts, { onConflict: 'employee_id,date' });
+                    if (error) throw error;
+                }
+
+                statusEl.style.color = '#059669';
+                statusEl.textContent = `✅ 已儲存 ${upserts.length} 筆排班`;
+                setTimeout(() => { statusEl.style.display = 'none'; }, 2500);
+            } catch (e) {
+                console.error(e);
+                statusEl.style.color = '#DC2626';
+                statusEl.textContent = '❌ 儲存失敗: ' + e.message;
+            }
+        }
+
+        async function copyLastWeek() {
+            if (!confirm('確定要複製上週排班到本週？\n（已有排班不會被覆蓋）')) return;
+            
+            const dates = getWeekDates();
+            const lastWeekDates = dates.map(d => {
+                const ld = new Date(d);
+                ld.setDate(ld.getDate() - 7);
+                return ld;
+            });
+
+            try {
+                const startStr = lastWeekDates[0].toISOString().split('T')[0];
+                const endStr = lastWeekDates[6].toISOString().split('T')[0];
+                const { data: lastScheds } = await sb.from('schedules').select('employee_id, date, shift_type_id, shift_types(code, name)')
+                    .gte('date', startStr).lte('date', endStr);
+
+                let copied = 0;
+                (lastScheds || []).forEach(s => {
+                    const oldDate = new Date(s.date + 'T00:00:00');
+                    const newDate = new Date(oldDate);
+                    newDate.setDate(newDate.getDate() + 7);
+                    const newDs = newDate.toISOString().split('T')[0];
+                    const key = `${s.employee_id}_${newDs}`;
+                    
+                    if (!smScheduleData[key]) {
+                        const code = s.shift_types?.code || s.shift_types?.name || 'morning';
+                        smScheduleData[key] = code;
+                        copied++;
+                    }
+                });
+
+                renderShiftTable();
+                showToast(`📋 已複製上週 ${copied} 筆排班`);
+            } catch (e) {
+                console.error(e);
+                showToast('❌ 複製失敗');
             }
         }
 

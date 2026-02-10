@@ -118,7 +118,13 @@
 
                 const typeText = currentCheckInType === 'in' ? '上班' : '下班';
                 showToast(`✅ ${typeText}成功！@${rpcData.location_name || '公司'}`);
-                setTimeout(() => { window.location.href = 'index.html'; }, 1500);
+                
+                // 上班打卡且10點前 → 彈出便當訂購
+                if (currentCheckInType === 'in' && new Date().getHours() < 10) {
+                    showLunchPopup();
+                } else {
+                    setTimeout(() => { window.location.href = 'index.html'; }, 1500);
+                }
 
             } catch (err) {
                 console.error(err);
@@ -181,6 +187,130 @@
         window.addEventListener('beforeunload', () => {
             if (videoStream) videoStream.getTracks().forEach(t => t.stop());
         });
+
+        // ===== 便當訂購彈窗 =====
+        function showLunchPopup() {
+            const overlay = document.createElement('div');
+            overlay.id = 'lunchOverlay';
+            overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;animation:fadeIn 0.3s;';
+            overlay.innerHTML = `
+                <div style="background:#fff;border-radius:20px;padding:24px;width:100%;max-width:340px;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+                    <div style="text-align:center;margin-bottom:16px;">
+                        <div style="font-size:40px;margin-bottom:8px;">🍱</div>
+                        <h3 style="font-size:16px;font-weight:800;color:#0F172A;">今日便當訂購</h3>
+                        <p style="font-size:12px;color:#94A3B8;margin-top:4px;">請選擇今日午餐</p>
+                    </div>
+                    
+                    <div id="lunchOptions" style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px;">
+                        <div class="lunch-opt" onclick="selectLunch('regular')" style="display:flex;align-items:center;gap:12px;padding:14px;border:2px solid #E5E7EB;border-radius:14px;cursor:pointer;transition:all 0.2s;">
+                            <span style="font-size:28px;">🍖</span>
+                            <div style="flex:1;"><b style="font-size:14px;">葷食便當</b><br><span style="font-size:11px;color:#94A3B8;">今日主菜由餐廳安排</span></div>
+                            <div id="checkRegular" style="width:22px;height:22px;border:2px solid #CBD5E1;border-radius:50%;transition:all 0.2s;"></div>
+                        </div>
+                        <div class="lunch-opt" onclick="selectLunch('vegetarian')" style="display:flex;align-items:center;gap:12px;padding:14px;border:2px solid #E5E7EB;border-radius:14px;cursor:pointer;transition:all 0.2s;">
+                            <span style="font-size:28px;">🥗</span>
+                            <div style="flex:1;"><b style="font-size:14px;">素食便當</b><br><span style="font-size:11px;color:#94A3B8;">蔬食料理</span></div>
+                            <div id="checkVeg" style="width:22px;height:22px;border:2px solid #CBD5E1;border-radius:50%;transition:all 0.2s;"></div>
+                        </div>
+                        <div class="lunch-opt" onclick="selectLunch('none')" style="display:flex;align-items:center;gap:12px;padding:14px;border:2px solid #E5E7EB;border-radius:14px;cursor:pointer;transition:all 0.2s;">
+                            <span style="font-size:28px;">💰</span>
+                            <div style="flex:1;"><b style="font-size:14px;">不訂購</b><br><span style="font-size:11px;color:#059669;">補助 NT$ 50</span></div>
+                            <div id="checkNone" style="width:22px;height:22px;border:2px solid #CBD5E1;border-radius:50%;transition:all 0.2s;"></div>
+                        </div>
+                    </div>
+                    
+                    <button id="lunchConfirmBtn" onclick="confirmLunch()" disabled style="width:100%;padding:14px;border:none;border-radius:12px;background:#CBD5E1;color:#fff;font-size:14px;font-weight:700;cursor:pointer;transition:all 0.2s;">
+                        請先選擇
+                    </button>
+                    <button onclick="skipLunch()" style="width:100%;padding:10px;border:none;background:transparent;color:#94A3B8;font-size:12px;cursor:pointer;margin-top:8px;">
+                        稍後再決定
+                    </button>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+        }
+
+        let selectedLunch = null;
+        function selectLunch(type) {
+            selectedLunch = type;
+            // 重設所有選項
+            document.querySelectorAll('.lunch-opt').forEach(opt => {
+                opt.style.borderColor = '#E5E7EB';
+                opt.style.background = '#fff';
+            });
+            ['checkRegular','checkVeg','checkNone'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) { el.style.borderColor = '#CBD5E1'; el.style.background = 'transparent'; el.innerHTML = ''; }
+            });
+            
+            // 標記選中
+            const opts = document.querySelectorAll('.lunch-opt');
+            const idx = { regular: 0, vegetarian: 1, none: 2 }[type];
+            if (opts[idx]) { opts[idx].style.borderColor = '#4F46E5'; opts[idx].style.background = '#F5F3FF'; }
+            
+            const checkId = { regular: 'checkRegular', vegetarian: 'checkVeg', none: 'checkNone' }[type];
+            const checkEl = document.getElementById(checkId);
+            if (checkEl) { checkEl.style.borderColor = '#4F46E5'; checkEl.style.background = '#4F46E5'; checkEl.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" style="margin:2px;"><path fill="white" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>'; }
+            
+            const btn = document.getElementById('lunchConfirmBtn');
+            btn.disabled = false;
+            btn.style.background = 'linear-gradient(135deg,#4F46E5,#7C3AED)';
+            const labels = { regular: '✅ 確認訂購葷食便當', vegetarian: '✅ 確認訂購素食便當', none: '✅ 確認不訂購（補助 $50）' };
+            btn.textContent = labels[type];
+        }
+
+        async function confirmLunch() {
+            if (!selectedLunch) return;
+            
+            // 二次確認
+            const msgs = {
+                regular: '確定訂購「葷食便當」？',
+                vegetarian: '確定訂購「素食便當」？',
+                none: '確定不訂購便當？\n將獲得 NT$ 50 午餐補助'
+            };
+            if (!confirm(msgs[selectedLunch])) return;
+            
+            const btn = document.getElementById('lunchConfirmBtn');
+            btn.disabled = true; btn.textContent = '⏳ 提交中...';
+            
+            try {
+                if (selectedLunch === 'none') {
+                    // 取消訂購，記錄補助
+                    if (typeof submitLunchOrder === 'function') {
+                        // 使用 common.js 的函數
+                    }
+                    await sb.from('lunch_orders').upsert({
+                        employee_id: currentEmployee.id,
+                        order_date: new Date().toISOString().split('T')[0],
+                        is_vegetarian: false,
+                        status: 'cancelled',
+                        notes: '不訂購，補助NT$50'
+                    }, { onConflict: 'employee_id,order_date' });
+                } else {
+                    await sb.from('lunch_orders').upsert({
+                        employee_id: currentEmployee.id,
+                        order_date: new Date().toISOString().split('T')[0],
+                        is_vegetarian: selectedLunch === 'vegetarian',
+                        status: 'ordered',
+                        notes: ''
+                    }, { onConflict: 'employee_id,order_date' });
+                }
+                
+                const emoji = { regular: '🍖', vegetarian: '🥗', none: '💰' };
+                showToast(`${emoji[selectedLunch]} ${selectedLunch === 'none' ? '已取消訂購（補助$50）' : '便當訂購成功！'}`);
+            } catch(e) {
+                console.error(e);
+                showToast('⚠️ 訂購失敗，請到便當訂購頁面重試');
+            }
+            
+            document.getElementById('lunchOverlay')?.remove();
+            setTimeout(() => { window.location.href = 'index.html'; }, 1200);
+        }
+
+        function skipLunch() {
+            document.getElementById('lunchOverlay')?.remove();
+            setTimeout(() => { window.location.href = 'index.html'; }, 500);
+        }
     </script>
 </body>
 </html>
