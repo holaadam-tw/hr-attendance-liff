@@ -821,14 +821,11 @@ async function initBottomNav() {
 
 // ===== 功能顯示設定 =====
 // 管理員可在 system_settings 中設定哪些功能對員工可見
-// key: 'feature_visibility', value: { schedule: true, salary: true, leave: true, lunch: true, attendance: true }
+// key: 'feature_visibility', value: { leave: true, lunch: true, attendance: true }
 const DEFAULT_FEATURES = {
-    schedule: true,     // 班表查詢
-    salary: true,       // 薪資查詢
-    leave: true,        // 請假申請
+    leave: true,        // 我要請假
     lunch: true,        // 便當訂購
-    attendance: true,   // 考勤查詢
-    bonus: true         // 年終獎金
+    attendance: true    // 考勤查詢
 };
 
 async function getFeatureVisibility() {
@@ -845,36 +842,22 @@ async function getFeatureVisibility() {
     return DEFAULT_FEATURES;
 }
 
-// 根據設定隱藏首頁選單項目
+// 根據設定隱藏首頁「中間選單」項目（不影響底部導航列）
 async function applyFeatureVisibility() {
     const features = await getFeatureVisibility();
     
-    // 首頁選單項目對應
+    // 只控制首頁中間的 menu-grid 選單 icon
     const menuMap = {
-        'records.html': 'leave',
-        'services.html': 'lunch',
-        'records.html#attendance': 'attendance'
+        'records.html': 'leave',        // 📝 我要請假
+        'services.html': 'lunch',       // 🍱 便當訂購  
+        'records.html#attendance': 'attendance'  // 📊 考勤查詢
     };
     
-    document.querySelectorAll('.menu-item').forEach(item => {
+    document.querySelectorAll('.menu-grid .menu-item').forEach(item => {
+        if (item.classList.contains('admin-only')) return; // 跳過管理員按鈕
         const onclick = item.getAttribute('onclick') || '';
         for (const [url, feature] of Object.entries(menuMap)) {
-            if (onclick.includes(url) && !features[feature]) {
-                item.style.display = 'none';
-            }
-        }
-    });
-    
-    // 底部導航對應
-    const navMap = {
-        'schedule.html': 'schedule',
-        'salary.html': 'salary'
-    };
-    
-    document.querySelectorAll('.nav-item').forEach(item => {
-        const onclick = item.getAttribute('onclick') || '';
-        for (const [url, feature] of Object.entries(navMap)) {
-            if (onclick.includes(url) && !features[feature]) {
+            if (onclick.includes(url) && features[feature] === false) {
                 item.style.display = 'none';
             }
         }

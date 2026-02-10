@@ -8,14 +8,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <link rel="stylesheet" href="style.css">
-    <style>
-        .feature-toggle input:checked + span { background: #4F46E5; }
-        .feature-toggle input + span::before {
-            content:''; position:absolute; width:22px; height:22px; left:3px; top:3px;
-            background:white; border-radius:50%; transition:.3s;
-        }
-        .feature-toggle input:checked + span::before { transform: translateX(22px); }
-    </style>
 </head>
 <body>
     <div id="loadingPage" class="loading-screen">
@@ -295,46 +287,45 @@
             <button class="btn btn-secondary" onclick="showPage('adminHomePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
             <div class="checkin-page">
                 <h2>🎛️ 功能管理</h2>
-                <p style="color:#6b7280;font-size:13px;margin-bottom:16px;">控制員工首頁顯示哪些功能選單</p>
+                <p style="color:#6b7280;font-size:13px;margin-bottom:16px;">控制員工首頁<b>中間選單</b>顯示哪些功能</p>
                 
                 <div id="featureToggles" style="display:flex;flex-direction:column;gap:12px;">
-                    <div class="feature-toggle" style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;background:#fff;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.08);">
-                        <div><span style="font-size:18px;">📝</span> <b>請假申請</b></div>
-                        <label style="position:relative;width:50px;height:28px;display:inline-block;">
-                            <input type="checkbox" id="feat_leave" checked onchange="saveFeatures()" style="opacity:0;width:0;height:0;">
-                            <span style="position:absolute;cursor:pointer;inset:0;background:#ccc;border-radius:14px;transition:.3s;"></span>
-                        </label>
+                    <!-- 請假 -->
+                    <div class="feature-toggle-card" id="ftCard_leave" onclick="toggleFeature('leave')" style="display:flex;align-items:center;gap:14px;padding:16px;background:#fff;border:2px solid #E5E7EB;border-radius:14px;cursor:pointer;transition:all 0.2s;">
+                        <span style="font-size:28px;">📝</span>
+                        <div style="flex:1;">
+                            <div style="font-weight:800;font-size:14px;color:#0F172A;">我要請假</div>
+                            <div style="font-size:12px;color:#94A3B8;margin-top:2px;">請假申請與記錄查詢</div>
+                        </div>
+                        <div class="ft-indicator" style="width:44px;height:26px;border-radius:13px;background:#4F46E5;position:relative;transition:background 0.3s;">
+                            <div style="width:20px;height:20px;border-radius:50%;background:#fff;position:absolute;top:3px;right:3px;transition:all 0.3s;box-shadow:0 1px 3px rgba(0,0,0,0.2);"></div>
+                        </div>
                     </div>
-                    <div class="feature-toggle" style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;background:#fff;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.08);">
-                        <div><span style="font-size:18px;">🍱</span> <b>便當訂購</b></div>
-                        <label style="position:relative;width:50px;height:28px;display:inline-block;">
-                            <input type="checkbox" id="feat_lunch" checked onchange="saveFeatures()" style="opacity:0;width:0;height:0;">
-                            <span style="position:absolute;cursor:pointer;inset:0;background:#ccc;border-radius:14px;transition:.3s;"></span>
-                        </label>
+                    <!-- 便當 -->
+                    <div class="feature-toggle-card" id="ftCard_lunch" onclick="toggleFeature('lunch')" style="display:flex;align-items:center;gap:14px;padding:16px;background:#fff;border:2px solid #E5E7EB;border-radius:14px;cursor:pointer;transition:all 0.2s;">
+                        <span style="font-size:28px;">🍱</span>
+                        <div style="flex:1;">
+                            <div style="font-weight:800;font-size:14px;color:#0F172A;">便當訂購</div>
+                            <div style="font-size:12px;color:#94A3B8;margin-top:2px;">每日午餐訂購管理</div>
+                        </div>
+                        <div class="ft-indicator" style="width:44px;height:26px;border-radius:13px;background:#4F46E5;position:relative;transition:background 0.3s;">
+                            <div style="width:20px;height:20px;border-radius:50%;background:#fff;position:absolute;top:3px;right:3px;transition:all 0.3s;box-shadow:0 1px 3px rgba(0,0,0,0.2);"></div>
+                        </div>
                     </div>
-                    <div class="feature-toggle" style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;background:#fff;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.08);">
-                        <div><span style="font-size:18px;">📊</span> <b>考勤查詢</b></div>
-                        <label style="position:relative;width:50px;height:28px;display:inline-block;">
-                            <input type="checkbox" id="feat_attendance" checked onchange="saveFeatures()" style="opacity:0;width:0;height:0;">
-                            <span style="position:absolute;cursor:pointer;inset:0;background:#ccc;border-radius:14px;transition:.3s;"></span>
-                        </label>
-                    </div>
-                    <div class="feature-toggle" style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;background:#fff;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.08);">
-                        <div><span style="font-size:18px;">📅</span> <b>班表查詢</b></div>
-                        <label style="position:relative;width:50px;height:28px;display:inline-block;">
-                            <input type="checkbox" id="feat_schedule" checked onchange="saveFeatures()" style="opacity:0;width:0;height:0;">
-                            <span style="position:absolute;cursor:pointer;inset:0;background:#ccc;border-radius:14px;transition:.3s;"></span>
-                        </label>
-                    </div>
-                    <div class="feature-toggle" style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;background:#fff;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.08);">
-                        <div><span style="font-size:18px;">💰</span> <b>薪資查詢</b></div>
-                        <label style="position:relative;width:50px;height:28px;display:inline-block;">
-                            <input type="checkbox" id="feat_salary" checked onchange="saveFeatures()" style="opacity:0;width:0;height:0;">
-                            <span style="position:absolute;cursor:pointer;inset:0;background:#ccc;border-radius:14px;transition:.3s;"></span>
-                        </label>
+                    <!-- 考勤 -->
+                    <div class="feature-toggle-card" id="ftCard_attendance" onclick="toggleFeature('attendance')" style="display:flex;align-items:center;gap:14px;padding:16px;background:#fff;border:2px solid #E5E7EB;border-radius:14px;cursor:pointer;transition:all 0.2s;">
+                        <span style="font-size:28px;">📊</span>
+                        <div style="flex:1;">
+                            <div style="font-weight:800;font-size:14px;color:#0F172A;">考勤查詢</div>
+                            <div style="font-size:12px;color:#94A3B8;margin-top:2px;">出勤月曆與記錄查詢</div>
+                        </div>
+                        <div class="ft-indicator" style="width:44px;height:26px;border-radius:13px;background:#4F46E5;position:relative;transition:background 0.3s;">
+                            <div style="width:20px;height:20px;border-radius:50%;background:#fff;position:absolute;top:3px;right:3px;transition:all 0.3s;box-shadow:0 1px 3px rgba(0,0,0,0.2);"></div>
+                        </div>
                     </div>
                 </div>
-                <div id="featureSaveStatus" style="margin-top:12px;text-align:center;font-size:13px;color:var(--success);display:none;">✅ 已儲存</div>
+                <div id="featureSaveStatus" style="margin-top:12px;text-align:center;font-size:13px;color:#059669;display:none;">✅ 已儲存</div>
+                <p style="color:#94A3B8;font-size:12px;margin-top:16px;text-align:center;">💡 底部導航列（首頁/班表/打卡/薪資/管理）為管理員專屬，不受此設定影響</p>
             </div>
         </div>
     </div>
@@ -379,6 +370,8 @@
         }
 
         // ===== 功能管理 =====
+        let featureState = { leave: true, lunch: true, attendance: true };
+
         async function loadFeatureSettings() {
             try {
                 const { data } = await sb.from('system_settings')
@@ -386,28 +379,40 @@
                     .eq('key', 'feature_visibility')
                     .maybeSingle();
                 
-                const defaults = { leave:true, lunch:true, attendance:true, schedule:true, salary:true };
-                const settings = data?.value ? { ...defaults, ...data.value } : defaults;
-                
-                document.getElementById('feat_leave').checked = settings.leave !== false;
-                document.getElementById('feat_lunch').checked = settings.lunch !== false;
-                document.getElementById('feat_attendance').checked = settings.attendance !== false;
-                document.getElementById('feat_schedule').checked = settings.schedule !== false;
-                document.getElementById('feat_salary').checked = settings.salary !== false;
-            } catch(e) { console.error('載入功能設定失敗', e); }
+                if (data?.value) {
+                    featureState = { ...featureState, ...data.value };
+                }
+            } catch(e) {}
+            
+            // 更新卡片顯示
+            ['leave', 'lunch', 'attendance'].forEach(key => updateToggleCard(key));
         }
 
-        async function saveFeatures() {
-            const settings = {
-                leave: document.getElementById('feat_leave').checked,
-                lunch: document.getElementById('feat_lunch').checked,
-                attendance: document.getElementById('feat_attendance').checked,
-                schedule: document.getElementById('feat_schedule').checked,
-                salary: document.getElementById('feat_salary').checked
-            };
+        function updateToggleCard(key) {
+            const card = document.getElementById('ftCard_' + key);
+            if (!card) return;
+            const on = featureState[key] !== false;
+            const indicator = card.querySelector('.ft-indicator');
+            const dot = indicator?.querySelector('div');
+            
+            if (on) {
+                card.style.borderColor = '#4F46E5';
+                card.style.background = '#F5F3FF';
+                indicator.style.background = '#4F46E5';
+                if (dot) { dot.style.right = '3px'; dot.style.left = 'auto'; }
+            } else {
+                card.style.borderColor = '#E5E7EB';
+                card.style.background = '#fff';
+                indicator.style.background = '#CBD5E1';
+                if (dot) { dot.style.left = '3px'; dot.style.right = 'auto'; }
+            }
+        }
+
+        async function toggleFeature(key) {
+            featureState[key] = !featureState[key];
+            updateToggleCard(key);
             
             try {
-                // upsert
                 const { data: existing } = await sb.from('system_settings')
                     .select('id')
                     .eq('key', 'feature_visibility')
@@ -415,19 +420,21 @@
                 
                 if (existing) {
                     await sb.from('system_settings')
-                        .update({ value: settings, updated_at: new Date().toISOString() })
+                        .update({ value: featureState, updated_at: new Date().toISOString() })
                         .eq('key', 'feature_visibility');
                 } else {
                     await sb.from('system_settings')
-                        .insert({ key: 'feature_visibility', value: settings, description: '員工可見功能設定' });
+                        .insert({ key: 'feature_visibility', value: featureState, description: '員工可見功能設定' });
                 }
                 
                 const el = document.getElementById('featureSaveStatus');
                 el.style.display = 'block';
-                setTimeout(() => el.style.display = 'none', 2000);
+                el.textContent = featureState[key] ? '✅ 已開啟' : '⛔ 已關閉';
+                el.style.color = featureState[key] ? '#059669' : '#DC2626';
+                setTimeout(() => el.style.display = 'none', 1500);
             } catch(e) {
                 console.error('儲存失敗', e);
-                showToast('❌ 儲存失敗: ' + e.message);
+                showToast('❌ 儲存失敗');
             }
         }
 
