@@ -299,36 +299,54 @@
         // 檢查管理員權限
         async function checkAdminPermission() {
             const statusEl = document.getElementById('permissionStatus');
+            const loadingPage = document.getElementById('loadingPage');
             
             try {
                 const initialized = await initializeLiff();
+                
+                // [BUG FIX] 無論成功失敗都要隱藏 loading 畫面
+                if (loadingPage) loadingPage.style.display = 'none';
+                
                 if (!initialized) {
-                    showStatus(statusEl, 'error', '❌ LIFF 初始化失敗');
+                    showStatus(statusEl, 'error', '❌ LIFF 初始化失敗，請從 LINE 開啟');
                     return;
                 }
+
+                console.log('🔑 LINE User ID:', liffProfile?.userId);
 
                 const { data, error } = await sb.from('employees')
                     .select('*')
                     .eq('line_user_id', liffProfile.userId)
                     .eq('role', 'admin')
                     .eq('is_active', true)
-                    .single();
+                    .maybeSingle();
 
-                if (error || !data) {
-                    showStatus(statusEl, 'error', '❌ 您沒有管理員權限');
-                    setTimeout(() => { window.location.href = 'index.html'; }, 3000);
+                if (error) {
+                    console.error('❌ 資料庫查詢錯誤:', error);
+                    showStatus(statusEl, 'error', '❌ 資料庫查詢失敗: ' + error.message);
+                    return;
+                }
+                
+                if (!data) {
+                    console.log('❌ 找不到管理員資料，LINE ID:', liffProfile?.userId);
+                    showStatus(statusEl, 'error', '❌ 您沒有管理員權限<br><small style="opacity:0.7">LINE ID: ' + (liffProfile?.userId || '未知') + '</small>');
+                    setTimeout(() => { window.location.href = 'index.html'; }, 5000);
                     return;
                 }
 
                 currentAdminEmployee = data;
                 updateAdminInfo(data);
-                showStatus(statusEl, 'success', '✅ 權限驗證通過');
                 
+                // 載入系統設定（地點等）
+                await loadSettings();
+                
+                showStatus(statusEl, 'success', '✅ 權限驗證通過');
                 setTimeout(() => { showPage('adminHomePage'); }, 800);
 
             } catch (err) {
                 console.error('權限檢查異常:', err);
-                showStatus(statusEl, 'error', '❌ 權限檢查失敗: ' + friendlyError(err));
+                if (loadingPage) loadingPage.style.display = 'none';
+                showStatus(statusEl, 'error', '❌ 權限檢查失敗: ' + (typeof friendlyError === 'function' ? friendlyError(err) : err.message));
             }
         }
 
