@@ -55,7 +55,10 @@
                         <p id="userDept">-</p>
                         <p id="userId" style="font-size: 11px; opacity: 0.7;">ID: -</p>
                     </div>
-                    <span class="user-status-badge" id="userStatusBadge" style="background:#D1FAE5;color:#065F46;">-</span>
+                    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
+                        <span class="user-status-badge" id="userStatusBadge" style="background:#D1FAE5;color:#065F46;">-</span>
+                        <span class="user-status-badge" id="userTypeBadge" style="background:#DBEAFE;color:#1E40AF;display:none;font-size:10px;">正職</span>
+                    </div>
                 </div>
                 <div class="location-status loading" id="locationStatus">
                     <div class="dot"></div><span>正在取得定位...</span>
@@ -141,9 +144,9 @@
             <span class="nav-icon">💰</span>
             <span class="nav-label">薪資</span>
         </a>
-        <a class="nav-item" onclick="goPage('services.html#settings')">
+        <a class="nav-item" onclick="goPage('admin.html')">
             <span class="nav-icon">⚙️</span>
-            <span class="nav-label">設定</span>
+            <span class="nav-label">管理</span>
         </a>
     </nav>
 
@@ -228,6 +231,36 @@
             } catch(e) { console.error('載入今日狀態失敗', e); }
         }
 
+        // 載入員工類型（正職/兼職）
+        async function loadEmployeeType() {
+            if (!currentEmployee) return;
+            try {
+                const { data } = await sb.from('salary_settings')
+                    .select('salary_type')
+                    .eq('employee_id', currentEmployee.id)
+                    .eq('is_current', true)
+                    .maybeSingle();
+                
+                const badge = document.getElementById('userTypeBadge');
+                if (badge && data) {
+                    badge.style.display = 'inline-block';
+                    if (data.salary_type === 'monthly') {
+                        badge.textContent = '正職';
+                        badge.style.background = '#DBEAFE';
+                        badge.style.color = '#1E40AF';
+                    } else if (data.salary_type === 'hourly') {
+                        badge.textContent = '時薪';
+                        badge.style.background = '#FEF3C7';
+                        badge.style.color = '#92400E';
+                    } else if (data.salary_type === 'daily') {
+                        badge.textContent = '日薪';
+                        badge.style.background = '#FEF3C7';
+                        badge.style.color = '#92400E';
+                    }
+                }
+            } catch(e) { console.log('載入員工類型失敗', e); }
+        }
+
         function checkLiffParams() {
             try {
                 if (liff && liff.isInClient()) {
@@ -260,6 +293,7 @@
                     updateTodayInfo();
                     preloadGPS();
                     loadTodayStatus();
+                    loadEmployeeType();
                     initBottomNav();
                     applyFeatureVisibility();
                     

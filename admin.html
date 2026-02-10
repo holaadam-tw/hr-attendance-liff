@@ -8,6 +8,14 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <link rel="stylesheet" href="style.css">
+    <style>
+        .feature-toggle input:checked + span { background: #4F46E5; }
+        .feature-toggle input + span::before {
+            content:''; position:absolute; width:22px; height:22px; left:3px; top:3px;
+            background:white; border-radius:50%; transition:.3s;
+        }
+        .feature-toggle input:checked + span::before { transform: translateX(22px); }
+    </style>
 </head>
 <body>
     <div id="loadingPage" class="loading-screen">
@@ -58,6 +66,9 @@
                 </div>
                 <div class="menu-item" onclick="showPage('reportPage')">
                     <div class="icon">📊</div><div class="label">報表匯出</div>
+                </div>
+                <div class="menu-item" onclick="showPage('featurePage')">
+                    <div class="icon">🎛️</div><div class="label">功能管理</div>
                 </div>
                 <div class="menu-item" onclick="window.location.href='index.html'">
                     <div class="icon">🏠</div><div class="label">返回首頁</div>
@@ -278,9 +289,55 @@
                 </div>
             </div>
         </div>
-    </div>
 
-    <!-- 底部導航列 -->
+        <!-- 功能管理頁面 -->
+        <div id="featurePage" class="page">
+            <button class="btn btn-secondary" onclick="showPage('adminHomePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
+            <div class="checkin-page">
+                <h2>🎛️ 功能管理</h2>
+                <p style="color:#6b7280;font-size:13px;margin-bottom:16px;">控制員工首頁顯示哪些功能選單</p>
+                
+                <div id="featureToggles" style="display:flex;flex-direction:column;gap:12px;">
+                    <div class="feature-toggle" style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;background:#fff;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.08);">
+                        <div><span style="font-size:18px;">📝</span> <b>請假申請</b></div>
+                        <label style="position:relative;width:50px;height:28px;display:inline-block;">
+                            <input type="checkbox" id="feat_leave" checked onchange="saveFeatures()" style="opacity:0;width:0;height:0;">
+                            <span style="position:absolute;cursor:pointer;inset:0;background:#ccc;border-radius:14px;transition:.3s;"></span>
+                        </label>
+                    </div>
+                    <div class="feature-toggle" style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;background:#fff;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.08);">
+                        <div><span style="font-size:18px;">🍱</span> <b>便當訂購</b></div>
+                        <label style="position:relative;width:50px;height:28px;display:inline-block;">
+                            <input type="checkbox" id="feat_lunch" checked onchange="saveFeatures()" style="opacity:0;width:0;height:0;">
+                            <span style="position:absolute;cursor:pointer;inset:0;background:#ccc;border-radius:14px;transition:.3s;"></span>
+                        </label>
+                    </div>
+                    <div class="feature-toggle" style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;background:#fff;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.08);">
+                        <div><span style="font-size:18px;">📊</span> <b>考勤查詢</b></div>
+                        <label style="position:relative;width:50px;height:28px;display:inline-block;">
+                            <input type="checkbox" id="feat_attendance" checked onchange="saveFeatures()" style="opacity:0;width:0;height:0;">
+                            <span style="position:absolute;cursor:pointer;inset:0;background:#ccc;border-radius:14px;transition:.3s;"></span>
+                        </label>
+                    </div>
+                    <div class="feature-toggle" style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;background:#fff;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.08);">
+                        <div><span style="font-size:18px;">📅</span> <b>班表查詢</b></div>
+                        <label style="position:relative;width:50px;height:28px;display:inline-block;">
+                            <input type="checkbox" id="feat_schedule" checked onchange="saveFeatures()" style="opacity:0;width:0;height:0;">
+                            <span style="position:absolute;cursor:pointer;inset:0;background:#ccc;border-radius:14px;transition:.3s;"></span>
+                        </label>
+                    </div>
+                    <div class="feature-toggle" style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;background:#fff;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.08);">
+                        <div><span style="font-size:18px;">💰</span> <b>薪資查詢</b></div>
+                        <label style="position:relative;width:50px;height:28px;display:inline-block;">
+                            <input type="checkbox" id="feat_salary" checked onchange="saveFeatures()" style="opacity:0;width:0;height:0;">
+                            <span style="position:absolute;cursor:pointer;inset:0;background:#ccc;border-radius:14px;transition:.3s;"></span>
+                        </label>
+                    </div>
+                </div>
+                <div id="featureSaveStatus" style="margin-top:12px;text-align:center;font-size:13px;color:var(--success);display:none;">✅ 已儲存</div>
+            </div>
+        </div>
+    </div>
     <nav class="bottom-nav" id="bottomNav" style="display:none;">
         <a class="nav-item" onclick="window.location.href='index.html'">
             <span class="nav-icon">🏠</span>
@@ -294,13 +351,13 @@
             <span class="nav-icon">📍</span>
             <span class="nav-label">打卡</span>
         </a>
-        <a class="nav-item active">
-            <span class="nav-icon">👑</span>
-            <span class="nav-label">管理</span>
+        <a class="nav-item" onclick="window.location.href='salary.html'">
+            <span class="nav-icon">💰</span>
+            <span class="nav-label">薪資</span>
         </a>
-        <a class="nav-item" onclick="window.location.href='services.html#settings'">
+        <a class="nav-item active">
             <span class="nav-icon">⚙️</span>
-            <span class="nav-label">設定</span>
+            <span class="nav-label">管理</span>
         </a>
     </nav>
 
@@ -318,6 +375,60 @@
             if (id === 'locationPage') renderLocationList();
             if (id === 'employeePage') loadEmployeeList();
             if (id === 'leaveApprovalPage') loadLeaveApprovals('pending');
+            if (id === 'featurePage') loadFeatureSettings();
+        }
+
+        // ===== 功能管理 =====
+        async function loadFeatureSettings() {
+            try {
+                const { data } = await sb.from('system_settings')
+                    .select('value')
+                    .eq('key', 'feature_visibility')
+                    .maybeSingle();
+                
+                const defaults = { leave:true, lunch:true, attendance:true, schedule:true, salary:true };
+                const settings = data?.value ? { ...defaults, ...data.value } : defaults;
+                
+                document.getElementById('feat_leave').checked = settings.leave !== false;
+                document.getElementById('feat_lunch').checked = settings.lunch !== false;
+                document.getElementById('feat_attendance').checked = settings.attendance !== false;
+                document.getElementById('feat_schedule').checked = settings.schedule !== false;
+                document.getElementById('feat_salary').checked = settings.salary !== false;
+            } catch(e) { console.error('載入功能設定失敗', e); }
+        }
+
+        async function saveFeatures() {
+            const settings = {
+                leave: document.getElementById('feat_leave').checked,
+                lunch: document.getElementById('feat_lunch').checked,
+                attendance: document.getElementById('feat_attendance').checked,
+                schedule: document.getElementById('feat_schedule').checked,
+                salary: document.getElementById('feat_salary').checked
+            };
+            
+            try {
+                // upsert
+                const { data: existing } = await sb.from('system_settings')
+                    .select('id')
+                    .eq('key', 'feature_visibility')
+                    .maybeSingle();
+                
+                if (existing) {
+                    await sb.from('system_settings')
+                        .update({ value: settings, updated_at: new Date().toISOString() })
+                        .eq('key', 'feature_visibility');
+                } else {
+                    await sb.from('system_settings')
+                        .insert({ key: 'feature_visibility', value: settings, description: '員工可見功能設定' });
+                }
+                
+                const el = document.getElementById('featureSaveStatus');
+                el.style.display = 'block';
+                setTimeout(() => el.style.display = 'none', 2000);
+            } catch(e) {
+                console.error('儲存失敗', e);
+                showToast('❌ 儲存失敗: ' + e.message);
+            }
         }
 
         // 檢查管理員權限
