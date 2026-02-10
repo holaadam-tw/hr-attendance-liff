@@ -3,63 +3,71 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>💰 薪資明細 - 員工服務中心</title>
+    <title>💰 薪資 - 員工服務中心</title>
     <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link rel="stylesheet" href="style.css">
     <style>
-        .salary-month-nav {
-            display: flex; align-items: center; justify-content: center; gap: 16px; margin-bottom: 20px;
-        }
-        .salary-month-nav button {
-            background: none; border: none; font-size: 20px; cursor: pointer;
-            padding: 6px 10px; border-radius: 8px; transition: background 0.2s;
-        }
+        .salary-tabs { display: flex; gap: 4px; margin-bottom: 20px; background: var(--gray-light); border-radius: 10px; padding: 3px; }
+        .salary-tab { flex: 1; padding: 10px; border: none; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 13px; transition: all 0.2s; background: transparent; color: var(--gray); }
+        .salary-tab.active { background: var(--white); color: var(--primary); box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+        .salary-tab:active { transform: scale(0.97); }
+        .salary-view { display: none; }
+        .salary-view.active { display: block; animation: pageIn 0.3s ease-out; }
+
+        .salary-month-nav { display: flex; align-items: center; justify-content: center; gap: 16px; margin-bottom: 20px; }
+        .salary-month-nav button { background: none; border: none; font-size: 20px; cursor: pointer; padding: 6px 10px; border-radius: 8px; }
         .salary-month-nav button:active { background: var(--gray-light); }
         .salary-month-nav span { font-size: 16px; font-weight: 700; color: var(--dark); min-width: 100px; text-align: center; }
 
-        /* Donut chart */
         .chart-container { display: flex; justify-content: center; margin-bottom: 20px; position: relative; }
-        .donut-center {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            text-align: center;
-        }
+        .donut-center { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; }
         .donut-center .amount { font-size: 20px; font-weight: 900; color: var(--dark); }
         .donut-center .label { font-size: 11px; color: var(--gray); font-weight: 600; }
-
-        /* Legend */
         .chart-legend { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-bottom: 20px; }
         .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--gray); }
         .legend-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
 
-        /* Detail rows */
         .detail-section { margin-bottom: 16px; }
-        .detail-section-title {
-            font-size: 13px; font-weight: 700; color: var(--dark); margin-bottom: 8px;
-            display: flex; align-items: center; gap: 6px;
-        }
+        .detail-section-title { font-size: 13px; font-weight: 700; color: var(--dark); margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
         .detail-section-title .dot { width: 4px; height: 16px; border-radius: 2px; }
-        .detail-row {
-            display: flex; justify-content: space-between; align-items: center;
-            padding: 11px 0; border-bottom: 1px solid var(--gray-light); font-size: 14px;
-        }
+        .detail-row { display: flex; justify-content: space-between; align-items: center; padding: 11px 0; border-bottom: 1px solid var(--gray-light); font-size: 14px; }
         .detail-row:last-child { border-bottom: none; }
         .detail-row .dl { color: var(--gray); }
         .detail-row .dv { font-weight: 700; color: var(--dark); }
-        .detail-row .dv.income { color: var(--success); }
         .detail-row .dv.deduct { color: var(--danger); }
-        .detail-total {
-            display: flex; justify-content: space-between; padding: 12px 0; font-size: 15px; font-weight: 800;
-            border-top: 2px solid var(--gray-light); margin-top: 4px;
-        }
+        .detail-total { display: flex; justify-content: space-between; padding: 12px 0; font-size: 15px; font-weight: 800; border-top: 2px solid var(--gray-light); margin-top: 4px; }
 
-        .download-btn {
-            width: 100%; padding: 14px; border-radius: 14px; border: none;
-            background: var(--primary-gradient); color: #fff; font-weight: 700;
-            font-size: 14px; cursor: pointer; box-shadow: 0 4px 16px var(--primary-shadow);
-            margin-top: 8px; transition: all 0.2s;
-        }
-        .download-btn:active { transform: scale(0.98); }
+        /* Calculator */
+        .calc-mode { display: flex; gap: 6px; margin-bottom: 16px; }
+        .calc-mode-btn { flex: 1; padding: 12px 8px; border: 2px solid var(--border); border-radius: 12px; background: var(--white); cursor: pointer; text-align: center; transition: all 0.2s; }
+        .calc-mode-btn.active { border-color: var(--primary); background: var(--primary-ghost); }
+        .calc-mode-btn:active { transform: scale(0.97); }
+        .calc-mode-btn .cm-icon { font-size: 24px; display: block; margin-bottom: 4px; }
+        .calc-mode-btn .cm-label { font-size: 12px; font-weight: 700; color: var(--dark); }
+        .calc-mode-btn .cm-desc { font-size: 10px; color: var(--gray); margin-top: 2px; }
+        .calc-mode-btn.active .cm-label { color: var(--primary); }
+
+        .calc-input-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+        .calc-input-row label { width: 80px; font-size: 13px; font-weight: 600; color: var(--gray); flex-shrink: 0; }
+        .calc-input-row input { flex: 1; padding: 12px; border: 2px solid var(--border); border-radius: 10px; font-size: 16px; font-weight: 700; text-align: right; }
+        .calc-input-row input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 4px rgba(79,70,229,0.08); }
+        .calc-input-row .unit { font-size: 13px; color: var(--gray); font-weight: 600; width: 30px; }
+
+        .calc-result { background: var(--primary-gradient); border-radius: 16px; padding: 20px; margin: 16px 0; }
+        .calc-result-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; }
+        .calc-result-row .cr-label { font-size: 13px; color: rgba(255,255,255,0.7); }
+        .calc-result-row .cr-value { font-size: 15px; font-weight: 800; color: white; }
+        .calc-result-row.main .cr-value { font-size: 28px; }
+        .calc-result-divider { border-top: 1px solid rgba(255,255,255,0.2); margin: 8px 0; }
+
+        .calc-detail-card { background: var(--white); border-radius: 14px; padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow-sm); }
+        .calc-detail-title { font-size: 13px; font-weight: 700; color: var(--dark); margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+        .calc-detail-row { display: flex; justify-content: space-between; padding: 8px 0; font-size: 13px; border-bottom: 1px solid var(--gray-light); }
+        .calc-detail-row:last-child { border-bottom: none; }
+        .calc-detail-row .cdr-label { color: var(--gray); }
+        .calc-detail-row .cdr-value { font-weight: 700; color: var(--dark); }
+        .calc-detail-row .cdr-formula { font-size: 11px; color: var(--info); display: block; margin-top: 2px; }
     </style>
 </head>
 <body>
@@ -70,349 +78,384 @@
 
     <div class="container">
         <div id="salaryPage" class="page active">
-            <div class="card">
-                <h2 style="text-align:center;font-size:18px;font-weight:800;color:var(--dark);margin-bottom:16px;">💰 薪資明細</h2>
+            <div class="card" style="padding:16px;">
+                <h2 style="text-align:center;font-size:18px;font-weight:800;color:var(--dark);margin-bottom:16px;">💰 薪資中心</h2>
 
-                <!-- 月份導航 -->
-                <div class="salary-month-nav">
-                    <button onclick="changeSalaryMonth(-1)">◀</button>
-                    <span id="salaryMonthLabel">2026年 1月</span>
-                    <button onclick="changeSalaryMonth(1)">▶</button>
+                <!-- 頁籤：明細 / 試算 -->
+                <div class="salary-tabs">
+                    <button class="salary-tab active" onclick="switchSalaryView('detail')">📋 薪資明細</button>
+                    <button class="salary-tab" onclick="switchSalaryView('calc')">🧮 薪資試算</button>
                 </div>
-
-                <!-- 淨薪資標頭 -->
-                <div style="background:var(--primary-gradient);border-radius:16px;padding:20px;text-align:center;margin-bottom:20px;">
-                    <div style="font-size:12px;color:rgba(255,255,255,0.7);font-weight:600;">實發薪資</div>
-                    <div id="netSalary" style="font-size:36px;font-weight:900;color:#fff;margin-top:6px;letter-spacing:-1px;">NT$ 45,000</div>
-                    <div id="paidDate" style="font-size:12px;color:rgba(255,255,255,0.6);margin-top:4px;">尚未發放</div>
-                </div>
-
-                <!-- 圓餅圖 -->
-                <div class="chart-container">
-                    <canvas id="donutChart" width="200" height="200"></canvas>
-                    <div class="donut-center">
-                        <div class="label">總收入</div>
-                        <div class="amount" id="chartTotal">NT$ 77,000</div>
-                    </div>
-                </div>
-                <div class="chart-legend" id="chartLegend"></div>
             </div>
 
-            <!-- 收入明細 -->
-            <div class="card">
-                <div class="detail-section">
-                    <div class="detail-section-title">
-                        <span class="dot" style="background:var(--success);"></span> 收入明細
+            <!-- ====== 薪資明細 ====== -->
+            <div id="salaryDetailView" class="salary-view active">
+                <div class="card">
+                    <div class="salary-month-nav">
+                        <button onclick="changeSalaryMonth(-1)">◀</button>
+                        <span id="salaryMonthLabel">2026年 1月</span>
+                        <button onclick="changeSalaryMonth(1)">▶</button>
                     </div>
-                    <div id="incomeRows"></div>
-                    <div class="detail-total">
-                        <span style="color:var(--success);">收入合計</span>
-                        <span id="totalIncome" style="color:var(--success);">NT$ 77,000</span>
+                    <div style="background:var(--primary-gradient);border-radius:16px;padding:20px;text-align:center;margin-bottom:20px;">
+                        <div style="font-size:12px;color:rgba(255,255,255,0.7);font-weight:600;">實發薪資</div>
+                        <div id="netSalary" style="font-size:36px;font-weight:900;color:#fff;margin-top:6px;letter-spacing:-1px;">NT$ 0</div>
+                        <div id="paidDate" style="font-size:12px;color:rgba(255,255,255,0.6);margin-top:4px;">尚未發放</div>
                     </div>
+                    <div class="chart-container">
+                        <canvas id="donutChart" width="200" height="200"></canvas>
+                        <div class="donut-center"><div class="label">總收入</div><div class="amount" id="chartTotal">NT$ 0</div></div>
+                    </div>
+                    <div class="chart-legend" id="chartLegend"></div>
                 </div>
 
-                <div class="detail-section">
-                    <div class="detail-section-title">
-                        <span class="dot" style="background:var(--danger);"></span> 扣款明細
+                <div class="card">
+                    <div class="detail-section">
+                        <div class="detail-section-title"><span class="dot" style="background:var(--success);"></span> 收入明細</div>
+                        <div id="incomeRows"></div>
+                        <div class="detail-total"><span style="color:var(--success);">收入合計</span><span id="totalIncome" style="color:var(--success);">NT$ 0</span></div>
                     </div>
-                    <div id="deductRows"></div>
-                    <div class="detail-total">
-                        <span style="color:var(--danger);">扣款合計</span>
-                        <span id="totalDeduct" style="color:var(--danger);">-NT$ 2,000</span>
+                    <div class="detail-section">
+                        <div class="detail-section-title"><span class="dot" style="background:var(--danger);"></span> 扣款明細</div>
+                        <div id="deductRows"></div>
+                        <div class="detail-total"><span style="color:var(--danger);">扣款合計</span><span id="totalDeduct" style="color:var(--danger);">-NT$ 0</span></div>
                     </div>
                 </div>
             </div>
 
-            <button class="download-btn" onclick="showToast('📄 PDF 下載功能開發中')">📄 下載薪資單 PDF</button>
-
-            <!-- 計算公式說明 -->
-            <div class="card" style="padding:16px; margin-top:16px;">
-                <div style="font-size:14px;font-weight:800;color:var(--dark);margin-bottom:12px;">📐 薪資計算說明</div>
-                
-                <div style="font-size:13px;color:var(--gray);line-height:1.8;">
-                    <div style="margin-bottom:12px;">
-                        <b style="color:var(--dark);">💰 基本薪資</b><br>
-                        月薪制員工為固定月薪
+            <!-- ====== 薪資試算器 ====== -->
+            <div id="salaryCalcView" class="salary-view">
+                <!-- 計算模式選擇 -->
+                <div class="card">
+                    <div style="font-size:14px;font-weight:800;color:var(--dark);margin-bottom:14px;">選擇計薪方式</div>
+                    <div class="calc-mode">
+                        <div class="calc-mode-btn active" onclick="setCalcMode('monthly')">
+                            <span class="cm-icon">📅</span>
+                            <span class="cm-label">月薪制</span>
+                            <span class="cm-desc">固定月薪</span>
+                        </div>
+                        <div class="calc-mode-btn" onclick="setCalcMode('daily')">
+                            <span class="cm-icon">📆</span>
+                            <span class="cm-label">日薪制</span>
+                            <span class="cm-desc">按天計算</span>
+                        </div>
+                        <div class="calc-mode-btn" onclick="setCalcMode('hourly')">
+                            <span class="cm-icon">⏰</span>
+                            <span class="cm-label">時薪制</span>
+                            <span class="cm-desc">按時計算</span>
+                        </div>
                     </div>
 
-                    <div style="margin-bottom:12px;">
-                        <b style="color:var(--dark);">⏰ 加班費計算（依勞基法 §24）</b><br>
-                        <span style="display:block;margin-left:8px;">• 平日前 2 小時：時薪 × <b>1.34</b> 倍</span>
-                        <span style="display:block;margin-left:8px;">• 平日後 2 小時：時薪 × <b>1.67</b> 倍</span>
-                        <span style="display:block;margin-left:8px;">• 休息日前 2 小時：時薪 × <b>1.34</b> 倍</span>
-                        <span style="display:block;margin-left:8px;">• 休息日 2-8 小時：時薪 × <b>1.67</b> 倍</span>
-                        <span style="display:block;margin-left:8px;">• 國定假日：時薪 × <b>2.0</b> 倍</span>
-                        <span style="display:block;margin-left:8px;color:var(--info);">📝 時薪 = 月薪 ÷ 30 ÷ 8</span>
-                    </div>
-
-                    <div style="margin-bottom:12px;">
-                        <b style="color:var(--dark);">🏆 全勤獎金</b><br>
-                        當月無遲到、無缺勤、無事假才發放
-                    </div>
-
-                    <div style="margin-bottom:12px;">
-                        <b style="color:var(--dark);">🌙 夜班津貼</b><br>
-                        中班 NT$ 200/天、晚班 NT$ 400/天
+                    <!-- 輸入區 -->
+                    <div id="calcInputs">
+                        <div class="calc-input-row" id="rowMonthly">
+                            <label>月薪</label>
+                            <input type="number" id="calcBase" value="35000" oninput="calculateSalary()">
+                            <span class="unit">元</span>
+                        </div>
+                        <div class="calc-input-row" id="rowDaily" style="display:none;">
+                            <label>日薪</label>
+                            <input type="number" id="calcDaily" value="1500" oninput="calculateSalary()">
+                            <span class="unit">元</span>
+                        </div>
+                        <div class="calc-input-row" id="rowHourly" style="display:none;">
+                            <label>時薪</label>
+                            <input type="number" id="calcHourly" value="190" oninput="calculateSalary()">
+                            <span class="unit">元</span>
+                        </div>
+                        <div class="calc-input-row">
+                            <label>出勤天數</label>
+                            <input type="number" id="calcDays" value="22" oninput="calculateSalary()">
+                            <span class="unit">天</span>
+                        </div>
+                        <div class="calc-input-row" id="rowHoursPerDay">
+                            <label>每日工時</label>
+                            <input type="number" id="calcHoursDay" value="8" oninput="calculateSalary()">
+                            <span class="unit">時</span>
+                        </div>
+                        <div class="calc-input-row">
+                            <label>加班時數</label>
+                            <input type="number" id="calcOT" value="0" oninput="calculateSalary()">
+                            <span class="unit">時</span>
+                        </div>
+                        <div class="calc-input-row">
+                            <label>全勤獎金</label>
+                            <input type="number" id="calcBonus" value="2000" oninput="calculateSalary()">
+                            <span class="unit">元</span>
+                        </div>
+                        <div class="calc-input-row">
+                            <label>伙食津貼</label>
+                            <input type="number" id="calcMeal" value="2400" oninput="calculateSalary()">
+                            <span class="unit">元</span>
+                        </div>
+                        <div class="calc-input-row">
+                            <label>勞退自提</label>
+                            <input type="number" id="calcPension" value="6" min="0" max="6" oninput="calculateSalary()">
+                            <span class="unit">%</span>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- 勞健保說明 -->
-            <div class="card" style="padding:16px; margin-top:12px;">
-                <div style="font-size:14px;font-weight:800;color:var(--dark);margin-bottom:12px;">🏥 勞健保費用說明</div>
-                
-                <div style="font-size:13px;color:var(--gray);line-height:1.8;">
-                    <div style="margin-bottom:12px;">
-                        <b style="color:var(--dark);">勞工保險（勞保）</b><br>
-                        <span style="display:block;margin-left:8px;">• 費率：12.5%（2025 年）</span>
-                        <span style="display:block;margin-left:8px;">• 勞工自付比例：<b>20%</b></span>
-                        <span style="display:block;margin-left:8px;color:var(--info);">📝 自付額 = 投保級距 × 12.5% × 20%</span>
+                <!-- 計算結果 -->
+                <div class="calc-result" id="calcResult">
+                    <div class="calc-result-row main">
+                        <span class="cr-label">預估實領</span>
+                        <span class="cr-value" id="crNet">NT$ 0</span>
                     </div>
-
-                    <div style="margin-bottom:12px;">
-                        <b style="color:var(--dark);">全民健康保險（健保）</b><br>
-                        <span style="display:block;margin-left:8px;">• 費率：5.17%（2025 年）</span>
-                        <span style="display:block;margin-left:8px;">• 勞工自付比例：<b>30%</b></span>
-                        <span style="display:block;margin-left:8px;color:var(--info);">📝 自付額 = 投保級距 × 5.17% × 30%</span>
+                    <div class="calc-result-divider"></div>
+                    <div class="calc-result-row">
+                        <span class="cr-label">總收入</span>
+                        <span class="cr-value" id="crGross">NT$ 0</span>
                     </div>
-
-                    <div style="margin-bottom:12px;">
-                        <b style="color:var(--dark);">勞工退休金（勞退）</b><br>
-                        <span style="display:block;margin-left:8px;">• 雇主提繳：月薪 × <b>6%</b>（不從薪資扣）</span>
-                        <span style="display:block;margin-left:8px;">• 勞工自提：月薪 × <b>0~6%</b>（可免稅）</span>
-                        <span style="display:block;margin-left:8px;color:var(--success);">💡 自提金額可從當年所得稅中扣除</span>
+                    <div class="calc-result-row">
+                        <span class="cr-label">總扣款</span>
+                        <span class="cr-value" id="crDeduct">-NT$ 0</span>
                     </div>
+                </div>
 
-                    <div style="margin-bottom:4px;">
-                        <b style="color:var(--dark);">所得稅預扣</b><br>
-                        <span style="display:block;margin-left:8px;">• 依薪資級距預扣 5%</span>
-                        <span style="display:block;margin-left:8px;color:var(--gray);">實際稅額以年度報稅結算為準</span>
+                <!-- 換算結果 -->
+                <div class="calc-detail-card">
+                    <div class="calc-detail-title">🔄 薪資換算</div>
+                    <div class="calc-detail-row"><span class="cdr-label">月薪</span><span class="cdr-value" id="cvMonth">-</span></div>
+                    <div class="calc-detail-row"><span class="cdr-label">日薪</span><span class="cdr-value" id="cvDay">-</span></div>
+                    <div class="calc-detail-row"><span class="cdr-label">時薪</span><span class="cdr-value" id="cvHour">-</span></div>
+                </div>
+
+                <!-- 收入明細 -->
+                <div class="calc-detail-card">
+                    <div class="calc-detail-title">💚 收入明細</div>
+                    <div id="calcIncomeRows"></div>
+                </div>
+
+                <!-- 扣款明細 -->
+                <div class="calc-detail-card">
+                    <div class="calc-detail-title">🔴 扣款明細</div>
+                    <div id="calcDeductRows"></div>
+                </div>
+
+                <!-- 加班費說明 -->
+                <div class="calc-detail-card">
+                    <div class="calc-detail-title">⏰ 加班費計算（勞基法 §24）</div>
+                    <div id="calcOTRows"></div>
+                </div>
+
+                <!-- 勞健保說明 -->
+                <div class="card" style="padding:16px;">
+                    <div style="font-size:14px;font-weight:800;color:var(--dark);margin-bottom:12px;">🏥 勞健保說明</div>
+                    <div style="font-size:13px;color:var(--gray);line-height:1.8;">
+                        <div style="margin-bottom:10px;">
+                            <b style="color:var(--dark);">勞保</b>：投保級距 × 12.5% × 自付 20%<br>
+                            <b style="color:var(--dark);">健保</b>：投保級距 × 5.17% × 自付 30%<br>
+                            <b style="color:var(--dark);">勞退自提</b>：月薪 × 0~6%（可節稅）<br>
+                            <b style="color:var(--dark);">所得稅</b>：預扣 5%（年度結算多退少補）
+                        </div>
+                        <div style="padding:10px;background:var(--success-bg);border-radius:10px;font-size:12px;color:var(--success-text);">
+                            💡 勞退自提部分可從年度所得稅中扣除，建議提滿 6%
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- 底部導航列 -->
     <nav class="bottom-nav" style="display:none;">
-        <a class="nav-item" onclick="window.location.href='index.html'">
-            <span class="nav-icon">🏠</span><span class="nav-label">首頁</span>
-        </a>
-        <a class="nav-item" onclick="window.location.href='schedule.html'">
-            <span class="nav-icon">📅</span><span class="nav-label">班表</span>
-        </a>
-        <a class="nav-item" onclick="window.location.href='checkin.html?type=in'">
-            <span class="nav-icon">📍</span><span class="nav-label">打卡</span>
-        </a>
-        <a class="nav-item active">
-            <span class="nav-icon">💰</span><span class="nav-label">薪資</span>
-        </a>
-        <a class="nav-item" onclick="window.location.href='services.html#settings'">
-            <span class="nav-icon">⚙️</span><span class="nav-label">設定</span>
-        </a>
+        <a class="nav-item" onclick="window.location.href='index.html'"><span class="nav-icon">🏠</span><span class="nav-label">首頁</span></a>
+        <a class="nav-item" onclick="window.location.href='schedule.html'"><span class="nav-icon">📅</span><span class="nav-label">班表</span></a>
+        <a class="nav-item" onclick="window.location.href='checkin.html?type=in'"><span class="nav-icon">📍</span><span class="nav-label">打卡</span></a>
+        <a class="nav-item active"><span class="nav-icon">💰</span><span class="nav-label">薪資</span></a>
+        <a class="nav-item" onclick="window.location.href='services.html#settings'"><span class="nav-icon">⚙️</span><span class="nav-label">設定</span></a>
     </nav>
 
     <script src="common.js"></script>
     <script>
         let salaryYear = new Date().getFullYear();
-        let salaryMonth = new Date().getMonth() - 1; // 預設顯示上個月
+        let salaryMonth = new Date().getMonth() - 1;
         if (salaryMonth < 0) { salaryMonth = 11; salaryYear--; }
+        let calcMode = 'monthly';
 
-        // Demo salary data
-        const demoSalary = {
-            base_salary: 45000,
-            overtime_pay: 10000,
-            meal_allowance: 2400,
-            position_allowance: 5000,
-            full_attendance_bonus: 2000,
-            night_allowance: 800,
-            labor_insurance: 1042,
-            health_insurance: 826,
-            pension_self: 2100,
-            income_tax: 894,
-            personal_leave_deduction: 0,
-            late_deduction: 0,
-            status: 'confirmed',
-            confirmed_at: '2026-02-05'
-        };
+        const CHART_COLORS = ['#4F46E5','#F59E0B','#10B981','#3B82F6','#8B5CF6','#EC4899','#06B6D4'];
+        function formatNT(n) { return 'NT$ ' + Math.abs(Math.round(n)).toLocaleString(); }
 
-        const CHART_COLORS = [
-            '#4F46E5', // 基本薪資 - 紫
-            '#F59E0B', // 職務加給 - 黃
-            '#10B981', // 加班費 - 綠
-            '#3B82F6', // 全勤獎金 - 藍
-            '#EF4444', // 勞健保扣除 - 紅
-            '#8B5CF6', // 伙食津貼 - 淡紫
-            '#EC4899', // 夜班津貼 - 粉
-        ];
-
-        function formatNT(n) {
-            return 'NT$ ' + Math.abs(n).toLocaleString();
+        // ===== Tab Switch =====
+        function switchSalaryView(view) {
+            document.querySelectorAll('.salary-tab').forEach((t,i) => t.classList.toggle('active', (view==='detail' ? i===0 : i===1)));
+            document.querySelectorAll('.salary-view').forEach(v => v.classList.remove('active'));
+            document.getElementById(view === 'detail' ? 'salaryDetailView' : 'salaryCalcView').classList.add('active');
+            if (view === 'calc') calculateSalary();
         }
 
+        // ===== Donut Chart =====
         function drawDonut(data) {
             const canvas = document.getElementById('donutChart');
             const ctx = canvas.getContext('2d');
             const dpr = window.devicePixelRatio || 1;
-            canvas.width = 200 * dpr;
-            canvas.height = 200 * dpr;
-            canvas.style.width = '200px';
-            canvas.style.height = '200px';
+            canvas.width = 200 * dpr; canvas.height = 200 * dpr;
+            canvas.style.width = '200px'; canvas.style.height = '200px';
             ctx.scale(dpr, dpr);
-
-            const cx = 100, cy = 100, outerR = 90, innerR = 58;
-            const total = data.reduce((s, d) => s + d.value, 0);
+            const cx=100,cy=100,outerR=90,innerR=58;
+            const total = data.reduce((s,d) => s + d.value, 0);
             let startAngle = -Math.PI / 2;
-
-            // Draw segments
-            data.forEach((d, i) => {
-                const sliceAngle = (d.value / total) * Math.PI * 2;
-                const endAngle = startAngle + sliceAngle;
-
-                ctx.beginPath();
-                ctx.arc(cx, cy, outerR, startAngle, endAngle);
-                ctx.arc(cx, cy, innerR, endAngle, startAngle, true);
-                ctx.closePath();
-                ctx.fillStyle = CHART_COLORS[i % CHART_COLORS.length];
-                ctx.fill();
-
-                startAngle = endAngle;
+            data.forEach((d,i) => {
+                const slice = (d.value / total) * Math.PI * 2;
+                ctx.beginPath(); ctx.arc(cx,cy,outerR,startAngle,startAngle+slice); ctx.arc(cx,cy,innerR,startAngle+slice,startAngle,true); ctx.closePath();
+                ctx.fillStyle = CHART_COLORS[i % CHART_COLORS.length]; ctx.fill();
+                startAngle += slice;
             });
-
-            // Center circle (white)
-            ctx.beginPath();
-            ctx.arc(cx, cy, innerR - 1, 0, Math.PI * 2);
-            ctx.fillStyle = '#fff';
-            ctx.fill();
+            ctx.beginPath(); ctx.arc(cx,cy,innerR-1,0,Math.PI*2); ctx.fillStyle='#fff'; ctx.fill();
         }
 
-        function renderSalary(salary) {
-            // Income items
-            const incomeItems = [
-                { label: '基本薪資', value: salary.base_salary },
-                { label: '職務加給', value: salary.position_allowance },
-                { label: '加班費', value: salary.overtime_pay },
-                { label: '全勤獎金', value: salary.full_attendance_bonus },
-                { label: '伙食津貼', value: salary.meal_allowance },
-                { label: '夜班津貼', value: salary.night_allowance },
-            ].filter(i => i.value > 0);
-
-            // Deduct items with formulas
-            const deductItems = [
-                { label: '勞保自付', value: salary.labor_insurance, desc: '投保級距 × 12.5% × 20%' },
-                { label: '健保自付', value: salary.health_insurance, desc: '投保級距 × 5.17% × 30%' },
-                { label: '勞退自提', value: salary.pension_self || 0, desc: '月薪 × 6%' },
-                { label: '預扣所得稅', value: salary.income_tax || 0, desc: '總收入 × 5%' },
-                { label: '事假扣款', value: salary.personal_leave_deduction || 0, desc: '日薪 × 事假天數' },
-                { label: '遲到扣款', value: salary.late_deduction || 0 },
-            ].filter(i => i.value > 0);
-
-            const totalIncome = incomeItems.reduce((s, i) => s + i.value, 0);
-            const totalDeduct = deductItems.reduce((s, i) => s + i.value, 0);
-            const netSalary = totalIncome - totalDeduct;
-
-            // Update header
-            document.getElementById('netSalary').textContent = formatNT(netSalary);
-            document.getElementById('chartTotal').textContent = formatNT(totalIncome);
-            document.getElementById('totalIncome').textContent = formatNT(totalIncome);
-            document.getElementById('totalDeduct').textContent = '-' + formatNT(totalDeduct);
-
-            if (salary.status === 'confirmed' || salary.status === 'paid') {
-                document.getElementById('paidDate').textContent = `已於 ${salary.confirmed_at} 確認`;
-            }
-
-            // Donut chart
-            const chartData = incomeItems.map(i => ({ label: i.label, value: i.value }));
-            drawDonut(chartData);
-
-            // Legend
-            const legendEl = document.getElementById('chartLegend');
-            legendEl.innerHTML = chartData.map((d, i) =>
-                `<span class="legend-item"><span class="legend-dot" style="background:${CHART_COLORS[i]}"></span>${d.label}</span>`
-            ).join('');
-
-            // Income rows
-            document.getElementById('incomeRows').innerHTML = incomeItems.map(i =>
-                `<div class="detail-row"><span class="dl">${i.label}</span><span class="dv">${formatNT(i.value)}</span></div>`
-            ).join('');
-
-            // Deduct rows (with formula)
-            document.getElementById('deductRows').innerHTML = deductItems.map(i =>
-                `<div class="detail-row">
-                    <span class="dl">${i.label}${i.desc ? `<br><span style="font-size:11px;color:#94A3B8;">${i.desc}</span>` : ''}</span>
-                    <span class="dv deduct">-${formatNT(i.value)}</span>
-                </div>`
-            ).join('');
+        // ===== Payroll Detail =====
+        function renderSalary(s) {
+            const income = [
+                {label:'基本薪資',value:s.base_salary||0},{label:'職務加給',value:s.position_allowance||0},
+                {label:'加班費',value:s.overtime_pay||0},{label:'全勤獎金',value:s.full_attendance_bonus||0},
+                {label:'伙食津貼',value:s.meal_allowance||0},{label:'夜班津貼',value:s.night_allowance||0}
+            ].filter(i=>i.value>0);
+            const deduct = [
+                {label:'勞保自付',value:s.labor_insurance||0,desc:'投保級距×12.5%×20%'},
+                {label:'健保自付',value:s.health_insurance||0,desc:'投保級距×5.17%×30%'},
+                {label:'勞退自提',value:s.pension_self||0,desc:'月薪×6%'},
+                {label:'預扣所得稅',value:s.income_tax||0,desc:'總收入×5%'},
+                {label:'事假扣款',value:s.personal_leave_deduction||0},{label:'遲到扣款',value:s.late_deduction||0}
+            ].filter(i=>i.value>0);
+            const totalI = income.reduce((a,b)=>a+b.value,0);
+            const totalD = deduct.reduce((a,b)=>a+b.value,0);
+            document.getElementById('netSalary').textContent = formatNT(totalI - totalD);
+            document.getElementById('chartTotal').textContent = formatNT(totalI);
+            document.getElementById('totalIncome').textContent = formatNT(totalI);
+            document.getElementById('totalDeduct').textContent = '-' + formatNT(totalD);
+            if (s.status==='confirmed'||s.status==='paid') document.getElementById('paidDate').textContent = `已於 ${s.confirmed_at?.split('T')[0]||''} 確認`;
+            drawDonut(income);
+            document.getElementById('chartLegend').innerHTML = income.map((d,i)=>`<span class="legend-item"><span class="legend-dot" style="background:${CHART_COLORS[i]}"></span>${d.label}</span>`).join('');
+            document.getElementById('incomeRows').innerHTML = income.map(i=>`<div class="detail-row"><span class="dl">${i.label}</span><span class="dv">${formatNT(i.value)}</span></div>`).join('');
+            document.getElementById('deductRows').innerHTML = deduct.map(i=>`<div class="detail-row"><span class="dl">${i.label}${i.desc?`<br><span style="font-size:11px;color:#94A3B8;">${i.desc}</span>`:''}</span><span class="dv deduct">-${formatNT(i.value)}</span></div>`).join('');
         }
 
         async function loadSalary() {
-            const label = document.getElementById('salaryMonthLabel');
-            label.textContent = `${salaryYear}年 ${salaryMonth + 1}月`;
-
+            document.getElementById('salaryMonthLabel').textContent = `${salaryYear}年 ${salaryMonth+1}月`;
             try {
-                if (typeof sb !== 'undefined' && typeof liffProfile !== 'undefined' && liffProfile) {
-                    // 先嘗試 RPC
-                    const { data, error } = await sb.rpc('get_employee_payroll', {
-                        p_line_user_id: liffProfile.userId,
-                        p_year: salaryYear,
-                        p_month: salaryMonth + 1
-                    });
-
-                    if (!error && data && data.success && data.data) {
-                        renderSalary(data.data);
-                        return;
-                    }
-
-                    // fallback: 直接查 payroll 表
+                if (typeof sb!=='undefined' && typeof liffProfile!=='undefined' && liffProfile) {
+                    const {data,error} = await sb.rpc('get_employee_payroll',{p_line_user_id:liffProfile.userId,p_year:salaryYear,p_month:salaryMonth+1});
+                    if (!error && data?.success && data.data) { renderSalary(data.data); return; }
                     if (currentEmployee) {
-                        const { data: pData, error: pErr } = await sb.from('payroll')
-                            .select('*')
-                            .eq('employee_id', currentEmployee.id)
-                            .eq('year', salaryYear)
-                            .eq('month', salaryMonth + 1)
-                            .maybeSingle();
-
-                        if (!pErr && pData) {
-                            renderSalary(pData);
-                            return;
-                        }
+                        const {data:p} = await sb.from('payroll').select('*').eq('employee_id',currentEmployee.id).eq('year',salaryYear).eq('month',salaryMonth+1).maybeSingle();
+                        if (p) { renderSalary(p); return; }
                     }
                 }
-            } catch (e) {
-                console.log('使用示範薪資:', e.message);
-            }
-
-            // Demo fallback
-            renderSalary(demoSalary);
+            } catch(e) { console.log('Demo fallback:', e.message); }
+            renderSalary({base_salary:45000,overtime_pay:0,meal_allowance:2400,position_allowance:5000,full_attendance_bonus:2000,night_allowance:0,labor_insurance:1042,health_insurance:826,pension_self:2100,income_tax:894,personal_leave_deduction:0,late_deduction:0,status:'demo'});
         }
 
-        function changeSalaryMonth(delta) {
-            salaryMonth += delta;
-            if (salaryMonth < 0) { salaryMonth = 11; salaryYear--; }
-            if (salaryMonth > 11) { salaryMonth = 0; salaryYear++; }
-            loadSalary();
+        function changeSalaryMonth(d) { salaryMonth+=d; if(salaryMonth<0){salaryMonth=11;salaryYear--;}if(salaryMonth>11){salaryMonth=0;salaryYear++;} loadSalary(); }
+
+        // ===== Salary Calculator =====
+        function setCalcMode(mode) {
+            calcMode = mode;
+            document.querySelectorAll('.calc-mode-btn').forEach(b => b.classList.remove('active'));
+            event.currentTarget.classList.add('active');
+            document.getElementById('rowMonthly').style.display = mode==='monthly' ? 'flex' : 'none';
+            document.getElementById('rowDaily').style.display = mode==='daily' ? 'flex' : 'none';
+            document.getElementById('rowHourly').style.display = mode==='hourly' ? 'flex' : 'none';
+            document.getElementById('rowHoursPerDay').style.display = mode==='hourly' ? 'flex' : 'none';
+            calculateSalary();
+        }
+
+        function calculateSalary() {
+            const days = parseFloat(document.getElementById('calcDays').value) || 0;
+            const otHours = parseFloat(document.getElementById('calcOT').value) || 0;
+            const bonus = parseFloat(document.getElementById('calcBonus').value) || 0;
+            const meal = parseFloat(document.getElementById('calcMeal').value) || 0;
+            const pensionRate = parseFloat(document.getElementById('calcPension').value) || 0;
+
+            let monthSalary, dailyRate, hourlyRate;
+
+            if (calcMode === 'monthly') {
+                monthSalary = parseFloat(document.getElementById('calcBase').value) || 0;
+                dailyRate = Math.round(monthSalary / 30);
+                hourlyRate = Math.round(dailyRate / 8);
+            } else if (calcMode === 'daily') {
+                dailyRate = parseFloat(document.getElementById('calcDaily').value) || 0;
+                hourlyRate = Math.round(dailyRate / 8);
+                monthSalary = dailyRate * days;
+            } else {
+                hourlyRate = parseFloat(document.getElementById('calcHourly').value) || 0;
+                const hpd = parseFloat(document.getElementById('calcHoursDay').value) || 8;
+                dailyRate = hourlyRate * hpd;
+                monthSalary = dailyRate * days;
+            }
+
+            // 加班費
+            let otPay = 0;
+            const otDetail = [];
+            if (otHours > 0) {
+                const h1 = Math.min(otHours, 2);
+                const h2 = Math.max(Math.min(otHours - 2, 2), 0);
+                const pay1 = Math.round(hourlyRate * 1.34 * h1);
+                const pay2 = Math.round(hourlyRate * 1.67 * h2);
+                otPay = pay1 + pay2;
+                if (h1 > 0) otDetail.push({label:`前 ${h1} 小時`,formula:`${hourlyRate} × 1.34 × ${h1}`,value:pay1});
+                if (h2 > 0) otDetail.push({label:`後 ${h2} 小時`,formula:`${hourlyRate} × 1.67 × ${h2}`,value:pay2});
+            }
+
+            const grossBase = (calcMode === 'monthly') ? monthSalary : dailyRate * days;
+            const gross = grossBase + otPay + bonus + meal;
+
+            // 勞健保（用月薪當投保級距簡化）
+            const laborIns = Math.round(monthSalary * 0.125 * 0.2);
+            const healthIns = Math.round(monthSalary * 0.0517 * 0.3);
+            const pension = Math.round(monthSalary * pensionRate / 100);
+            const tax = Math.round(gross * 0.05);
+            const totalDeduct = laborIns + healthIns + pension + tax;
+            const net = gross - totalDeduct;
+
+            // 顯示結果
+            document.getElementById('crNet').textContent = formatNT(net);
+            document.getElementById('crGross').textContent = formatNT(gross);
+            document.getElementById('crDeduct').textContent = '-' + formatNT(totalDeduct);
+
+            document.getElementById('cvMonth').textContent = formatNT(monthSalary);
+            document.getElementById('cvDay').textContent = formatNT(dailyRate) + ' /天';
+            document.getElementById('cvHour').textContent = formatNT(hourlyRate) + ' /時';
+
+            // 收入明細
+            const incomeItems = [
+                {label: calcMode==='monthly'?'基本月薪':'出勤薪資', value: grossBase, formula: calcMode==='monthly'?'固定月薪':`${formatNT(dailyRate)} × ${days}天`},
+                {label:'加班費', value:otPay, formula:otHours>0?`${otHours}小時`:''},
+                {label:'全勤獎金', value:bonus}, {label:'伙食津貼', value:meal}
+            ].filter(i=>i.value>0);
+            document.getElementById('calcIncomeRows').innerHTML = incomeItems.map(i=>
+                `<div class="calc-detail-row"><span class="cdr-label">${i.label}${i.formula?`<span class="cdr-formula">${i.formula}</span>`:''}</span><span class="cdr-value" style="color:var(--success);">${formatNT(i.value)}</span></div>`
+            ).join('') + `<div class="calc-detail-row" style="font-weight:800;border-top:2px solid var(--gray-light);"><span>收入合計</span><span style="color:var(--success);">${formatNT(gross)}</span></div>`;
+
+            // 扣款明細
+            const deductItems = [
+                {label:'勞保自付', value:laborIns, formula:`${formatNT(monthSalary)} × 12.5% × 20%`},
+                {label:'健保自付', value:healthIns, formula:`${formatNT(monthSalary)} × 5.17% × 30%`},
+                {label:'勞退自提', value:pension, formula:`${formatNT(monthSalary)} × ${pensionRate}%`},
+                {label:'預扣所得稅', value:tax, formula:`${formatNT(gross)} × 5%`}
+            ].filter(i=>i.value>0);
+            document.getElementById('calcDeductRows').innerHTML = deductItems.map(i=>
+                `<div class="calc-detail-row"><span class="cdr-label">${i.label}<span class="cdr-formula">${i.formula}</span></span><span class="cdr-value" style="color:var(--danger);">-${formatNT(i.value)}</span></div>`
+            ).join('') + `<div class="calc-detail-row" style="font-weight:800;border-top:2px solid var(--gray-light);"><span>扣款合計</span><span style="color:var(--danger);">-${formatNT(totalDeduct)}</span></div>`;
+
+            // 加班費明細
+            if (otDetail.length > 0) {
+                document.getElementById('calcOTRows').innerHTML = 
+                    `<div class="calc-detail-row"><span class="cdr-label">時薪<span class="cdr-formula">月薪 ÷ 30 ÷ 8</span></span><span class="cdr-value">${formatNT(hourlyRate)}</span></div>` +
+                    otDetail.map(d=>`<div class="calc-detail-row"><span class="cdr-label">${d.label}<span class="cdr-formula">${d.formula}</span></span><span class="cdr-value" style="color:var(--success);">${formatNT(d.value)}</span></div>`).join('') +
+                    `<div class="calc-detail-row" style="font-weight:800;border-top:2px solid var(--gray-light);"><span>加班費合計</span><span style="color:var(--success);">${formatNT(otPay)}</span></div>`;
+            } else {
+                document.getElementById('calcOTRows').innerHTML = '<div style="text-align:center;color:var(--gray);font-size:13px;padding:12px;">無加班</div>';
+            }
         }
 
         window.addEventListener('load', async () => {
-            if (typeof initializeLiff === 'undefined') {
-                loadSalary();
-                return;
-            }
-
-            const initialized = await initializeLiff();
-            if (initialized) {
-                const isLoggedIn = await checkUserStatus();
-                if (isLoggedIn) {
-                    document.getElementById('loadingPage').style.display = 'none';
-                    initBottomNav();
-                    loadSalary();
-                } else {
-                    window.location.href = 'index.html';
-                }
-            } else {
-                document.getElementById('loadingPage').style.display = 'none';
-                loadSalary();
-            }
+            if (typeof initializeLiff === 'undefined') { loadSalary(); calculateSalary(); return; }
+            const init = await initializeLiff();
+            if (init) {
+                const ok = await checkUserStatus();
+                if (ok) { document.getElementById('loadingPage').style.display='none'; initBottomNav(); loadSalary(); calculateSalary(); }
+                else window.location.href = 'index.html';
+            } else { document.getElementById('loadingPage').style.display='none'; loadSalary(); calculateSalary(); }
         });
     </script>
 </body>

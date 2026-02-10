@@ -7,12 +7,52 @@
     <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link rel="stylesheet" href="style.css">
+    <style>
+        .att-nav { display: flex; align-items: center; justify-content: center; gap: 16px; margin-bottom: 16px; }
+        .att-nav button { background: none; border: none; font-size: 20px; cursor: pointer; padding: 6px 10px; border-radius: 8px; }
+        .att-nav button:active { background: var(--gray-light); }
+        .att-nav span { font-size: 16px; font-weight: 700; color: var(--dark); min-width: 120px; text-align: center; }
+
+        .att-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 16px; }
+        .att-stat { text-align: center; padding: 10px 6px; border-radius: 12px; }
+        .att-stat .as-num { font-size: 22px; font-weight: 900; }
+        .att-stat .as-label { font-size: 11px; font-weight: 600; margin-top: 2px; }
+
+        .att-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+        .att-weekday { text-align: center; font-size: 11px; font-weight: 700; color: var(--gray); padding: 6px 0; }
+        .att-day {
+            min-height: 54px; border-radius: 10px; padding: 4px 2px; display: flex; flex-direction: column;
+            align-items: center; justify-content: flex-start; font-size: 13px; font-weight: 600;
+            cursor: pointer; transition: all 0.15s;
+        }
+        .att-day:active { transform: scale(0.92); }
+        .att-day.empty { cursor: default; }
+        .att-day .day-num { margin-bottom: 2px; }
+        .att-day .day-badge { font-size: 9px; font-weight: 700; padding: 1px 4px; border-radius: 4px; white-space: nowrap; }
+        .att-day .day-sub { font-size: 8px; color: var(--gray); margin-top: 1px; }
+
+        .att-day.s-ok { background: #ECFDF5; color: #059669; }
+        .att-day.s-late { background: #FFF7ED; color: #EA580C; }
+        .att-day.s-leave { background: #EFF6FF; color: #2563EB; }
+        .att-day.s-absent { background: #FEF2F2; color: #DC2626; }
+        .att-day.s-off { background: var(--gray-light); color: #94A3B8; opacity: 0.6; }
+        .att-day.s-future { background: transparent; color: #CBD5E1; }
+        .att-day.today-ring { box-shadow: 0 0 0 2px var(--primary); }
+
+        .att-legend { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 14px; }
+        .att-legend-item { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--gray); }
+        .att-legend-dot { width: 10px; height: 10px; border-radius: 3px; }
+
+        .att-detail { background: var(--white); border-radius: 14px; padding: 16px; margin-top: 16px; box-shadow: var(--shadow-md); display: none; }
+        .att-detail.show { display: block; animation: pageIn 0.25s ease-out; }
+        .att-detail-hdr { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+        .att-detail-hdr h3 { font-size: 15px; font-weight: 800; color: var(--dark); margin: 0; }
+        .adr { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--gray-light); font-size: 13px; }
+        .adr:last-child { border-bottom: none; }
+    </style>
 </head>
 <body>
-    <div id="loadingPage" class="loading-screen">
-        <div class="spinner"></div>
-        <p>系統載入中...</p>
-    </div>
+    <div id="loadingPage" class="loading-screen"><div class="spinner"></div><p>系統載入中...</p></div>
 
     <div class="container">
         <!-- 請假頁面 -->
@@ -20,13 +60,10 @@
             <button class="btn btn-secondary" onclick="window.location.href='index.html'" style="width:auto;margin-bottom:10px;">← 返回</button>
             <div class="checkin-page">
                 <h2>📝 請假申請</h2>
-                <div class="form-group">
-                    <label>假別</label>
+                <div class="form-group"><label>假別</label>
                     <select id="leaveType">
-                        <option value="annual">特休假</option>
-                        <option value="sick">病假</option>
-                        <option value="personal">事假</option>
-                        <option value="compensatory">補休</option>
+                        <option value="annual">特休假</option><option value="sick">病假</option>
+                        <option value="personal">事假</option><option value="compensatory">補休</option>
                     </select>
                 </div>
                 <div class="form-group"><label>開始日期</label><input type="date" id="leaveStartDate"></div>
@@ -34,45 +71,52 @@
                 <div class="form-group"><label>原因</label><textarea id="leaveReason"></textarea></div>
                 <button class="btn btn-primary" onclick="submitLeave()">📤 提交申請</button>
                 <div id="leaveStatus" class="status-box"></div>
-                
                 <div style="margin-top:30px; padding-top:20px; border-top:2px dashed #e5e7eb;">
                     <h3 style="margin-bottom:15px;">📋 我的請假記錄</h3>
-                    <div id="leaveHistoryList">
-                        <p style="text-align:center;color:#666;">載入中...</p>
-                    </div>
+                    <div id="leaveHistoryList"><p style="text-align:center;color:#666;">載入中...</p></div>
                 </div>
             </div>
         </div>
 
-        <!-- 考勤查詢頁面 -->
+        <!-- ====== 考勤月曆 ====== -->
         <div id="attendancePage" class="page">
             <button class="btn btn-secondary" onclick="window.location.href='index.html'" style="width:auto;margin-bottom:10px;">← 返回</button>
-            <div class="checkin-page">
-                <h2>📊 考勤記錄</h2>
-                <div class="form-group">
-                    <label>查詢月份</label>
-                    <div style="display:flex; gap:10px;">
-                        <select id="attendanceYear" onchange="loadMonthlyAttendance()" style="flex:1;">
-                            <option value="2026">2026</option>
-                            <option value="2025">2025</option>
-                        </select>
-                        <select id="attendanceMonth" onchange="loadMonthlyAttendance()" style="flex:1;">
-                            <option value="1">1月</option>
-                            <option value="2">2月</option>
-                            <option value="3">3月</option>
-                            <option value="4">4月</option>
-                            <option value="5">5月</option>
-                            <option value="6">6月</option>
-                            <option value="7">7月</option>
-                            <option value="8">8月</option>
-                            <option value="9">9月</option>
-                            <option value="10">10月</option>
-                            <option value="11">11月</option>
-                            <option value="12">12月</option>
-                        </select>
-                    </div>
+
+            <div class="card">
+                <h2 style="text-align:center;font-size:18px;font-weight:800;color:var(--dark);margin-bottom:16px;">📊 考勤記錄</h2>
+                <div class="att-nav">
+                    <button onclick="changeAttMonth(-1)">◀</button>
+                    <span id="attMonthLabel">-</span>
+                    <button onclick="changeAttMonth(1)">▶</button>
                 </div>
-                <div id="attendanceList" style="margin-top:15px;"></div>
+                <div class="att-summary">
+                    <div class="att-stat" style="background:#ECFDF5;"><div class="as-num" style="color:#059669;" id="stOk">0</div><div class="as-label" style="color:#059669;">出勤</div></div>
+                    <div class="att-stat" style="background:#FFF7ED;"><div class="as-num" style="color:#EA580C;" id="stLate">0</div><div class="as-label" style="color:#EA580C;">遲到</div></div>
+                    <div class="att-stat" style="background:#EFF6FF;"><div class="as-num" style="color:#2563EB;" id="stLeave">0</div><div class="as-label" style="color:#2563EB;">請假</div></div>
+                    <div class="att-stat" style="background:#FEF2F2;"><div class="as-num" style="color:#DC2626;" id="stAbsent">0</div><div class="as-label" style="color:#DC2626;">缺勤</div></div>
+                </div>
+                <div style="text-align:center;margin-bottom:16px;font-size:13px;color:var(--gray);">
+                    ⏱️ 總工時 <b id="stHours" style="color:var(--dark);">0</b> 小時
+                </div>
+            </div>
+
+            <div class="card" style="padding:12px;">
+                <div class="att-grid" id="attGrid">
+                    <div class="att-weekday">日</div><div class="att-weekday">一</div><div class="att-weekday">二</div>
+                    <div class="att-weekday">三</div><div class="att-weekday">四</div><div class="att-weekday">五</div><div class="att-weekday">六</div>
+                </div>
+                <div class="att-legend">
+                    <span class="att-legend-item"><span class="att-legend-dot" style="background:#ECFDF5;border:1px solid #059669;"></span>出勤</span>
+                    <span class="att-legend-item"><span class="att-legend-dot" style="background:#FFF7ED;border:1px solid #EA580C;"></span>遲到</span>
+                    <span class="att-legend-item"><span class="att-legend-dot" style="background:#EFF6FF;border:1px solid #2563EB;"></span>請假</span>
+                    <span class="att-legend-item"><span class="att-legend-dot" style="background:#FEF2F2;border:1px solid #DC2626;"></span>缺勤</span>
+                    <span class="att-legend-item"><span class="att-legend-dot" style="background:var(--gray-light);border:1px solid #94A3B8;"></span>休</span>
+                </div>
+            </div>
+
+            <div class="att-detail" id="attDetail">
+                <div class="att-detail-hdr"><h3 id="adTitle">-</h3><span id="adBadge"></span></div>
+                <div id="adRows"></div>
             </div>
         </div>
 
@@ -81,131 +125,189 @@
             <button class="btn btn-secondary" onclick="window.location.href='index.html'" style="width:auto;margin-bottom:10px;">← 返回</button>
             <div class="checkin-page">
                 <h2>💰 薪資查詢</h2>
-                <div class="form-group">
-                    <label>查詢年度</label>
-                    <select id="salaryYear" onchange="loadAnnualSummary()">
-                        <option value="2026">2026</option>
-                        <option value="2025">2025</option>
-                    </select>
+                <div class="form-group"><label>查詢年度</label>
+                    <select id="salaryYear" onchange="loadAnnualSummary()"><option value="2026">2026</option><option value="2025">2025</option></select>
                 </div>
-                
-                <!-- 年度成績單狀態卡片 -->
                 <div id="yearEndStatusCard" class="status-card" style="display:none; margin-bottom:20px;">
                     <h1 id="statusResult" style="margin:10px 0;">計算中...</h1>
                     <p id="statusReason" style="margin:0; opacity:0.8;"></p>
                 </div>
-
-                <!-- 詳細統計資料 -->
                 <div class="stats-grid" id="statsGrid" style="display:none;">
-                    <div class="stat-item">
-                        <label>📅 到職日期</label>
-                        <input type="date" id="bonusHireDate" style="border:1px solid #ddd; padding:5px; border-radius:5px; text-align:right;">
-                    </div>
-                    <div class="stat-item">
-                        <label>⏳ 實際年資</label>
-                        <span id="bonusMonths">-</span>
-                    </div>
-                    <div class="stat-item">
-                        <label>🏃 總出勤天數</label>
-                        <span id="bonusDays">-</span>
-                    </div>
-                    <div class="stat-item">
-                        <label>📈 出席率</label>
-                        <span id="attendanceRate">-</span>
-                    </div>
-                    <div class="stat-item">
-                        <label>⏰ 遲到次數</label>
-                        <span id="bonusLate" style="color:red;">-</span>
-                    </div>
-                    <div class="stat-item">
-                        <label>📉 遲到率</label>
-                        <span id="lateRate">-</span>
-                    </div>
-                    <div class="stat-item">
-                        <label>⏱️ 累計工時</label>
-                        <span id="bonusHours">-</span>
-                    </div>
-                    <div class="stat-item">
-                        <label>📊 平均每日工時</label>
-                        <span id="bonusAvgHours">-</span>
-                    </div>
+                    <div class="stat-item"><label>📅 到職日期</label><input type="date" id="bonusHireDate" style="border:1px solid #ddd; padding:5px; border-radius:5px; text-align:right;"></div>
+                    <div class="stat-item"><label>⏳ 實際年資</label><span id="bonusMonths">-</span></div>
+                    <div class="stat-item"><label>🏃 總出勤天數</label><span id="bonusDays">-</span></div>
+                    <div class="stat-item"><label>📈 出席率</label><span id="attendanceRate">-</span></div>
+                    <div class="stat-item"><label>⏰ 遲到次數</label><span id="bonusLate" style="color:red;">-</span></div>
+                    <div class="stat-item"><label>📉 遲到率</label><span id="lateRate">-</span></div>
+                    <div class="stat-item"><label>⏱️ 累計工時</label><span id="bonusHours">-</span></div>
+                    <div class="stat-item"><label>📊 平均每日工時</label><span id="bonusAvgHours">-</span></div>
                 </div>
-                <div style="margin-top:20px;">
-                    <h3>📄 薪資單查詢</h3>
-                    <p class="status-box show info">功能開發中...</p>
-                </div>
+                <div style="margin-top:20px;"><h3>📄 薪資單查詢</h3><p class="status-box show info">請前往 💰 薪資中心 查看明細</p></div>
             </div>
         </div>
     </div>
 
     <script src="common.js"></script>
     <script>
-        // 頁面切換功能
+        let attYear = new Date().getFullYear();
+        let attMonth = new Date().getMonth();
+        let attData = [], lvData = [];
+
         function showPage(id) {
-            document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
             document.getElementById(id).classList.add('active');
-            
-            if(id==='attendancePage') {
-                const now = new Date();
-                const yearEl = document.getElementById('attendanceYear');
-                const monthEl = document.getElementById('attendanceMonth');
-                if (yearEl) yearEl.value = now.getFullYear();
-                if (monthEl) monthEl.value = now.getMonth() + 1;
-                loadMonthlyAttendance();
-            }
-            if(id==='leavePage') loadLeaveHistory();
-            if(id==='salaryPage') {
-                const salaryYearEl = document.getElementById('salaryYear');
-                if (salaryYearEl) salaryYearEl.value = new Date().getFullYear();
-                loadAnnualSummary();
-            }
+            if (id === 'attendancePage') { attYear = new Date().getFullYear(); attMonth = new Date().getMonth(); loadAttCal(); }
+            if (id === 'leavePage') loadLeaveHistory();
+            if (id === 'salaryPage') { document.getElementById('salaryYear').value = new Date().getFullYear(); loadAnnualSummary(); }
         }
 
-        // 頁面載入完成後初始化
-        window.addEventListener('load', async () => {
-            // 確保 common.js 中的函數已載入
-            if (typeof initializeLiff === 'undefined') {
-                console.error('initializeLiff 函數未定義，請檢查 common.js 是否正確載入');
-                return;
-            }
-            
-            // 根據 hash 決定顯示哪個頁面
-            const hash = window.location.hash || '#leave';
-            let pageId = 'leavePage';
-            
-            if (hash === '#attendance') pageId = 'attendancePage';
-            else if (hash === '#salary') pageId = 'salaryPage';
+        function changeAttMonth(d) {
+            attMonth += d;
+            if (attMonth < 0) { attMonth = 11; attYear--; }
+            if (attMonth > 11) { attMonth = 0; attYear++; }
+            loadAttCal();
+        }
 
-            const initialized = await initializeLiff();
-            if (initialized) {
-                const isLoggedIn = await checkUserStatus();
-                if (isLoggedIn) {
-                    initBottomNav();
-                    showPage(pageId);
-                } else {
-                    window.location.href = 'index.html';
-                }
+        async function loadAttCal() {
+            document.getElementById('attMonthLabel').textContent = `${attYear}年 ${attMonth + 1}月`;
+            if (!currentEmployee) return;
+
+            const ms = `${attYear}-${String(attMonth+1).padStart(2,'0')}-01`;
+            const ld = new Date(attYear, attMonth+1, 0).getDate();
+            const me = `${attYear}-${String(attMonth+1).padStart(2,'0')}-${ld}`;
+
+            try {
+                const {data} = await sb.rpc('get_monthly_attendance', { p_line_user_id: liffProfile.userId, p_year: attYear, p_month: attMonth+1 });
+                attData = data || [];
+            } catch(e) { attData = []; }
+
+            try {
+                const {data} = await sb.from('leave_requests').select('*').eq('employee_id', currentEmployee.id).eq('status','approved').gte('start_date', ms).lte('start_date', me);
+                lvData = data || [];
+            } catch(e) { lvData = []; }
+
+            renderAttCal();
+        }
+
+        function getStatus(ds) {
+            const att = attData.find(r => r.date === ds);
+            const lv = lvData.find(r => ds >= r.start_date && ds <= (r.end_date || r.start_date));
+            const d = new Date(ds), dow = d.getDay();
+            const now = new Date(); now.setHours(0,0,0,0);
+
+            if (d > now) return { s: 'future', l: '' };
+            if (dow === 0 || dow === 6) return att ? { s: 'ok', l: '加班', att } : { s: 'off', l: '休' };
+            if (lv) {
+                const m = { annual:'特休', sick:'病假', personal:'事假', compensatory:'補休', maternity:'產假', marriage:'婚假' };
+                return { s: 'leave', l: m[lv.leave_type] || '假', lv };
             }
+            if (att) {
+                if (att.is_late) {
+                    let min = '';
+                    try { const t = new Date(att.check_in_time); const sc = new Date(t); sc.setHours(8,0,0,0); const df = Math.round((t-sc)/60000); if(df>0) min = df+'分'; } catch(e){}
+                    return { s: 'late', l: '遲'+(min||'到'), att };
+                }
+                return { s: 'ok', l: '✓', att };
+            }
+            return { s: 'absent', l: '缺勤' };
+        }
+
+        function renderAttCal() {
+            const grid = document.getElementById('attGrid');
+            const wk = grid.querySelectorAll('.att-weekday');
+            grid.innerHTML = ''; wk.forEach(w => grid.appendChild(w));
+
+            const fd = new Date(attYear, attMonth, 1).getDay();
+            const dim = new Date(attYear, attMonth+1, 0).getDate();
+            const todayS = new Date().toISOString().split('T')[0];
+
+            let cOk=0, cLate=0, cLv=0, cAb=0, tH=0;
+
+            for (let i=0; i<fd; i++) { const e=document.createElement('div'); e.className='att-day empty'; grid.appendChild(e); }
+
+            for (let d=1; d<=dim; d++) {
+                const ds = `${attYear}-${String(attMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+                const info = getStatus(ds);
+                const el = document.createElement('div');
+                let cls = 'att-day';
+                if (info.s==='ok') { cls+=' s-ok'; cOk++; }
+                else if (info.s==='late') { cls+=' s-late'; cLate++; cOk++; }
+                else if (info.s==='leave') { cls+=' s-leave'; cLv++; }
+                else if (info.s==='absent') { cls+=' s-absent'; cAb++; }
+                else if (info.s==='off') cls+=' s-off';
+                else if (info.s==='future') cls+=' s-future';
+                if (ds===todayS) cls+=' today-ring';
+                el.className = cls;
+
+                if (info.att) tH += parseFloat(info.att.total_work_hours) || 0;
+
+                const bc = {ok:'background:#D1FAE5;color:#059669;',late:'background:#FFEDD5;color:#EA580C;',leave:'background:#DBEAFE;color:#2563EB;',absent:'background:#FEE2E2;color:#DC2626;',off:'color:#94A3B8;'}[info.s] || '';
+                el.innerHTML = `<span class="day-num">${d}</span>${info.l?`<span class="day-badge" style="${bc}">${info.l}</span>`:''}${info.att&&info.att.total_work_hours?`<span class="day-sub">${parseFloat(info.att.total_work_hours).toFixed(1)}h</span>`:''}`;
+
+                if (info.s!=='future' && info.s!=='off') el.onclick = () => showDetail(ds, info);
+                grid.appendChild(el);
+            }
+
+            document.getElementById('stOk').textContent = cOk;
+            document.getElementById('stLate').textContent = cLate;
+            document.getElementById('stLeave').textContent = cLv;
+            document.getElementById('stAbsent').textContent = cAb;
+            document.getElementById('stHours').textContent = tH.toFixed(1);
+        }
+
+        function showDetail(ds, info) {
+            const card = document.getElementById('attDetail');
+            const wd = ['日','一','二','三','四','五','六'];
+            const dd = new Date(ds);
+            document.getElementById('adTitle').textContent = `${ds} 週${wd[dd.getDay()]}`;
+
+            const sm = {ok:'<span style="color:#059669;font-weight:700;">✅ 正常出勤</span>',late:'<span style="color:#EA580C;font-weight:700;">⚠️ 遲到</span>',leave:'<span style="color:#2563EB;font-weight:700;">📝 請假</span>',absent:'<span style="color:#DC2626;font-weight:700;">❌ 缺勤</span>'};
+            document.getElementById('adBadge').innerHTML = sm[info.s] || '';
+
+            let r = '';
+            if (info.att) {
+                let ci='-', co='-';
+                try {
+                    if(info.att.check_in_time){const p=info.att.check_in_time.split(' ');ci=p.length>1?p[1].substring(0,5):info.att.check_in_time.substring(0,5);}
+                    if(info.att.check_out_time){const p=info.att.check_out_time.split(' ');co=p.length>1?p[1].substring(0,5):info.att.check_out_time.substring(0,5);}
+                } catch(e){}
+                r += `<div class="adr"><span style="color:var(--gray)">上班打卡</span><b>${ci}</b></div>`;
+                r += `<div class="adr"><span style="color:var(--gray)">下班打卡</span><b>${co}</b></div>`;
+                if (info.att.total_work_hours) r += `<div class="adr"><span style="color:var(--gray)">工作時數</span><b>${parseFloat(info.att.total_work_hours).toFixed(1)} 小時</b></div>`;
+                if (info.att.is_late) {
+                    try { const t=new Date(info.att.check_in_time),sc=new Date(t);sc.setHours(8,0,0,0);const df=Math.round((t-sc)/60000);if(df>0) r+=`<div class="adr"><span style="color:#EA580C">遲到時間</span><b style="color:#EA580C">${df} 分鐘</b></div>`; } catch(e){}
+                }
+                if (info.att.check_in_location) r += `<div class="adr"><span style="color:var(--gray)">打卡地點</span><b>${info.att.check_in_location}</b></div>`;
+                if (info.att.photo_url) r += `<div class="adr"><span style="color:var(--gray)">打卡照片</span><a href="${info.att.photo_url}" target="_blank" style="color:var(--primary);font-weight:700;">📷 查看</a></div>`;
+            }
+            if (info.lv) {
+                const tm = {annual:'特休假',sick:'病假',personal:'事假',compensatory:'補休',maternity:'產假',marriage:'婚假'};
+                r += `<div class="adr"><span style="color:var(--gray)">假別</span><b style="color:#2563EB">${tm[info.lv.leave_type]||info.lv.leave_type}</b></div>`;
+                r += `<div class="adr"><span style="color:var(--gray)">天數</span><b>${info.lv.days||1} 天</b></div>`;
+                if (info.lv.reason) r += `<div class="adr"><span style="color:var(--gray)">原因</span><b>${info.lv.reason}</b></div>`;
+            }
+            if (info.s==='absent') r += `<div class="adr"><span style="color:#DC2626">說明</span><b style="color:#DC2626">未打卡且無請假紀錄</b></div>`;
+
+            document.getElementById('adRows').innerHTML = r;
+            card.classList.add('show');
+            card.scrollIntoView({ behavior:'smooth', block:'nearest' });
+        }
+
+        window.addEventListener('load', async () => {
+            if (typeof initializeLiff === 'undefined') return;
+            const hash = window.location.hash || '#leave';
+            let pid = hash==='#attendance'?'attendancePage':hash==='#salary'?'salaryPage':'leavePage';
+            const ok = await initializeLiff();
+            if (ok) { const li = await checkUserStatus(); if(li){initBottomNav();showPage(pid);}else window.location.href='index.html'; }
         });
     </script>
-    <!-- 底部導航列 -->
-    <nav class="bottom-nav" style="display:none;">
-        <a class="nav-item" onclick="window.location.href='index.html'">
-            <span class="nav-icon">🏠</span><span class="nav-label">首頁</span>
-        </a>
-        <a class="nav-item" onclick="window.location.href='schedule.html'">
-            <span class="nav-icon">📅</span><span class="nav-label">班表</span>
-        </a>
-        <a class="nav-item" onclick="window.location.href='checkin.html?type=in'">
-            <span class="nav-icon">📍</span><span class="nav-label">打卡</span>
-        </a>
-        <a class="nav-item active">
-            <span class="nav-icon">💰</span><span class="nav-label">薪資</span>
-        </a>
-        <a class="nav-item" onclick="window.location.href='services.html#settings'">
-            <span class="nav-icon">⚙️</span><span class="nav-label">設定</span>
-        </a>
-    </nav>
 
+    <nav class="bottom-nav" style="display:none;">
+        <a class="nav-item" onclick="window.location.href='index.html'"><span class="nav-icon">🏠</span><span class="nav-label">首頁</span></a>
+        <a class="nav-item" onclick="window.location.href='schedule.html'"><span class="nav-icon">📅</span><span class="nav-label">班表</span></a>
+        <a class="nav-item" onclick="window.location.href='checkin.html?type=in'"><span class="nav-icon">📍</span><span class="nav-label">打卡</span></a>
+        <a class="nav-item active"><span class="nav-icon">💰</span><span class="nav-label">薪資</span></a>
+        <a class="nav-item" onclick="window.location.href='services.html#settings'"><span class="nav-icon">⚙️</span><span class="nav-label">設定</span></a>
+    </nav>
 </body>
 </html>
