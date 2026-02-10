@@ -148,8 +148,9 @@
 
     <script src="common.js"></script>
     <script>
-        let salaryYear = 2026;
-        let salaryMonth = 0; // 0-indexed, January
+        let salaryYear = new Date().getFullYear();
+        let salaryMonth = new Date().getMonth() - 1; // 預設顯示上個月
+        if (salaryMonth < 0) { salaryMonth = 11; salaryYear--; }
 
         // Demo salary data
         const demoSalary = {
@@ -279,17 +280,32 @@
             label.textContent = `${salaryYear}年 ${salaryMonth + 1}月`;
 
             try {
-                if (typeof sb !== 'undefined' && currentEmployee) {
-                    const { data, error } = await sb.from('payroll')
-                        .select('*')
-                        .eq('employee_id', currentEmployee.id)
-                        .eq('year', salaryYear)
-                        .eq('month', salaryMonth + 1)
-                        .maybeSingle();
+                if (typeof sb !== 'undefined' && typeof liffProfile !== 'undefined' && liffProfile) {
+                    // 先嘗試 RPC
+                    const { data, error } = await sb.rpc('get_employee_payroll', {
+                        p_line_user_id: liffProfile.userId,
+                        p_year: salaryYear,
+                        p_month: salaryMonth + 1
+                    });
 
-                    if (!error && data) {
-                        renderSalary(data);
+                    if (!error && data && data.success && data.data) {
+                        renderSalary(data.data);
                         return;
+                    }
+
+                    // fallback: 直接查 payroll 表
+                    if (currentEmployee) {
+                        const { data: pData, error: pErr } = await sb.from('payroll')
+                            .select('*')
+                            .eq('employee_id', currentEmployee.id)
+                            .eq('year', salaryYear)
+                            .eq('month', salaryMonth + 1)
+                            .maybeSingle();
+
+                        if (!pErr && pData) {
+                            renderSalary(pData);
+                            return;
+                        }
                     }
                 }
             } catch (e) {
