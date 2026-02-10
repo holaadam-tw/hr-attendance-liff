@@ -19,11 +19,11 @@
             <div class="card">
                 <div class="bind-header">
                     <span class="logo">🔐</span>
-                    <h2>員工身分綁定</h2>
-                    <p>初次使用請驗證身分</p>
+                    <h2>員工身份綁定</h2>
+                    <p>初次使用請驗證身份</p>
                 </div>
                 <div class="tabs">
-                    <button class="tab-btn active" id="tabIdCard" onclick="switchBindMode('id_card')">身分證驗證</button>
+                    <button class="tab-btn active" id="tabIdCard" onclick="switchBindMode('id_card')">身份證驗證</button>
                     <button class="tab-btn inactive" id="tabCode" onclick="switchBindMode('code')">驗證碼驗證</button>
                 </div>
                 <div class="form-group">
@@ -31,7 +31,7 @@
                     <input type="text" id="bindEmpId" placeholder="例如：EMP001" autocomplete="off">
                 </div>
                 <div id="modeIdCard" class="form-group">
-                    <label>身分證後 4 碼 *</label>
+                    <label>身份證後 4 碼 *</label>
                     <input type="tel" id="bindIdLast4" maxlength="4" placeholder="例如：1234" autocomplete="off">
                 </div>
                 <div id="modeCode" class="form-group hidden">
@@ -90,7 +90,7 @@
                 <div class="menu-item" onclick="window.location.href='services.html#settings'">
                     <div class="icon">⚙️</div><div class="label">系統設定</div>
                 </div>
-                <!-- 管理員專用入口 - 動態顯示 -->
+                <!-- 管理員專用入口 -->
                 <div class="menu-item admin-only" id="adminEntry" style="display:none;" onclick="window.location.href='admin.html'">
                     <div class="icon">👑</div><div class="label">管理後台</div>
                 </div>
@@ -100,9 +100,8 @@
 
     <script src="common.js"></script>
     <script>
-        // 首頁專用邏輯
         function showPage(id) {
-            document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
             document.getElementById(id).classList.add('active');
         }
 
@@ -122,60 +121,31 @@
             setTimeout(() => isProcessing = false, 1000);
         }
 
-        // 檢查 LIFF 啟動參數
         function checkLiffParams() {
-            // 檢查 LIFF 啟動參數
             if (liff && liff.isInClient()) {
-                const liffParams = liff.getContext();
-                if (liffParams && liffParams.type && liffParams.type === 'utim') {
-                    const urlParams = new URLSearchParams(liffParams.utm);
-                    const company = urlParams.get('company');
-                    if (company) {
-                        sessionStorage.setItem('company_code', company);
-                        console.log('🏢 從 LIFF 參數取得公司代碼:', company);
+                try {
+                    const liffParams = liff.getContext();
+                    if (liffParams?.type === 'utim' && liffParams.utm) {
+                        const urlParams = new URLSearchParams(liffParams.utm);
+                        const company = urlParams.get('company');
+                        if (company) sessionStorage.setItem('company_code', company);
                     }
-                }
+                } catch(e) {}
             }
             
-            // 檢查網址參數（適用於外部瀏覽器）
             const urlParams = new URLSearchParams(window.location.search);
             const company = urlParams.get('company');
-            if (company) {
-                sessionStorage.setItem('company_code', company);
-                console.log('🏢 從網址參數取得公司代碼:', company);
-            }
-            
-            // 自動填入公司代碼到綁定表單
-            const savedCompany = sessionStorage.getItem('company_code');
-            if (savedCompany) {
-                const companyInput = document.getElementById('companyCode');
-                if (companyInput) {
-                    companyInput.value = savedCompany;
-                    companyInput.readOnly = true;
-                    companyInput.style.backgroundColor = '#f3f4f6';
-                    
-                    // 顯示提示
-                    const hint = document.createElement('small');
-                    hint.style.color = '#10b981';
-                    hint.style.display = 'block';
-                    hint.style.marginTop = '5px';
-                    hint.textContent = '✅ 公司代碼已自動填入';
-                    companyInput.parentNode.appendChild(hint);
-                }
-            }
+            if (company) sessionStorage.setItem('company_code', company);
         }
 
-        // 頁面載入完成後檢查用戶狀態
         window.addEventListener('load', async () => {
-            // 確保 common.js 中的函數已載入
             if (typeof initializeLiff === 'undefined') {
-                console.error('initializeLiff 函數未定義，請檢查 common.js 是否正確載入');
+                console.error('common.js 未正確載入');
                 return;
             }
             
             const initialized = await initializeLiff();
             if (initialized) {
-                // 檢查 LIFF 啟動參數
                 checkLiffParams();
                 
                 const isLoggedIn = await checkUserStatus();
@@ -183,13 +153,10 @@
                     showPage('homePage');
                     preloadGPS();
                     
-                    // 檢查是否為管理員，如果是則顯示管理後台入口
                     const isAdmin = await checkIsAdmin();
                     if (isAdmin) {
                         const adminEntry = document.getElementById('adminEntry');
-                        if (adminEntry) {
-                            adminEntry.style.display = 'block';
-                        }
+                        if (adminEntry) adminEntry.style.display = 'block';
                     }
                 } else {
                     showPage('bindPage');

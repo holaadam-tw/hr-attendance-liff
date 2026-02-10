@@ -35,7 +35,6 @@
     <script>
         let currentCheckInType = 'in';
 
-        // 拍照打卡功能
         async function captureAndCheckIn() {
             if (!currentEmployee) {
                 showToast('❌ 員工資料未載入，請重新登入');
@@ -65,7 +64,6 @@
 
                 const { data: urlData } = sb.storage.from(CONFIG.BUCKET).getPublicUrl(fileName);
                 const publicUrl = urlData?.publicUrl || urlData?.publicURL;
-
                 if (!publicUrl) throw new Error('無法取得照片網址');
 
                 showStatus(statusBox, 'info', '📍 定位中...');
@@ -87,19 +85,16 @@
                 const typeText = currentCheckInType === 'in' ? '上班' : '下班';
                 showToast(`✅ ${typeText}成功！@${rpcData.location_name || '公司'}`);
                 
-                setTimeout(() => { 
-                    window.location.href = 'index.html'; 
-                }, 1500);
+                setTimeout(() => { window.location.href = 'index.html'; }, 1500);
 
             } catch (err) {
                 console.error(err);
-                showStatus(statusBox, 'error', `❌ 失敗: ${err.message}`);
+                showStatus(statusBox, 'error', `❌ 失敗: ${friendlyError(err)}`);
                 btn.disabled = false; 
                 btn.textContent = '📸 重試';
             }
         }
 
-        // 開啟相機
         async function openCamera() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
@@ -115,23 +110,18 @@
             } catch(e) { 
                 console.error('相機錯誤', e);
                 let msg = '無法啟動相機';
-                if(e.name === 'NotAllowedError') msg = '請允許相機權限';
-                if(e.name === 'NotFoundError') msg = '找不到相機裝置';
-                const status = document.getElementById('checkInStatus');
-                status.className = 'status-box show error';
-                status.innerHTML = `❌ ${msg}`;
+                if (e.name === 'NotAllowedError') msg = '請允許相機權限';
+                if (e.name === 'NotFoundError') msg = '找不到相機裝置';
+                showStatus(document.getElementById('checkInStatus'), 'error', `❌ ${msg}`);
             }
         }
 
-        // 頁面載入完成後初始化
         window.addEventListener('load', async () => {
-            // 確保 common.js 中的函數已載入
             if (typeof initializeLiff === 'undefined') {
-                console.error('initializeLiff 函數未定義，請檢查 common.js 是否正確載入');
+                console.error('common.js 未正確載入');
                 return;
             }
             
-            // 取得 URL 參數
             const urlParams = new URLSearchParams(window.location.search);
             currentCheckInType = urlParams.get('type') || 'in';
             
@@ -151,10 +141,9 @@
             }
         });
 
-        // 頁面離開時關閉相機
         window.addEventListener('beforeunload', () => {
-            if(videoStream) {
-                videoStream.getTracks().forEach(t=>t.stop());
+            if (videoStream) {
+                videoStream.getTracks().forEach(t => t.stop());
             }
         });
     </script>

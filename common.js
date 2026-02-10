@@ -12,14 +12,13 @@ const sb = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANO
 let liffProfile = null;
 let currentEmployee = null;
 let videoStream = null;
-let currentCheckInType = 'in';
 let cachedLocation = null;
 let currentBindMode = 'id_card';
 let todayAttendance = null;
 let officeLocations = []; 
 let isProcessing = false;
 
-// 初始化 LIFF
+// ===== 初始化 LIFF =====
 async function initializeLiff() {
     try {
         console.log('🚀 系統初始化...');
@@ -32,19 +31,22 @@ async function initializeLiff() {
         liffProfile = await liff.getProfile();
         return true;
     } catch (error) {
-        alert('初始化失敗: ' + error.message);
+        console.error('LIFF 初始化失敗:', error);
+        showToast('⚠️ 系統初始化失敗，請重新整理');
         return false;
     }
 }
 
-// 核心：取得台灣時間 YYYY-MM-DD
+// ===== 核心工具函數 =====
+
+// 取得台灣時間 YYYY-MM-DD
 function getTaiwanDate(offsetDays = 0) {
     const date = new Date();
     date.setDate(date.getDate() + offsetDays);
     return date.toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' });
 }
 
-// 計算距離公式 (Haversine)
+// 計算距離 (Haversine)
 function calculateDistance(lat1, lon1, lat2, lon2) {
     const R = 6371e3; 
     const φ1 = lat1 * Math.PI/180;
@@ -60,16 +62,56 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
     return R * c;
 }
 
-// 檢查用戶狀態
+// 狀態顯示
+function showStatus(el, type, msg) { 
+    if (!el) return;
+    el.className = `status-box show ${type}`; 
+    el.innerHTML = msg; 
+}
+
+// [BUG FIX] Toast — 改進：避免重疊、限制同時顯示數量
+function showToast(msg) { 
+    // 移除舊的 toast 避免堆疊
+    const oldToasts = document.querySelectorAll('.toast');
+    if (oldToasts.length > 2) {
+        oldToasts[0].remove();
+    }
+    
+    const t = document.createElement('div'); 
+    t.className = 'toast'; 
+    t.textContent = msg; 
+    document.body.appendChild(t); 
+    setTimeout(() => {
+        if (t.parentNode) t.remove();
+    }, 3000); 
+}
+
+// 友善錯誤訊息
+function friendlyError(err) {
+    const msg = err?.message || String(err);
+    if (msg.includes('fetch') || msg.includes('network') || msg.includes('Failed')) {
+        return '網路連線異常，請檢查網路後重試';
+    }
+    if (msg.includes('timeout')) return '連線逾時，請稍後再試';
+    if (msg.includes('permission') || msg.includes('denied')) return '權限不足';
+    if (msg.includes('not found') || msg.includes('404')) return '找不到資料';
+    return msg;
+}
+
+// ===== 用戶狀態 =====
 async function checkUserStatus() {
-    document.getElementById('loadingPage').style.display = 'flex';
+    const loadingEl = document.getElementById('loadingPage');
+    if (loadingEl) loadingEl.style.display = 'flex';
     
     try {
-        const { data, error } = await sb.from('employees').select('*').eq('line_user_id', liffProfile.userId).maybeSingle();
+        const { data, error } = await sb.from('employees')
+            .select('*')
+            .eq('line_user_id', liffProfile.userId)
+            .maybeSingle();
         
         await loadSettings();
 
-        document.getElementById('loadingPage').style.display = 'none';
+        if (loadingEl) loadingEl.style.display = 'none';
 
         if (data) {
             currentEmployee = data;
@@ -80,7 +122,8 @@ async function checkUserStatus() {
             return false;
         }
     } catch (err) {
-        document.getElementById('loadingPage').style.display = 'none';
+        console.error('檢查用戶狀態失敗:', err);
+        if (loadingEl) loadingEl.style.display = 'none';
         return false;
     }
 }
@@ -97,20 +140,23 @@ function updateUserInfo(data) {
     if (userIdEl) userIdEl.textContent = `ID: ${data.employee_number}`;
     
     if (avatarEl) {
-        if(liffProfile.pictureUrl) {
+        if (liffProfile?.pictureUrl) {
             avatarEl.style.backgroundImage = `url(${liffProfile.pictureUrl})`;
             avatarEl.style.backgroundSize = 'cover'; 
-            avatarEl.textContent='';
+            avatarEl.textContent = '';
         } else {
-            avatarEl.textContent = data.name.charAt(0);
+            avatarEl.textContent = data.name?.charAt(0) || '?';
         }
     }
 }
 
-// 載入系統設定
+// ===== 系統設定 =====
 async function loadSettings() {
     try {
-        const { data, error } = await sb.from('system_settings').select('value').eq('key', 'office_locations').maybeSingle();
+        const { data, error } = await sb.from('system_settings')
+            .select('value')
+            .eq('key', 'office_locations')
+            .maybeSingle();
         if (!error && data) {
             officeLocations = data.value || [];
         }
@@ -119,7 +165,7 @@ async function loadSettings() {
     }
 }
 
-// 預載 GPS
+// ===== GPS 功能 =====
 function preloadGPS() {
     const el = document.getElementById('locationStatus');
     if (!el) return;
@@ -136,12 +182,9 @@ function preloadGPS() {
             
             for (const loc of officeLocations) {
                 const dist = calculateDistance(
-                    cachedLocation.latitude, 
-                    cachedLocation.longitude, 
-                    loc.lat, 
-                    loc.lng
+                    cachedLocation.latitude, cachedLocation.longitude, 
+                    loc.lat, loc.lng
                 );
-                
                 if (dist <= loc.radius && dist < minDistance) {
                     minDistance = dist;
                     foundLocation = loc.name;
@@ -163,18 +206,17 @@ function preloadGPS() {
     );
 }
 
-// 取得 GPS
 function getGPS() { 
     return new Promise((res, rej) => {
         navigator.geolocation.getCurrentPosition(
-            p => res({latitude:p.coords.latitude, longitude:p.coords.longitude}), 
+            p => res({ latitude: p.coords.latitude, longitude: p.coords.longitude }), 
             e => rej(e), 
             { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
         );
     });
 }
 
-// 檢查今日考勤
+// ===== 考勤功能 =====
 async function checkTodayAttendance() {
     if (!currentEmployee) return;
     try {
@@ -197,7 +239,6 @@ async function checkTodayAttendance() {
     }
 }
 
-// 更新打卡按鈕狀態
 function updateCheckInButtons() {
     const btnIn = document.getElementById('checkInBtn');
     const btnOut = document.getElementById('checkOutBtn');
@@ -213,7 +254,7 @@ function updateCheckInButtons() {
     } else if (todayAttendance.check_out_time) {
         btnIn.classList.add('disabled');
         btnOut.classList.add('disabled');
-        showStatus(statusBox, 'success', `✅ 今日完工 (工時 ${todayAttendance.total_work_hours?.toFixed(1)}h)`);
+        showStatus(statusBox, 'success', `✅ 今日完工 (工時 ${todayAttendance.total_work_hours?.toFixed(1) || '0'}h)`);
     } else {
         btnIn.classList.add('disabled');
         btnOut.classList.remove('disabled');
@@ -223,7 +264,7 @@ function updateCheckInButtons() {
     }
 }
 
-// 綁定模式切換
+// ===== 綁定功能 =====
 function switchBindMode(mode) {
     currentBindMode = mode;
     const modeIdCard = document.getElementById('modeIdCard');
@@ -237,7 +278,6 @@ function switchBindMode(mode) {
     if (tabCode) tabCode.className = mode === 'code' ? 'tab-btn active' : 'tab-btn inactive';
 }
 
-// 處理員工綁定
 async function handleBind() {
     const empId = document.getElementById('bindEmpId')?.value.trim();
     const idLast4 = document.getElementById('bindIdLast4')?.value.trim();
@@ -259,24 +299,20 @@ async function handleBind() {
         const { data, error } = await sb.rpc('bind_employee', params);
         if (error) throw error;
         
-        console.log('綁定回應:', data); // 除錯用
-        
         if (data && data.success) {
             showStatus(statusBox, 'success', '✅ 綁定成功！');
-            setTimeout(() => {
-                window.location.href = 'index.html';
-            }, 1500);
+            setTimeout(() => { window.location.href = 'index.html'; }, 1500);
         } else {
             const errorMsg = (data && data.error) ? data.error : '綁定失敗，請檢查資料';
             showStatus(statusBox, 'error', errorMsg);
         }
     } catch (err) {
-        console.error('綁定錯誤:', err); // 除錯用
-        showStatus(statusBox, 'error', err.message || '綁定失敗，請稍後再試');
+        console.error('綁定錯誤:', err);
+        showStatus(statusBox, 'error', friendlyError(err));
     }
 }
 
-// 便當相關功能
+// ===== 便當功能 =====
 async function loadLunchSummary() {
     const dateStr = getTaiwanDate(1);
     const lunchDateEl = document.getElementById('lunchDate');
@@ -284,19 +320,14 @@ async function loadLunchSummary() {
     
     try {
         const { data } = await sb.rpc('get_lunch_summary', { p_date: dateStr });
-        if(data) {
-            const totalOrdersEl = document.getElementById('totalOrders');
-            const vegCountEl = document.getElementById('vegCount');
-            const regularCountEl = document.getElementById('regularCount');
-            const lunarNoticeEl = document.getElementById('lunarNotice');
-            const lunchVegetarianEl = document.getElementById('lunchVegetarian');
-            
-            if (totalOrdersEl) totalOrdersEl.textContent = data.total_orders || 0;
-            if (vegCountEl) vegCountEl.textContent = data.vegetarian_count || 0;
-            if (regularCountEl) regularCountEl.textContent = data.regular_count || 0;
+        if (data) {
+            const el = (id) => document.getElementById(id);
+            if (el('totalOrders')) el('totalOrders').textContent = data.total_orders || 0;
+            if (el('vegCount')) el('vegCount').textContent = data.vegetarian_count || 0;
+            if (el('regularCount')) el('regularCount').textContent = data.regular_count || 0;
             if (data.is_lunar_vegetarian_day) {
-                if (lunarNoticeEl) lunarNoticeEl.classList.add('show');
-                if (lunchVegetarianEl) lunchVegetarianEl.checked = true;
+                if (el('lunarNotice')) el('lunarNotice').classList.add('show');
+                if (el('lunchVegetarian')) el('lunchVegetarian').checked = true;
             }
         }
     } catch(e) { 
@@ -316,28 +347,34 @@ async function submitLunchOrder() {
             p_line_user_id: liffProfile.userId,
             p_order_date: date, p_is_vegetarian: isVeg, p_special_requirements: notes
         });
-        if(error) throw error;
+        if (error) throw error;
         showToast('✅ 訂購成功'); 
         loadLunchSummary();
     } catch(e) { 
-        showToast('失敗:'+e.message); 
+        showToast('❌ 訂購失敗：' + friendlyError(e)); 
     }
 }
 
-// 請假相關功能
+// ===== 請假功能 =====
 async function submitLeave() {
     if (!currentEmployee) return showToast('❌ 請先登入');
     const type = document.getElementById('leaveType')?.value;
     const start = document.getElementById('leaveStartDate')?.value;
     const end = document.getElementById('leaveEndDate')?.value;
     const reason = document.getElementById('leaveReason')?.value;
-    if(!start || !end || !reason) return showToast('請填寫完整');
+    if (!start || !end || !reason) return showToast('請填寫完整');
+    
+    // [BUG FIX] 驗證日期邏輯
+    if (new Date(end) < new Date(start)) {
+        return showToast('❌ 結束日期不能早於開始日期');
+    }
     
     try {
         const { error } = await sb.from('leave_requests').insert({
-            employee_id: currentEmployee.id, leave_type: type, start_date: start, end_date: end, reason: reason, status: 'pending'
+            employee_id: currentEmployee.id, leave_type: type, 
+            start_date: start, end_date: end, reason: reason, status: 'pending'
         });
-        if(error) throw error;
+        if (error) throw error;
         showToast('✅ 申請成功'); 
         loadLeaveHistory();
         const leaveStatusEl = document.getElementById('leaveStatus');
@@ -345,8 +382,10 @@ async function submitLeave() {
             leaveStatusEl.className = 'status-box show success';
             leaveStatusEl.textContent = '✅ 申請已提交';
         }
+        // 清空表單
+        if (document.getElementById('leaveReason')) document.getElementById('leaveReason').value = '';
     } catch(e) { 
-        showToast('失敗:'+e.message); 
+        showToast('❌ 申請失敗：' + friendlyError(e)); 
     }
 }
 
@@ -356,28 +395,34 @@ async function loadLeaveHistory() {
     try {
         const { data } = await sb.rpc('get_leave_history', { p_line_user_id: liffProfile.userId, p_limit: 5 });
         if (!data || data.length === 0) { 
-            list.innerHTML = '<p style="text-align:center;">尚無記錄</p>'; 
+            list.innerHTML = '<p style="text-align:center;color:#999;">尚無記錄</p>'; 
             return; 
         }
         
         const typeMap = { 'annual': '特休', 'sick': '病假', 'personal': '事假', 'compensatory': '補休' };
-        const statusMap = { 'pending': '⏳', 'approved': '✅', 'rejected': '❌' };
+        const statusMap = { 'pending': '⏳ 待審', 'approved': '✅ 通過', 'rejected': '❌ 拒絕' };
         
         list.innerHTML = data.map(r => `
             <div class="attendance-item">
-                <div class="date">${typeMap[r.leave_type]} ${statusMap[r.status]}</div>
-                <div class="details">
-                    <div>${r.start_date} ~ ${r.end_date}</div>
-                    <div style="color:#999;">${r.reason}</div>
+                <div class="date">
+                    <span>${typeMap[r.leave_type] || r.leave_type}</span>
+                    <span class="badge ${r.status === 'approved' ? 'badge-success' : r.status === 'rejected' ? 'badge-danger' : 'badge-warning'}">
+                        ${statusMap[r.status] || r.status}
+                    </span>
                 </div>
+                <div class="details">
+                    <span>${r.start_date} ~ ${r.end_date}</span>
+                </div>
+                <div style="font-size:12px;color:#999;margin-top:4px;">${r.reason || ''}</div>
             </div>
         `).join('');
     } catch(e) { 
         console.error(e); 
+        list.innerHTML = '<p style="text-align:center;color:#ef4444;">載入失敗</p>';
     }
 }
 
-// 月度出勤查詢
+// ===== 月度出勤查詢 =====
 async function loadMonthlyAttendance() {
     const list = document.getElementById('attendanceList');
     const yearEl = document.getElementById('attendanceYear');
@@ -388,7 +433,7 @@ async function loadMonthlyAttendance() {
     const year = parseInt(yearEl.value);
     const month = parseInt(monthEl.value);
     
-    list.innerHTML = '<p style="text-align:center;">查詢中...</p>';
+    list.innerHTML = '<p style="text-align:center;color:#666;">查詢中...</p>';
     
     try {
         const { data, error } = await sb.rpc('get_monthly_attendance', {
@@ -399,7 +444,7 @@ async function loadMonthlyAttendance() {
         
         if (error) throw error;
         if (!data || data.length === 0) {
-            list.innerHTML = `<p style="text-align:center;">${year}年${month}月 無記錄</p>`;
+            list.innerHTML = `<p style="text-align:center;color:#999;">${year}年${month}月 無記錄</p>`;
             return;
         }
         
@@ -409,34 +454,55 @@ async function loadMonthlyAttendance() {
         
         let html = `
             <div class="lunch-summary" style="margin-bottom:15px;">
-                <div class="stat-row"><span>出勤</span><span>${totalDays}天</span></div>
-                <div class="stat-row"><span>遲到</span><span>${lateDays}次</span></div>
-                <div class="stat-row"><span>工時</span><span>${totalHours.toFixed(1)}h</span></div>
+                <div class="stat-row"><span>📅 出勤</span><span>${totalDays} 天</span></div>
+                <div class="stat-row"><span>⏰ 遲到</span><span style="color:${lateDays > 0 ? '#ef4444' : '#1f2937'}">${lateDays} 次</span></div>
+                <div class="stat-row"><span>⏱️ 總工時</span><span>${totalHours.toFixed(1)} h</span></div>
             </div>
         `;
         
         html += data.map(r => {
-            const badge = r.is_late ? '<span class="badge badge-warning">遲到</span>' : '<span class="badge badge-success">正常</span>';
+            const badge = r.is_late 
+                ? '<span class="badge badge-warning">遲到</span>' 
+                : '<span class="badge badge-success">正常</span>';
             const hours = r.total_work_hours ? `${parseFloat(r.total_work_hours).toFixed(1)}h` : '-';
+            
+            // [BUG FIX] 安全解析時間，避免 split 失敗
+            let checkInTime = '-';
+            let checkOutTime = '-';
+            try {
+                if (r.check_in_time) {
+                    const parts = r.check_in_time.split(' ');
+                    checkInTime = parts.length > 1 ? parts[1].substring(0,5) : r.check_in_time.substring(0,5);
+                }
+                if (r.check_out_time) {
+                    const parts = r.check_out_time.split(' ');
+                    checkOutTime = parts.length > 1 ? parts[1].substring(0,5) : r.check_out_time.substring(0,5);
+                }
+            } catch(e) {}
+            
             return `
                 <div class="attendance-item ${r.is_late ? 'late' : 'normal'}">
-                    <div class="date">${r.date} ${badge} <span style="font-size:12px;">${hours}</span></div>
-                    <div class="details">
-                        <span>上班: ${r.check_in_time ? r.check_in_time.split(' ')[1].substr(0,5) : '-'}</span>
-                        <span>下班: ${r.check_out_time ? r.check_out_time.split(' ')[1].substr(0,5) : '-'}</span>
+                    <div class="date">
+                        <span>${r.date}</span>
+                        <span>${badge} <span style="font-size:12px;color:#6b7280;">${hours}</span></span>
                     </div>
-                    ${r.photo_url ? `<div style="margin-top:5px;"><a href="${r.photo_url}" target="_blank" style="font-size:12px;">📷 照片</a></div>` : ''}
+                    <div class="details">
+                        <span>上班: ${checkInTime}</span>
+                        <span>下班: ${checkOutTime}</span>
+                    </div>
+                    ${r.photo_url ? `<div style="margin-top:5px;"><a href="${r.photo_url}" target="_blank" style="font-size:12px;color:#667eea;">📷 查看照片</a></div>` : ''}
                 </div>
             `;
         }).join('');
         list.innerHTML = html;
     } catch (err) { 
         console.error(err); 
-        list.innerHTML = '查詢失敗'; 
+        list.innerHTML = `<p style="text-align:center;color:#ef4444;">查詢失敗：${friendlyError(err)}</p>`; 
     }
 }
 
-// 年終統計
+// ===== 年終統計 =====
+// [BUG FIX] 移除 event listener 洩漏問題，用 onchange 替代 addEventListener
 async function loadAnnualSummary() {
     const yearEl = document.getElementById('salaryYear');
     const statusCard = document.getElementById('yearEndStatusCard');
@@ -446,7 +512,6 @@ async function loadAnnualSummary() {
 
     const year = parseInt(yearEl.value);
     
-    // 顯示載入狀態
     statusCard.style.display = 'block';
     statusCard.className = 'status-card';
     document.getElementById('statusResult').textContent = '計算中...';
@@ -462,42 +527,38 @@ async function loadAnnualSummary() {
         if (error) throw error;
         if (data.error) throw new Error(data.error);
         
-        // 更新狀態卡片 - 隱藏符合/不符合文字
         statusCard.className = 'status-card';
         document.getElementById('statusResult').textContent = '📊 年度考勤統計';
         document.getElementById('statusReason').textContent = '';
         
-        // 更新統計資料
-        const bonusHireDateEl = document.getElementById('bonusHireDate');
-        const bonusMonthsEl = document.getElementById('bonusMonths');
-        const bonusDaysEl = document.getElementById('bonusDays');
-        const attendanceRateEl = document.getElementById('attendanceRate');
-        const bonusLateEl = document.getElementById('bonusLate');
-        const lateRateEl = document.getElementById('lateRate');
-        const bonusHoursEl = document.getElementById('bonusHours');
-        const bonusAvgHoursEl = document.getElementById('bonusAvgHours');
+        const el = (id) => document.getElementById(id);
+        const bonusHireDateEl = el('bonusHireDate');
+        const bonusMonthsEl = el('bonusMonths');
         
         if (bonusHireDateEl) {
             bonusHireDateEl.value = data.hire_date || '2026-01-01';
-            // 當日期改變時重新計算年資
-            bonusHireDateEl.addEventListener('change', () => {
+            // [BUG FIX] 使用 onchange 避免重複綁定 event listener
+            bonusHireDateEl.onchange = () => {
                 calculateAndUpdateMonthsWorked(bonusHireDateEl.value, bonusMonthsEl);
-            });
+            };
         }
         
         if (bonusMonthsEl) bonusMonthsEl.textContent = `${data.months_worked} 個月`;
-        if (bonusDaysEl) bonusDaysEl.textContent = `${data.total_attendance_days} 天`;
-        if (attendanceRateEl) attendanceRateEl.textContent = `${data.attendance_rate}%`;
-        if (bonusLateEl) {
-            bonusLateEl.textContent = `${data.late_count} 次`;
-            bonusLateEl.style.color = data.late_count > 5 ? '#ef4444' : '#1f2937';
+        if (el('bonusDays')) el('bonusDays').textContent = `${data.total_attendance_days} 天`;
+        if (el('attendanceRate')) {
+            el('attendanceRate').textContent = `${data.attendance_rate}%`;
+            el('attendanceRate').style.color = data.attendance_rate < 85 ? '#ef4444' : '#1f2937';
         }
-        if (lateRateEl) {
-            lateRateEl.textContent = `${data.late_rate}%`;
-            lateRateEl.style.color = data.late_rate > 5 ? '#ef4444' : '#1f2937';
+        if (el('bonusLate')) {
+            el('bonusLate').textContent = `${data.late_count} 次`;
+            el('bonusLate').style.color = data.late_count > 5 ? '#ef4444' : '#1f2937';
         }
-        if (bonusHoursEl) bonusHoursEl.textContent = `${data.total_work_hours} 小時`;
-        if (bonusAvgHoursEl) bonusAvgHoursEl.textContent = `${data.avg_daily_hours} 小時`;
+        if (el('lateRate')) {
+            el('lateRate').textContent = `${data.late_rate}%`;
+            el('lateRate').style.color = data.late_rate > 5 ? '#ef4444' : '#1f2937';
+        }
+        if (el('bonusHours')) el('bonusHours').textContent = `${data.total_work_hours} 小時`;
+        if (el('bonusAvgHours')) el('bonusAvgHours').textContent = `${data.avg_daily_hours} 小時`;
         
         statsGrid.style.display = 'grid';
         
@@ -505,17 +566,18 @@ async function loadAnnualSummary() {
         console.error(err); 
         statusCard.className = 'status-card error';
         document.getElementById('statusResult').textContent = '❌ 載入失敗';
-        document.getElementById('statusReason').textContent = err.message;
+        document.getElementById('statusReason').textContent = friendlyError(err);
     }
 }
 
-// 設定頁面功能
+// ===== 地點管理功能 =====
 function renderLocationList() {
-    const listEl = document.getElementById('locationList');
+    // [BUG FIX] 同時支援 settings 和 admin 頁面的地點列表容器
+    const listEl = document.getElementById('locationList') || document.getElementById('adminLocationList');
     if (!listEl) return;
     
     if (officeLocations.length === 0) {
-        listEl.innerHTML = '<p style="color:#666;text-align:center;">尚未設定地點</p>';
+        listEl.innerHTML = '<p style="color:#999;text-align:center;">尚未設定地點</p>';
         return;
     }
     listEl.innerHTML = officeLocations.map((loc, index) => `
@@ -524,7 +586,7 @@ function renderLocationList() {
                 <div style="font-weight:bold;">${loc.name}</div>
                 <div style="font-size:11px;color:#999;">範圍: ${loc.radius}m</div>
             </div>
-            <button onclick="deleteLocation(${index})" class="btn-danger">刪除</button>
+            <button onclick="deleteLocation(${index})" class="btn-danger" style="font-size:12px;padding:6px 12px;">刪除</button>
         </div>
     `).join('');
 }
@@ -533,22 +595,24 @@ function getCurrentGPSForSetting() {
     showToast('📍 定位中...');
     navigator.geolocation.getCurrentPosition(
         (pos) => {
-            const newLocLatEl = document.getElementById('newLocLat');
-            const newLocLngEl = document.getElementById('newLocLng');
-            if (newLocLatEl) newLocLatEl.value = pos.coords.latitude;
-            if (newLocLngEl) newLocLngEl.value = pos.coords.longitude;
+            // [BUG FIX] 同時支援 settings 和 admin 頁面的座標輸入框
+            const latEl = document.getElementById('newLocLat') || document.getElementById('adminNewLocLat');
+            const lngEl = document.getElementById('newLocLng') || document.getElementById('adminNewLocLng');
+            if (latEl) latEl.value = pos.coords.latitude;
+            if (lngEl) lngEl.value = pos.coords.longitude;
             showToast('✅ 已填入座標');
         },
-        (err) => showToast('定位失敗: ' + err.message),
+        (err) => showToast('❌ 定位失敗: ' + err.message),
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
 }
 
 async function addNewLocation() {
-    const nameEl = document.getElementById('newLocName');
-    const radiusEl = document.getElementById('newLocRadius');
-    const latEl = document.getElementById('newLocLat');
-    const lngEl = document.getElementById('newLocLng');
+    // [BUG FIX] 同時支援 settings 和 admin 頁面的元素 ID
+    const nameEl = document.getElementById('newLocName') || document.getElementById('adminNewLocName');
+    const radiusEl = document.getElementById('newLocRadius') || document.getElementById('adminNewLocRadius');
+    const latEl = document.getElementById('newLocLat') || document.getElementById('adminNewLocLat');
+    const lngEl = document.getElementById('newLocLng') || document.getElementById('adminNewLocLng');
     
     const name = nameEl?.value.trim();
     const radius = parseInt(radiusEl?.value);
@@ -556,6 +620,7 @@ async function addNewLocation() {
     const lng = parseFloat(lngEl?.value);
 
     if (!name || !lat || !lng) return showToast('⚠️ 資料不完整');
+    if (!radius || radius < 50) return showToast('⚠️ 打卡半徑至少 50 公尺');
 
     const newLocations = [...officeLocations, { name, lat, lng, radius }];
     await saveLocationsToDB(newLocations);
@@ -587,53 +652,30 @@ async function saveLocationsToDB(newLocations) {
         preloadGPS(); 
     } catch (err) {
         console.error(err);
-        showToast('❌ 儲存失敗');
+        showToast('❌ 儲存失敗：' + friendlyError(err));
     }
 }
 
-// 工具函數
-function showStatus(el, type, msg) { 
-    if (!el) return;
-    el.className=`status-box show ${type}`; 
-    el.innerHTML=msg; 
-}
-
-function showToast(msg) { 
-    const t=document.createElement('div'); 
-    t.className='toast'; 
-    t.textContent=msg; 
-    document.body.appendChild(t); 
-    setTimeout(()=>t.remove(), 3000); 
-}
-
-// 前端計算年資（從到職日到今天）
+// ===== 前端計算年資 =====
 function calculateAndUpdateMonthsWorked(hireDate, targetElement) {
     if (!hireDate || !targetElement) return;
     
     const hire = new Date(hireDate);
     const today = new Date();
     
-    // 如果到職日期在未來，年資為 0
     if (hire > today) {
         targetElement.textContent = '0 個月';
         return;
     }
     
-    // 計算完整月份數
     let months = (today.getFullYear() - hire.getFullYear()) * 12 + (today.getMonth() - hire.getMonth());
-    
-    // 如果今天的日期小於到職日期的日期，減去一個月
-    if (today.getDate() < hire.getDate()) {
-        months--;
-    }
-    
-    // 確保不為負數
+    if (today.getDate() < hire.getDate()) months--;
     months = Math.max(0, months);
     
     targetElement.textContent = `${months} 個月`;
 }
 
-// 檢查是否為管理員
+// ===== 管理員功能 =====
 async function checkIsAdmin() {
     if (!liffProfile) return false;
     
@@ -652,7 +694,6 @@ async function checkIsAdmin() {
     }
 }
 
-// 取得管理員資訊
 async function getAdminInfo() {
     if (!liffProfile) return null;
     
@@ -672,7 +713,6 @@ async function getAdminInfo() {
     }
 }
 
-// 管理員專用：更新員工角色
 async function updateEmployeeRole(employeeId, newRole) {
     try {
         const { error } = await sb.from('employees')
@@ -687,7 +727,6 @@ async function updateEmployeeRole(employeeId, newRole) {
     }
 }
 
-// 管理員專用：手動調整獎金
 async function adjustEmployeeBonus(employeeId, year, bonusAmount, reason) {
     try {
         const { error } = await sb.from('annual_bonus')
@@ -709,7 +748,6 @@ async function adjustEmployeeBonus(employeeId, year, bonusAmount, reason) {
     }
 }
 
-// 管理員專用：審核請假
 async function approveLeaveRequest(requestId, status, approverId, rejectionReason = null) {
     try {
         const updateData = {
@@ -734,21 +772,12 @@ async function approveLeaveRequest(requestId, status, approverId, rejectionReaso
     }
 }
 
-// 頁面載入時初始化
-window.addEventListener('load', async () => {
-    // 添加 debug console
-    if(location.search.includes('debug=true')) {
-        const script = document.createElement('script');
-        script.src = 'https://unpkg.com/vconsole@latest/dist/vconsole.min.js';
-        script.onload = () => new window.VConsole();
-        document.head.appendChild(script);
-    }
-    
-    const initialized = await initializeLiff();
-    if (initialized) {
-        const isLoggedIn = await checkUserStatus();
-        if (isLoggedIn) {
-            preloadGPS();
-        }
-    }
-});
+// ===== Debug 模式 =====
+// [BUG FIX] 移除 window.addEventListener('load') — 各頁面自行處理初始化
+// 之前這裡有一個重複的 load 事件監聽器會導致雙重初始化
+if (location.search.includes('debug=true')) {
+    const script = document.createElement('script');
+    script.src = 'https://unpkg.com/vconsole@latest/dist/vconsole.min.js';
+    script.onload = () => new window.VConsole();
+    document.head.appendChild(script);
+}

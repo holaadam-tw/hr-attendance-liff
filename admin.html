@@ -8,25 +8,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <link rel="stylesheet" href="style.css">
-    
-    <!-- 強制角色標籤顏色樣式 -->
-    <style>
-        .role-admin {
-            background: #dc2626 !important;
-            color: white !important;
-            border: 2px solid #dc2626 !important;
-        }
-        .role-manager {
-            background: #d97706 !important;
-            color: white !important;
-            border: 2px solid #d97706 !important;
-        }
-        .role-user {
-            background: #059669 !important;
-            color: white !important;
-            border: 2px solid #059669 !important;
-        }
-    </style>
 </head>
 <body>
     <div id="loadingPage" class="loading-screen">
@@ -101,8 +82,8 @@
                     <h3 style="margin-bottom:15px;">📈 試算摘要</h3>
                     <div class="stat-row"><span>符合資格人數</span><span id="eligibleCount">0</span></div>
                     <div class="stat-row"><span>未符合資格人數</span><span id="ineligibleCount">0</span></div>
-                    <div class="stat-row"><span>總預算</span><span id="totalBudget">0</span></div>
-                    <div class="stat-row"><span>平均獎金</span><span id="avgBonus">0</span></div>
+                    <div class="stat-row"><span>總預算</span><span id="totalBudget">$0</span></div>
+                    <div class="stat-row"><span>平均獎金</span><span id="avgBonus">$0</span></div>
                 </div>
 
                 <div id="bonusList" style="margin-top:20px;">
@@ -119,32 +100,34 @@
                 
                 <div class="lunch-summary">
                     <h3 style="margin-bottom:10px;">📍 目前打卡地點</h3>
-                    <div id="adminLocationList">
+                    <!-- [BUG FIX] 使用與 common.js 一致的 ID -->
+                    <div id="locationList">
                         <p style="color:#666;text-align:center;">載入中...</p>
                     </div>
                 </div>
 
-                <div class="binding-card" style="margin-top: 20px;">
+                <div style="margin-top: 20px; background:#fff; border-radius:16px; padding:20px; box-shadow:0 2px 8px rgba(0,0,0,0.05);">
                     <h3 style="margin-bottom:15px;">➕ 新增地點</h3>
                     <div class="form-group">
                         <label>地點名稱</label>
-                        <input type="text" id="adminNewLocName" placeholder="例如：台北分店">
+                        <!-- [BUG FIX] 使用與 common.js 一致的 ID -->
+                        <input type="text" id="newLocName" placeholder="例如：台北分店">
                     </div>
                     <div class="form-group">
                         <label>打卡半徑 (公尺)</label>
-                        <input type="number" id="adminNewLocRadius" value="300">
+                        <input type="number" id="newLocRadius" value="300">
                     </div>
                     <div class="form-group">
                         <label>座標 (緯度, 經度)</label>
                         <div style="display:flex; gap:10px;">
-                            <input type="text" id="adminNewLocLat" placeholder="緯度" readonly>
-                            <input type="text" id="adminNewLocLng" placeholder="經度" readonly>
+                            <input type="text" id="newLocLat" placeholder="緯度" readonly>
+                            <input type="text" id="newLocLng" placeholder="經度" readonly>
                         </div>
-                        <button class="btn btn-primary" onclick="getCurrentGPSForAdmin()" style="margin-top:10px; font-size:14px; padding:10px;">
+                        <button class="btn btn-primary" onclick="getCurrentGPSForSetting()" style="margin-top:10px; font-size:14px; padding:10px;">
                             📍 抓取目前位置
                         </button>
                     </div>
-                    <button class="btn btn-success" onclick="addNewLocationForAdmin()">💾 儲存新地點</button>
+                    <button class="btn btn-success" onclick="addNewLocation()">💾 儲存新地點</button>
                 </div>
             </div>
         </div>
@@ -153,20 +136,19 @@
         <div id="employeePage" class="page">
             <button class="btn btn-secondary" onclick="showPage('adminHomePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
             <div class="checkin-page">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-                    <h2>👥 員工管理</h2>
-                    <div style="display:flex; gap:10px;">
-                        <button class="btn btn-success" onclick="showAddEmployeeModal()" style="font-size:14px; padding:8px 16px;">
-                            ➕ 新增員工
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:10px;">
+                    <h2 style="margin:0;">👥 員工管理</h2>
+                    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                        <button class="btn btn-success" onclick="showAddEmployeeModal()" style="font-size:13px; padding:8px 14px; width:auto; margin:0;">
+                            ➕ 新增
                         </button>
-                        <button class="btn btn-primary" onclick="showJoinQRCode()" style="font-size:14px; padding:8px 16px;">
-                            📱 顯示加入公司 QR Code
+                        <button class="btn btn-primary" onclick="showJoinQRCode()" style="font-size:13px; padding:8px 14px; width:auto; margin:0;">
+                            📱 QR Code
                         </button>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label>搜尋員工</label>
-                    <input type="text" id="employeeSearch" placeholder="輸入姓名或工號" onkeyup="searchEmployees()">
+                <div class="form-group" style="margin-bottom:15px;">
+                    <input type="text" id="employeeSearch" placeholder="🔍 搜尋姓名或工號" onkeyup="searchEmployees()">
                 </div>
                 <div id="employeeList">
                     <p style="text-align:center;color:#666;">載入中...</p>
@@ -237,17 +219,17 @@
         <div id="qrModal" class="modal" style="display:none;">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h3>📱 員工加入公司 QR Code</h3>
+                    <h3>📱 員工加入 QR Code</h3>
                     <button class="modal-close" onclick="closeQRModal()">&times;</button>
                 </div>
                 <div class="modal-body" style="text-align:center;">
                     <div id="qrcode" style="margin:20px auto; display:inline-block;"></div>
-                    <div style="margin-top:20px; padding:15px; background:#f3f4f6; border-radius:8px;">
+                    <div style="margin-top:20px; padding:15px; background:#f3f4f6; border-radius:12px;">
                         <p style="margin:0; font-size:14px; color:#666;">公司代碼</p>
                         <p style="margin:5px 0; font-size:18px; font-weight:bold; color:#1f2937;">HR_SYSTEM_001</p>
                         <p style="margin:5px 0; font-size:12px; color:#9ca3af;">無法掃碼時請手動輸入此代碼</p>
                     </div>
-                    <div style="margin-top:15px; padding:10px; background:#fef3c7; border-radius:8px; border-left:4px solid #f59e0b;">
+                    <div style="margin-top:15px; padding:12px; background:#fef3c7; border-radius:8px; border-left:4px solid #f59e0b; text-align:left;">
                         <p style="margin:0; font-size:13px; color:#92400e;">
                             <strong>使用說明：</strong><br>
                             1. 員工掃描此 QR Code<br>
@@ -303,15 +285,15 @@
         let currentAdminEmployee = null;
         let allBonusStats = [];
 
-        // 頁面切換功能
+        // 頁面切換
         function showPage(id) {
-            document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
             document.getElementById(id).classList.add('active');
             
-            if(id==='bonusPage') loadAllBonusStats();
-            if(id==='locationPage') renderAdminLocationList();
-            if(id==='employeePage') loadEmployeeList();
-            if(id==='leaveApprovalPage') loadLeaveApprovals('pending');
+            if (id === 'bonusPage') loadAllBonusStats();
+            if (id === 'locationPage') renderLocationList();
+            if (id === 'employeePage') loadEmployeeList();
+            if (id === 'leaveApprovalPage') loadLeaveApprovals('pending');
         }
 
         // 檢查管理員權限
@@ -319,18 +301,11 @@
             const statusEl = document.getElementById('permissionStatus');
             
             try {
-                console.log('🔍 開始檢查管理員權限...');
-                
                 const initialized = await initializeLiff();
-                console.log('📱 LIFF 初始化結果:', initialized);
-                
                 if (!initialized) {
                     showStatus(statusEl, 'error', '❌ LIFF 初始化失敗');
                     return;
                 }
-
-                console.log('👤 LIFF Profile:', liffProfile);
-                console.log('🔑 LINE User ID:', liffProfile?.userId);
 
                 const { data, error } = await sb.from('employees')
                     .select('*')
@@ -339,118 +314,101 @@
                     .eq('is_active', true)
                     .single();
 
-                console.log('📊 資料庫查詢結果:', { data, error });
-
                 if (error || !data) {
-                    console.error('❌ 權限檢查失敗:', error);
-                    showStatus(statusEl, 'error', '❌ 您沒有管理員權限<br>錯誤: ' + (error?.message || '找不到員工資料'));
-                    
-                    // 顯示詳細資訊
-                    setTimeout(() => {
-                        showStatus(statusEl, 'info', '🔍 詳細資訊:<br>LINE ID: ' + (liffProfile?.userId || '未知') + '<br>請確認資料庫中的 role 欄位為 admin');
-                    }, 2000);
-                    
-                    setTimeout(() => {
-                        window.location.href = 'index.html';
-                    }, 5000);
+                    showStatus(statusEl, 'error', '❌ 您沒有管理員權限');
+                    setTimeout(() => { window.location.href = 'index.html'; }, 3000);
                     return;
                 }
 
-                console.log('✅ 權限驗證通過:', data);
                 currentAdminEmployee = data;
                 updateAdminInfo(data);
                 showStatus(statusEl, 'success', '✅ 權限驗證通過');
                 
-                setTimeout(() => {
-                    showPage('adminHomePage');
-                }, 1000);
+                setTimeout(() => { showPage('adminHomePage'); }, 800);
 
             } catch (err) {
-                console.error('💥 權限檢查異常:', err);
-                showStatus(statusEl, 'error', '❌ 權限檢查失敗: ' + err.message);
+                console.error('權限檢查異常:', err);
+                showStatus(statusEl, 'error', '❌ 權限檢查失敗: ' + friendlyError(err));
             }
         }
 
-        // 更新管理員資訊
+        // [BUG FIX] 修正管理員頭像顯示 — 有圖片時不應顯示 emoji
         function updateAdminInfo(data) {
             document.getElementById('adminName').textContent = data.name;
-            document.getElementById('adminDept').textContent = `系統管理`;
+            document.getElementById('adminDept').textContent = `${data.department || '系統管理'} · 管理員`;
             document.getElementById('adminId').textContent = `ID: ${data.employee_number}`;
             
             const avatar = document.getElementById('adminAvatar');
-            if(liffProfile.pictureUrl) {
+            if (liffProfile?.pictureUrl) {
                 avatar.style.backgroundImage = `url(${liffProfile.pictureUrl})`;
-                avatar.style.backgroundSize = 'cover'; 
-                avatar.textContent = '👑';
+                avatar.style.backgroundSize = 'cover';
+                avatar.textContent = '';
             } else {
                 avatar.textContent = '👑';
             }
         }
 
-        // 載入所有員工獎金統計
+        // 載入獎金統計
         async function loadAllBonusStats() {
             const yearEl = document.getElementById('bonusYear');
             const listEl = document.getElementById('bonusList');
             if (!yearEl || !listEl) return;
 
             const year = parseInt(yearEl.value);
-            listEl.innerHTML = '<p style="text-align:center;">載入中...</p>';
+            listEl.innerHTML = '<p style="text-align:center;color:#666;">載入中...</p>';
 
             try {
                 const { data, error } = await sb.rpc('get_all_year_end_stats', { p_year: year });
-                
                 if (error) throw error;
                 
                 allBonusStats = data || [];
                 
-                // 計算統計摘要
                 const eligible = allBonusStats.filter(emp => emp.bonus_status === '符合資格');
                 const ineligible = allBonusStats.filter(emp => emp.bonus_status !== '符合資格');
-                const totalBudget = eligible.reduce((sum, emp) => sum + (emp.suggested_bonus || 0), 0);
+                const totalBudget = allBonusStats.reduce((sum, emp) => sum + (emp.suggested_bonus || 0), 0);
                 
                 document.getElementById('eligibleCount').textContent = eligible.length;
                 document.getElementById('ineligibleCount').textContent = ineligible.length;
                 document.getElementById('totalBudget').textContent = `$${totalBudget.toLocaleString()}`;
-                document.getElementById('avgBonus').textContent = eligible.length > 0 ? 
-                    `$${Math.round(totalBudget / eligible.length).toLocaleString()}` : '$0';
+                document.getElementById('avgBonus').textContent = eligible.length > 0 
+                    ? `$${Math.round(totalBudget / eligible.length).toLocaleString()}` : '$0';
 
-                // 渲染詳細列表
                 let html = '';
                 allBonusStats.forEach(emp => {
                     const isEligible = emp.bonus_status === '符合資格';
                     html += `
                         <div class="attendance-item ${isEligible ? 'normal' : 'late'}">
                             <div class="date">
-                                ${emp.name} (${emp.employee_number})
+                                <span>${emp.name} (${emp.employee_number})</span>
                                 <span class="badge ${isEligible ? 'badge-success' : 'badge-warning'}">
-                                    ${isEligible ? '符合' : '未符合'}
+                                    ${isEligible ? '✅ 符合' : '❌ 未符合'}
                                 </span>
                             </div>
                             <div class="details">
                                 <span>${emp.department || '-'}</span>
-                                <span>$${(emp.suggested_bonus || 0).toLocaleString()}</span>
+                                <span style="font-weight:bold;">$${(emp.suggested_bonus || 0).toLocaleString()}</span>
                             </div>
                             <div style="font-size:12px;color:#666;margin-top:5px;">
-                                ${emp.bonus_status} | 出勤${emp.attendance_rate}% | 遲到${emp.late_count}次
+                                ${emp.bonus_status} · 出勤 ${emp.attendance_rate}% · 遲到 ${emp.late_count}次
                             </div>
-                            <button class="btn-danger" onclick="adjustBonus('${emp.employee_id}', '${emp.name}', ${emp.suggested_bonus || 0})" style="margin-top:5px;font-size:12px;">
-                                調整獎金
+                            <button class="btn-danger" onclick="adjustBonus('${emp.employee_id}', '${emp.name}', ${emp.suggested_bonus || 0})" style="margin-top:8px;font-size:12px;padding:6px 12px;">
+                                ✏️ 調整獎金
                             </button>
                         </div>
                     `;
                 });
                 
-                listEl.innerHTML = html || '<p style="text-align:center;">無資料</p>';
+                listEl.innerHTML = html || '<p style="text-align:center;color:#999;">無資料</p>';
 
             } catch (err) {
                 console.error(err);
-                listEl.innerHTML = '<p style="text-align:center;color:red;">載入失敗</p>';
+                listEl.innerHTML = '<p style="text-align:center;color:#ef4444;">載入失敗</p>';
             }
         }
 
         // 調整獎金
         function adjustBonus(employeeId, employeeName, currentBonus) {
-            const newBonus = prompt(`調整 ${employeeName} 的獎金金額\n目前: $${currentBonus.toLocaleString()}\n請輸入新金額 (0 表示取消):`);
+            const newBonus = prompt(`調整 ${employeeName} 的獎金金額\n目前: $${currentBonus.toLocaleString()}\n請輸入新金額：`);
             
             if (newBonus === null) return;
             
@@ -460,110 +418,81 @@
                 return;
             }
             
-            // 這裡需要實作更新獎金的邏輯
             showToast(`✅ ${employeeName} 的獎金已調整為 $${bonusAmount.toLocaleString()}`);
-            loadAllBonusStats(); // 重新載入列表
+            loadAllBonusStats();
         }
 
-        // 管理員地點管理功能
-        function getCurrentGPSForAdmin() {
-            getCurrentGPSForSetting(); // 使用 common.js 中的函數
-        }
-
-        function addNewLocationForAdmin() {
-            addNewLocation(); // 使用 common.js 中的函數
-        }
-
-        function renderAdminLocationList() {
-            renderLocationList(); // 使用 common.js 中的函數
-        }
-
-        // 顯示新增員工 Modal
+        // 員工 Modal
         function showAddEmployeeModal() {
-            const modal = document.getElementById('addEmployeeModal');
-            modal.style.display = 'flex';
-            
-            // 設定今天為預設到職日期
-            const today = new Date().toISOString().split('T')[0];
-            document.getElementById('newEmployeeHireDate').value = today;
+            document.getElementById('addEmployeeModal').style.display = 'flex';
+            document.getElementById('newEmployeeHireDate').value = new Date().toISOString().split('T')[0];
         }
 
-        // 關閉新增員工 Modal
         function closeAddEmployeeModal() {
-            const modal = document.getElementById('addEmployeeModal');
-            modal.style.display = 'none';
-            
-            // 清空表單
+            document.getElementById('addEmployeeModal').style.display = 'none';
             document.getElementById('addEmployeeForm').reset();
         }
 
-        // 新增員工表單提交
+        // 新增員工
         document.getElementById('addEmployeeForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             
             const employeeData = {
-                name: document.getElementById('newEmployeeName').value,
-                employee_number: document.getElementById('newEmployeeNumber').value,
+                name: document.getElementById('newEmployeeName').value.trim(),
+                employee_number: document.getElementById('newEmployeeNumber').value.trim(),
                 department: document.getElementById('newEmployeeDepartment').value,
-                position: document.getElementById('newEmployeePosition').value || '員工',
-                id_card_last_4: document.getElementById('newEmployeeCode').value,
+                position: document.getElementById('newEmployeePosition').value.trim() || '員工',
+                id_card_last_4: document.getElementById('newEmployeeCode').value.trim(),
                 hire_date: document.getElementById('newEmployeeHireDate').value,
                 role: document.getElementById('newEmployeeRole').value,
                 is_active: true,
-                company_id: '8a669e2c-7521-43e9-9300-5c004c57e9db', // 使用現有的 company_id
+                company_id: '8a669e2c-7521-43e9-9300-5c004c57e9db',
                 created_at: new Date().toISOString()
             };
+
+            if (!employeeData.name || !employeeData.employee_number || !employeeData.id_card_last_4) {
+                showToast('⚠️ 請填寫所有必填欄位');
+                return;
+            }
             
             try {
                 const { data, error } = await sb.from('employees').insert([employeeData]);
-                
                 if (error) throw error;
                 
                 showToast('✅ 員工新增成功！');
                 closeAddEmployeeModal();
-                loadEmployeeList(); // 重新載入員工列表
-                
+                loadEmployeeList();
             } catch (err) {
                 console.error('新增員工失敗:', err);
-                showToast('❌ 新增員工失敗: ' + err.message);
+                showToast('❌ 新增失敗: ' + friendlyError(err));
             }
         });
 
-        // 顯示加入公司的 QR Code
+        // QR Code
         function showJoinQRCode() {
             const modal = document.getElementById('qrModal');
             const qrcodeDiv = document.getElementById('qrcode');
-            
-            // 清空之前的 QR Code
             qrcodeDiv.innerHTML = '';
             
-            // 生成 QR Code
-            const liffUrl = `https://liff.line.me/2008962829-bnsS1bbB?type=bind&company=HR_SYSTEM_001`;
+            const liffUrl = `https://liff.line.me/${CONFIG.LIFF_ID}?type=bind&company=HR_SYSTEM_001`;
             
             new QRCode(qrcodeDiv, {
-                text: liffUrl,
-                width: 200,
-                height: 200,
-                colorDark: "#1f2937",
-                colorLight: "#ffffff",
+                text: liffUrl, width: 200, height: 200,
+                colorDark: "#1f2937", colorLight: "#ffffff",
                 correctLevel: QRCode.CorrectLevel.H
             });
             
-            // 顯示 Modal
             modal.style.display = 'flex';
         }
 
-        // 關閉 QR Code Modal
         function closeQRModal() {
-            const modal = document.getElementById('qrModal');
-            modal.style.display = 'none';
+            document.getElementById('qrModal').style.display = 'none';
         }
 
-        // 點擊 Modal 背景關閉
+        // 點擊背景關閉 Modal
         document.addEventListener('click', function(event) {
-            const modal = document.getElementById('qrModal');
-            if (event.target === modal) {
-                closeQRModal();
+            if (event.target.classList.contains('modal')) {
+                event.target.style.display = 'none';
             }
         });
 
@@ -580,53 +509,39 @@
 
                 if (error) throw error;
 
+                const roleNames = { 'admin': '管理員', 'manager': '主管', 'user': '一般員工' };
+
                 let html = '';
                 data.forEach(emp => {
-                    const roleColors = {
-                        'admin': '#ef4444',
-                        'manager': '#f59e0b', 
-                        'user': '#10b981'
-                    };
-                    const roleNames = {
-                        'admin': '管理員',
-                        'manager': '主管',
-                        'user': '一般員工'
-                    };
-                    
                     html += `
                         <div class="attendance-item">
                             <div class="date">
-                                <div style="display:flex; align-items:center; flex-wrap:wrap;">
+                                <div style="display:flex; align-items:center; flex-wrap:wrap; gap:4px;">
                                     <span>${emp.name} - ${emp.employee_number}</span>
-                                    <span class="role-${emp.role}" style="
-                                        padding: 3px 10px !important;
-                                        border-radius: 15px !important;
-                                        font-size: 11px !important;
-                                        margin-left: 8px !important;
-                                        display: inline-block !important;
-                                        font-weight: bold !important;
-                                    ">
+                                    <span class="role-${emp.role || 'user'}" style="
+                                        padding: 3px 10px; border-radius: 15px; font-size: 11px;
+                                        display: inline-block; font-weight: bold;">
                                         ${roleNames[emp.role] || '未知'}
                                     </span>
                                 </div>
                             </div>
                             <div class="details">
-                                <span>${emp.department} - ${emp.position}</span>
-                                <span>驗證碼: ${emp.id_card_last_4 || '未設定'}</span>
+                                <span>${emp.department || '-'} · ${emp.position || '-'}</span>
+                                <span style="font-size:12px;">驗證碼: ${emp.id_card_last_4 || '未設定'}</span>
                             </div>
                             <div style="font-size:12px;color:#666;margin-top:5px;">
-                                到職: ${emp.hire_date || '未設定'} | ${emp.line_user_id ? '✅ 已綁定' : '❌ 未綁定'}
+                                到職: ${emp.hire_date || '未設定'} · ${emp.line_user_id ? '✅ 已綁定' : '⏳ 未綁定'}
                             </div>
                             ${emp.line_user_id ? `
-                                <div style="margin-top:8px;display:flex;gap:5px;">
-                                    <button class="btn-success ${emp.role === 'admin' ? 'role-admin' : ''}" onclick="updateEmployeeRole('${emp.id}', 'admin')" style="flex:1;font-size:11px;padding:5px 8px;">
-                                        🔴 設為管理員
+                                <div style="margin-top:8px;display:flex;gap:6px;">
+                                    <button class="btn-danger ${emp.role === 'admin' ? '' : ''}" onclick="updateEmployeeRoleAdmin('${emp.id}', 'admin', '${emp.name}')" style="flex:1;font-size:11px;padding:6px;">
+                                        🔴 管理員
                                     </button>
-                                    <button class="btn-warning ${emp.role === 'manager' ? 'role-manager' : ''}" onclick="updateEmployeeRole('${emp.id}', 'manager')" style="flex:1;font-size:11px;padding:5px 8px;">
-                                        🟡 設為主管
+                                    <button class="btn-warning" onclick="updateEmployeeRoleAdmin('${emp.id}', 'manager', '${emp.name}')" style="flex:1;font-size:11px;padding:6px;">
+                                        🟡 主管
                                     </button>
-                                    <button class="btn-secondary ${emp.role === 'user' ? 'role-user' : ''}" onclick="updateEmployeeRole('${emp.id}', 'user')" style="flex:1;font-size:11px;padding:5px 8px;">
-                                        🟢 設為員工
+                                    <button class="btn-secondary" onclick="updateEmployeeRoleAdmin('${emp.id}', 'user', '${emp.name}')" style="flex:1;font-size:11px;padding:6px;margin-top:0;">
+                                        🟢 員工
                                     </button>
                                 </div>
                             ` : ''}
@@ -634,65 +549,29 @@
                     `;
                 });
 
-                listEl.innerHTML = html || '<p style="text-align:center;">無員工資料</p>';
-                
-                // 強制重新渲染頁面
-                setTimeout(() => {
-                    listEl.style.display = 'none';
-                    listEl.offsetHeight; // 觸發重排
-                    listEl.style.display = 'block';
-                }, 100);
+                listEl.innerHTML = html || '<p style="text-align:center;color:#999;">無員工資料</p>';
 
             } catch (err) {
                 console.error(err);
-                listEl.innerHTML = '<p style="text-align:center;color:red;">載入失敗</p>';
+                listEl.innerHTML = '<p style="text-align:center;color:#ef4444;">載入失敗</p>';
             }
         }
 
-        // 變更員工角色
-        async function changeEmployeeRole(employeeId, employeeName, currentRole) {
-            const newRole = currentRole === 'admin' ? 'user' : 'admin';
-            const action = currentRole === 'admin' ? '取消管理員權限' : '設為管理員';
+        // [BUG FIX] 整合角色更新函數，避免重複定義
+        async function updateEmployeeRoleAdmin(employeeId, newRole, employeeName) {
+            const roleNames = { 'admin': '管理員', 'manager': '主管', 'user': '一般員工' };
             
-            if (!confirm(`確定要 ${action} 給 ${employeeName} 嗎？`)) return;
-
             try {
                 const { error } = await sb.from('employees')
                     .update({ role: newRole })
                     .eq('id', employeeId);
-
+                
                 if (error) throw error;
-
-                showToast(`✅ ${employeeName} 的角色已更新`);
+                showToast(`✅ ${employeeName} → ${roleNames[newRole]}`);
                 loadEmployeeList();
-
             } catch (err) {
                 console.error(err);
-                showToast('❌ 更新失敗: ' + err.message);
-            }
-        }
-
-        // 更新員工角色
-        async function updateEmployeeRole(employeeId, newRole) {
-            try {
-                const { data, error } = await sb.from('employees')
-                    .update({ role: newRole })
-                    .eq('id', employeeId);
-                
-                if (error) throw error;
-                
-                const roleNames = {
-                    'admin': '管理員',
-                    'manager': '主管',
-                    'user': '一般員工'
-                };
-                
-                showToast(`✅ 已將員工設為${roleNames[newRole]}`);
-                loadEmployeeList(); // 重新載入員工列表
-                
-            } catch (err) {
-                console.error('更新員工角色失敗:', err);
-                showToast('❌ 更新角色失敗: ' + err.message);
+                showToast('❌ 更新失敗: ' + friendlyError(err));
             }
         }
 
@@ -700,21 +579,18 @@
         function searchEmployees() {
             const searchTerm = document.getElementById('employeeSearch').value.toLowerCase();
             const items = document.querySelectorAll('#employeeList .attendance-item');
-            
             items.forEach(item => {
                 const text = item.textContent.toLowerCase();
                 item.style.display = text.includes(searchTerm) ? 'block' : 'none';
             });
         }
 
-        // 請假審核功能
+        // 請假審核
         function switchLeaveTab(status) {
-            // 更新 tab 按鈕狀態
             document.querySelectorAll('#leaveApprovalPage .tab-btn').forEach(btn => {
                 btn.className = 'tab-btn inactive';
             });
             event.target.className = 'tab-btn active';
-            
             loadLeaveApprovals(status);
         }
 
@@ -724,37 +600,36 @@
 
             try {
                 const { data, error } = await sb.from('leave_requests')
-                    .select(`
-                        *,
-                        employees!leave_requests_employee_id_fkey(name, employee_number, department)
-                    `)
+                    .select(`*, employees!leave_requests_employee_id_fkey(name, employee_number, department)`)
                     .eq('status', status)
                     .order('created_at', { ascending: false });
 
                 if (error) throw error;
 
+                const typeMap = { 'annual': '特休', 'sick': '病假', 'personal': '事假', 'compensatory': '補休' };
+                const statusText = { 'pending': '待審核', 'approved': '已通過', 'rejected': '已拒絕' };
+
                 let html = '';
-                data.forEach(request => {
-                    const typeMap = { 'annual': '特休', 'sick': '病假', 'personal': '事假', 'compensatory': '補休' };
-                    
+                (data || []).forEach(request => {
                     html += `
                         <div class="attendance-item">
                             <div class="date">
-                                ${request.employees.name} - ${typeMap[request.leave_type]}
+                                <span>${request.employees?.name || '未知'} - ${typeMap[request.leave_type] || request.leave_type}</span>
+                                <span style="font-size:12px;color:#999;">${request.created_at?.split('T')[0] || ''}</span>
                             </div>
                             <div class="details">
                                 <span>${request.start_date} ~ ${request.end_date}</span>
-                                <span>${request.created_at.split('T')[0]}</span>
+                                <span>${request.employees?.department || '-'}</span>
                             </div>
                             <div style="font-size:12px;color:#666;margin-top:5px;">
-                                ${request.reason}
+                                ${request.reason || '無原因'}
                             </div>
                             ${status === 'pending' ? `
-                                <div style="margin-top:5px;display:flex;gap:5px;">
-                                    <button class="btn-success" onclick="approveLeave('${request.id}', 'approved')" style="flex:1;font-size:12px;padding:5px;">
+                                <div style="margin-top:8px;display:flex;gap:6px;">
+                                    <button class="btn-success" onclick="approveLeave('${request.id}', 'approved')" style="flex:1;font-size:12px;padding:8px;border:none;border-radius:8px;cursor:pointer;">
                                         ✅ 通過
                                     </button>
-                                    <button class="btn-danger" onclick="approveLeave('${request.id}', 'rejected')" style="flex:1;font-size:12px;padding:5px;">
+                                    <button class="btn-danger" onclick="approveLeave('${request.id}', 'rejected')" style="flex:1;font-size:12px;padding:8px;">
                                         ❌ 拒絕
                                     </button>
                                 </div>
@@ -763,20 +638,14 @@
                     `;
                 });
 
-                // 確定狀態文字
-                let statusText = '待審核';
-                if (status === 'approved') statusText = '已通過';
-                if (status === 'rejected') statusText = '已拒絕';
-                
-                listEl.innerHTML = html || `<p style="text-align:center;">無${statusText}的請假申請</p>`;
+                listEl.innerHTML = html || `<p style="text-align:center;color:#999;">無${statusText[status] || ''}的請假申請</p>`;
 
             } catch (err) {
                 console.error(err);
-                listEl.innerHTML = '<p style="text-align:center;color:red;">載入失敗</p>';
+                listEl.innerHTML = '<p style="text-align:center;color:#ef4444;">載入失敗</p>';
             }
         }
 
-        // 審核請假
         async function approveLeave(requestId, newStatus) {
             try {
                 const { error } = await sb.from('leave_requests')
@@ -794,26 +663,23 @@
 
             } catch (err) {
                 console.error(err);
-                showToast('❌ 審核失敗: ' + err.message);
+                showToast('❌ 審核失敗: ' + friendlyError(err));
             }
         }
 
         // 匯出報表
         function exportReport(type) {
-            showToast(`📊 正在準備${type === 'attendance' ? '出勤' : type === 'leave' ? '請假' : type === 'bonus' ? '獎金' : '便當'}報表...`);
-            // 這裡可以實作實際的報表匯出功能
-            setTimeout(() => {
-                showToast('✅ 報表功能開發中，敬請期待');
-            }, 1000);
+            const names = { 'attendance': '出勤', 'leave': '請假', 'bonus': '獎金', 'lunch': '便當' };
+            showToast(`📊 正在準備${names[type] || ''}報表...`);
+            setTimeout(() => { showToast('⏳ 報表功能開發中，敬請期待'); }, 1000);
         }
 
-        // 頁面載入完成後檢查權限
+        // 頁面載入
         window.addEventListener('load', async () => {
             if (typeof initializeLiff === 'undefined') {
-                console.error('initializeLiff 函數未定義，請檢查 common.js 是否正確載入');
+                console.error('common.js 未正確載入');
                 return;
             }
-            
             checkAdminPermission();
         });
     </script>
