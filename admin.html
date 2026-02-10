@@ -64,11 +64,8 @@
                 <div class="menu-item" onclick="showPage('reportPage')">
                     <div class="icon">📊</div><div class="label">報表匯出</div>
                 </div>
-                <div class="menu-item" onclick="showPage('leaveCalPage')">
-                    <div class="icon">🗓️</div><div class="label">休假管理</div>
-                </div>
-                <div class="menu-item" onclick="showPage('shiftMgrPage')">
-                    <div class="icon">📋</div><div class="label">排班管理</div>
+                <div class="menu-item" onclick="showPage('staffMgrPage')">
+                    <div class="icon">📋</div><div class="label">人力管理</div>
                 </div>
                 <div class="menu-item" onclick="showPage('featurePage')">
                     <div class="icon">🎛️</div><div class="label">功能管理</div>
@@ -340,89 +337,118 @@
             </div>
         </div>
 
-        <!-- ====== ④ 休假管理月表 ====== -->
-        <div id="leaveCalPage" class="page">
+        <!-- ====== 人力管理（排班 + 休假 + 設定） ====== -->
+        <div id="staffMgrPage" class="page">
             <button class="btn btn-secondary" onclick="showPage('adminHomePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
             <div class="checkin-page">
-                <h2>🗓️ 員工休假管理</h2>
-                <p style="color:#6b7280;font-size:13px;margin-bottom:12px;">一覽全員休假狀態，方便安排工作</p>
-                
-                <div style="display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:16px;">
-                    <button onclick="changeLeaveCal(-1)" style="background:none;border:none;font-size:20px;cursor:pointer;padding:6px 10px;border-radius:8px;">◀</button>
-                    <span id="lcMonthLabel" style="font-size:16px;font-weight:700;min-width:120px;text-align:center;">-</span>
-                    <button onclick="changeLeaveCal(1)" style="background:none;border:none;font-size:20px;cursor:pointer;padding:6px 10px;border-radius:8px;">▶</button>
+                <h2>📋 人力管理</h2>
+
+                <!-- 三頁籤 -->
+                <div style="display:flex;gap:4px;margin-bottom:16px;background:#F1F5F9;border-radius:10px;padding:3px;">
+                    <button class="smTab" onclick="switchStaffTab('shift')" style="flex:1;padding:10px;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;background:#fff;color:#4F46E5;box-shadow:0 1px 4px rgba(0,0,0,0.08);">📋 排班表</button>
+                    <button class="smTab" onclick="switchStaffTab('leave')" style="flex:1;padding:10px;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;background:transparent;color:#94A3B8;">🗓️ 休假月表</button>
+                    <button class="smTab" onclick="switchStaffTab('setting')" style="flex:1;padding:10px;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;background:transparent;color:#94A3B8;">⚙️ 人力設定</button>
                 </div>
 
-                <!-- 統計 -->
-                <div style="display:flex;gap:8px;margin-bottom:16px;">
-                    <div style="flex:1;text-align:center;padding:10px;background:#EFF6FF;border-radius:12px;">
-                        <div style="font-size:20px;font-weight:900;color:#2563EB;" id="lcTotal">0</div>
-                        <div style="font-size:10px;font-weight:600;color:#2563EB;">總請假人次</div>
+                <!-- === 排班表 TAB === -->
+                <div id="tabShift" class="staffTabContent">
+                    <p style="color:#6b7280;font-size:12px;margin-bottom:12px;">點擊格子切換班別，排好後按儲存</p>
+                    <div style="display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:12px;">
+                        <button onclick="changeShiftWeek(-1)" style="background:none;border:none;font-size:20px;cursor:pointer;padding:6px 10px;border-radius:8px;">◀</button>
+                        <span id="smWeekLabel" style="font-size:14px;font-weight:700;min-width:180px;text-align:center;">-</span>
+                        <button onclick="changeShiftWeek(1)" style="background:none;border:none;font-size:20px;cursor:pointer;padding:6px 10px;border-radius:8px;">▶</button>
                     </div>
-                    <div style="flex:1;text-align:center;padding:10px;background:#ECFDF5;border-radius:12px;">
-                        <div style="font-size:20px;font-weight:900;color:#059669;" id="lcAvail">0</div>
-                        <div style="font-size:10px;font-weight:600;color:#059669;">今日可用人力</div>
+                    <div style="display:flex;gap:5px;margin-bottom:12px;flex-wrap:wrap;justify-content:center;">
+                        <span style="font-size:10px;padding:3px 8px;background:#DBEAFE;color:#1E40AF;border-radius:6px;font-weight:700;">☀️早</span>
+                        <span style="font-size:10px;padding:3px 8px;background:#FEF3C7;color:#92400E;border-radius:6px;font-weight:700;">🌤️中</span>
+                        <span style="font-size:10px;padding:3px 8px;background:#EDE9FE;color:#6D28D9;border-radius:6px;font-weight:700;">🌙晚</span>
+                        <span style="font-size:10px;padding:3px 8px;background:#ECFDF5;color:#059669;border-radius:6px;font-weight:700;">🏖️休</span>
+                        <span style="font-size:10px;padding:3px 8px;background:#F1F5F9;color:#64748B;border-radius:6px;font-weight:700;">⬜未排</span>
+                    </div>
+                    <!-- 人力不足警告 -->
+                    <div id="shiftStaffWarn" style="display:none;padding:10px 14px;background:#FEF2F2;border-radius:10px;margin-bottom:12px;font-size:12px;color:#DC2626;font-weight:700;"></div>
+                    <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
+                        <table id="smTable" style="width:100%;border-collapse:collapse;font-size:12px;min-width:500px;"><thead id="smHead"></thead><tbody id="smBody"></tbody></table>
+                    </div>
+                    <!-- 每日人力統計 -->
+                    <div id="shiftDaySummary" style="display:flex;gap:4px;margin-top:10px;overflow-x:auto;padding-bottom:4px;"></div>
+                    <div style="margin-top:14px;display:flex;gap:8px;">
+                        <button onclick="saveSchedule()" style="flex:1;padding:14px;border:none;border-radius:12px;background:linear-gradient(135deg,#4F46E5,#7C3AED);color:#fff;font-weight:700;font-size:14px;cursor:pointer;">💾 儲存排班</button>
+                        <button onclick="copyLastWeek()" style="padding:14px 20px;border:2px solid #E5E7EB;border-radius:12px;background:#fff;font-weight:700;font-size:14px;cursor:pointer;">📋 複製上週</button>
+                    </div>
+                    <div id="smSaveStatus" style="margin-top:10px;text-align:center;font-size:13px;display:none;"></div>
+                </div>
+
+                <!-- === 休假月表 TAB === -->
+                <div id="tabLeave" class="staffTabContent" style="display:none;">
+                    <p style="color:#6b7280;font-size:12px;margin-bottom:12px;">一覽全員休假狀態，方便安排工作</p>
+                    <div style="display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:12px;">
+                        <button onclick="changeLeaveCal(-1)" style="background:none;border:none;font-size:20px;cursor:pointer;padding:6px 10px;border-radius:8px;">◀</button>
+                        <span id="lcMonthLabel" style="font-size:14px;font-weight:700;min-width:120px;text-align:center;">-</span>
+                        <button onclick="changeLeaveCal(1)" style="background:none;border:none;font-size:20px;cursor:pointer;padding:6px 10px;border-radius:8px;">▶</button>
+                    </div>
+                    <div style="display:flex;gap:8px;margin-bottom:12px;">
+                        <div style="flex:1;text-align:center;padding:10px;background:#EFF6FF;border-radius:12px;">
+                            <div style="font-size:20px;font-weight:900;color:#2563EB;" id="lcTotal">0</div>
+                            <div style="font-size:10px;font-weight:600;color:#2563EB;">總請假人次</div>
+                        </div>
+                        <div style="flex:1;text-align:center;padding:10px;background:#ECFDF5;border-radius:12px;">
+                            <div style="font-size:20px;font-weight:900;color:#059669;" id="lcAvail">0</div>
+                            <div style="font-size:10px;font-weight:600;color:#059669;">今日可用人力</div>
+                        </div>
+                        <div style="flex:1;text-align:center;padding:10px;background:#FEF2F2;border-radius:12px;">
+                            <div style="font-size:20px;font-weight:900;color:#DC2626;" id="lcMax">0</div>
+                            <div style="font-size:10px;font-weight:600;color:#DC2626;">上限</div>
+                        </div>
+                    </div>
+                    <!-- 日期有超過上限的高亮 -->
+                    <div id="lcOverWarn" style="display:none;padding:10px 14px;background:#FEF2F2;border-radius:10px;margin-bottom:12px;font-size:12px;color:#DC2626;font-weight:700;"></div>
+                    <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
+                        <table id="lcTable" style="width:100%;border-collapse:collapse;font-size:11px;min-width:600px;"><thead id="lcHead"></thead><tbody id="lcBody"></tbody></table>
+                    </div>
+                    <div style="display:flex;gap:10px;justify-content:center;margin-top:12px;flex-wrap:wrap;">
+                        <span style="font-size:11px;display:flex;align-items:center;gap:4px;"><span style="width:14px;height:14px;background:#DBEAFE;border-radius:3px;display:inline-block;"></span>特休</span>
+                        <span style="font-size:11px;display:flex;align-items:center;gap:4px;"><span style="width:14px;height:14px;background:#FEE2E2;border-radius:3px;display:inline-block;"></span>病假</span>
+                        <span style="font-size:11px;display:flex;align-items:center;gap:4px;"><span style="width:14px;height:14px;background:#FEF3C7;border-radius:3px;display:inline-block;"></span>事假</span>
+                        <span style="font-size:11px;display:flex;align-items:center;gap:4px;"><span style="width:14px;height:14px;background:#E0E7FF;border-radius:3px;display:inline-block;"></span>補休</span>
+                        <span style="font-size:11px;display:flex;align-items:center;gap:4px;"><span style="width:14px;height:14px;background:#FCA5A5;border-radius:3px;display:inline-block;border:2px solid #DC2626;"></span>超限</span>
                     </div>
                 </div>
 
-                <!-- 月表格 -->
-                <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
-                    <table id="lcTable" style="width:100%;border-collapse:collapse;font-size:11px;min-width:600px;">
-                        <thead id="lcHead"></thead>
-                        <tbody id="lcBody"></tbody>
-                    </table>
-                </div>
+                <!-- === 人力設定 TAB === -->
+                <div id="tabSetting" class="staffTabContent" style="display:none;">
+                    <p style="color:#6b7280;font-size:12px;margin-bottom:16px;">設定請假限制與人力規則</p>
 
-                <!-- 圖例 -->
-                <div style="display:flex;gap:12px;justify-content:center;margin-top:12px;flex-wrap:wrap;">
-                    <span style="font-size:11px;display:flex;align-items:center;gap:4px;"><span style="width:14px;height:14px;background:#DBEAFE;border-radius:3px;display:inline-block;"></span>特休</span>
-                    <span style="font-size:11px;display:flex;align-items:center;gap:4px;"><span style="width:14px;height:14px;background:#FEE2E2;border-radius:3px;display:inline-block;"></span>病假</span>
-                    <span style="font-size:11px;display:flex;align-items:center;gap:4px;"><span style="width:14px;height:14px;background:#FEF3C7;border-radius:3px;display:inline-block;"></span>事假</span>
-                    <span style="font-size:11px;display:flex;align-items:center;gap:4px;"><span style="width:14px;height:14px;background:#E0E7FF;border-radius:3px;display:inline-block;"></span>補休</span>
-                </div>
-            </div>
-        </div>
+                    <div style="background:#fff;border-radius:14px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,0.08);margin-bottom:16px;">
+                        <div style="font-size:14px;font-weight:800;color:#0F172A;margin-bottom:12px;">🚫 同時請假人數上限</div>
+                        <p style="font-size:12px;color:#94A3B8;margin-bottom:12px;">當某天已有 N 人請假，第 N+1 人提交申請時會被<b style="color:#DC2626;">自動駁回</b></p>
+                        <div style="display:flex;align-items:center;gap:12px;">
+                            <button onclick="adjustMaxLeave(-1)" style="width:44px;height:44px;border:2px solid #E5E7EB;border-radius:12px;background:#fff;font-size:20px;cursor:pointer;font-weight:700;">−</button>
+                            <div style="flex:1;text-align:center;">
+                                <div id="maxLeaveNum" style="font-size:36px;font-weight:900;color:#4F46E5;">2</div>
+                                <div style="font-size:11px;color:#94A3B8;">人</div>
+                            </div>
+                            <button onclick="adjustMaxLeave(1)" style="width:44px;height:44px;border:2px solid #E5E7EB;border-radius:12px;background:#fff;font-size:20px;cursor:pointer;font-weight:700;">+</button>
+                        </div>
+                        <button onclick="saveMaxLeave()" style="width:100%;margin-top:14px;padding:12px;border:none;border-radius:10px;background:linear-gradient(135deg,#4F46E5,#7C3AED);color:#fff;font-weight:700;font-size:14px;cursor:pointer;">💾 儲存設定</button>
+                        <div id="maxLeaveSaveStatus" style="margin-top:8px;text-align:center;font-size:13px;display:none;"></div>
+                    </div>
 
-        <!-- ====== ⑤ 排班管理 ====== -->
-        <div id="shiftMgrPage" class="page">
-            <button class="btn btn-secondary" onclick="showPage('adminHomePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
-            <div class="checkin-page">
-                <h2>📋 排班管理</h2>
-                <p style="color:#6b7280;font-size:13px;margin-bottom:12px;">安排員工班別，點擊格子切換班別</p>
-                
-                <div style="display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:12px;">
-                    <button onclick="changeShiftWeek(-1)" style="background:none;border:none;font-size:20px;cursor:pointer;padding:6px 10px;border-radius:8px;">◀</button>
-                    <span id="smWeekLabel" style="font-size:15px;font-weight:700;min-width:180px;text-align:center;">-</span>
-                    <button onclick="changeShiftWeek(1)" style="background:none;border:none;font-size:20px;cursor:pointer;padding:6px 10px;border-radius:8px;">▶</button>
-                </div>
+                    <div style="background:#fff;border-radius:14px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,0.08);">
+                        <div style="font-size:14px;font-weight:800;color:#0F172A;margin-bottom:12px;">📊 目前人力概況</div>
+                        <div id="staffOverview" style="font-size:13px;color:#64748B;line-height:1.8;">載入中...</div>
+                    </div>
 
-                <!-- 班別圖例 -->
-                <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;justify-content:center;">
-                    <span style="font-size:11px;padding:4px 10px;background:#DBEAFE;color:#1E40AF;border-radius:8px;font-weight:700;">☀️ 早班</span>
-                    <span style="font-size:11px;padding:4px 10px;background:#FEF3C7;color:#92400E;border-radius:8px;font-weight:700;">🌤️ 中班</span>
-                    <span style="font-size:11px;padding:4px 10px;background:#EDE9FE;color:#6D28D9;border-radius:8px;font-weight:700;">🌙 晚班</span>
-                    <span style="font-size:11px;padding:4px 10px;background:#ECFDF5;color:#059669;border-radius:8px;font-weight:700;">🏖️ 休假</span>
-                    <span style="font-size:11px;padding:4px 10px;background:#F1F5F9;color:#64748B;border-radius:8px;font-weight:700;">⬜ 未排</span>
+                    <div style="background:#FFF7ED;border-radius:14px;padding:14px;margin-top:16px;">
+                        <div style="font-size:13px;color:#EA580C;line-height:1.6;">
+                            <b>💡 自動駁回規則說明</b><br>
+                            • 員工填入請假日期時，系統<b>即時檢查</b>該日已有幾人請假<br>
+                            • 若加上申請者會超過上限，<b>表單直接鎖定</b>無法提交<br>
+                            • 已核准 + 待審核 的假都會被計入<br>
+                            • 週末不計入衝突檢查
+                        </div>
+                    </div>
                 </div>
-
-                <!-- 排班表格 -->
-                <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
-                    <table id="smTable" style="width:100%;border-collapse:collapse;font-size:12px;min-width:500px;">
-                        <thead id="smHead"></thead>
-                        <tbody id="smBody"></tbody>
-                    </table>
-                </div>
-
-                <!-- 快速操作 -->
-                <div style="margin-top:16px;display:flex;gap:8px;">
-                    <button onclick="saveSchedule()" style="flex:1;padding:14px;border:none;border-radius:12px;background:linear-gradient(135deg,#4F46E5,#7C3AED);color:#fff;font-weight:700;font-size:14px;cursor:pointer;">
-                        💾 儲存排班
-                    </button>
-                    <button onclick="copyLastWeek()" style="padding:14px 20px;border:2px solid #E5E7EB;border-radius:12px;background:#fff;font-weight:700;font-size:14px;cursor:pointer;">
-                        📋 複製上週
-                    </button>
-                </div>
-                <div id="smSaveStatus" style="margin-top:10px;text-align:center;font-size:13px;display:none;"></div>
             </div>
         </div>
     </div>
@@ -464,8 +490,7 @@
             if (id === 'employeePage') loadEmployeeList();
             if (id === 'leaveApprovalPage') loadLeaveApprovals('pending');
             if (id === 'featurePage') loadFeatureSettings();
-            if (id === 'leaveCalPage') loadLeaveCal();
-            if (id === 'shiftMgrPage') loadShiftMgr();
+            if (id === 'staffMgrPage') { loadShiftMgr(); loadMaxLeaveSetting(); loadStaffOverview(); }
         }
 
         // ===== 功能管理 =====
@@ -926,7 +951,78 @@
             }
         }
 
-        // ===== ④ 休假管理月表 =====
+        // ===== 人力管理 — 頁籤切換 =====
+        function switchStaffTab(tab) {
+            document.querySelectorAll('.staffTabContent').forEach(el => el.style.display = 'none');
+            document.querySelectorAll('.smTab').forEach(btn => {
+                btn.style.background = 'transparent'; btn.style.color = '#94A3B8'; btn.style.boxShadow = 'none';
+            });
+            const tabEl = document.getElementById({ shift:'tabShift', leave:'tabLeave', setting:'tabSetting' }[tab]);
+            if (tabEl) tabEl.style.display = 'block';
+            const btns = document.querySelectorAll('.smTab');
+            const idx = { shift:0, leave:1, setting:2 }[tab];
+            if (btns[idx]) { btns[idx].style.background = '#fff'; btns[idx].style.color = '#4F46E5'; btns[idx].style.boxShadow = '0 1px 4px rgba(0,0,0,0.08)'; }
+            if (tab === 'leave') loadLeaveCal();
+            if (tab === 'shift') loadShiftMgr();
+            if (tab === 'setting') { loadMaxLeaveSetting(); loadStaffOverview(); }
+        }
+
+        // ===== 人力設定 =====
+        let maxLeaveValue = 2;
+
+        function adjustMaxLeave(d) {
+            maxLeaveValue = Math.max(1, Math.min(10, maxLeaveValue + d));
+            document.getElementById('maxLeaveNum').textContent = maxLeaveValue;
+        }
+
+        async function loadMaxLeaveSetting() {
+            try {
+                const { data } = await sb.from('system_settings').select('value').eq('key', 'max_concurrent_leave').maybeSingle();
+                if (data?.value?.max) { maxLeaveValue = data.value.max; }
+            } catch(e) {}
+            document.getElementById('maxLeaveNum').textContent = maxLeaveValue;
+        }
+
+        async function saveMaxLeave() {
+            const statusEl = document.getElementById('maxLeaveSaveStatus');
+            try {
+                const { data: existing } = await sb.from('system_settings').select('id').eq('key', 'max_concurrent_leave').maybeSingle();
+                const val = { max: maxLeaveValue };
+                if (existing) {
+                    await sb.from('system_settings').update({ value: val, updated_at: new Date().toISOString() }).eq('key', 'max_concurrent_leave');
+                } else {
+                    await sb.from('system_settings').insert({ key: 'max_concurrent_leave', value: val, description: '同時請假人數上限' });
+                }
+                statusEl.style.display = 'block'; statusEl.style.color = '#059669'; statusEl.textContent = '✅ 已儲存';
+                setTimeout(() => { statusEl.style.display = 'none'; }, 2000);
+            } catch(e) {
+                statusEl.style.display = 'block'; statusEl.style.color = '#DC2626'; statusEl.textContent = '❌ 儲存失敗';
+            }
+        }
+
+        async function loadStaffOverview() {
+            const el = document.getElementById('staffOverview');
+            if (!el) return;
+            try {
+                const { data: emps } = await sb.from('employees').select('id, status').eq('status', 'active');
+                const total = emps?.length || 0;
+                const todayStr = new Date().toISOString().split('T')[0];
+                const { data: todayLeaves } = await sb.from('leave_requests').select('id')
+                    .in('status', ['approved','pending'])
+                    .lte('start_date', todayStr).gte('end_date', todayStr);
+                const onLeave = todayLeaves?.length || 0;
+                el.innerHTML = `
+                    <div style="display:flex;gap:8px;margin-bottom:8px;">
+                        <span style="padding:6px 12px;background:#ECFDF5;border-radius:8px;font-weight:700;color:#059669;">👥 在職 ${total} 人</span>
+                        <span style="padding:6px 12px;background:#FFF7ED;border-radius:8px;font-weight:700;color:#EA580C;">🏖️ 今日請假 ${onLeave} 人</span>
+                        <span style="padding:6px 12px;background:#EFF6FF;border-radius:8px;font-weight:700;color:#2563EB;">💪 今日可用 ${total - onLeave} 人</span>
+                    </div>
+                    <div style="font-size:12px;color:#94A3B8;">目前設定：同時最多 <b style="color:#DC2626;">${maxLeaveValue}</b> 人請假</div>
+                `;
+            } catch(e) { el.textContent = '載入失敗'; }
+        }
+
+        // ===== 休假月表 =====
         let lcYear, lcMonth;
         (function() { const n = new Date(); lcYear = n.getFullYear(); lcMonth = n.getMonth(); })();
 
@@ -943,58 +1039,74 @@
             const ms = `${lcYear}-${String(lcMonth + 1).padStart(2, '0')}-01`;
             const me = `${lcYear}-${String(lcMonth + 1).padStart(2, '0')}-${dim}`;
 
+            // 讀取上限
+            let maxC = maxLeaveValue || 2;
+            try {
+                const { data: s } = await sb.from('system_settings').select('value').eq('key', 'max_concurrent_leave').maybeSingle();
+                if (s?.value?.max) maxC = s.value.max;
+            } catch(e) {}
+            document.getElementById('lcMax').textContent = maxC;
+
             let employees = [], leaves = [];
             try {
                 const { data: emps } = await sb.from('employees').select('id, name, department').eq('status', 'active').order('department').order('name');
                 employees = emps || [];
                 const { data: lvs } = await sb.from('leave_requests').select('employee_id, start_date, end_date, leave_type, status')
-                    .in('status', ['approved', 'pending'])
-                    .or(`start_date.lte.${me},end_date.gte.${ms}`);
+                    .in('status', ['approved', 'pending']).or(`and(start_date.lte.${me},end_date.gte.${ms})`);
                 leaves = lvs || [];
-            } catch (e) { console.error(e); }
+            } catch(e) { console.error(e); }
 
-            // Build date headers
-            const wd = ['日', '一', '二', '三', '四', '五', '六'];
-            let headHtml = '<tr><th style="position:sticky;left:0;background:#fff;z-index:2;padding:6px 8px;min-width:70px;text-align:left;border-bottom:2px solid #E5E7EB;">姓名</th>';
+            const wd = ['日','一','二','三','四','五','六'];
+            // 計算每天請假人數
+            const dayCount = {};
+            for (let d = 1; d <= dim; d++) {
+                const ds = `${lcYear}-${String(lcMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+                dayCount[ds] = 0;
+                leaves.forEach(l => { if (ds >= l.start_date && ds <= (l.end_date || l.start_date)) dayCount[ds]++; });
+            }
+
+            // 表頭
+            let headHtml = '<tr><th style="position:sticky;left:0;background:#fff;z-index:2;padding:6px 8px;min-width:60px;text-align:left;border-bottom:2px solid #E5E7EB;font-size:11px;">姓名</th>';
             for (let d = 1; d <= dim; d++) {
                 const dt = new Date(lcYear, lcMonth, d);
-                const isWeekend = dt.getDay() === 0 || dt.getDay() === 6;
-                const bgc = isWeekend ? '#F1F5F9' : '#fff';
-                headHtml += `<th style="padding:4px 2px;min-width:28px;text-align:center;border-bottom:2px solid #E5E7EB;background:${bgc};font-size:10px;">
-                    <div>${d}</div><div style="color:#94A3B8;font-size:9px;">${wd[dt.getDay()]}</div>
+                const isW = dt.getDay()===0 || dt.getDay()===6;
+                const ds = `${lcYear}-${String(lcMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+                const over = dayCount[ds] >= maxC && !isW;
+                const bg = over ? '#FEE2E2' : isW ? '#F1F5F9' : '#fff';
+                headHtml += `<th style="padding:4px 2px;min-width:28px;text-align:center;border-bottom:2px solid ${over?'#FCA5A5':'#E5E7EB'};background:${bg};font-size:10px;">
+                    <div style="${over?'color:#DC2626;font-weight:900;':''}">${d}</div><div style="color:#94A3B8;font-size:9px;">${wd[dt.getDay()]}</div>
+                    ${over ? '<div style="font-size:8px;color:#DC2626;font-weight:900;">滿</div>' : ''}
                 </th>`;
             }
             headHtml += '</tr>';
             document.getElementById('lcHead').innerHTML = headHtml;
 
-            // Build rows
-            const typeColor = { annual: '#DBEAFE', sick: '#FEE2E2', personal: '#FEF3C7', compensatory: '#E0E7FF' };
-            const typeEmoji = { annual: '🏖', sick: '🤒', personal: '📋', compensatory: '💤' };
+            // 表身
+            const typeColor = { annual:'#DBEAFE', sick:'#FEE2E2', personal:'#FEF3C7', compensatory:'#E0E7FF' };
+            const typeEmoji = { annual:'🏖', sick:'🤒', personal:'📋', compensatory:'💤' };
             let totalLeaves = 0;
             const todayStr = new Date().toISOString().split('T')[0];
             let todayAvail = employees.length;
+            let overDays = [];
 
             let bodyHtml = '';
             employees.forEach(emp => {
                 const empLeaves = leaves.filter(l => l.employee_id === emp.id);
-                bodyHtml += `<tr><td style="position:sticky;left:0;background:#fff;z-index:1;padding:6px 8px;font-weight:700;font-size:12px;white-space:nowrap;border-bottom:1px solid #F1F5F9;">${emp.name}</td>`;
-                
+                bodyHtml += `<tr><td style="position:sticky;left:0;background:#fff;z-index:1;padding:6px 8px;font-weight:700;font-size:11px;white-space:nowrap;border-bottom:1px solid #F1F5F9;">${emp.name}</td>`;
                 for (let d = 1; d <= dim; d++) {
-                    const ds = `${lcYear}-${String(lcMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                    const ds = `${lcYear}-${String(lcMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
                     const dt = new Date(lcYear, lcMonth, d);
-                    const isWeekend = dt.getDay() === 0 || dt.getDay() === 6;
-
-                    // Find leave for this day
+                    const isW = dt.getDay()===0 || dt.getDay()===6;
                     const lv = empLeaves.find(l => ds >= l.start_date && ds <= (l.end_date || l.start_date));
-
+                    const over = dayCount[ds] > maxC && !isW;
                     if (lv) {
                         totalLeaves++;
                         if (ds === todayStr) todayAvail--;
-                        const bg = typeColor[lv.leave_type] || '#F1F5F9';
+                        const bg = over ? '#FCA5A5' : (typeColor[lv.leave_type] || '#F1F5F9');
                         const emoji = typeEmoji[lv.leave_type] || '📝';
-                        const pending = lv.status === 'pending' ? 'opacity:0.5;' : '';
-                        bodyHtml += `<td style="text-align:center;background:${bg};border-bottom:1px solid #F1F5F9;${pending}font-size:10px;cursor:default;" title="${emp.name} ${lv.leave_type}${lv.status === 'pending' ? ' (待審)' : ''}">${emoji}</td>`;
-                    } else if (isWeekend) {
+                        const pending = lv.status === 'pending' ? 'opacity:0.6;' : '';
+                        bodyHtml += `<td style="text-align:center;background:${bg};border-bottom:1px solid #F1F5F9;${pending}font-size:10px;cursor:default;" title="${emp.name} ${lv.leave_type}${lv.status==='pending'?' (待審)':''}${over?' ⚠超限':''}">${emoji}</td>`;
+                    } else if (isW) {
                         bodyHtml += `<td style="background:#F8FAFC;border-bottom:1px solid #F1F5F9;"></td>`;
                     } else {
                         bodyHtml += `<td style="border-bottom:1px solid #F1F5F9;"></td>`;
@@ -1003,44 +1115,59 @@
                 bodyHtml += '</tr>';
             });
 
+            // 底部統計列 — 每日請假人數
+            bodyHtml += '<tr style="background:#F8FAFC;"><td style="position:sticky;left:0;background:#F8FAFC;z-index:1;padding:6px 8px;font-weight:700;font-size:10px;color:#64748B;">請假數</td>';
+            for (let d = 1; d <= dim; d++) {
+                const ds = `${lcYear}-${String(lcMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+                const dt = new Date(lcYear, lcMonth, d);
+                const isW = dt.getDay()===0 || dt.getDay()===6;
+                const cnt = dayCount[ds] || 0;
+                const over = cnt >= maxC && !isW;
+                if (over && !isW) overDays.push(`${lcMonth+1}/${d}`);
+                bodyHtml += `<td style="text-align:center;font-size:10px;font-weight:900;color:${over?'#DC2626':cnt>0?'#EA580C':'#CBD5E1'};border-bottom:1px solid #F1F5F9;background:${over?'#FEF2F2':'#F8FAFC'};">${cnt||'-'}</td>`;
+            }
+            bodyHtml += '</tr>';
+
             document.getElementById('lcBody').innerHTML = bodyHtml;
             document.getElementById('lcTotal').textContent = totalLeaves;
             document.getElementById('lcAvail').textContent = Math.max(0, todayAvail);
+
+            // 超限警告
+            const warnEl = document.getElementById('lcOverWarn');
+            if (overDays.length > 0) {
+                warnEl.style.display = 'block';
+                warnEl.innerHTML = `🚨 以下日期請假人數已達/超過上限（${maxC}人）：<br><b>${overDays.join('、')}</b><br><span style="font-size:11px;opacity:0.7;">員工在這些日期提交請假將被自動駁回</span>`;
+            } else {
+                warnEl.style.display = 'none';
+            }
         }
 
-        // ===== ⑤ 排班管理 =====
+        // ===== 排班管理 =====
         let smWeekStart;
         (function() {
-            const n = new Date();
-            const dow = n.getDay();
+            const n = new Date(); const dow = n.getDay();
             smWeekStart = new Date(n);
-            smWeekStart.setDate(n.getDate() - dow + 1); // Monday
-            smWeekStart.setHours(0, 0, 0, 0);
+            smWeekStart.setDate(n.getDate() - dow + 1);
+            smWeekStart.setHours(0,0,0,0);
         })();
 
         let smEmployees = [];
-        let smScheduleData = {}; // { 'empId_YYYY-MM-DD': 'morning' | 'afternoon' | 'night' | 'off' | null }
+        let smScheduleData = {};
+        let smLeaveData = {};
         const SHIFT_TYPES = [null, 'morning', 'afternoon', 'night', 'off'];
         const SHIFT_DISPLAY = {
-            null: { label: '⬜', bg: '#F8FAFC', color: '#94A3B8' },
-            morning: { label: '☀️', bg: '#DBEAFE', color: '#1E40AF' },
-            afternoon: { label: '🌤️', bg: '#FEF3C7', color: '#92400E' },
-            night: { label: '🌙', bg: '#EDE9FE', color: '#6D28D9' },
-            off: { label: '🏖️', bg: '#ECFDF5', color: '#059669' }
+            null: { label:'⬜', bg:'#F8FAFC', color:'#94A3B8', name:'未排' },
+            morning: { label:'☀️', bg:'#DBEAFE', color:'#1E40AF', name:'早班' },
+            afternoon: { label:'🌤️', bg:'#FEF3C7', color:'#92400E', name:'中班' },
+            night: { label:'🌙', bg:'#EDE9FE', color:'#6D28D9', name:'晚班' },
+            off: { label:'🏖️', bg:'#ECFDF5', color:'#059669', name:'休假' }
         };
 
-        function changeShiftWeek(d) {
-            smWeekStart.setDate(smWeekStart.getDate() + d * 7);
-            loadShiftMgr();
-        }
+        function changeShiftWeek(d) { smWeekStart.setDate(smWeekStart.getDate() + d*7); loadShiftMgr(); }
 
         function getWeekDates() {
             const dates = [];
-            for (let i = 0; i < 7; i++) {
-                const d = new Date(smWeekStart);
-                d.setDate(d.getDate() + i);
-                dates.push(d);
-            }
+            for (let i = 0; i < 7; i++) { const d = new Date(smWeekStart); d.setDate(d.getDate()+i); dates.push(d); }
             return dates;
         }
 
@@ -1053,134 +1180,174 @@
             try {
                 const { data: emps } = await sb.from('employees').select('id, name, department').eq('status', 'active').order('name');
                 smEmployees = emps || [];
-                
                 const { data: scheds } = await sb.from('schedules').select('employee_id, date, shift_type_id, shift_types(name, code)')
                     .gte('date', startStr).lte('date', endStr);
-                
                 smScheduleData = {};
                 (scheds || []).forEach(s => {
                     const code = s.shift_types?.code || s.shift_types?.name || 'morning';
                     smScheduleData[`${s.employee_id}_${s.date}`] = code;
                 });
-            } catch (e) { console.error(e); }
+                // 載入該週請假
+                const { data: lvs } = await sb.from('leave_requests').select('employee_id, start_date, end_date, status')
+                    .in('status', ['approved']).or(`and(start_date.lte.${endStr},end_date.gte.${startStr})`);
+                smLeaveData = {};
+                (lvs || []).forEach(l => {
+                    for (let d = new Date(Math.max(new Date(l.start_date), dates[0])); d <= Math.min(new Date(l.end_date), dates[6]); d.setDate(d.getDate()+1)) {
+                        smLeaveData[`${l.employee_id}_${d.toISOString().split('T')[0]}`] = true;
+                    }
+                });
+            } catch(e) { console.error(e); }
 
             renderShiftTable();
         }
 
         function renderShiftTable() {
             const dates = getWeekDates();
-            const wd = ['日', '一', '二', '三', '四', '五', '六'];
+            const wd = ['日','一','二','三','四','五','六'];
 
-            let headHtml = '<tr><th style="position:sticky;left:0;background:#fff;z-index:2;padding:8px;min-width:70px;text-align:left;border-bottom:2px solid #E5E7EB;">姓名</th>';
+            // 表頭
+            let headHtml = '<tr><th style="position:sticky;left:0;background:#fff;z-index:2;padding:8px;min-width:60px;text-align:left;border-bottom:2px solid #E5E7EB;font-size:11px;">姓名</th>';
             dates.forEach(d => {
-                const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-                headHtml += `<th style="padding:6px 4px;min-width:46px;text-align:center;border-bottom:2px solid #E5E7EB;background:${isWeekend ? '#F1F5F9' : '#fff'};">
-                    <div style="font-size:12px;">${d.getDate()}</div>
-                    <div style="font-size:10px;color:#94A3B8;">週${wd[d.getDay()]}</div>
+                const isW = d.getDay()===0||d.getDay()===6;
+                headHtml += `<th style="padding:6px 4px;min-width:46px;text-align:center;border-bottom:2px solid #E5E7EB;background:${isW?'#F1F5F9':'#fff'};">
+                    <div style="font-size:12px;">${d.getDate()}</div><div style="font-size:10px;color:#94A3B8;">週${wd[d.getDay()]}</div>
                 </th>`;
             });
             headHtml += '</tr>';
             document.getElementById('smHead').innerHTML = headHtml;
 
+            // 表身
             let bodyHtml = '';
             smEmployees.forEach(emp => {
-                bodyHtml += `<tr><td style="position:sticky;left:0;background:#fff;z-index:1;padding:8px;font-weight:700;font-size:12px;white-space:nowrap;border-bottom:1px solid #F1F5F9;">${emp.name}</td>`;
-                
+                bodyHtml += `<tr><td style="position:sticky;left:0;background:#fff;z-index:1;padding:8px;font-weight:700;font-size:11px;white-space:nowrap;border-bottom:1px solid #F1F5F9;">${emp.name}</td>`;
                 dates.forEach(d => {
                     const ds = d.toISOString().split('T')[0];
                     const key = `${emp.id}_${ds}`;
+                    const onLeave = smLeaveData[key];
                     const shift = smScheduleData[key] || null;
                     const disp = SHIFT_DISPLAY[shift] || SHIFT_DISPLAY[null];
-                    
-                    bodyHtml += `<td onclick="cycleShift('${key}')" style="text-align:center;padding:8px 4px;cursor:pointer;border-bottom:1px solid #F1F5F9;background:${disp.bg};font-size:16px;transition:all 0.15s;user-select:none;" title="${emp.name} ${ds}">${disp.label}</td>`;
+                    if (onLeave) {
+                        bodyHtml += `<td style="text-align:center;padding:8px 4px;border-bottom:1px solid #F1F5F9;background:#FEE2E2;font-size:14px;cursor:not-allowed;opacity:0.7;" title="${emp.name} 已請假">🏖️</td>`;
+                    } else {
+                        bodyHtml += `<td onclick="cycleShift('${key}')" style="text-align:center;padding:8px 4px;cursor:pointer;border-bottom:1px solid #F1F5F9;background:${disp.bg};font-size:14px;transition:all 0.15s;user-select:none;" title="${emp.name} ${ds} ${disp.name}">${disp.label}</td>`;
+                    }
                 });
                 bodyHtml += '</tr>';
             });
+
+            // 每日人力統計列
+            bodyHtml += '<tr style="background:#F8FAFC;font-weight:700;"><td style="position:sticky;left:0;background:#F8FAFC;z-index:1;padding:6px 8px;font-size:10px;color:#64748B;">上班人數</td>';
+            let warnDays = [];
+            dates.forEach(d => {
+                const ds = d.toISOString().split('T')[0];
+                const isW = d.getDay()===0||d.getDay()===6;
+                let working = 0;
+                smEmployees.forEach(emp => {
+                    const key = `${emp.id}_${ds}`;
+                    if (smLeaveData[key]) return;
+                    const shift = smScheduleData[key];
+                    if (shift && shift !== 'off') working++;
+                });
+                const low = working > 0 && working <= 2 && !isW;
+                if (low) warnDays.push(`${d.getMonth()+1}/${d.getDate()}(${working}人)`);
+                bodyHtml += `<td style="text-align:center;font-size:11px;color:${low?'#DC2626':working>0?'#059669':'#94A3B8'};background:${low?'#FEF2F2':'#F8FAFC'};border-bottom:1px solid #F1F5F9;">${working||'-'}</td>`;
+            });
+            bodyHtml += '</tr>';
             document.getElementById('smBody').innerHTML = bodyHtml;
+
+            // 每日摘要卡片
+            let sumHtml = '';
+            dates.forEach(d => {
+                const ds = d.toISOString().split('T')[0];
+                const isW = d.getDay()===0||d.getDay()===6;
+                const counts = { morning:0, afternoon:0, night:0, off:0, leave:0, unset:0 };
+                smEmployees.forEach(emp => {
+                    const key = `${emp.id}_${ds}`;
+                    if (smLeaveData[key]) { counts.leave++; return; }
+                    const s = smScheduleData[key];
+                    if (s && counts.hasOwnProperty(s)) counts[s]++;
+                    else counts.unset++;
+                });
+                const total = counts.morning + counts.afternoon + counts.night;
+                const low = total > 0 && total <= 2 && !isW;
+                sumHtml += `<div style="min-width:60px;padding:6px 8px;background:${low?'#FEF2F2':'#F8FAFC'};border-radius:8px;text-align:center;flex-shrink:0;${low?'border:2px solid #FCA5A5;':''}">
+                    <div style="font-size:10px;font-weight:700;color:#64748B;">${d.getDate()}日</div>
+                    <div style="font-size:14px;font-weight:900;color:${low?'#DC2626':'#0F172A'};">${total}人</div>
+                    <div style="font-size:9px;color:#94A3B8;">☀${counts.morning} 🌤${counts.afternoon} 🌙${counts.night}</div>
+                    ${counts.leave>0?`<div style="font-size:9px;color:#EA580C;">假${counts.leave}</div>`:''}
+                </div>`;
+            });
+            document.getElementById('shiftDaySummary').innerHTML = sumHtml;
+
+            // 人手不足警告
+            const warnEl = document.getElementById('shiftStaffWarn');
+            if (warnDays.length > 0) {
+                warnEl.style.display = 'block';
+                warnEl.innerHTML = `⚠️ 人手不足警告：${warnDays.join('、')}<br><span style="font-size:11px;opacity:0.7;">建議調整排班或限制請假</span>`;
+            } else {
+                warnEl.style.display = 'none';
+            }
         }
 
         function cycleShift(key) {
             const current = smScheduleData[key] || null;
             const idx = SHIFT_TYPES.indexOf(current);
-            const next = SHIFT_TYPES[(idx + 1) % SHIFT_TYPES.length];
-            smScheduleData[key] = next;
+            smScheduleData[key] = SHIFT_TYPES[(idx+1) % SHIFT_TYPES.length];
             renderShiftTable();
         }
 
         async function saveSchedule() {
             const statusEl = document.getElementById('smSaveStatus');
-            statusEl.style.display = 'block';
-            statusEl.style.color = '#F59E0B';
-            statusEl.textContent = '⏳ 儲存中...';
-
+            statusEl.style.display = 'block'; statusEl.style.color = '#F59E0B'; statusEl.textContent = '⏳ 儲存中...';
             try {
-                // Get shift_types mapping
                 const { data: shiftTypes } = await sb.from('shift_types').select('id, code, name');
                 const stMap = {};
                 (shiftTypes || []).forEach(st => { stMap[st.code || st.name] = st.id; });
-
                 const upserts = [];
                 for (const [key, shift] of Object.entries(smScheduleData)) {
                     if (!shift) continue;
-                    const [empId, date] = key.split('_');
+                    const parts = key.split('_');
+                    const empId = parts[0];
+                    const date = parts.slice(1).join('-');
                     const stId = stMap[shift];
                     if (!stId) continue;
-                    upserts.push({ employee_id: empId, date: date, shift_type_id: stId });
+                    upserts.push({ employee_id: empId, date, shift_type_id: stId });
                 }
-
                 if (upserts.length > 0) {
                     const { error } = await sb.from('schedules').upsert(upserts, { onConflict: 'employee_id,date' });
                     if (error) throw error;
                 }
-
-                statusEl.style.color = '#059669';
-                statusEl.textContent = `✅ 已儲存 ${upserts.length} 筆排班`;
+                statusEl.style.color = '#059669'; statusEl.textContent = `✅ 已儲存 ${upserts.length} 筆排班`;
                 setTimeout(() => { statusEl.style.display = 'none'; }, 2500);
-            } catch (e) {
+            } catch(e) {
                 console.error(e);
-                statusEl.style.color = '#DC2626';
-                statusEl.textContent = '❌ 儲存失敗: ' + e.message;
+                statusEl.style.color = '#DC2626'; statusEl.textContent = '❌ 儲存失敗: ' + e.message;
             }
         }
 
         async function copyLastWeek() {
             if (!confirm('確定要複製上週排班到本週？\n（已有排班不會被覆蓋）')) return;
-            
             const dates = getWeekDates();
-            const lastWeekDates = dates.map(d => {
-                const ld = new Date(d);
-                ld.setDate(ld.getDate() - 7);
-                return ld;
-            });
-
             try {
-                const startStr = lastWeekDates[0].toISOString().split('T')[0];
-                const endStr = lastWeekDates[6].toISOString().split('T')[0];
+                const lwStart = new Date(dates[0]); lwStart.setDate(lwStart.getDate()-7);
+                const lwEnd = new Date(dates[6]); lwEnd.setDate(lwEnd.getDate()-7);
                 const { data: lastScheds } = await sb.from('schedules').select('employee_id, date, shift_type_id, shift_types(code, name)')
-                    .gte('date', startStr).lte('date', endStr);
-
+                    .gte('date', lwStart.toISOString().split('T')[0]).lte('date', lwEnd.toISOString().split('T')[0]);
                 let copied = 0;
                 (lastScheds || []).forEach(s => {
-                    const oldDate = new Date(s.date + 'T00:00:00');
-                    const newDate = new Date(oldDate);
-                    newDate.setDate(newDate.getDate() + 7);
-                    const newDs = newDate.toISOString().split('T')[0];
-                    const key = `${s.employee_id}_${newDs}`;
-                    
+                    const oldD = new Date(s.date + 'T00:00:00');
+                    const newD = new Date(oldD); newD.setDate(newD.getDate()+7);
+                    const key = `${s.employee_id}_${newD.toISOString().split('T')[0]}`;
                     if (!smScheduleData[key]) {
-                        const code = s.shift_types?.code || s.shift_types?.name || 'morning';
-                        smScheduleData[key] = code;
+                        smScheduleData[key] = s.shift_types?.code || s.shift_types?.name || 'morning';
                         copied++;
                     }
                 });
-
                 renderShiftTable();
                 showToast(`📋 已複製上週 ${copied} 筆排班`);
-            } catch (e) {
-                console.error(e);
-                showToast('❌ 複製失敗');
-            }
+            } catch(e) { console.error(e); showToast('❌ 複製失敗'); }
         }
+
 
         // 匯出報表
         function exportReport(type) {

@@ -357,6 +357,78 @@ async function submitLunchOrder() {
 }
 
 // ===== 請假功能 =====
+// ===== 請假可用性檢查 =====
+async function checkLeaveAvailability(startDate, endDate) {
+    if (!currentEmployee || !sb) return { ok: true };
+    
+    try {
+        // 1. 讀取最大同時請假人數設定
+        let maxConcurrent = 2; // 預設
+        try {
+            const { data: setting } = await sb.from('system_settings')
+                .select('value').eq('key', 'max_concurrent_leave').maybeSingle();
+            if (setting?.value?.max) maxConcurrent = setting.value.max;
+        } catch(e) {}
+
+        // 2. 查詢日期範圍內所有已核准/待審假單（排除自己）
+        const { data: leaves } = await sb.from('leave_requests')
+            .select('employee_id, start_date, end_date, status, employees(name)')
+            .neq('employee_id', currentEmployee.id)
+            .in('status', ['approved', 'pending'])
+            .or(`and(start_date.lte.${endDate},end_date.gte.${startDate})`);
+
+        // 3. 查詢每一天的衝突人數
+        const start = new Date(startDate), end = new Date(endDate);
+        const conflicts = []; // { date, count, names }
+        let maxDayConflict = 0;
+
+        for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+            const ds = d.toISOString().split('T')[0];
+            const dow = d.getDay();
+            if (dow === 0 || dow === 6) continue; // 週末跳過
+
+            const dayLeaves = (leaves || []).filter(l => ds >= l.start_date && ds <= (l.end_date || l.start_date));
+            const count = dayLeaves.length;
+            const names = dayLeaves.map(l => l.employees?.name || '同事').filter((v, i, a) => a.indexOf(v) === i);
+            
+            if (count > 0) {
+                conflicts.push({ date: ds, count, names });
+            }
+            if (count > maxDayConflict) maxDayConflict = count;
+        }
+
+        // 4. 查排班資料，看該日是否人手不足
+        let staffWarning = '';
+        try {
+            const { data: totalEmps } = await sb.from('employees').select('id').eq('status', 'active');
+            const totalCount = totalEmps?.length || 0;
+            
+            if (totalCount > 0 && maxDayConflict + 1 >= totalCount) {
+                staffWarning = `⚠️ 若核准此假，最少只剩 ${totalCount - maxDayConflict - 1} 人上班`;
+            }
+        } catch(e) {}
+
+        // 5. 判斷是否超過上限
+        const wouldExceed = (maxDayConflict + 1) > maxConcurrent;
+
+        return {
+            ok: !wouldExceed,
+            maxConcurrent,
+            conflicts,
+            maxDayConflict,
+            staffWarning,
+            message: wouldExceed 
+                ? `❌ 無法請假：${conflicts.find(c => c.count >= maxConcurrent)?.date || ''} 已有 ${maxDayConflict} 人請假（上限 ${maxConcurrent} 人）`
+                : conflicts.length > 0 
+                    ? `⚠️ 提醒：期間已有 ${maxDayConflict} 人請假（上限 ${maxConcurrent} 人）`
+                    : '✅ 該期間無人請假，可正常申請'
+        };
+    } catch(e) {
+        console.error('檢查請假可用性失敗', e);
+        return { ok: true, message: '' };
+    }
+}
+
 async function submitLeave() {
     if (!currentEmployee) return showToast('❌ 請先登入');
     const type = document.getElementById('leaveType')?.value;
@@ -365,9 +437,24 @@ async function submitLeave() {
     const reason = document.getElementById('leaveReason')?.value;
     if (!start || !end || !reason) return showToast('請填寫完整');
     
-    // [BUG FIX] 驗證日期邏輯
     if (new Date(end) < new Date(start)) {
         return showToast('❌ 結束日期不能早於開始日期');
+    }
+    
+    const statusEl = document.getElementById('leaveStatus');
+    if (statusEl) { statusEl.className = 'status-box show info'; statusEl.innerHTML = '⏳ 檢查人力狀態中...'; }
+
+    // 先檢查是否超過同時請假上限
+    const check = await checkLeaveAvailability(start, end);
+    
+    if (!check.ok) {
+        // 自動駁回
+        if (statusEl) {
+            statusEl.className = 'status-box show error';
+            statusEl.innerHTML = `${check.message}<br><span style="font-size:12px;color:#94A3B8;margin-top:4px;display:block;">已有同事請假：${check.conflicts.map(c => `${c.date}(${c.names.join(',')})`).slice(0,3).join('、')}</span>`;
+        }
+        showToast('❌ 該日期請假人數已達上限');
+        return;
     }
     
     try {
@@ -378,13 +465,14 @@ async function submitLeave() {
         if (error) throw error;
         showToast('✅ 申請成功'); 
         loadLeaveHistory();
-        const leaveStatusEl = document.getElementById('leaveStatus');
-        if (leaveStatusEl) {
-            leaveStatusEl.className = 'status-box show success';
-            leaveStatusEl.textContent = '✅ 申請已提交';
+        if (statusEl) {
+            statusEl.className = 'status-box show success';
+            statusEl.innerHTML = '✅ 申請已提交' + (check.conflicts.length > 0 ? `<br><span style="font-size:12px;color:#F59E0B;">💡 提醒：期間已有 ${check.maxDayConflict} 人請假</span>` : '');
         }
-        // 清空表單
         if (document.getElementById('leaveReason')) document.getElementById('leaveReason').value = '';
+        // 清除衝突提示
+        const warn = document.getElementById('leaveConflictWarn');
+        if (warn) warn.style.display = 'none';
     } catch(e) { 
         showToast('❌ 申請失敗：' + friendlyError(e)); 
     }

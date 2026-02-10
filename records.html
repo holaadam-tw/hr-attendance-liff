@@ -66,10 +66,14 @@
                         <option value="personal">事假</option><option value="compensatory">補休</option>
                     </select>
                 </div>
-                <div class="form-group"><label>開始日期</label><input type="date" id="leaveStartDate"></div>
-                <div class="form-group"><label>結束日期</label><input type="date" id="leaveEndDate"></div>
+                <div class="form-group"><label>開始日期</label><input type="date" id="leaveStartDate" onchange="onLeaveDateChange()"></div>
+                <div class="form-group"><label>結束日期</label><input type="date" id="leaveEndDate" onchange="onLeaveDateChange()"></div>
+
+                <!-- 即時衝突警告 -->
+                <div id="leaveConflictWarn" style="display:none;padding:12px 14px;border-radius:12px;margin-bottom:12px;font-size:13px;line-height:1.6;"></div>
+
                 <div class="form-group"><label>原因</label><textarea id="leaveReason"></textarea></div>
-                <button class="btn btn-primary" onclick="submitLeave()">📤 提交申請</button>
+                <button class="btn btn-primary" id="leaveSubmitBtn" onclick="submitLeave()">📤 提交申請</button>
                 <div id="leaveStatus" class="status-box"></div>
                 <div style="margin-top:30px; padding-top:20px; border-top:2px dashed #e5e7eb;">
                     <h3 style="margin-bottom:15px;">📋 我的請假記錄</h3>
@@ -291,6 +295,63 @@
             document.getElementById('adRows').innerHTML = r;
             card.classList.add('show');
             card.scrollIntoView({ behavior:'smooth', block:'nearest' });
+        }
+
+        // ===== 日期選取即時衝突檢查 =====
+        async function onLeaveDateChange() {
+            const start = document.getElementById('leaveStartDate')?.value;
+            const end = document.getElementById('leaveEndDate')?.value;
+            const warn = document.getElementById('leaveConflictWarn');
+            const btn = document.getElementById('leaveSubmitBtn');
+            if (!start || !end || !warn) return;
+            if (new Date(end) < new Date(start)) {
+                warn.style.display = 'block';
+                warn.style.background = '#FEF2F2';
+                warn.style.color = '#DC2626';
+                warn.innerHTML = '❌ 結束日期不能早於開始日期';
+                if (btn) { btn.disabled = true; btn.style.opacity = '0.5'; }
+                return;
+            }
+
+            warn.style.display = 'block';
+            warn.style.background = '#F5F3FF';
+            warn.style.color = '#6D28D9';
+            warn.innerHTML = '⏳ 檢查人力狀態...';
+            if (btn) { btn.disabled = true; btn.style.opacity = '0.5'; }
+
+            const check = await checkLeaveAvailability(start, end);
+
+            if (!check.ok) {
+                warn.style.background = '#FEF2F2';
+                warn.style.color = '#DC2626';
+                let html = `<b>${check.message}</b>`;
+                if (check.conflicts.length > 0) {
+                    html += '<div style="margin-top:6px;font-size:12px;">';
+                    check.conflicts.slice(0, 5).forEach(c => {
+                        html += `<div style="padding:2px 0;">📅 ${c.date}：${c.names.join('、')}（${c.count}人）</div>`;
+                    });
+                    html += '</div>';
+                }
+                warn.innerHTML = html;
+                if (btn) { btn.disabled = true; btn.style.opacity = '0.5'; }
+            } else if (check.conflicts && check.conflicts.length > 0) {
+                warn.style.background = '#FFF7ED';
+                warn.style.color = '#EA580C';
+                let html = `<b>${check.message}</b>`;
+                html += '<div style="margin-top:6px;font-size:12px;">';
+                check.conflicts.slice(0, 5).forEach(c => {
+                    html += `<div style="padding:2px 0;">📅 ${c.date}：${c.names.join('、')}（${c.count}人）</div>`;
+                });
+                html += '</div>';
+                if (check.staffWarning) html += `<div style="margin-top:4px;font-weight:700;">${check.staffWarning}</div>`;
+                warn.innerHTML = html;
+                if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+            } else {
+                warn.style.background = '#ECFDF5';
+                warn.style.color = '#059669';
+                warn.innerHTML = '<b>✅ 該期間無人請假，可正常申請</b>';
+                if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+            }
         }
 
         window.addEventListener('load', async () => {
