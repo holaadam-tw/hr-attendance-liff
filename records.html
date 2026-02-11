@@ -290,7 +290,7 @@
 
         function initOtDate() {
             const el = document.getElementById('otDate');
-            if (el && !el.value) el.value = new Date().toISOString().split('T')[0];
+            if (el && !el.value) el.value = fmtDate(new Date());
         }
 
         // 補打卡類型選擇
@@ -305,8 +305,8 @@
             const mpDate = document.getElementById('mpDate');
             if (mpDate && !mpDate.value) {
                 const y = new Date(); y.setDate(y.getDate() - 1);
-                mpDate.value = y.toISOString().split('T')[0];
-                mpDate.max = new Date().toISOString().split('T')[0];
+                mpDate.value = fmtDate(y);
+                mpDate.max = fmtDate(new Date());
             }
         }
 
@@ -368,7 +368,7 @@
 
             const fd = new Date(attYear, attMonth, 1).getDay();
             const dim = new Date(attYear, attMonth+1, 0).getDate();
-            const todayS = new Date().toISOString().split('T')[0];
+            const todayS = fmtDate(new Date());
 
             let cOk=0, cLate=0, cLv=0, cAb=0, tH=0;
 

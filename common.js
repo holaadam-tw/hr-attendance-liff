@@ -47,6 +47,11 @@ function getTaiwanDate(offsetDays = 0) {
     return date.toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' });
 }
 
+// 任意 Date 物件 → YYYY-MM-DD（本地時區，避免 toISOString UTC 偏移）
+function fmtDate(d) {
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
 // 計算距離 (Haversine)
 function calculateDistance(lat1, lon1, lat2, lon2) {
     const R = 6371e3; 
@@ -383,7 +388,7 @@ async function checkLeaveAvailability(startDate, endDate) {
         let maxDayConflict = 0;
 
         for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-            const ds = d.toISOString().split('T')[0];
+            const ds = fmtDate(d);
             const dow = d.getDay();
             if (dow === 0 || dow === 6) continue; // 週末跳過
 
@@ -664,7 +669,7 @@ async function loadAnnouncements() {
     if (!el) return;
     
     try {
-        const todayStr = new Date().toISOString().split('T')[0];
+        const todayStr = fmtDate(new Date());
         const { data } = await sb.from('hr_settings')
             .select('value').eq('key', 'announcements').maybeSingle();
         
@@ -817,7 +822,7 @@ async function checkPendingAcknowledgments() {
         
         if (!settings?.value?.items) return;
         
-        const todayStr = new Date().toISOString().split('T')[0];
+        const todayStr = fmtDate(new Date());
         const forceRead = settings.value.items.filter(a => 
             a.require_ack && 
             (!a.expire_date || a.expire_date >= todayStr)
@@ -921,7 +926,7 @@ async function loadMonthlyAttendance() {
         let leaveDays = 0;
         try {
             const monthStart = `${year}-${String(month).padStart(2,'0')}-01`;
-            const monthEnd = new Date(year, month, 0).toISOString().split('T')[0];
+            const monthEnd = fmtDate(new Date(year, month, 0));
             const { data: leaveData } = await sb.from('leave_requests')
                 .select('days, leave_type')
                 .eq('employee_id', currentEmployee.id)
@@ -1400,7 +1405,7 @@ async function checkForcedAnnouncements() {
             .select('value').eq('key', 'announcements').maybeSingle();
         if (!settingData?.value?.items) return;
         
-        const todayStr = new Date().toISOString().split('T')[0];
+        const todayStr = fmtDate(new Date());
         const forced = settingData.value.items.filter(a => 
             a.require_ack && (!a.expire_date || a.expire_date >= todayStr)
         );

@@ -156,7 +156,7 @@
             const actions = document.getElementById('myOrderActions');
             if (!currentEmployee || !card) return;
             
-            const todayStr = new Date().toISOString().split('T')[0];
+            const todayStr = fmtDate(new Date());
             try {
                 const { data } = await sb.from('lunch_orders')
                     .select('*')

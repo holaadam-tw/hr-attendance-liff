@@ -303,7 +303,7 @@
                     }
                     await sb.from('lunch_orders').upsert({
                         employee_id: currentEmployee.id,
-                        order_date: new Date().toISOString().split('T')[0],
+                        order_date: fmtDate(new Date()),
                         is_vegetarian: false,
                         status: 'cancelled',
                         notes: '不訂購，補助NT$50'
@@ -311,7 +311,7 @@
                 } else {
                     await sb.from('lunch_orders').upsert({
                         employee_id: currentEmployee.id,
-                        order_date: new Date().toISOString().split('T')[0],
+                        order_date: fmtDate(new Date()),
                         is_vegetarian: selectedLunch === 'vegetarian',
                         status: 'ordered',
                         notes: ''

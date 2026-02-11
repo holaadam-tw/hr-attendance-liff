@@ -193,7 +193,7 @@
         async function loadTodayStatus() {
             if (!currentEmployee || !liffProfile) return;
             try {
-                const today = new Date().toISOString().split('T')[0];
+                const today = fmtDate(new Date());
                 const { data } = await sb.from('attendance')
                     .select('check_in_time, check_out_time, status')
                     .eq('employee_id', currentEmployee.id)

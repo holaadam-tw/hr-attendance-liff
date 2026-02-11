@@ -350,7 +350,7 @@
             // 預設選中日期或明天
             const dateEl = document.getElementById('swapDate');
             if (selectedDate) dateEl.value = selectedDate;
-            else { const t = new Date(); t.setDate(t.getDate()+1); dateEl.value = t.toISOString().split('T')[0]; }
+            else { const t = new Date(); t.setDate(t.getDate()+1); dateEl.value = fmtDate(t); }
             // 載入同事列表
             try {
                 const { data } = await sb.from('employees')
