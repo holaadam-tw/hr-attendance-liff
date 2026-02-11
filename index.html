@@ -300,6 +300,7 @@
                     initBottomNav();
                     applyFeatureVisibility();
                     loadAnnouncements();
+                    checkForcedAnnouncements();
                     
                     const isAdmin = await checkIsAdmin();
                     if (isAdmin) {

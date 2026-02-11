@@ -104,7 +104,13 @@
                 </div>
             </div>
 
-            <button class="swap-btn" onclick="showToast('🔄 換班功能開發中')">🔄 申請換班</button>
+            <button class="swap-btn" onclick="openSwapModal()">🔄 申請換班</button>
+
+            <!-- 換班申請/記錄 -->
+            <div class="card" style="margin-top:16px;padding:14px;">
+                <div style="font-size:14px;font-weight:800;color:var(--dark);margin-bottom:10px;">🔄 換班申請</div>
+                <div id="swapList"><p style="text-align:center;color:var(--gray);font-size:12px;">載入中...</p></div>
+            </div>
 
             <!-- 班別說明 -->
             <div class="card" style="padding:14px; margin-top:16px;">
@@ -122,6 +128,30 @@
                     <span style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--gray);">
                         <span style="width:12px;height:12px;border-radius:4px;background:var(--gray-light);border:1px solid var(--gray);"></span> 休
                     </span>
+                </div>
+            </div>
+        </div>
+        <!-- 換班 Modal -->
+        <div id="swapModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;align-items:center;justify-content:center;padding:20px;">
+            <div style="background:#fff;border-radius:20px;max-width:360px;width:100%;padding:24px;">
+                <h3 style="text-align:center;font-size:16px;font-weight:800;margin-bottom:16px;">🔄 換班申請</h3>
+                <div class="form-group" style="margin-bottom:12px;">
+                    <label style="font-size:13px;font-weight:700;">換班日期</label>
+                    <input type="date" id="swapDate" style="width:100%;padding:10px;border:1px solid #E5E7EB;border-radius:10px;">
+                </div>
+                <div class="form-group" style="margin-bottom:12px;">
+                    <label style="font-size:13px;font-weight:700;">要跟誰換？</label>
+                    <select id="swapTarget" style="width:100%;padding:10px;border:1px solid #E5E7EB;border-radius:10px;font-size:14px;">
+                        <option value="">載入中...</option>
+                    </select>
+                </div>
+                <div class="form-group" style="margin-bottom:16px;">
+                    <label style="font-size:13px;font-weight:700;">原因</label>
+                    <input type="text" id="swapReason" placeholder="如：家中有事" style="width:100%;padding:10px;border:1px solid #E5E7EB;border-radius:10px;">
+                </div>
+                <div style="display:flex;gap:8px;">
+                    <button onclick="closeSwapModal()" style="flex:1;padding:12px;border:2px solid #E5E7EB;border-radius:12px;background:#fff;font-weight:700;cursor:pointer;">取消</button>
+                    <button onclick="submitSwapRequest()" style="flex:1;padding:12px;border:none;border-radius:12px;background:var(--primary);color:#fff;font-weight:700;cursor:pointer;">📤 送出</button>
                 </div>
             </div>
         </div>
@@ -312,6 +342,114 @@
             loadSchedule();
         }
 
+        // ===== 換班功能 =====
+        async function openSwapModal() {
+            if (!currentEmployee) return showToast('❌ 請先登入');
+            const modal = document.getElementById('swapModal');
+            modal.style.display = 'flex';
+            // 預設選中日期或明天
+            const dateEl = document.getElementById('swapDate');
+            if (selectedDate) dateEl.value = selectedDate;
+            else { const t = new Date(); t.setDate(t.getDate()+1); dateEl.value = t.toISOString().split('T')[0]; }
+            // 載入同事列表
+            try {
+                const { data } = await sb.from('employees')
+                    .select('id, name, department').eq('status','active').neq('id', currentEmployee.id).order('name');
+                const sel = document.getElementById('swapTarget');
+                sel.innerHTML = '<option value="">-- 請選擇同事 --</option>';
+                (data||[]).forEach(e => { sel.innerHTML += `<option value="${e.id}">${e.name}（${e.department||''}）</option>`; });
+            } catch(e) { showToast('❌ 載入同事失敗'); }
+        }
+        function closeSwapModal() { document.getElementById('swapModal').style.display = 'none'; }
+
+        async function submitSwapRequest() {
+            const date = document.getElementById('swapDate')?.value;
+            const targetId = document.getElementById('swapTarget')?.value;
+            const reason = document.getElementById('swapReason')?.value;
+            if (!date || !targetId) return showToast('❌ 請選擇日期和同事');
+            
+            try {
+                // 查雙方當日班別
+                const myShift = scheduleData[date]?.name || '未排';
+                const { data: targetSched } = await sb.from('schedules')
+                    .select('shift_types(name)').eq('employee_id', targetId).eq('date', date).maybeSingle();
+                const targetShift = targetSched?.shift_types?.name || '未排';
+                
+                const { error } = await sb.from('shift_swap_requests').insert({
+                    requester_id: currentEmployee.id,
+                    target_id: targetId,
+                    swap_date: date,
+                    requester_original_shift: myShift,
+                    target_original_shift: targetShift,
+                    reason: reason || '',
+                    status: 'pending_target'
+                });
+                if (error) throw error;
+                
+                showToast('✅ 換班申請已送出，等待對方確認');
+                closeSwapModal();
+                loadSwapRequests();
+                
+                // 通知對方
+                sendUserNotify(targetId, `🔄 ${currentEmployee.name} 想跟您換 ${date} 的班\n您的班：${targetShift} → ${myShift}\n請到班表頁面確認`);
+            } catch(e) { showToast('❌ 申請失敗：' + friendlyError(e)); }
+        }
+
+        async function loadSwapRequests() {
+            const el = document.getElementById('swapList');
+            if (!el || !currentEmployee) return;
+            try {
+                const { data } = await sb.from('shift_swap_requests')
+                    .select('*, requester:employees!shift_swap_requests_requester_id_fkey(name), target:employees!shift_swap_requests_target_id_fkey(name)')
+                    .or(`requester_id.eq.${currentEmployee.id},target_id.eq.${currentEmployee.id}`)
+                    .order('created_at', { ascending: false }).limit(10);
+                
+                if (!data || data.length === 0) { el.innerHTML = '<p style="text-align:center;color:#999;font-size:12px;">尚無換班記錄</p>'; return; }
+                
+                const statusMap = { pending_target:'⏳ 等對方', pending_admin:'⏳ 等主管', approved:'✅ 通過', rejected:'❌ 拒絕', cancelled:'🚫 取消' };
+                const statusColor = { pending_target:'#F59E0B', pending_admin:'#3B82F6', approved:'#059669', rejected:'#DC2626', cancelled:'#94A3B8' };
+                
+                el.innerHTML = data.map(r => {
+                    const isTarget = r.target_id === currentEmployee.id;
+                    const otherName = isTarget ? r.requester?.name : r.target?.name;
+                    const showAgree = isTarget && r.status === 'pending_target';
+                    
+                    return `
+                    <div style="padding:10px 0;border-bottom:1px solid #F1F5F9;font-size:13px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                            <span>📅 ${r.swap_date} · 🔄 ${otherName || '?'}</span>
+                            <span style="font-size:11px;padding:3px 8px;border-radius:6px;background:${statusColor[r.status]||'#eee'}20;color:${statusColor[r.status]||'#666'};font-weight:700;">${statusMap[r.status]||r.status}</span>
+                        </div>
+                        <div style="font-size:11px;color:#64748B;margin-top:3px;">${r.requester_original_shift||''} ↔ ${r.target_original_shift||''}${r.reason ? ' · '+r.reason : ''}</div>
+                        ${showAgree ? `
+                            <div style="display:flex;gap:6px;margin-top:8px;">
+                                <button onclick="agreeSwap('${r.id}')" style="flex:1;padding:8px;border:none;border-radius:8px;background:#ECFDF5;color:#059669;font-weight:700;font-size:12px;cursor:pointer;">✅ 同意換班</button>
+                                <button onclick="declineSwap('${r.id}')" style="flex:1;padding:8px;border:none;border-radius:8px;background:#FEF2F2;color:#DC2626;font-weight:700;font-size:12px;cursor:pointer;">❌ 拒絕</button>
+                            </div>
+                        ` : ''}
+                    </div>`;
+                }).join('');
+            } catch(e) { el.innerHTML = '<p style="text-align:center;color:#ef4444;font-size:12px;">載入失敗</p>'; }
+        }
+
+        async function agreeSwap(id) {
+            if (!confirm('確定同意換班？')) return;
+            try {
+                await sb.from('shift_swap_requests').update({ target_agreed: true, status: 'pending_admin' }).eq('id', id);
+                showToast('✅ 已同意，等待主管審核');
+                loadSwapRequests();
+                sendAdminNotify('🔄 換班申請：雙方已同意，請審核');
+            } catch(e) { showToast('❌ 操作失敗'); }
+        }
+
+        async function declineSwap(id) {
+            try {
+                await sb.from('shift_swap_requests').update({ target_agreed: false, status: 'rejected', rejection_reason: '對方不同意' }).eq('id', id);
+                showToast('❌ 已拒絕');
+                loadSwapRequests();
+            } catch(e) { showToast('❌ 操作失敗'); }
+        }
+
         window.addEventListener('load', async () => {
             if (typeof initializeLiff === 'undefined') {
                 // No common.js, show demo
@@ -326,6 +464,7 @@
                     document.getElementById('loadingPage').style.display = 'none';
                     initBottomNav();
                     loadSchedule();
+                    loadSwapRequests();
                 } else {
                     window.location.href = 'index.html';
                 }

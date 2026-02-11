@@ -480,6 +480,21 @@
             calculateSalary();
         }
 
+        // ===== 勞健保級距快取 =====
+        let cachedBrackets = [];
+        async function loadInsuranceBrackets() {
+            try {
+                const { data } = await sb.from('insurance_brackets')
+                    .select('*').eq('is_active', true).order('salary_min');
+                if (data && data.length > 0) cachedBrackets = data;
+            } catch(e) { console.log('級距表載入失敗，使用預設計算'); }
+        }
+        function lookupBracket(salary) {
+            if (cachedBrackets.length === 0) return null;
+            const b = cachedBrackets.find(r => salary >= r.salary_min && salary <= r.salary_max);
+            return b || cachedBrackets[cachedBrackets.length - 1]; // fallback 最高級距
+        }
+
         function calculateSalary() {
             const days = parseFloat(document.getElementById('calcDays').value) || 0;
             const otHours = parseFloat(document.getElementById('calcOT').value) || 0;
@@ -525,8 +540,18 @@
             const grossBase = (calcMode === 'monthly') ? monthSalary : dailyRate * days;
             const gross = grossBase + otPay + bonus + mealAmount + posAmount;
 
-            const laborIns = Math.round(monthSalary * 0.125 * 0.2);
-            const healthIns = Math.round(monthSalary * 0.0517 * 0.3);
+            // 勞健保 — 查級距表（有快取則用，無則 fallback 直接計算）
+            let laborIns, healthIns, insuredAmt;
+            const bracket = lookupBracket(monthSalary);
+            if (bracket) {
+                insuredAmt = bracket.insured_amount;
+                laborIns = Math.round(insuredAmt * (bracket.labor_rate || 0.125) * (bracket.labor_employee_share || 0.2));
+                healthIns = Math.round(insuredAmt * (bracket.health_rate || 0.0517) * (bracket.health_employee_share || 0.3));
+            } else {
+                insuredAmt = monthSalary;
+                laborIns = Math.round(monthSalary * 0.125 * 0.2);
+                healthIns = Math.round(monthSalary * 0.0517 * 0.3);
+            }
             const pension = Math.round(monthSalary * pensionRate / 100);
             const tax = Math.round(gross * 0.05);
             const totalDeduct = laborIns + healthIns + pension + tax;
@@ -555,8 +580,8 @@
             ).join('') + `<div class="calc-detail-row" style="font-weight:800;border-top:2px solid var(--gray-light);"><span>收入合計</span><span style="color:var(--success);">${formatNT(gross)}</span></div>`;
 
             const deductItems = [
-                { label: '勞保自付', value: laborIns, formula: `${formatNT(monthSalary)} × 12.5% × 20%` },
-                { label: '健保自付', value: healthIns, formula: `${formatNT(monthSalary)} × 5.17% × 30%` },
+                { label: '勞保自付', value: laborIns, formula: `投保 ${formatNT(insuredAmt)} × 12.5% × 20%` },
+                { label: '健保自付', value: healthIns, formula: `投保 ${formatNT(insuredAmt)} × 5.17% × 30%` },
                 { label: '勞退自提', value: pension, formula: `${formatNT(monthSalary)} × ${pensionRate}%` },
                 { label: '預扣所得稅', value: tax, formula: `${formatNT(gross)} × 5%` }
             ].filter(i => i.value > 0);
@@ -642,6 +667,7 @@
                 if (ok) {
                     document.getElementById('loadingPage').style.display = 'none';
                     initBottomNav();
+                    loadInsuranceBrackets(); // 預載勞健保級距表
                     loadSalary();
 
                     // 從 salary_settings 自動帶入
