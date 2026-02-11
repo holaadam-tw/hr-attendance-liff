@@ -64,6 +64,12 @@
                 <div class="menu-item" onclick="showPage('makeupApprovalPage')">
                     <div class="icon">🔧</div><div class="label">補打卡審核</div>
                 </div>
+                <div class="menu-item" onclick="showPage('overtimeApprovalPage')">
+                    <div class="icon">⏰</div><div class="label">加班審核</div>
+                </div>
+                <div class="menu-item" onclick="showPage('swapApprovalPage')">
+                    <div class="icon">🔄</div><div class="label">換班審核</div>
+                </div>
                 <div class="menu-item" onclick="showPage('announcementPage')">
                     <div class="icon">📢</div><div class="label">公告管理</div>
                 </div>
@@ -75,6 +81,9 @@
                 </div>
                 <div class="menu-item" onclick="showPage('featurePage')">
                     <div class="icon">🎛️</div><div class="label">功能管理</div>
+                </div>
+                <div class="menu-item" onclick="showPage('auditLogPage')">
+                    <div class="icon">📜</div><div class="label">操作日誌</div>
                 </div>
                 <div class="menu-item" onclick="window.location.href='index.html'">
                     <div class="icon">🏠</div><div class="label">返回首頁</div>
@@ -316,12 +325,50 @@
                     <div class="form-group">
                         <label style="display:flex;align-items:center;gap:8px;"><input type="checkbox" id="annPinned"> 📌 置頂</label>
                     </div>
+                    <div class="form-group">
+                        <label style="display:flex;align-items:center;gap:8px;"><input type="checkbox" id="annRequireAck"> ✍️ 強制閱讀簽署（員工必須確認才能使用系統）</label>
+                    </div>
                     <button class="btn btn-primary" onclick="publishAnnouncement()">📤 發布公告</button>
                 </div>
 
                 <!-- 現有公告列表 -->
                 <div style="font-size:14px;font-weight:800;color:#0F172A;margin-bottom:12px;">📋 現有公告</div>
                 <div id="announcementList"><p style="text-align:center;color:#999;">載入中...</p></div>
+            </div>
+        </div>
+
+        <!-- ====== 加班審核 ====== -->
+        <div id="overtimeApprovalPage" class="page">
+            <button class="btn btn-secondary" onclick="showPage('adminHomePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
+            <div class="checkin-page">
+                <h2>⏰ 加班審核</h2>
+                <div class="tabs">
+                    <button class="tab-btn active" onclick="switchOtTab('pending')">待審核</button>
+                    <button class="tab-btn inactive" onclick="switchOtTab('approved')">已通過</button>
+                    <button class="tab-btn inactive" onclick="switchOtTab('rejected')">已拒絕</button>
+                </div>
+                <div id="otApprovalList"><p style="text-align:center;color:#666;">載入中...</p></div>
+            </div>
+        </div>
+
+        <!-- ====== 換班審核 ====== -->
+        <div id="swapApprovalPage" class="page">
+            <button class="btn btn-secondary" onclick="showPage('adminHomePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
+            <div class="checkin-page">
+                <h2>🔄 換班審核</h2>
+                <p style="color:#94A3B8;font-size:12px;margin-bottom:12px;">雙方同意後才會出現在此列表</p>
+                <div id="swapApprovalList"><p style="text-align:center;color:#666;">載入中...</p></div>
+            </div>
+        </div>
+
+        <!-- ====== 操作日誌 ====== -->
+        <div id="auditLogPage" class="page">
+            <button class="btn btn-secondary" onclick="showPage('adminHomePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
+            <div class="checkin-page">
+                <h2>📜 操作日誌</h2>
+                <p style="color:#94A3B8;font-size:12px;margin-bottom:12px;">系統自動記錄所有管理操作</p>
+                <div id="auditLogList"><p style="text-align:center;color:#666;">載入中...</p></div>
+                <button class="btn btn-secondary" id="loadMoreAudit" onclick="loadAuditLogs(true)" style="margin-top:12px;">載入更多...</button>
             </div>
         </div>
 
@@ -342,6 +389,9 @@
                     </div>
                     <div class="menu-item" onclick="exportReport('lunch')">
                         <div class="icon">🍱</div><div class="label">便當報表</div>
+                    </div>
+                    <div class="menu-item" onclick="exportReport('overtime')">
+                        <div class="icon">⏰</div><div class="label">加班報表</div>
                     </div>
                 </div>
             </div>
@@ -569,7 +619,10 @@
             if (id === 'employeePage') loadEmployeeList();
             if (id === 'leaveApprovalPage') loadLeaveApprovals('pending');
             if (id === 'makeupApprovalPage') loadMakeupApprovals('pending');
+            if (id === 'overtimeApprovalPage') loadOtApprovals('pending');
+            if (id === 'swapApprovalPage') loadSwapApprovals();
             if (id === 'announcementPage') loadAnnouncementList();
+            if (id === 'auditLogPage') loadAuditLogs();
             if (id === 'featurePage') { loadFeatureSettings(); loadNotifyToken(); }
             if (id === 'staffMgrPage') { loadShiftMgr(); loadMaxLeaveSetting(); loadStaffOverview(); }
         }
@@ -580,7 +633,7 @@
         // LINE Notify 設定
         async function loadNotifyToken() {
             try {
-                const { data } = await sb.from('system_settings')
+                const { data } = await sb.from('hr_settings')
                     .select('value').eq('key', 'line_notify_token').maybeSingle();
                 if (data?.value?.token) {
                     const el = document.getElementById('lineNotifyToken');
@@ -594,12 +647,12 @@
             if (!token) return showToast('❌ 請輸入 Token');
             const status = document.getElementById('notifyStatus');
             try {
-                const { data: existing } = await sb.from('system_settings')
+                const { data: existing } = await sb.from('hr_settings')
                     .select('id').eq('key', 'line_notify_token').maybeSingle();
                 if (existing) {
-                    await sb.from('system_settings').update({ value: { token }, updated_at: new Date().toISOString() }).eq('key', 'line_notify_token');
+                    await sb.from('hr_settings').update({ value: { token }, updated_at: new Date().toISOString() }).eq('key', 'line_notify_token');
                 } else {
-                    await sb.from('system_settings').insert({ key: 'line_notify_token', value: { token }, description: 'LINE Notify 推播 Token' });
+                    await sb.from('hr_settings').insert({ key: 'line_notify_token', value: { token }, description: 'LINE Notify 推播 Token' });
                 }
                 showToast('✅ Token 已儲存');
                 if (status) { status.style.display = 'block'; status.style.color = '#059669'; status.textContent = '✅ 已儲存'; }
@@ -621,7 +674,7 @@
 
         async function loadFeatureSettings() {
             try {
-                const { data } = await sb.from('system_settings')
+                const { data } = await sb.from('hr_settings')
                     .select('value')
                     .eq('key', 'feature_visibility')
                     .maybeSingle();
@@ -660,17 +713,17 @@
             updateToggleCard(key);
             
             try {
-                const { data: existing } = await sb.from('system_settings')
+                const { data: existing } = await sb.from('hr_settings')
                     .select('id')
                     .eq('key', 'feature_visibility')
                     .maybeSingle();
                 
                 if (existing) {
-                    await sb.from('system_settings')
+                    await sb.from('hr_settings')
                         .update({ value: featureState, updated_at: new Date().toISOString() })
                         .eq('key', 'feature_visibility');
                 } else {
-                    await sb.from('system_settings')
+                    await sb.from('hr_settings')
                         .insert({ key: 'feature_visibility', value: featureState, description: '員工可見功能設定' });
                 }
                 
@@ -1099,6 +1152,7 @@
                 }
 
                 showToast(`✅ 請假申請已${newStatus === 'approved' ? '通過' : '拒絕'}`);
+                writeAuditLog(newStatus === 'approved' ? 'approve' : 'reject', 'leave_requests', requestId, reqData?.employees?.name);
                 loadLeaveApprovals('pending');
 
             } catch (err) {
@@ -1133,7 +1187,7 @@
 
         async function loadMaxLeaveSetting() {
             try {
-                const { data } = await sb.from('system_settings').select('value').eq('key', 'max_concurrent_leave').maybeSingle();
+                const { data } = await sb.from('hr_settings').select('value').eq('key', 'max_concurrent_leave').maybeSingle();
                 if (data?.value?.max) { maxLeaveValue = data.value.max; }
             } catch(e) {}
             document.getElementById('maxLeaveNum').textContent = maxLeaveValue;
@@ -1142,12 +1196,12 @@
         async function saveMaxLeave() {
             const statusEl = document.getElementById('maxLeaveSaveStatus');
             try {
-                const { data: existing } = await sb.from('system_settings').select('id').eq('key', 'max_concurrent_leave').maybeSingle();
+                const { data: existing } = await sb.from('hr_settings').select('id').eq('key', 'max_concurrent_leave').maybeSingle();
                 const val = { max: maxLeaveValue };
                 if (existing) {
-                    await sb.from('system_settings').update({ value: val, updated_at: new Date().toISOString() }).eq('key', 'max_concurrent_leave');
+                    await sb.from('hr_settings').update({ value: val, updated_at: new Date().toISOString() }).eq('key', 'max_concurrent_leave');
                 } else {
-                    await sb.from('system_settings').insert({ key: 'max_concurrent_leave', value: val, description: '同時請假人數上限' });
+                    await sb.from('hr_settings').insert({ key: 'max_concurrent_leave', value: val, description: '同時請假人數上限' });
                 }
                 statusEl.style.display = 'block'; statusEl.style.color = '#059669'; statusEl.textContent = '✅ 已儲存';
                 setTimeout(() => { statusEl.style.display = 'none'; }, 2000);
@@ -1198,7 +1252,7 @@
             // 讀取上限
             let maxC = maxLeaveValue || 2;
             try {
-                const { data: s } = await sb.from('system_settings').select('value').eq('key', 'max_concurrent_leave').maybeSingle();
+                const { data: s } = await sb.from('hr_settings').select('value').eq('key', 'max_concurrent_leave').maybeSingle();
                 if (s?.value?.max) maxC = s.value.max;
             } catch(e) {}
             document.getElementById('lcMax').textContent = maxC;
@@ -1603,6 +1657,7 @@
                 }
 
                 showToast(status === 'approved' ? '✅ 已通過並寫入出勤' : '❌ 已拒絕');
+                writeAuditLog(status === 'approved' ? 'approve' : 'reject', 'makeup_punch_requests', id, req?.employees?.name || '');
                 loadMakeupApprovals('pending');
             } catch(e) {
                 console.error(e);
@@ -1636,27 +1691,29 @@
             const type = document.getElementById('annType')?.value;
             const expire = document.getElementById('annExpire')?.value;
             const pinned = document.getElementById('annPinned')?.checked;
+            const requireAck = document.getElementById('annRequireAck')?.checked;
             
             if (!title) return showToast('❌ 請輸入標題');
             
             try {
                 // 讀取現有公告
-                const { data: existing } = await sb.from('system_settings')
+                const { data: existing } = await sb.from('hr_settings')
                     .select('value').eq('key', 'announcements').maybeSingle();
                 
                 const items = existing?.value?.items || [];
                 items.unshift({
                     id: Date.now().toString(),
                     title, content, type, pinned,
+                    require_ack: requireAck || false,
                     expire_date: expire || null,
                     created_at: new Date().toISOString(),
                     created_by: currentAdminEmployee?.name || 'admin'
                 });
                 
                 if (existing) {
-                    await sb.from('system_settings').update({ value: { items }, updated_at: new Date().toISOString() }).eq('key', 'announcements');
+                    await sb.from('hr_settings').update({ value: { items }, updated_at: new Date().toISOString() }).eq('key', 'announcements');
                 } else {
-                    await sb.from('system_settings').insert({ key: 'announcements', value: { items }, description: '公告系統' });
+                    await sb.from('hr_settings').insert({ key: 'announcements', value: { items }, description: '公告系統' });
                 }
                 
                 showToast('📢 公告已發布');
@@ -1664,6 +1721,7 @@
                 document.getElementById('annContent').value = '';
                 document.getElementById('annExpire').value = '';
                 document.getElementById('annPinned').checked = false;
+                if (document.getElementById('annRequireAck')) document.getElementById('annRequireAck').checked = false;
                 loadAnnouncementList();
             } catch(e) { showToast('❌ 發布失敗：' + friendlyError(e)); }
         }
@@ -1673,7 +1731,7 @@
             if (!el) return;
             
             try {
-                const { data } = await sb.from('system_settings')
+                const { data } = await sb.from('hr_settings')
                     .select('value').eq('key', 'announcements').maybeSingle();
                 
                 const items = data?.value?.items || [];
@@ -1703,22 +1761,240 @@
         async function deleteAnnouncement(id) {
             if (!confirm('確定刪除此公告？')) return;
             try {
-                const { data } = await sb.from('system_settings')
+                const { data } = await sb.from('hr_settings')
                     .select('value').eq('key', 'announcements').maybeSingle();
                 if (!data?.value?.items) return;
                 
                 const items = data.value.items.filter(a => a.id !== id);
-                await sb.from('system_settings').update({ value: { items }, updated_at: new Date().toISOString() }).eq('key', 'announcements');
+                await sb.from('hr_settings').update({ value: { items }, updated_at: new Date().toISOString() }).eq('key', 'announcements');
                 showToast('🗑️ 已刪除');
                 loadAnnouncementList();
             } catch(e) { showToast('❌ 刪除失敗'); }
         }
 
-        // 匯出報表
-        function exportReport(type) {
-            const names = { 'attendance': '出勤', 'leave': '請假', 'bonus': '獎金', 'lunch': '便當' };
-            showToast(`📊 正在準備${names[type] || ''}報表...`);
-            setTimeout(() => { showToast('⏳ 報表功能開發中，敬請期待'); }, 1000);
+        // ===== 加班審核 =====
+        function switchOtTab(status) {
+            document.querySelectorAll('#overtimeApprovalPage .tab-btn').forEach(btn => {
+                btn.className = 'tab-btn ' + (btn.textContent.includes(status === 'pending' ? '待審' : status === 'approved' ? '已通過' : '已拒絕') ? 'active' : 'inactive');
+            });
+            loadOtApprovals(status);
+        }
+
+        async function loadOtApprovals(status) {
+            const el = document.getElementById('otApprovalList');
+            if (!el) return;
+            el.innerHTML = '<p style="text-align:center;color:#666;">載入中...</p>';
+            try {
+                const { data } = await sb.from('overtime_requests')
+                    .select('*, employees(name, department, employee_number)')
+                    .eq('status', status).order('created_at', { ascending: false }).limit(20);
+                if (!data || data.length === 0) {
+                    el.innerHTML = `<p style="text-align:center;color:#999;">無資料</p>`; return;
+                }
+                const compMap = { pay:'💰 加班費', comp_leave:'🏖️ 換補休' };
+                el.innerHTML = data.map(r => `
+                    <div style="background:#fff;border-radius:14px;padding:14px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,0.06);">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                            <b>${r.employees?.name || '?'}</b>
+                            <span style="font-size:11px;color:#94A3B8;">${r.employees?.department || ''}</span>
+                        </div>
+                        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;font-size:12px;">
+                            <span style="padding:3px 8px;background:#EFF6FF;border-radius:6px;color:#2563EB;font-weight:700;">📅 ${r.ot_date}</span>
+                            <span style="padding:3px 8px;background:#F5F3FF;border-radius:6px;color:#7C3AED;font-weight:700;">⏰ ${r.planned_hours}h</span>
+                            <span style="padding:3px 8px;background:#ECFDF5;border-radius:6px;color:#059669;font-weight:700;">${compMap[r.compensation_type] || ''}</span>
+                        </div>
+                        <div style="font-size:12px;color:#64748B;margin-bottom:6px;">${r.reason || ''}</div>
+                        ${status === 'pending' ? `
+                            <div style="margin-bottom:8px;">
+                                <label style="font-size:12px;font-weight:700;">核准時數：</label>
+                                <input type="number" id="otAH_${r.id}" value="${r.planned_hours}" min="0" max="12" step="0.5" style="width:70px;padding:4px;border:1px solid #E5E7EB;border-radius:6px;">h
+                            </div>
+                            <div style="display:flex;gap:8px;">
+                                <button onclick="approveOt('${r.id}')" style="flex:1;padding:10px;border:none;border-radius:10px;background:#ECFDF5;color:#059669;font-weight:700;cursor:pointer;">✅ 通過</button>
+                                <button onclick="rejectOtPrompt('${r.id}')" style="flex:1;padding:10px;border:none;border-radius:10px;background:#FEF2F2;color:#DC2626;font-weight:700;cursor:pointer;">❌ 拒絕</button>
+                            </div>
+                        ` : ''}
+                        ${r.approved_hours ? `<div style="font-size:11px;color:#059669;">核准 ${r.approved_hours}h${r.final_hours != null ? ' · 計薪 '+r.final_hours+'h' : ''}</div>` : ''}
+                        ${r.rejection_reason ? `<div style="font-size:11px;color:#DC2626;">❌ ${r.rejection_reason}</div>` : ''}
+                    </div>
+                `).join('');
+            } catch(e) { el.innerHTML = '<p style="text-align:center;color:#ef4444;">載入失敗</p>'; }
+        }
+
+        async function approveOt(id) {
+            const h = parseFloat(document.getElementById(`otAH_${id}`)?.value) || 0;
+            if (h <= 0) return showToast('❌ 核准時數需大於 0');
+            try {
+                const { data: req } = await sb.from('overtime_requests').select('*, employees(name, id)').eq('id', id).single();
+                await sb.from('overtime_requests').update({
+                    status:'approved', approved_hours:h, approver_id:currentAdminEmployee?.id, approved_at:new Date().toISOString()
+                }).eq('id', id);
+                writeAuditLog('approve','overtime_requests',id,req?.employees?.name,{approved_hours:h});
+                if (req?.employees?.id) sendUserNotify(req.employees.id,`✅ 加班已通過\n📅 ${req.ot_date} 核准 ${h}h`);
+                showToast('✅ 已通過'); loadOtApprovals('pending');
+            } catch(e) { showToast('❌ 審核失敗'); }
+        }
+        function rejectOtPrompt(id) { const r = prompt('拒絕原因：'); if(r===null) return; rejectOt(id,r); }
+        async function rejectOt(id, reason) {
+            try {
+                await sb.from('overtime_requests').update({
+                    status:'rejected', rejection_reason:reason||'不符合規定',
+                    approver_id:currentAdminEmployee?.id, approved_at:new Date().toISOString()
+                }).eq('id', id);
+                showToast('❌ 已拒絕'); loadOtApprovals('pending');
+            } catch(e) { showToast('❌ 操作失敗'); }
+        }
+
+        // ===== 換班審核 =====
+        async function loadSwapApprovals() {
+            const el = document.getElementById('swapApprovalList');
+            if (!el) return;
+            el.innerHTML = '<p style="text-align:center;color:#666;">載入中...</p>';
+            try {
+                const { data } = await sb.from('shift_swap_requests')
+                    .select('*, requester:employees!shift_swap_requests_requester_id_fkey(name, department), target:employees!shift_swap_requests_target_id_fkey(name, department)')
+                    .in('status', ['pending_admin', 'approved', 'rejected'])
+                    .order('created_at', { ascending: false }).limit(20);
+                
+                if (!data || data.length === 0) { el.innerHTML = '<p style="text-align:center;color:#999;">無換班申請</p>'; return; }
+                
+                const sMap = { pending_admin:'⏳ 待審', approved:'✅ 通過', rejected:'❌ 拒絕' };
+                el.innerHTML = data.map(r => `
+                    <div style="background:#fff;border-radius:14px;padding:14px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,0.06);">
+                        <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+                            <b style="font-size:14px;">${r.requester?.name} ↔ ${r.target?.name}</b>
+                            <span style="font-size:11px;color:#94A3B8;">${sMap[r.status] || r.status}</span>
+                        </div>
+                        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;font-size:12px;">
+                            <span style="padding:3px 8px;background:#EFF6FF;border-radius:6px;color:#2563EB;font-weight:700;">📅 ${r.swap_date}</span>
+                            <span style="padding:3px 8px;background:#FFF7ED;border-radius:6px;color:#EA580C;font-weight:700;">${r.requester_original_shift||'?'} ↔ ${r.target_original_shift||'?'}</span>
+                        </div>
+                        <div style="font-size:11px;color:#64748B;margin-bottom:6px;">✅ 雙方已同意${r.reason ? ' · 原因：'+r.reason : ''}</div>
+                        ${r.status === 'pending_admin' ? `
+                            <div style="display:flex;gap:8px;">
+                                <button onclick="approveSwap('${r.id}')" style="flex:1;padding:10px;border:none;border-radius:10px;background:#ECFDF5;color:#059669;font-weight:700;cursor:pointer;">✅ 核准</button>
+                                <button onclick="rejectSwap('${r.id}')" style="flex:1;padding:10px;border:none;border-radius:10px;background:#FEF2F2;color:#DC2626;font-weight:700;cursor:pointer;">❌ 拒絕</button>
+                            </div>
+                        ` : ''}
+                    </div>
+                `).join('');
+            } catch(e) { el.innerHTML = '<p style="text-align:center;color:#ef4444;">載入失敗</p>'; }
+        }
+
+        async function approveSwap(id) {
+            try {
+                const { data: req } = await sb.from('shift_swap_requests')
+                    .select('*, requester:employees!shift_swap_requests_requester_id_fkey(name, id), target:employees!shift_swap_requests_target_id_fkey(name, id)')
+                    .eq('id', id).single();
+                
+                // 更新狀態
+                await sb.from('shift_swap_requests').update({
+                    status: 'approved', approver_id: currentAdminEmployee?.id, approved_at: new Date().toISOString()
+                }).eq('id', id);
+                
+                // 交換排班表（互相更新 schedules）
+                if (req) {
+                    const date = req.swap_date;
+                    // 取得雙方當日排班
+                    const { data: s1 } = await sb.from('schedules').select('id, shift_type_id').eq('employee_id', req.requester_id).eq('date', date).maybeSingle();
+                    const { data: s2 } = await sb.from('schedules').select('id, shift_type_id').eq('employee_id', req.target_id).eq('date', date).maybeSingle();
+                    
+                    if (s1 && s2) {
+                        // 交換 shift_type_id
+                        await sb.from('schedules').update({ shift_type_id: s2.shift_type_id }).eq('id', s1.id);
+                        await sb.from('schedules').update({ shift_type_id: s1.shift_type_id }).eq('id', s2.id);
+                    }
+                    
+                    writeAuditLog('approve', 'shift_swap_requests', id, `${req.requester?.name} ↔ ${req.target?.name}`, { date });
+                    if (req.requester?.id) sendUserNotify(req.requester.id, `✅ 換班已核准\n📅 ${date} 班表已自動更新`);
+                    if (req.target?.id) sendUserNotify(req.target.id, `✅ 換班已核准\n📅 ${date} 班表已自動更新`);
+                }
+                
+                showToast('✅ 已核准，班表已交換');
+                loadSwapApprovals();
+            } catch(e) { showToast('❌ 審核失敗：' + friendlyError(e)); }
+        }
+
+        async function rejectSwap(id) {
+            const reason = prompt('拒絕原因：');
+            if (reason === null) return;
+            try {
+                await sb.from('shift_swap_requests').update({
+                    status: 'rejected', rejection_reason: reason || '不符規定',
+                    approver_id: currentAdminEmployee?.id, approved_at: new Date().toISOString()
+                }).eq('id', id);
+                showToast('❌ 已拒絕'); loadSwapApprovals();
+            } catch(e) { showToast('❌ 操作失敗'); }
+        }
+
+        // ===== 操作日誌 =====
+        let auditOffset = 0;
+        async function loadAuditLogs(more = false) {
+            const el = document.getElementById('auditLogList');
+            if (!el) return;
+            if (!more) { auditOffset = 0; el.innerHTML = ''; }
+            try {
+                const { data } = await sb.from('hr_audit_logs').select('*').order('created_at',{ascending:false}).range(auditOffset, auditOffset+29);
+                if (!data || data.length === 0) { if(auditOffset===0) el.innerHTML = '<p style="text-align:center;color:#999;">尚無記錄</p>'; return; }
+                const ai = {create:'➕',update:'✏️',delete:'🗑️',approve:'✅',reject:'❌',export:'📊',acknowledge:'✍️'};
+                const al = {create:'新增',update:'修改',delete:'刪除',approve:'通過',reject:'拒絕',export:'匯出',acknowledge:'簽署'};
+                el.innerHTML += data.map(r => `
+                    <div style="padding:8px 0;border-bottom:1px solid #F1F5F9;font-size:13px;">
+                        <div style="display:flex;justify-content:space-between;">
+                            <span>${ai[r.action]||'📝'} <b>${r.actor_name||'?'}</b> ${al[r.action]||r.action} <span style="color:#7C3AED;">${r.target_table||''}</span></span>
+                            <span style="font-size:10px;color:#94A3B8;">${r.created_at?new Date(r.created_at).toLocaleString('zh-TW'):''}</span>
+                        </div>
+                        ${r.target_name?`<div style="font-size:11px;color:#64748B;margin-top:2px;">對象：${r.target_name}</div>`:''}
+                    </div>
+                `).join('');
+                auditOffset += data.length;
+            } catch(e) { el.innerHTML = '<p style="text-align:center;color:#ef4444;">載入失敗</p>'; }
+        }
+
+        // ===== 報表匯出（CSV）=====
+        async function exportReport(type) {
+            showToast(`📊 正在產生報表...`);
+            try {
+                const now = new Date();
+                const y = now.getFullYear(), m = now.getMonth()+1, ms = `${y}-${String(m).padStart(2,'0')}`;
+                let rows = [], fn = '';
+                
+                if (type === 'attendance') {
+                    const { data } = await sb.from('attendance').select('*, employees(name, employee_number, department)').gte('date',ms+'-01').lte('date',ms+'-31').order('date');
+                    rows.push(['日期','工號','姓名','部門','上班','下班','狀態','遲到(分)','補卡','備註']);
+                    (data||[]).forEach(r => rows.push([r.date,r.employees?.employee_number,r.employees?.name,r.employees?.department,r.check_in_time?.split('T')[1]?.substring(0,5)||'',r.check_out_time?.split('T')[1]?.substring(0,5)||'',r.status,r.late_minutes||0,r.is_manual?'是':'',r.notes||'']));
+                    fn = `出勤報表_${ms}.csv`;
+                } else if (type === 'leave') {
+                    const { data } = await sb.from('leave_requests').select('*, employees(name, employee_number, department)').order('created_at',{ascending:false}).limit(200);
+                    const tm = {annual:'特休',sick:'病假',personal:'事假',compensatory:'補休'};
+                    rows.push(['工號','姓名','部門','假別','開始','結束','天數','原因','狀態','拒絕原因']);
+                    (data||[]).forEach(r => rows.push([r.employees?.employee_number,r.employees?.name,r.employees?.department,tm[r.leave_type]||r.leave_type,r.start_date,r.end_date,r.days||1,r.reason||'',r.status,r.rejection_reason||'']));
+                    fn = `請假報表_${ms}.csv`;
+                } else if (type === 'overtime') {
+                    const { data } = await sb.from('overtime_requests').select('*, employees(name, employee_number, department)').order('ot_date',{ascending:false}).limit(200);
+                    rows.push(['工號','姓名','部門','日期','申請h','核准h','實際h','計薪h','補償','狀態']);
+                    (data||[]).forEach(r => rows.push([r.employees?.employee_number,r.employees?.name,r.employees?.department,r.ot_date,r.planned_hours,r.approved_hours||'',r.actual_hours||'',r.final_hours||'',r.compensation_type==='pay'?'加班費':'補休',r.status]));
+                    fn = `加班報表_${ms}.csv`;
+                } else if (type === 'lunch') {
+                    const { data } = await sb.from('lunch_orders').select('*, employees(name, employee_number)').gte('order_date',ms+'-01').lte('order_date',ms+'-31').order('order_date');
+                    rows.push(['日期','工號','姓名','類型','狀態','備註']);
+                    (data||[]).forEach(r => rows.push([r.order_date,r.employees?.employee_number,r.employees?.name,r.is_vegetarian?'素食':'葷食',r.status==='cancelled'?'取消($50)':'已訂',r.notes||'']));
+                    fn = `便當報表_${ms}.csv`;
+                } else if (type === 'bonus') {
+                    const { data } = await sb.from('annual_bonus').select('*, employees(name, employee_number, department)').eq('year',y);
+                    rows.push(['工號','姓名','部門','年資(月)','基本獎金','調整','最終']);
+                    (data||[]).forEach(r => rows.push([r.employees?.employee_number,r.employees?.name,r.employees?.department,r.months_worked,r.base_amount,r.adjustment||0,(r.base_amount||0)+(r.adjustment||0)]));
+                    fn = `獎金報表_${y}.csv`;
+                }
+                
+                if (rows.length <= 1) { showToast('⚠️ 無資料'); return; }
+                const csv = '\uFEFF' + rows.map(r => r.map(c => `"${String(c??'').replace(/"/g,'""')}"`).join(',')).join('\n');
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
+                a.download = fn; a.click();
+                writeAuditLog('export',type,null,fn,{rows:rows.length-1});
+                showToast(`✅ ${fn}（${rows.length-1} 筆）`);
+            } catch(e) { showToast('❌ 匯出失敗：'+friendlyError(e)); }
         }
 
         // 頁面載入

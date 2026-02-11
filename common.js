@@ -154,7 +154,7 @@ function updateUserInfo(data) {
 // ===== 系統設定 =====
 async function loadSettings() {
     try {
-        const { data, error } = await sb.from('system_settings')
+        const { data, error } = await sb.from('hr_settings')
             .select('value')
             .eq('key', 'office_locations')
             .maybeSingle();
@@ -365,7 +365,7 @@ async function checkLeaveAvailability(startDate, endDate) {
         // 1. 讀取最大同時請假人數設定
         let maxConcurrent = 2; // 預設
         try {
-            const { data: setting } = await sb.from('system_settings')
+            const { data: setting } = await sb.from('hr_settings')
                 .select('value').eq('key', 'max_concurrent_leave').maybeSingle();
             if (setting?.value?.max) maxConcurrent = setting.value.max;
         } catch(e) {}
@@ -548,6 +548,18 @@ async function submitMakeupPunch() {
     
     if (!date || !time || !reasonType) return showToast('❌ 請填寫完整');
     
+    // ⭐ 每月補打卡限制 3 次
+    const monthStart = date.substring(0, 7) + '-01';
+    const monthEnd = date.substring(0, 7) + '-31';
+    const { data: monthCount } = await sb.from('makeup_punch_requests')
+        .select('id', { count: 'exact' })
+        .eq('employee_id', currentEmployee.id)
+        .gte('punch_date', monthStart).lte('punch_date', monthEnd)
+        .in('status', ['pending', 'approved']);
+    if (monthCount && monthCount.length >= 3) {
+        return showToast('❌ 本月補打卡已達上限（3 次/月）');
+    }
+    
     const reason = `[${{'forgot':'忘記打卡','field':'外出公務','phone_dead':'手機沒電','system_error':'系統故障','other':'其他'}[reasonType] || reasonType}] ${reasonText || ''}`.trim();
     
     const statusEl = document.getElementById('mpStatus');
@@ -621,7 +633,7 @@ async function loadMakeupHistory() {
 // ===== LINE Notify 推播 =====
 async function sendAdminNotify(message) {
     try {
-        const { data: setting } = await sb.from('system_settings')
+        const { data: setting } = await sb.from('hr_settings')
             .select('value').eq('key', 'line_notify_token').maybeSingle();
         if (!setting?.value?.token) return;
         
@@ -653,7 +665,7 @@ async function loadAnnouncements() {
     
     try {
         const todayStr = new Date().toISOString().split('T')[0];
-        const { data } = await sb.from('system_settings')
+        const { data } = await sb.from('hr_settings')
             .select('value').eq('key', 'announcements').maybeSingle();
         
         if (!data?.value?.items || data.value.items.length === 0) {
@@ -685,6 +697,194 @@ async function loadAnnouncements() {
             </div>`;
         }).join('');
     } catch(e) { el.style.display = 'none'; }
+}
+
+// ===== 加班申請 =====
+async function submitOvertime() {
+    if (!currentEmployee) return showToast('❌ 請先登入');
+    const date = document.getElementById('otDate')?.value;
+    const hours = parseFloat(document.getElementById('otHours')?.value);
+    const reason = document.getElementById('otReason')?.value;
+    const compType = document.getElementById('otCompType')?.value || 'pay';
+    const statusEl = document.getElementById('otStatus');
+    
+    if (!date || !hours || !reason) return showToast('❌ 請填寫完整');
+    if (hours <= 0 || hours > 12) return showToast('❌ 加班時數需為 0.5~12 小時');
+    
+    try {
+        const { error } = await sb.from('overtime_requests').insert({
+            employee_id: currentEmployee.id,
+            ot_date: date,
+            planned_hours: hours,
+            reason: reason,
+            compensation_type: compType,
+            status: 'pending'
+        });
+        if (error) throw error;
+        
+        showToast('✅ 加班申請已提交');
+        if (statusEl) { statusEl.className = 'status-box show success'; statusEl.innerHTML = '✅ 已提交，等待審核'; }
+        loadOvertimeHistory();
+        
+        const compLabel = compType === 'pay' ? '加班費' : '補休';
+        sendAdminNotify(`🔔 ${currentEmployee.name} 申請加班\n📅 ${date}（${hours}小時）\n💰 ${compLabel}\n📝 ${reason}`);
+        
+        if (document.getElementById('otReason')) document.getElementById('otReason').value = '';
+    } catch(e) {
+        showToast('❌ 申請失敗：' + friendlyError(e));
+    }
+}
+
+async function loadOvertimeHistory() {
+    const list = document.getElementById('overtimeHistoryList');
+    if (!currentEmployee || !list) return;
+    
+    try {
+        const { data } = await sb.from('overtime_requests')
+            .select('*')
+            .eq('employee_id', currentEmployee.id)
+            .order('created_at', { ascending: false })
+            .limit(10);
+        
+        if (!data || data.length === 0) {
+            list.innerHTML = '<p style="text-align:center;color:#999;font-size:13px;">尚無加班記錄</p>';
+            return;
+        }
+        
+        const statusMap = { pending:'⏳ 待審', approved:'✅ 通過', rejected:'❌ 拒絕' };
+        const statusColor = { pending:'#F59E0B', approved:'#059669', rejected:'#DC2626' };
+        const compMap = { pay:'💰 加班費', comp_leave:'🏖 補休' };
+        
+        list.innerHTML = data.map(r => `
+            <div class="attendance-item" style="border-left:3px solid ${statusColor[r.status] || '#ccc'};">
+                <div class="date">
+                    <span>📅 ${r.ot_date}（${r.planned_hours}h）</span>
+                    <span class="badge" style="background:${statusColor[r.status]}20;color:${statusColor[r.status]};">${statusMap[r.status]}</span>
+                </div>
+                <div style="display:flex;gap:8px;margin-top:4px;">
+                    <span style="font-size:11px;padding:2px 8px;background:#F5F3FF;border-radius:6px;color:#7C3AED;">${compMap[r.compensation_type] || r.compensation_type}</span>
+                    ${r.actual_hours != null ? `<span style="font-size:11px;padding:2px 8px;background:#ECFDF5;border-radius:6px;color:#059669;">實際 ${r.actual_hours}h</span>` : ''}
+                </div>
+                <div style="font-size:12px;color:#666;margin-top:4px;">${r.reason || ''}</div>
+                ${r.status === 'rejected' && r.rejection_reason ? 
+                    `<div style="font-size:12px;color:#DC2626;margin-top:4px;padding:6px 8px;background:#FEF2F2;border-radius:6px;">❌ ${r.rejection_reason}</div>` : ''}
+            </div>
+        `).join('');
+    } catch(e) {
+        list.innerHTML = '<p style="text-align:center;color:#ef4444;">載入失敗</p>';
+    }
+}
+
+// ===== 勞健保級距查表 =====
+async function getInsuranceBracket(monthlySalary) {
+    try {
+        const { data } = await sb.from('insurance_brackets')
+            .select('*')
+            .eq('active', true)
+            .lte('min_salary', Math.round(monthlySalary))
+            .gte('max_salary', Math.round(monthlySalary))
+            .limit(1)
+            .single();
+        
+        if (data) {
+            return {
+                insured_salary: data.insured_salary,
+                labor_self: Math.round(data.insured_salary * data.labor_rate * data.labor_self_ratio),
+                health_self: Math.round(data.insured_salary * data.health_rate * data.health_self_ratio),
+                labor_rate: data.labor_rate,
+                health_rate: data.health_rate
+            };
+        }
+    } catch(e) { console.log('級距查表失敗，使用預設', e); }
+    
+    // Fallback：直接算（舊邏輯）
+    return {
+        insured_salary: monthlySalary,
+        labor_self: Math.round(monthlySalary * 0.125 * 0.2),
+        health_self: Math.round(monthlySalary * 0.0517 * 0.3),
+        labor_rate: 0.125,
+        health_rate: 0.0517
+    };
+}
+
+// ===== 公告強制簽署 =====
+async function checkPendingAcknowledgments() {
+    if (!currentEmployee) return;
+    
+    try {
+        const { data: settings } = await sb.from('hr_settings')
+            .select('value').eq('key', 'announcements').maybeSingle();
+        
+        if (!settings?.value?.items) return;
+        
+        const todayStr = new Date().toISOString().split('T')[0];
+        const forceRead = settings.value.items.filter(a => 
+            a.require_ack && 
+            (!a.expire_date || a.expire_date >= todayStr)
+        );
+        
+        if (forceRead.length === 0) return;
+        
+        // 查哪些還沒簽
+        const { data: acked } = await sb.from('announcement_acknowledgments')
+            .select('announcement_id')
+            .eq('employee_id', currentEmployee.id);
+        
+        const ackedIds = new Set((acked || []).map(a => a.announcement_id));
+        const pending = forceRead.filter(a => !ackedIds.has(a.id));
+        
+        if (pending.length === 0) return;
+        
+        // 顯示第一個未簽署公告
+        showAckModal(pending[0]);
+    } catch(e) { console.log('公告簽署檢查失敗', e); }
+}
+
+function showAckModal(announcement) {
+    const typeIcon = { info:'📢', warning:'⚠️', urgent:'🚨', event:'🎉' };
+    const existing = document.getElementById('ackOverlay');
+    if (existing) existing.remove();
+    
+    const overlay = document.createElement('div');
+    overlay.id = 'ackOverlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
+    
+    overlay.innerHTML = `
+        <div style="background:#fff;border-radius:20px;max-width:400px;width:100%;max-height:80vh;overflow-y:auto;padding:24px;">
+            <div style="text-align:center;font-size:32px;margin-bottom:12px;">${typeIcon[announcement.type] || '📌'}</div>
+            <h2 style="text-align:center;font-size:18px;font-weight:900;color:#0F172A;margin-bottom:12px;">${announcement.title}</h2>
+            ${announcement.content ? `<div style="font-size:14px;color:#475569;line-height:1.8;padding:16px;background:#F8FAFC;border-radius:12px;margin-bottom:16px;white-space:pre-wrap;">${announcement.content}</div>` : ''}
+            <div style="font-size:11px;color:#94A3B8;text-align:center;margin-bottom:16px;">
+                發布者：${announcement.created_by || '管理員'} · ${announcement.created_at ? new Date(announcement.created_at).toLocaleDateString() : ''}
+            </div>
+            <button onclick="acknowledgeAnnouncement('${announcement.id}')" style="width:100%;padding:14px;background:linear-gradient(135deg,#4F46E5,#7C3AED);color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:800;cursor:pointer;">
+                ✅ 我已閱讀並了解
+            </button>
+            <p style="font-size:10px;color:#94A3B8;text-align:center;margin-top:8px;">必須確認後才能繼續使用系統</p>
+        </div>
+    `;
+    
+    document.body.appendChild(overlay);
+}
+
+async function acknowledgeAnnouncement(announcementId) {
+    if (!currentEmployee) return;
+    
+    try {
+        await sb.from('announcement_acknowledgments').insert({
+            announcement_id: announcementId,
+            employee_id: currentEmployee.id
+        });
+        
+        const overlay = document.getElementById('ackOverlay');
+        if (overlay) overlay.remove();
+        showToast('✅ 已確認');
+        
+        // 檢查是否還有其他待簽署
+        setTimeout(() => checkPendingAcknowledgments(), 500);
+    } catch(e) {
+        showToast('❌ 確認失敗');
+    }
 }
 
 // ===== 月度出勤查詢 =====
@@ -1060,7 +1260,7 @@ async function initBottomNav() {
 }
 
 // ===== 功能顯示設定 =====
-// 管理員可在 system_settings 中設定哪些功能對員工可見
+// 管理員可在 hr_settings 中設定哪些功能對員工可見
 // key: 'feature_visibility', value: { leave: true, lunch: true, attendance: true }
 const DEFAULT_FEATURES = {
     leave: true,        // 我要請假
@@ -1070,7 +1270,7 @@ const DEFAULT_FEATURES = {
 
 async function getFeatureVisibility() {
     try {
-        const { data } = await sb.from('system_settings')
+        const { data } = await sb.from('hr_settings')
             .select('value')
             .eq('key', 'feature_visibility')
             .maybeSingle();
@@ -1102,6 +1302,193 @@ async function applyFeatureVisibility() {
             }
         }
     });
+}
+
+// ===== 加班申請 =====
+async function submitOvertime() {
+    if (!currentEmployee) return showToast('❌ 請先登入');
+    const date = document.getElementById('otDate')?.value;
+    const hours = parseFloat(document.getElementById('otHours')?.value);
+    const reason = document.getElementById('otReason')?.value;
+    const compType = document.getElementById('otCompType')?.value || 'pay';
+    const statusEl = document.getElementById('otStatus');
+    
+    if (!date || !hours || hours <= 0) return showToast('❌ 請填寫日期與時數');
+    if (hours > 12) return showToast('❌ 加班時數不可超過 12 小時');
+    
+    try {
+        const { error } = await sb.from('overtime_requests').insert({
+            employee_id: currentEmployee.id,
+            ot_date: date,
+            planned_hours: hours,
+            reason: reason || '',
+            compensation_type: compType,
+            status: 'pending'
+        });
+        if (error) throw error;
+        
+        showToast('✅ 加班申請已提交');
+        if (statusEl) { statusEl.className = 'status-box show success'; statusEl.innerHTML = '✅ 申請已提交，等待審核'; }
+        loadOvertimeHistory();
+        
+        const compLabel = compType === 'pay' ? '加班費' : '補休';
+        sendAdminNotify(`🔔 ${currentEmployee.name} 申請加班\n📅 ${date} ${hours}小時\n💰 ${compLabel}\n📝 ${reason || '無附原因'}`);
+    } catch(e) {
+        showToast('❌ 申請失敗：' + friendlyError(e));
+    }
+}
+
+async function loadOvertimeHistory() {
+    const list = document.getElementById('overtimeHistoryList');
+    if (!currentEmployee || !list) return;
+    
+    try {
+        const { data } = await sb.from('overtime_requests')
+            .select('*')
+            .eq('employee_id', currentEmployee.id)
+            .order('created_at', { ascending: false })
+            .limit(10);
+        
+        if (!data || data.length === 0) {
+            list.innerHTML = '<p style="text-align:center;color:#999;font-size:13px;">尚無加班記錄</p>';
+            return;
+        }
+        
+        const statusMap = { pending: '⏳ 待審', approved: '✅ 通過', rejected: '❌ 拒絕' };
+        const statusColor = { pending: '#F59E0B', approved: '#059669', rejected: '#DC2626' };
+        
+        list.innerHTML = data.map(r => {
+            const comp = r.compensation_type === 'pay' ? '💰 加班費' : '🏖️ 換補休';
+            const finalH = r.final_hours != null ? ` → 計薪 ${r.final_hours}h` : '';
+            return `
+            <div class="attendance-item" style="border-left:3px solid ${statusColor[r.status] || '#ccc'};">
+                <div class="date">
+                    <span>📅 ${r.ot_date} · ${r.planned_hours}h · ${comp}</span>
+                    <span class="badge ${r.status === 'approved' ? 'badge-success' : r.status === 'rejected' ? 'badge-danger' : 'badge-warning'}">
+                        ${statusMap[r.status]}${finalH}
+                    </span>
+                </div>
+                <div style="font-size:12px;color:#666;margin-top:4px;">${r.reason || ''}</div>
+                ${r.status === 'approved' && r.approved_hours ? `<div style="font-size:11px;color:#059669;margin-top:2px;">核准 ${r.approved_hours}h${r.actual_hours != null ? ` · 實際 ${r.actual_hours}h` : ''}${finalH}</div>` : ''}
+                ${r.status === 'rejected' && r.rejection_reason ? `<div style="font-size:12px;color:#DC2626;margin-top:4px;padding:6px 8px;background:#FEF2F2;border-radius:6px;">❌ ${r.rejection_reason}</div>` : ''}
+            </div>`;
+        }).join('');
+    } catch(e) {
+        list.innerHTML = '<p style="text-align:center;color:#ef4444;">載入失敗</p>';
+    }
+}
+
+// ===== 操作日誌 =====
+async function writeAuditLog(action, targetTable, targetId, targetName, details = null) {
+    try {
+        await sb.from('hr_audit_logs').insert({
+            actor_id: currentEmployee?.id || null,
+            actor_name: currentEmployee?.name || 'System',
+            action, target_table: targetTable,
+            target_id: String(targetId || ''),
+            target_name: targetName || '',
+            details: details
+        });
+    } catch(e) { console.log('Audit log failed (non-critical)', e); }
+}
+
+// ===== 強制公告簽署 =====
+async function checkForcedAnnouncements() {
+    if (!currentEmployee) return;
+    try {
+        const { data: settingData } = await sb.from('hr_settings')
+            .select('value').eq('key', 'announcements').maybeSingle();
+        if (!settingData?.value?.items) return;
+        
+        const todayStr = new Date().toISOString().split('T')[0];
+        const forced = settingData.value.items.filter(a => 
+            a.require_ack && (!a.expire_date || a.expire_date >= todayStr)
+        );
+        if (forced.length === 0) return;
+        
+        // 查已簽署記錄
+        const ids = forced.map(a => a.id);
+        const { data: acks } = await sb.from('announcement_acknowledgments')
+            .select('announcement_id')
+            .eq('employee_id', currentEmployee.id)
+            .in('announcement_id', ids);
+        
+        const ackedIds = new Set((acks || []).map(a => a.announcement_id));
+        const unacked = forced.filter(a => !ackedIds.has(a.id));
+        
+        if (unacked.length === 0) return;
+        
+        // 顯示強制閱讀 Modal
+        showForcedAnnouncementModal(unacked[0]);
+    } catch(e) { console.log('Forced announcement check failed', e); }
+}
+
+function showForcedAnnouncementModal(announcement) {
+    const existing = document.getElementById('forcedAnnModal');
+    if (existing) existing.remove();
+    
+    const typeIcon = { info:'📢', warning:'⚠️', urgent:'🚨', event:'🎉' }[announcement.type] || '📌';
+    const typeColor = { info:'#2563EB', warning:'#EA580C', urgent:'#DC2626', event:'#7C3AED' }[announcement.type] || '#64748B';
+    
+    const modal = document.createElement('div');
+    modal.id = 'forcedAnnModal';
+    modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;';
+    modal.innerHTML = `
+        <div style="background:#fff;border-radius:20px;max-width:380px;width:100%;padding:24px;animation:pageIn 0.3s ease-out;">
+            <div style="text-align:center;font-size:36px;margin-bottom:12px;">${typeIcon}</div>
+            <h3 style="text-align:center;font-size:18px;font-weight:800;color:${typeColor};margin-bottom:12px;">${announcement.title}</h3>
+            ${announcement.content ? `<div style="font-size:14px;color:#374151;line-height:1.8;padding:14px;background:#F8FAFC;border-radius:12px;margin-bottom:16px;max-height:300px;overflow-y:auto;">${announcement.content.replace(/\n/g, '<br>')}</div>` : ''}
+            <div style="font-size:11px;color:#94A3B8;text-align:center;margin-bottom:16px;">
+                發布者：${announcement.created_by || '-'} · ${announcement.created_at ? new Date(announcement.created_at).toLocaleDateString() : ''}
+            </div>
+            <button id="forcedAckBtn" onclick="acknowledgeForcedAnnouncement('${announcement.id}')" 
+                style="width:100%;padding:14px;border:none;border-radius:12px;background:${typeColor};color:#fff;font-size:15px;font-weight:800;cursor:pointer;">
+                ✅ 我已閱讀並確認
+            </button>
+            <p style="font-size:10px;color:#94A3B8;text-align:center;margin-top:8px;">確認後才能繼續使用系統</p>
+        </div>
+    `;
+    document.body.appendChild(modal);
+}
+
+async function acknowledgeForcedAnnouncement(announcementId) {
+    const btn = document.getElementById('forcedAckBtn');
+    if (btn) { btn.disabled = true; btn.textContent = '處理中...'; }
+    
+    try {
+        await sb.from('announcement_acknowledgments').insert({
+            announcement_id: announcementId,
+            employee_id: currentEmployee.id
+        });
+        
+        writeAuditLog('acknowledge', 'announcements', announcementId, currentEmployee.name, { announcement_id: announcementId });
+        
+        const modal = document.getElementById('forcedAnnModal');
+        if (modal) modal.remove();
+        showToast('✅ 已確認');
+        
+        // 檢查是否還有未簽署的
+        setTimeout(() => checkForcedAnnouncements(), 300);
+    } catch(e) {
+        showToast('❌ 確認失敗');
+        if (btn) { btn.disabled = false; btn.textContent = '✅ 我已閱讀並確認'; }
+    }
+}
+
+// ===== 勞健保級距查表 =====
+async function getInsuranceBracket(monthlySalary) {
+    try {
+        const { data } = await sb.rpc('get_insurance_bracket', { p_salary: monthlySalary });
+        if (data && data.length > 0) return data[0];
+    } catch(e) { console.log('級距查詢失敗，使用預設計算', e); }
+    
+    // fallback: 直接計算
+    return {
+        insured_amount: monthlySalary,
+        labor_self: Math.round(monthlySalary * 0.125 * 0.2),
+        health_self: Math.round(monthlySalary * 0.0517 * 0.3),
+        pension: Math.round(monthlySalary * 0.06)
+    };
 }
 
 // ===== Debug 模式 =====
