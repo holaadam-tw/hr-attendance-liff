@@ -391,6 +391,28 @@
                 </div>
                 <div id="featureSaveStatus" style="margin-top:12px;text-align:center;font-size:13px;color:#059669;display:none;">✅ 已儲存</div>
                 <p style="color:#94A3B8;font-size:12px;margin-top:16px;text-align:center;">💡 底部導航列（首頁/班表/打卡/薪資/管理）為管理員專屬，不受此設定影響</p>
+
+                <!-- LINE Notify 設定 -->
+                <div style="margin-top:30px;padding-top:20px;border-top:2px dashed #e5e7eb;">
+                    <h3 style="margin-bottom:12px;">🔔 LINE Notify 推播設定</h3>
+                    <p style="color:#94A3B8;font-size:12px;margin-bottom:12px;">設定後，請假/補打卡申請會自動推播通知管理員群組</p>
+                    <div class="form-group">
+                        <label>LINE Notify Token</label>
+                        <input type="text" id="lineNotifyToken" placeholder="請貼上 LINE Notify Token">
+                    </div>
+                    <div style="display:flex;gap:8px;">
+                        <button class="btn btn-primary" onclick="saveNotifyToken()" style="flex:1;">💾 儲存</button>
+                        <button class="btn btn-secondary" onclick="testNotify()" style="flex:1;">🔔 測試推播</button>
+                    </div>
+                    <div id="notifyStatus" style="margin-top:8px;text-align:center;font-size:13px;display:none;"></div>
+                    <div style="margin-top:12px;padding:10px;background:#FFF7ED;border-radius:10px;font-size:11px;color:#EA580C;line-height:1.6;">
+                        📌 如何取得 Token：<br>
+                        1. 前往 <b>notify-bot.line.me</b><br>
+                        2. 登入 → 發行權杖<br>
+                        3. 選擇要接收通知的群組<br>
+                        4. 複製 Token 貼到上方
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -548,12 +570,54 @@
             if (id === 'leaveApprovalPage') loadLeaveApprovals('pending');
             if (id === 'makeupApprovalPage') loadMakeupApprovals('pending');
             if (id === 'announcementPage') loadAnnouncementList();
-            if (id === 'featurePage') loadFeatureSettings();
+            if (id === 'featurePage') { loadFeatureSettings(); loadNotifyToken(); }
             if (id === 'staffMgrPage') { loadShiftMgr(); loadMaxLeaveSetting(); loadStaffOverview(); }
         }
 
         // ===== 功能管理 =====
         let featureState = { leave: true, lunch: true, attendance: true };
+
+        // LINE Notify 設定
+        async function loadNotifyToken() {
+            try {
+                const { data } = await sb.from('system_settings')
+                    .select('value').eq('key', 'line_notify_token').maybeSingle();
+                if (data?.value?.token) {
+                    const el = document.getElementById('lineNotifyToken');
+                    if (el) el.value = data.value.token;
+                }
+            } catch(e) {}
+        }
+
+        async function saveNotifyToken() {
+            const token = document.getElementById('lineNotifyToken')?.value?.trim();
+            if (!token) return showToast('❌ 請輸入 Token');
+            const status = document.getElementById('notifyStatus');
+            try {
+                const { data: existing } = await sb.from('system_settings')
+                    .select('id').eq('key', 'line_notify_token').maybeSingle();
+                if (existing) {
+                    await sb.from('system_settings').update({ value: { token }, updated_at: new Date().toISOString() }).eq('key', 'line_notify_token');
+                } else {
+                    await sb.from('system_settings').insert({ key: 'line_notify_token', value: { token }, description: 'LINE Notify 推播 Token' });
+                }
+                showToast('✅ Token 已儲存');
+                if (status) { status.style.display = 'block'; status.style.color = '#059669'; status.textContent = '✅ 已儲存'; }
+            } catch(e) { showToast('❌ 儲存失敗'); }
+        }
+
+        async function testNotify() {
+            const status = document.getElementById('notifyStatus');
+            if (status) { status.style.display = 'block'; status.style.color = '#6D28D9'; status.textContent = '⏳ 發送測試...'; }
+            try {
+                await sendAdminNotify('🔔 HR 系統推播測試\n如果您收到此訊息，表示 LINE Notify 設定成功！');
+                showToast('✅ 測試推播已發送');
+                if (status) { status.style.color = '#059669'; status.textContent = '✅ 推播成功！請查看 LINE 群組'; }
+            } catch(e) {
+                showToast('❌ 推播失敗');
+                if (status) { status.style.color = '#DC2626'; status.textContent = '❌ 推播失敗，請檢查 Token 或 Edge Function'; }
+            }
+        }
 
         async function loadFeatureSettings() {
             try {
@@ -967,6 +1031,11 @@
                             <div style="font-size:12px;color:#666;margin-top:5px;">
                                 ${request.reason || '無原因'}
                             </div>
+                            ${request.status === 'rejected' && request.rejection_reason ? `
+                                <div style="font-size:12px;color:#DC2626;margin-top:6px;padding:8px 10px;background:#FEF2F2;border-radius:8px;">
+                                    ❌ 拒絕原因：${request.rejection_reason}
+                                </div>
+                            ` : ''}
                             ${status === 'pending' ? `
                                 <div style="margin-top:8px;display:flex;gap:6px;">
                                     <button class="btn-success" onclick="approveLeave('${request.id}', 'approved')" style="flex:1;font-size:12px;padding:8px;border:none;border-radius:8px;cursor:pointer;">
@@ -990,16 +1059,44 @@
         }
 
         async function approveLeave(requestId, newStatus) {
+            // 拒絕時要求填原因
+            let rejectionReason = null;
+            if (newStatus === 'rejected') {
+                rejectionReason = prompt('請輸入拒絕原因（選填）：');
+                if (rejectionReason === null) return; // 按取消 = 不操作
+            }
+
             try {
+                const updateData = { 
+                    status: newStatus,
+                    approver_id: currentAdminEmployee.id,
+                    approved_at: new Date().toISOString()
+                };
+                if (newStatus === 'rejected') {
+                    updateData.rejection_reason = rejectionReason || '不符合規定';
+                }
+
+                // 先查請假資訊（用於通知）
+                const { data: reqData } = await sb.from('leave_requests')
+                    .select('*, employees(name, id)')
+                    .eq('id', requestId).single();
+
                 const { error } = await sb.from('leave_requests')
-                    .update({ 
-                        status: newStatus,
-                        approver_id: currentAdminEmployee.id,
-                        approved_at: new Date().toISOString()
-                    })
+                    .update(updateData)
                     .eq('id', requestId);
 
                 if (error) throw error;
+
+                // LINE Notify 通知員工
+                if (reqData?.employees?.id) {
+                    const typeMap = { annual:'特休', sick:'病假', personal:'事假', compensatory:'補休' };
+                    const typeName = typeMap[reqData.leave_type] || reqData.leave_type;
+                    if (newStatus === 'approved') {
+                        sendUserNotify(reqData.employees.id, `✅ 您的${typeName}申請已通過\n📅 ${reqData.start_date} ~ ${reqData.end_date}`);
+                    } else {
+                        sendUserNotify(reqData.employees.id, `❌ 您的${typeName}申請已被拒絕\n📅 ${reqData.start_date} ~ ${reqData.end_date}\n原因：${updateData.rejection_reason}`);
+                    }
+                }
 
                 showToast(`✅ 請假申請已${newStatus === 'approved' ? '通過' : '拒絕'}`);
                 loadLeaveApprovals('pending');

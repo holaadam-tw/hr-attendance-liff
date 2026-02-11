@@ -315,9 +315,9 @@ async function handleBind() {
 
 // ===== 便當功能 =====
 async function loadLunchSummary() {
-    const dateStr = getTaiwanDate(1);
+    const dateStr = getTaiwanDate(0); // 今天（與 checkMyOrder 一致）
     const lunchDateEl = document.getElementById('lunchDate');
-    if (lunchDateEl) lunchDateEl.value = dateStr;
+    if (lunchDateEl && !lunchDateEl.value) lunchDateEl.value = dateStr;
     
     try {
         const { data } = await sb.rpc('get_lunch_summary', { p_date: dateStr });
@@ -473,6 +473,10 @@ async function submitLeave() {
         // 清除衝突提示
         const warn = document.getElementById('leaveConflictWarn');
         if (warn) warn.style.display = 'none';
+        
+        // 通知管理員
+        const typeNames = { annual:'特休', sick:'病假', personal:'事假', compensatory:'補休' };
+        sendAdminNotify(`🔔 ${currentEmployee.name} 申請${typeNames[type]||type}\n📅 ${start} ~ ${end}\n📝 ${reason || '無附原因'}`);
     } catch(e) { 
         showToast('❌ 申請失敗：' + friendlyError(e)); 
     }
@@ -1031,30 +1035,6 @@ async function adjustEmployeeBonus(employeeId, year, bonusAmount, reason) {
         return { success: true };
     } catch (err) {
         console.error('調整獎金失敗:', err);
-        return { success: false, error: err.message };
-    }
-}
-
-async function approveLeaveRequest(requestId, status, approverId, rejectionReason = null) {
-    try {
-        const updateData = {
-            status: status,
-            approver_id: approverId,
-            approved_at: new Date().toISOString()
-        };
-        
-        if (status === 'rejected' && rejectionReason) {
-            updateData.rejection_reason = rejectionReason;
-        }
-        
-        const { error } = await sb.from('leave_requests')
-            .update(updateData)
-            .eq('id', requestId);
-        
-        if (error) throw error;
-        return { success: true };
-    } catch (err) {
-        console.error('審核請假失敗:', err);
         return { success: false, error: err.message };
     }
 }
