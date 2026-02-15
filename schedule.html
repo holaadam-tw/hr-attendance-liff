@@ -337,7 +337,7 @@
             // 載入同事列表
             try {
                 const { data } = await sb.from('employees')
-                    .select('id, name, department').eq('status','active').neq('id', currentEmployee.id).order('name');
+                    .select('id, name, department').eq('is_active', true).neq('id', currentEmployee.id).order('name');
                 const sel = document.getElementById('swapTarget');
                 sel.innerHTML = '<option value="">-- 請選擇同事 --</option>';
                 (data||[]).forEach(e => { sel.innerHTML += `<option value="${e.id}">${e.name}（${e.department||''}）</option>`; });

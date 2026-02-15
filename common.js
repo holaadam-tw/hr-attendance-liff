@@ -465,7 +465,7 @@ async function checkLeaveAvailability(startDate, endDate) {
         // 4. 查排班資料，看該日是否人手不足（用 count 避免拉全部員工資料）
         let staffWarning = '';
         try {
-            const { count: totalCount } = await sb.from('employees').select('id', { count: 'exact', head: true }).eq('status', 'active');
+            const { count: totalCount } = await sb.from('employees').select('id', { count: 'exact', head: true }).eq('is_active', true);
 
             if (totalCount > 0 && maxDayConflict + 1 >= totalCount) {
                 staffWarning = `⚠️ 若核准此假，最少只剩 ${totalCount - maxDayConflict - 1} 人上班`;

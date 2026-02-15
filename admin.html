@@ -914,6 +914,7 @@
                 hire_date: document.getElementById('newEmployeeHireDate').value,
                 role: document.getElementById('newEmployeeRole').value,
                 is_active: true,
+                status: 'active',
                 company_id: '8a669e2c-7521-43e9-9300-5c004c57e9db',
                 created_at: new Date().toISOString()
             };
@@ -1219,7 +1220,7 @@
             const el = document.getElementById('staffOverview');
             if (!el) return;
             try {
-                const { data: emps } = await sb.from('employees').select('id, status').eq('status', 'active');
+                const { data: emps } = await sb.from('employees').select('id, is_active').eq('is_active', true);
                 const total = emps?.length || 0;
                 if (total === 0) {
                     el.innerHTML = `
@@ -1279,7 +1280,7 @@
 
             let employees = [], leaves = [];
             try {
-                const { data: emps } = await sb.from('employees').select('id, name, department').eq('status', 'active').order('department').order('name');
+                const { data: emps } = await sb.from('employees').select('id, name, department').eq('is_active', true).order('department').order('name');
                 employees = emps || [];
                 const { data: lvs } = await sb.from('leave_requests').select('employee_id, start_date, end_date, leave_type, status')
                     .in('status', ['approved', 'pending']).or(`and(start_date.lte.${me},end_date.gte.${ms})`);
@@ -1434,7 +1435,7 @@
             document.getElementById('shiftDaySummary').innerHTML = '';
 
             try {
-                const { data: emps } = await sb.from('employees').select('id, name, department').eq('status', 'active').order('name');
+                const { data: emps } = await sb.from('employees').select('id, name, department').eq('is_active', true).order('name');
                 smEmployees = emps || [];
                 const { data: scheds } = await sb.from('schedules').select('employee_id, date, shift_type_id, shift_types(name, code)')
                     .gte('date', startStr).lte('date', endStr);
