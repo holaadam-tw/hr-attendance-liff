@@ -1,10 +1,9 @@
 // ================= 設定與初始化 =================
-const CONFIG = {
-    LIFF_ID: '2008962829-bnsS1bbB',
-    SUPABASE_URL: 'https://nssuisyvlrqnqfxupklb.supabase.co',
-    SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5zc3Vpc3l2bHJxbnFmeHVwa2xiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkyOTAwMzUsImV4cCI6MjA4NDg2NjAzNX0.q_B6v3gf1TOCuAq7z0xIw10wDueCSJn0p37VzdMfmbc',
-    BUCKET: 'selfies'
-};
+// CONFIG 由外部 config.js 提供（請參考 config.example.js）
+if (typeof CONFIG === 'undefined') {
+    document.body.innerHTML = '<div style="padding:40px;text-align:center;color:#DC2626;"><h2>⚠️ 設定檔缺失</h2><p>請複製 <code>config.example.js</code> 為 <code>config.js</code> 並填入實際設定值</p></div>';
+    throw new Error('config.js 未載入，請確認檔案存在且在 common.js 之前引入');
+}
 
 const sb = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
 
