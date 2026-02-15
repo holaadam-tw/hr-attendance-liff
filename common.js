@@ -199,24 +199,24 @@ let _settingsCache = null; // { key: value, ... }
 async function loadSettings() {
     try {
         // 優先從 sessionStorage 讀取快取（跨頁共用，減少 API 呼叫）
-        const cached = sessionStorage.getItem('hr_settings_cache');
+        const cached = sessionStorage.getItem('system_settings_cache');
         if (cached) {
             try {
                 _settingsCache = JSON.parse(cached);
                 officeLocations = _settingsCache['office_locations'] || [];
                 return;
-            } catch(e) { sessionStorage.removeItem('hr_settings_cache'); }
+            } catch(e) { sessionStorage.removeItem('system_settings_cache'); }
         }
 
-        // 一次查出所有 hr_settings，避免多次查詢
-        const { data, error } = await sb.from('hr_settings')
+        // 一次查出所有 system_settings，避免多次查詢
+        const { data, error } = await sb.from('system_settings')
             .select('key, value');
         if (!error && data) {
             _settingsCache = {};
             data.forEach(row => { _settingsCache[row.key] = row.value; });
             officeLocations = _settingsCache['office_locations'] || [];
             // 寫入 sessionStorage（關閉瀏覽器自動清除）
-            try { sessionStorage.setItem('hr_settings_cache', JSON.stringify(_settingsCache)); } catch(e) {}
+            try { sessionStorage.setItem('system_settings_cache', JSON.stringify(_settingsCache)); } catch(e) {}
         }
     } catch (e) {
         console.error('載入設定失敗', e);
@@ -226,10 +226,10 @@ async function loadSettings() {
 // 清除設定快取（管理員修改設定後呼叫）
 function invalidateSettingsCache() {
     _settingsCache = null;
-    try { sessionStorage.removeItem('hr_settings_cache'); } catch(e) {}
+    try { sessionStorage.removeItem('system_settings_cache'); } catch(e) {}
 }
 
-// 從快取取得 hr_settings 的值，避免重複查詢 DB
+// 從快取取得 system_settings 的值，避免重複查詢 DB
 function getCachedSetting(key) {
     return _settingsCache ? _settingsCache[key] : null;
 }
@@ -1135,7 +1135,7 @@ function initBottomNav() {
 }
 
 // ===== 功能顯示設定 =====
-// 管理員可在 hr_settings 中設定哪些功能對員工可見
+// 管理員可在 system_settings 中設定哪些功能對員工可見
 // key: 'feature_visibility', value: { leave: true, lunch: true, attendance: true }
 const DEFAULT_FEATURES = {
     leave: true,        // 我要請假

@@ -195,7 +195,7 @@
             // 先檢查排班模式
             try {
                 if (typeof sb !== 'undefined') {
-                    const { data: modeData } = await sb.from('hr_settings').select('value').eq('key', 'scheduling_mode').maybeSingle();
+                    const { data: modeData } = await sb.from('system_settings').select('value').eq('key', 'scheduling_mode').maybeSingle();
                     if (modeData?.value?.mode === 'fixed') {
                         isFixedDayShift = true;
                         applyFixedDayShiftUI();

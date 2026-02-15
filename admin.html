@@ -786,7 +786,7 @@
         // LINE Notify 設定
         async function loadNotifyToken() {
             try {
-                const { data } = await sb.from('hr_settings')
+                const { data } = await sb.from('system_settings')
                     .select('value').eq('key', 'line_notify_token').maybeSingle();
                 if (data?.value?.token) {
                     const el = document.getElementById('lineNotifyToken');
@@ -800,12 +800,12 @@
             if (!token) return showToast('❌ 請輸入 Token');
             const status = document.getElementById('notifyStatus');
             try {
-                const { data: existing } = await sb.from('hr_settings')
+                const { data: existing } = await sb.from('system_settings')
                     .select('id').eq('key', 'line_notify_token').maybeSingle();
                 if (existing) {
-                    await sb.from('hr_settings').update({ value: { token }, updated_at: new Date().toISOString() }).eq('key', 'line_notify_token');
+                    await sb.from('system_settings').update({ value: { token }, updated_at: new Date().toISOString() }).eq('key', 'line_notify_token');
                 } else {
-                    await sb.from('hr_settings').insert({ key: 'line_notify_token', value: { token }, description: 'LINE Notify 推播 Token' });
+                    await sb.from('system_settings').insert({ key: 'line_notify_token', value: { token }, description: 'LINE Notify 推播 Token' });
                 }
                 showToast('✅ Token 已儲存');
                 if (status) { status.style.display = 'block'; status.style.color = '#059669'; status.textContent = '✅ 已儲存'; }
@@ -827,7 +827,7 @@
 
         async function loadFeatureSettings() {
             try {
-                const { data } = await sb.from('hr_settings')
+                const { data } = await sb.from('system_settings')
                     .select('value')
                     .eq('key', 'feature_visibility')
                     .maybeSingle();
@@ -866,17 +866,17 @@
             updateToggleCard(key);
             
             try {
-                const { data: existing } = await sb.from('hr_settings')
+                const { data: existing } = await sb.from('system_settings')
                     .select('id')
                     .eq('key', 'feature_visibility')
                     .maybeSingle();
                 
                 if (existing) {
-                    await sb.from('hr_settings')
+                    await sb.from('system_settings')
                         .update({ value: featureState, updated_at: new Date().toISOString() })
                         .eq('key', 'feature_visibility');
                 } else {
-                    await sb.from('hr_settings')
+                    await sb.from('system_settings')
                         .insert({ key: 'feature_visibility', value: featureState, description: '員工可見功能設定' });
                 }
                 
@@ -1173,11 +1173,14 @@
                 const records = bonusEmployees.map(emp => {
                     const c = calculateBonus(emp);
                     return {
-                        employee_id: emp.id, year, base_amount: c.baseAmount,
-                        adjustment: c.manualAdj, final_bonus: c.finalAmount,
+                        employee_id: emp.id, year,
+                        calculated_bonus: c.baseAmount,
+                        adjusted_bonus: c.finalAmount,
+                        final_bonus: c.finalAmount,
                         manager_adjustment: c.manualAdj,
                         months_worked: Math.round(emp.tenureRatio * 12 * 10) / 10,
                         is_approved: true,
+                        status: 'approved',
                         ai_recommendation: JSON.stringify({ attendance_grade: emp.attendanceGrade, performance_rating: c.perfRating, matrix_multiplier: c.multiplier, full_attendance_bonus: c.fullAtt, late_penalty: c.latePen, base_salary: emp.baseSalary, tenure_ratio: emp.tenureRatio }),
                         updated_at: new Date().toISOString()
                     };
@@ -1233,10 +1236,8 @@
                 position: document.getElementById('newEmployeePosition').value.trim() || '員工',
                 id_card_last_4: document.getElementById('newEmployeeCode').value.trim(),
                 hire_date: document.getElementById('newEmployeeHireDate').value,
-                employment_type: document.getElementById('newEmployeeType').value || 'fulltime',
                 role: document.getElementById('newEmployeeRole').value,
                 is_active: true,
-                status: 'active',
                 company_id: '8a669e2c-7521-43e9-9300-5c004c57e9db',
                 created_at: new Date().toISOString()
             };
@@ -1632,7 +1633,7 @@
 
         async function loadMaxLeaveSetting() {
             try {
-                const { data } = await sb.from('hr_settings').select('value').eq('key', 'max_concurrent_leave').maybeSingle();
+                const { data } = await sb.from('system_settings').select('value').eq('key', 'max_concurrent_leave').maybeSingle();
                 if (data?.value?.max) { maxLeaveValue = data.value.max; }
             } catch(e) {}
             document.getElementById('maxLeaveNum').textContent = maxLeaveValue;
@@ -1641,12 +1642,12 @@
         async function saveMaxLeave() {
             const statusEl = document.getElementById('maxLeaveSaveStatus');
             try {
-                const { data: existing } = await sb.from('hr_settings').select('id').eq('key', 'max_concurrent_leave').maybeSingle();
+                const { data: existing } = await sb.from('system_settings').select('id').eq('key', 'max_concurrent_leave').maybeSingle();
                 const val = { max: maxLeaveValue };
                 if (existing) {
-                    await sb.from('hr_settings').update({ value: val, updated_at: new Date().toISOString() }).eq('key', 'max_concurrent_leave');
+                    await sb.from('system_settings').update({ value: val, updated_at: new Date().toISOString() }).eq('key', 'max_concurrent_leave');
                 } else {
-                    await sb.from('hr_settings').insert({ key: 'max_concurrent_leave', value: val, description: '同時請假人數上限' });
+                    await sb.from('system_settings').insert({ key: 'max_concurrent_leave', value: val, description: '同時請假人數上限' });
                 }
                 statusEl.style.display = 'block'; statusEl.style.color = '#059669'; statusEl.textContent = '✅ 已儲存';
                 setTimeout(() => { statusEl.style.display = 'none'; }, 2000);
@@ -1660,7 +1661,7 @@
 
         async function loadSchedulingMode() {
             try {
-                const { data } = await sb.from('hr_settings').select('value').eq('key', 'scheduling_mode').maybeSingle();
+                const { data } = await sb.from('system_settings').select('value').eq('key', 'scheduling_mode').maybeSingle();
                 if (data?.value?.mode) { currentSchedulingMode = data.value.mode; }
             } catch(e) {}
             applySchedulingModeUI();
@@ -1721,12 +1722,12 @@
         async function saveSchedulingMode() {
             const statusEl = document.getElementById('schedModeSaveStatus');
             try {
-                const { data: existing } = await sb.from('hr_settings').select('id').eq('key', 'scheduling_mode').maybeSingle();
+                const { data: existing } = await sb.from('system_settings').select('id').eq('key', 'scheduling_mode').maybeSingle();
                 const val = { mode: currentSchedulingMode };
                 if (existing) {
-                    await sb.from('hr_settings').update({ value: val, updated_at: new Date().toISOString() }).eq('key', 'scheduling_mode');
+                    await sb.from('system_settings').update({ value: val, updated_at: new Date().toISOString() }).eq('key', 'scheduling_mode');
                 } else {
-                    await sb.from('hr_settings').insert({ key: 'scheduling_mode', value: val, description: '排班模式：shift=排班制, fixed=固定日班' });
+                    await sb.from('system_settings').insert({ key: 'scheduling_mode', value: val, description: '排班模式：shift=排班制, fixed=固定日班' });
                 }
                 statusEl.style.display = 'block'; statusEl.style.color = '#059669';
                 statusEl.textContent = '✅ 已儲存 — ' + (currentSchedulingMode === 'shift' ? '排班制' : '固定日班');
@@ -1794,7 +1795,7 @@
             // 讀取上限
             let maxC = maxLeaveValue || 2;
             try {
-                const { data: s } = await sb.from('hr_settings').select('value').eq('key', 'max_concurrent_leave').maybeSingle();
+                const { data: s } = await sb.from('system_settings').select('value').eq('key', 'max_concurrent_leave').maybeSingle();
                 if (s?.value?.max) maxC = s.value.max;
             } catch(e) {}
             document.getElementById('lcMax').textContent = maxC;
@@ -2287,7 +2288,7 @@
             
             try {
                 // 讀取現有公告
-                const { data: existing } = await sb.from('hr_settings')
+                const { data: existing } = await sb.from('system_settings')
                     .select('value').eq('key', 'announcements').maybeSingle();
                 
                 const items = existing?.value?.items || [];
@@ -2301,9 +2302,9 @@
                 });
                 
                 if (existing) {
-                    await sb.from('hr_settings').update({ value: { items }, updated_at: new Date().toISOString() }).eq('key', 'announcements');
+                    await sb.from('system_settings').update({ value: { items }, updated_at: new Date().toISOString() }).eq('key', 'announcements');
                 } else {
-                    await sb.from('hr_settings').insert({ key: 'announcements', value: { items }, description: '公告系統' });
+                    await sb.from('system_settings').insert({ key: 'announcements', value: { items }, description: '公告系統' });
                 }
                 
                 showToast('📢 公告已發布');
@@ -2321,7 +2322,7 @@
             if (!el) return;
             
             try {
-                const { data } = await sb.from('hr_settings')
+                const { data } = await sb.from('system_settings')
                     .select('value').eq('key', 'announcements').maybeSingle();
                 
                 const items = data?.value?.items || [];
@@ -2351,12 +2352,12 @@
         async function deleteAnnouncement(id) {
             if (!confirm('確定刪除此公告？')) return;
             try {
-                const { data } = await sb.from('hr_settings')
+                const { data } = await sb.from('system_settings')
                     .select('value').eq('key', 'announcements').maybeSingle();
                 if (!data?.value?.items) return;
                 
                 const items = data.value.items.filter(a => a.id !== id);
-                await sb.from('hr_settings').update({ value: { items }, updated_at: new Date().toISOString() }).eq('key', 'announcements');
+                await sb.from('system_settings').update({ value: { items }, updated_at: new Date().toISOString() }).eq('key', 'announcements');
                 showToast('🗑️ 已刪除');
                 loadAnnouncementList();
             } catch(e) { showToast('❌ 刪除失敗'); }
