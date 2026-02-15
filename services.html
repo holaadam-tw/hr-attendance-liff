@@ -17,7 +17,7 @@
     <div class="container">
         <!-- 便當訂購頁面 -->
         <div id="lunchPage" class="page active">
-            <button class="btn btn-secondary" onclick="window.location.href='index.html'" style="width:auto;margin-bottom:10px;">← 返回</button>
+            <button class="btn btn-secondary" onclick="window.location.href='index.html'" class="btn-auto-mb">← 返回</button>
             <div class="checkin-page">
                 <h2>🍱 便當訂購</h2>
                 <div class="lunar-notice" id="lunarNotice">🌙 明天是農曆初一/十五，建議訂購素食</div>
@@ -26,10 +26,10 @@
                 <div id="lunchDeadline" style="padding:10px 14px;border-radius:10px;margin-bottom:12px;font-size:13px;font-weight:700;"></div>
 
                 <!-- 我的今日訂單 -->
-                <div id="myOrderCard" style="display:none;background:#fff;border-radius:14px;padding:16px;box-shadow:0 2px 8px rgba(0,0,0,0.06);margin-bottom:16px;">
-                    <div style="font-size:14px;font-weight:800;color:#0F172A;margin-bottom:10px;">📋 我的訂單</div>
+                <div id="myOrderCard" class="order-card hidden">
+                    <div class="text-heading-sm">📋 我的訂單</div>
                     <div id="myOrderContent" style="font-size:13px;"></div>
-                    <div id="myOrderActions" style="margin-top:12px;display:flex;gap:8px;"></div>
+                    <div id="myOrderActions" style="margin-top:12px;" class="flex-gap-8"></div>
                 </div>
                 
                 <div class="lunch-summary">
@@ -45,20 +45,20 @@
                     
                     <!-- 便當選擇卡片 -->
                     <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px;">
-                        <div class="lunch-choice" onclick="selectLunchType('regular')" style="display:flex;align-items:center;gap:12px;padding:14px;border:2px solid #E5E7EB;border-radius:14px;cursor:pointer;transition:all 0.2s;">
+                        <div class="lunch-choice choice-card" onclick="selectLunchType('regular')">
                             <span style="font-size:28px;">🍖</span>
-                            <div style="flex:1;"><b style="font-size:14px;">葷食便當</b><br><span style="font-size:11px;color:#94A3B8;">今日主菜由餐廳安排</span></div>
-                            <div class="lunch-check" id="lunchCheckRegular" style="width:22px;height:22px;border:2px solid #CBD5E1;border-radius:50%;transition:all 0.2s;"></div>
+                            <div class="flex-1"><b>葷食便當</b><br><span class="text-sm-secondary">今日主菜由餐廳安排</span></div>
+                            <div class="lunch-check choice-check" id="lunchCheckRegular"></div>
                         </div>
-                        <div class="lunch-choice" onclick="selectLunchType('vegetarian')" style="display:flex;align-items:center;gap:12px;padding:14px;border:2px solid #E5E7EB;border-radius:14px;cursor:pointer;transition:all 0.2s;">
+                        <div class="lunch-choice choice-card" onclick="selectLunchType('vegetarian')">
                             <span style="font-size:28px;">🥗</span>
-                            <div style="flex:1;"><b style="font-size:14px;">素食便當</b><br><span style="font-size:11px;color:#94A3B8;">健康蔬食料理</span></div>
-                            <div class="lunch-check" id="lunchCheckVeg" style="width:22px;height:22px;border:2px solid #CBD5E1;border-radius:50%;transition:all 0.2s;"></div>
+                            <div class="flex-1"><b>素食便當</b><br><span class="text-sm-secondary">健康蔬食料理</span></div>
+                            <div class="lunch-check choice-check" id="lunchCheckVeg"></div>
                         </div>
-                        <div class="lunch-choice" onclick="selectLunchType('none')" style="display:flex;align-items:center;gap:12px;padding:14px;border:2px solid #E5E7EB;border-radius:14px;cursor:pointer;transition:all 0.2s;">
+                        <div class="lunch-choice choice-card" onclick="selectLunchType('none')">
                             <span style="font-size:28px;">💰</span>
-                            <div style="flex:1;"><b style="font-size:14px;">不訂購</b><br><span style="font-size:11px;color:#059669;">可獲得 NT$ 50 午餐補助</span></div>
-                            <div class="lunch-check" id="lunchCheckNone" style="width:22px;height:22px;border:2px solid #CBD5E1;border-radius:50%;transition:all 0.2s;"></div>
+                            <div class="flex-1"><b>不訂購</b><br><span style="font-size:11px;color:#059669;">可獲得 NT$ 50 午餐補助</span></div>
+                            <div class="lunch-check choice-check" id="lunchCheckNone"></div>
                         </div>
                     </div>
 
@@ -70,14 +70,14 @@
 
         <!-- 系統設定頁面 -->
         <div id="settingsPage" class="page">
-            <button class="btn btn-secondary" onclick="window.location.href='index.html'" style="width:auto;margin-bottom:10px;">← 返回</button>
+            <button class="btn btn-secondary" onclick="window.location.href='index.html'" class="btn-auto-mb">← 返回</button>
             <div class="checkin-page">
                 <h2>⚙️ 系統設定</h2>
                 
                 <div class="lunch-summary">
                     <h3 style="margin-bottom:10px;">📍 目前打卡地點</h3>
                     <div id="locationList">
-                        <p style="color:#666;text-align:center;">載入中...</p>
+                        <p class="text-center-gray">載入中...</p>
                     </div>
                 </div>
 
@@ -156,7 +156,7 @@
             const actions = document.getElementById('myOrderActions');
             if (!currentEmployee || !card) return;
             
-            const todayStr = fmtDate(new Date());
+            const todayStr = getTaiwanDate();
             try {
                 const { data } = await sb.from('lunch_orders')
                     .select('*')
@@ -165,9 +165,9 @@
                     .maybeSingle();
                 
                 myCurrentOrder = data;
-                if (!data) { card.style.display = 'none'; return; }
-                
-                card.style.display = 'block';
+                if (!data) { card.classList.add('hidden'); return; }
+
+                card.classList.remove('hidden');
                 const isVeg = data.is_vegetarian;
                 const isCancelled = data.status === 'cancelled';
                 const emoji = isCancelled ? '💰' : (isVeg ? '🥗' : '🍖');
@@ -175,11 +175,11 @@
                 const statusColor = isCancelled ? '#EA580C' : '#059669';
                 
                 content.innerHTML = `
-                    <div style="display:flex;align-items:center;gap:10px;padding:10px;background:#F8FAFC;border-radius:10px;">
+                    <div class="flex-center-gap-8" style="padding:10px;background:#F8FAFC;border-radius:10px;">
                         <span style="font-size:28px;">${emoji}</span>
-                        <div style="flex:1;">
+                        <div class="flex-1">
                             <div style="font-weight:700;">${label}</div>
-                            <div style="font-size:11px;color:#94A3B8;">訂購日期：${data.order_date}${data.notes ? ' · ' + data.notes : ''}</div>
+                            <div class="text-sm-secondary">訂購日期：${data.order_date}${data.notes ? ' · ' + data.notes : ''}</div>
                         </div>
                         <span style="font-size:11px;font-weight:700;color:${statusColor};">${isCancelled ? '已取消' : '已訂購'}</span>
                     </div>
@@ -189,9 +189,9 @@
                 const now = new Date();
                 if (now.getHours() < LUNCH_DEADLINE_HOUR) {
                     actions.innerHTML = `
-                        <button onclick="modifyLunchOrder('vegetarian')" style="flex:1;padding:10px;border:2px solid #059669;border-radius:10px;background:#ECFDF5;color:#059669;font-weight:700;font-size:12px;cursor:pointer;">🥗 改素食</button>
-                        <button onclick="modifyLunchOrder('regular')" style="flex:1;padding:10px;border:2px solid #2563EB;border-radius:10px;background:#EFF6FF;color:#2563EB;font-weight:700;font-size:12px;cursor:pointer;">🍖 改葷食</button>
-                        <button onclick="cancelLunchOrder()" style="flex:1;padding:10px;border:2px solid #DC2626;border-radius:10px;background:#FEF2F2;color:#DC2626;font-weight:700;font-size:12px;cursor:pointer;">❌ 取消</button>
+                        <button class="modify-btn" onclick="modifyLunchOrder('vegetarian')" style="border-color:#059669;background:#ECFDF5;color:#059669;">🥗 改素食</button>
+                        <button class="modify-btn" onclick="modifyLunchOrder('regular')" style="border-color:#2563EB;background:#EFF6FF;color:#2563EB;">🍖 改葷食</button>
+                        <button class="modify-btn" onclick="cancelLunchOrder()" style="border-color:#DC2626;background:#FEF2F2;color:#DC2626;">❌ 取消</button>
                     `;
                 } else {
                     actions.innerHTML = '<span style="font-size:12px;color:#94A3B8;">⏰ 已過截止時間，無法修改</span>';
@@ -201,16 +201,16 @@
 
         function selectLunchType(type) {
             selectedLunchType = type;
-            document.querySelectorAll('.lunch-choice').forEach(c => { c.style.borderColor = '#E5E7EB'; c.style.background = '#fff'; });
-            document.querySelectorAll('.lunch-check').forEach(c => { c.style.borderColor = '#CBD5E1'; c.style.background = 'transparent'; c.innerHTML = ''; });
-            
+            document.querySelectorAll('.lunch-choice').forEach(c => c.classList.remove('selected'));
+            document.querySelectorAll('.lunch-check').forEach(c => { c.classList.remove('checked'); c.innerHTML = ''; });
+
             const choices = document.querySelectorAll('.lunch-choice');
             const checks = { regular: 'lunchCheckRegular', vegetarian: 'lunchCheckVeg', none: 'lunchCheckNone' };
             const idx = { regular:0, vegetarian:1, none:2 }[type];
-            
-            if (choices[idx]) { choices[idx].style.borderColor = '#4F46E5'; choices[idx].style.background = '#F5F3FF'; }
+
+            if (choices[idx]) choices[idx].classList.add('selected');
             const ck = document.getElementById(checks[type]);
-            if (ck) { ck.style.borderColor = '#4F46E5'; ck.style.background = '#4F46E5'; ck.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" style="margin:2px;"><path fill="white" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>'; }
+            if (ck) { ck.classList.add('checked'); ck.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" style="margin:2px;"><path fill="white" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>'; }
             
             const btn = document.getElementById('lunchSubmitBtn');
             btn.disabled = false; btn.style.opacity = '1';
@@ -299,24 +299,6 @@
             }
         });
     </script>
-    <!-- 底部導航列 -->
-    <nav class="bottom-nav" style="display:none;">
-        <a class="nav-item" onclick="window.location.href='index.html'">
-            <span class="nav-icon">🏠</span><span class="nav-label">首頁</span>
-        </a>
-        <a class="nav-item" onclick="window.location.href='schedule.html'">
-            <span class="nav-icon">📅</span><span class="nav-label">班表</span>
-        </a>
-        <a class="nav-item" onclick="window.location.href='checkin.html?type=in'">
-            <span class="nav-icon">📍</span><span class="nav-label">打卡</span>
-        </a>
-        <a class="nav-item" onclick="window.location.href='salary.html'">
-            <span class="nav-icon">💰</span><span class="nav-label">薪資</span>
-        </a>
-        <a class="nav-item" onclick="window.location.href='admin.html'">
-            <span class="nav-icon">⚙️</span><span class="nav-label">管理</span>
-        </a>
-    </nav>
 
 </body>
 </html>

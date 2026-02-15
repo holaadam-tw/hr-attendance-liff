@@ -56,16 +56,16 @@
 
     <div class="container">
         <!-- 頁面導航 -->
-        <div style="display:flex;gap:4px;padding:10px 16px 0;background:transparent;">
-            <button class="recTab" onclick="showPage('leavePage')" style="flex:1;padding:10px 6px;border:none;border-radius:10px 10px 0 0;font-weight:700;font-size:12px;background:#fff;color:#4F46E5;cursor:pointer;">📝 請假</button>
-            <button class="recTab" onclick="showPage('makeupPunchPage')" style="flex:1;padding:10px 6px;border:none;border-radius:10px 10px 0 0;font-weight:700;font-size:12px;background:#E5E7EB;color:#94A3B8;cursor:pointer;">🔧 補卡</button>
-            <button class="recTab" onclick="showPage('overtimePage')" style="flex:1;padding:10px 6px;border:none;border-radius:10px 10px 0 0;font-weight:700;font-size:12px;background:#E5E7EB;color:#94A3B8;cursor:pointer;">⏰ 加班</button>
-            <button class="recTab" onclick="showPage('attendancePage')" style="flex:1;padding:10px 6px;border:none;border-radius:10px 10px 0 0;font-weight:700;font-size:12px;background:#E5E7EB;color:#94A3B8;cursor:pointer;">📊 考勤</button>
+        <div class="flex-gap-8" style="padding:10px 16px 0;">
+            <button class="recTab rec-tab active" onclick="showPage('leavePage')">📝 請假</button>
+            <button class="recTab rec-tab" onclick="showPage('makeupPunchPage')">🔧 補卡</button>
+            <button class="recTab rec-tab" onclick="showPage('overtimePage')">⏰ 加班</button>
+            <button class="recTab rec-tab" onclick="showPage('attendancePage')">📊 考勤</button>
         </div>
 
         <!-- 請假頁面 -->
         <div id="leavePage" class="page active">
-            <button class="btn btn-secondary" onclick="window.location.href='index.html'" style="width:auto;margin-bottom:10px;">← 返回</button>
+            <button class="btn btn-secondary btn-auto-mb" onclick="window.location.href='index.html'">← 返回</button>
             <div class="checkin-page">
                 <h2>📝 請假申請</h2>
                 <div class="form-group"><label>假別</label>
@@ -83,19 +83,19 @@
                 <div class="form-group"><label>原因</label><textarea id="leaveReason"></textarea></div>
                 <button class="btn btn-primary" id="leaveSubmitBtn" onclick="submitLeave()">📤 提交申請</button>
                 <div id="leaveStatus" class="status-box"></div>
-                <div style="margin-top:30px; padding-top:20px; border-top:2px dashed #e5e7eb;">
-                    <h3 style="margin-bottom:15px;">📋 我的請假記錄</h3>
-                    <div id="leaveHistoryList"><p style="text-align:center;color:#666;">載入中...</p></div>
+                <div class="section-divider">
+                    <h3 class="mb-4">📋 我的請假記錄</h3>
+                    <div id="leaveHistoryList"><p class="text-center-gray">載入中...</p></div>
                 </div>
             </div>
         </div>
 
         <!-- ====== 補打卡申請 ====== -->
         <div id="makeupPunchPage" class="page">
-            <button class="btn btn-secondary" onclick="window.location.href='index.html'" style="width:auto;margin-bottom:10px;">← 返回</button>
+            <button class="btn btn-secondary btn-auto-mb" onclick="window.location.href='index.html'">← 返回</button>
             <div class="checkin-page">
                 <h2>🔧 補打卡申請</h2>
-                <p style="color:#94A3B8;font-size:12px;margin-bottom:16px;">忘記打卡？系統異常？在這裡申請補打卡，審核通過後自動寫入出勤記錄。</p>
+                <p class="desc-hint">忘記打卡？系統異常？在這裡申請補打卡，審核通過後自動寫入出勤記錄。</p>
 
                 <div class="form-group">
                     <label>補打卡日期</label>
@@ -143,19 +143,19 @@
                 <button class="btn btn-primary" onclick="submitMakeupPunch()">📤 提交補打卡申請</button>
                 <div id="mpStatus" class="status-box"></div>
 
-                <div style="margin-top:30px;padding-top:20px;border-top:2px dashed #e5e7eb;">
-                    <h3 style="margin-bottom:15px;">📋 補打卡記錄</h3>
-                    <div id="makeupHistoryList"><p style="text-align:center;color:#666;">載入中...</p></div>
+                <div class="section-divider">
+                    <h3 class="mb-4">📋 補打卡記錄</h3>
+                    <div id="makeupHistoryList"><p class="text-center-gray">載入中...</p></div>
                 </div>
             </div>
         </div>
 
         <!-- ====== 加班申請 ====== -->
         <div id="overtimePage" class="page">
-            <button class="btn btn-secondary" onclick="window.location.href='index.html'" style="width:auto;margin-bottom:10px;">← 返回</button>
+            <button class="btn btn-secondary btn-auto-mb" onclick="window.location.href='index.html'">← 返回</button>
             <div class="checkin-page">
                 <h2>⏰ 加班申請</h2>
-                <p style="color:#94A3B8;font-size:12px;margin-bottom:16px;">加班需事前或事後申請，審核通過後依核准時數計算</p>
+                <p class="desc-hint">加班需事前或事後申請，審核通過後依核准時數計算</p>
 
                 <div class="form-group"><label>加班日期</label><input type="date" id="otDate"></div>
 
@@ -189,16 +189,16 @@
                 <button class="btn btn-primary" onclick="submitOvertime()">📤 提交加班申請</button>
                 <div id="otStatus" class="status-box"></div>
 
-                <div style="margin-top:30px;padding-top:20px;border-top:2px dashed #e5e7eb;">
-                    <h3 style="margin-bottom:15px;">📋 加班記錄</h3>
-                    <div id="overtimeHistoryList"><p style="text-align:center;color:#666;">載入中...</p></div>
+                <div class="section-divider">
+                    <h3 class="mb-4">📋 加班記錄</h3>
+                    <div id="overtimeHistoryList"><p class="text-center-gray">載入中...</p></div>
                 </div>
             </div>
         </div>
 
         <!-- ====== 考勤月曆 ====== -->
         <div id="attendancePage" class="page">
-            <button class="btn btn-secondary" onclick="window.location.href='index.html'" style="width:auto;margin-bottom:10px;">← 返回</button>
+            <button class="btn btn-secondary btn-auto-mb" onclick="window.location.href='index.html'">← 返回</button>
 
             <div class="card">
                 <h2 style="text-align:center;font-size:18px;font-weight:800;color:var(--dark);margin-bottom:16px;">📊 考勤記錄</h2>
@@ -240,11 +240,11 @@
 
         <!-- 薪資查詢頁面 -->
         <div id="salaryPage" class="page">
-            <button class="btn btn-secondary" onclick="window.location.href='index.html'" style="width:auto;margin-bottom:10px;">← 返回</button>
+            <button class="btn btn-secondary btn-auto-mb" onclick="window.location.href='index.html'">← 返回</button>
             <div class="checkin-page">
                 <h2>💰 薪資查詢</h2>
                 <div class="form-group"><label>查詢年度</label>
-                    <select id="salaryYear" onchange="loadAnnualSummary()"><option value="2026">2026</option><option value="2025">2025</option></select>
+                    <select id="salaryYear" onchange="loadAnnualSummary()"></select>
                 </div>
                 <div id="yearEndStatusCard" class="status-card" style="display:none; margin-bottom:20px;">
                     <h1 id="statusResult" style="margin:10px 0;">計算中...</h1>
@@ -277,9 +277,9 @@
             // Tab 高亮
             const tabs = document.querySelectorAll('.recTab');
             if (tabs.length) {
-                tabs.forEach(t => { t.style.background = '#E5E7EB'; t.style.color = '#94A3B8'; });
+                tabs.forEach(t => t.classList.remove('active'));
                 const idx = { leavePage:0, makeupPunchPage:1, overtimePage:2, attendancePage:3 }[id];
-                if (idx !== undefined && tabs[idx]) { tabs[idx].style.background = '#fff'; tabs[idx].style.color = '#4F46E5'; }
+                if (idx !== undefined && tabs[idx]) tabs[idx].classList.add('active');
             }
             if (id === 'attendancePage') { attYear = new Date().getFullYear(); attMonth = new Date().getMonth(); loadAttCal(); }
             if (id === 'leavePage') loadLeaveHistory();
@@ -325,15 +325,13 @@
             const ld = new Date(attYear, attMonth+1, 0).getDate();
             const me = `${attYear}-${String(attMonth+1).padStart(2,'0')}-${ld}`;
 
-            try {
-                const {data} = await sb.rpc('get_monthly_attendance', { p_line_user_id: liffProfile.userId, p_year: attYear, p_month: attMonth+1 });
-                attData = data || [];
-            } catch(e) { attData = []; }
-
-            try {
-                const {data} = await sb.from('leave_requests').select('*').eq('employee_id', currentEmployee.id).eq('status','approved').gte('start_date', ms).lte('start_date', me);
-                lvData = data || [];
-            } catch(e) { lvData = []; }
+            // [優化] 兩個 API 並行查詢，減少等待時間
+            const [attResult, lvResult] = await Promise.all([
+                sb.rpc('get_monthly_attendance', { p_line_user_id: liffProfile.userId, p_year: attYear, p_month: attMonth+1 }).catch(() => ({ data: null })),
+                sb.from('leave_requests').select('*').eq('employee_id', currentEmployee.id).eq('status','approved').gte('start_date', ms).lte('start_date', me).catch(() => ({ data: null }))
+            ]);
+            attData = attResult.data || [];
+            lvData = lvResult.data || [];
 
             renderAttCal();
         }
@@ -368,7 +366,7 @@
 
             const fd = new Date(attYear, attMonth, 1).getDay();
             const dim = new Date(attYear, attMonth+1, 0).getDate();
-            const todayS = fmtDate(new Date());
+            const todayS = getTaiwanDate();
 
             let cOk=0, cLate=0, cLv=0, cAb=0, tH=0;
 
@@ -426,14 +424,14 @@
                 if (info.att.is_late) {
                     try { const t=new Date(info.att.check_in_time),sc=new Date(t);sc.setHours(8,0,0,0);const df=Math.round((t-sc)/60000);if(df>0) r+=`<div class="adr"><span style="color:#EA580C">遲到時間</span><b style="color:#EA580C">${df} 分鐘</b></div>`; } catch(e){}
                 }
-                if (info.att.check_in_location) r += `<div class="adr"><span style="color:var(--gray)">打卡地點</span><b>${info.att.check_in_location}</b></div>`;
-                if (info.att.photo_url) r += `<div class="adr"><span style="color:var(--gray)">打卡照片</span><a href="${info.att.photo_url}" target="_blank" style="color:var(--primary);font-weight:700;">📷 查看</a></div>`;
+                if (info.att.check_in_location) r += `<div class="adr"><span style="color:var(--gray)">打卡地點</span><b>${escapeHTML(info.att.check_in_location)}</b></div>`;
+                if (info.att.photo_url) r += `<div class="adr"><span style="color:var(--gray)">打卡照片</span><a href="${escapeHTML(info.att.photo_url)}" target="_blank" rel="noopener" style="color:var(--primary);font-weight:700;">📷 查看</a></div>`;
             }
             if (info.lv) {
                 const tm = {annual:'特休假',sick:'病假',personal:'事假',compensatory:'補休',maternity:'產假',marriage:'婚假'};
                 r += `<div class="adr"><span style="color:var(--gray)">假別</span><b style="color:#2563EB">${tm[info.lv.leave_type]||info.lv.leave_type}</b></div>`;
                 r += `<div class="adr"><span style="color:var(--gray)">天數</span><b>${info.lv.days||1} 天</b></div>`;
-                if (info.lv.reason) r += `<div class="adr"><span style="color:var(--gray)">原因</span><b>${info.lv.reason}</b></div>`;
+                if (info.lv.reason) r += `<div class="adr"><span style="color:var(--gray)">原因</span><b>${escapeHTML(info.lv.reason)}</b></div>`;
             }
             if (info.s==='absent') r += `<div class="adr"><span style="color:#DC2626">說明</span><b style="color:#DC2626">未打卡且無請假紀錄</b></div>`;
 
@@ -504,16 +502,9 @@
             const hash = window.location.hash || '#leave';
             let pid = hash==='#attendance'?'attendancePage':hash==='#salary'?'salaryPage':hash==='#makeup'?'makeupPunchPage':hash==='#overtime'?'overtimePage':'leavePage';
             const ok = await initializeLiff();
-            if (ok) { const li = await checkUserStatus(); if(li){initBottomNav();showPage(pid);}else window.location.href='index.html'; }
+            if (ok) { const li = await checkUserStatus(); if(li){populateYearSelect('salaryYear');initBottomNav();showPage(pid);}else window.location.href='index.html'; }
         });
     </script>
 
-    <nav class="bottom-nav" style="display:none;">
-        <a class="nav-item" onclick="window.location.href='index.html'"><span class="nav-icon">🏠</span><span class="nav-label">首頁</span></a>
-        <a class="nav-item" onclick="window.location.href='schedule.html'"><span class="nav-icon">📅</span><span class="nav-label">班表</span></a>
-        <a class="nav-item" onclick="window.location.href='checkin.html?type=in'"><span class="nav-icon">📍</span><span class="nav-label">打卡</span></a>
-        <a class="nav-item active"><span class="nav-icon">💰</span><span class="nav-label">薪資</span></a>
-        <a class="nav-item" onclick="window.location.href='admin.html'"><span class="nav-icon">⚙️</span><span class="nav-label">管理</span></a>
-    </nav>
 </body>
 </html>

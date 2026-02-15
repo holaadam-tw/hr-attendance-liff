@@ -129,29 +129,7 @@
         </div>
     </div>
 
-    <!-- 底部導航列（管理員限定）-->
-    <nav class="bottom-nav" id="bottomNav" style="display:none;">
-        <a class="nav-item active" onclick="goPage('index.html')">
-            <span class="nav-icon">🏠</span>
-            <span class="nav-label">首頁</span>
-        </a>
-        <a class="nav-item" onclick="goPage('schedule.html')">
-            <span class="nav-icon">📅</span>
-            <span class="nav-label">班表</span>
-        </a>
-        <a class="nav-item" onclick="startCheckIn()">
-            <span class="nav-icon">📍</span>
-            <span class="nav-label">打卡</span>
-        </a>
-        <a class="nav-item" onclick="goPage('salary.html')">
-            <span class="nav-icon">💰</span>
-            <span class="nav-label">薪資</span>
-        </a>
-        <a class="nav-item" onclick="goPage('admin.html')">
-            <span class="nav-icon">⚙️</span>
-            <span class="nav-label">管理</span>
-        </a>
-    </nav>
+    <!-- 底部導航列由 common.js initBottomNav() 動態產生 -->
 
     <script src="common.js"></script>
     <script>
@@ -189,49 +167,40 @@
             if (el) el.textContent = dateStr;
         }
 
-        // 載入今日打卡狀態
-        async function loadTodayStatus() {
-            if (!currentEmployee || !liffProfile) return;
-            try {
-                const today = fmtDate(new Date());
-                const { data } = await sb.from('attendance')
-                    .select('check_in_time, check_out_time, status')
-                    .eq('employee_id', currentEmployee.id)
-                    .eq('date', today)
-                    .maybeSingle();
+        // 載入今日打卡狀態（重用 checkTodayAttendance() 已取得的 todayAttendance，避免重複 API）
+        function loadTodayStatus() {
+            const data = todayAttendance;
+            const badgeEl = document.getElementById('userStatusBadge');
 
-                const badgeEl = document.getElementById('userStatusBadge');
+            if (data?.check_in_time) {
+                const inTime = new Date(data.check_in_time);
+                const timeStr = `${String(inTime.getHours()).padStart(2,'0')}:${String(inTime.getMinutes()).padStart(2,'0')}`;
+                document.getElementById('todayCheckinTime').textContent = timeStr;
 
-                if (data?.check_in_time) {
-                    const inTime = new Date(data.check_in_time);
-                    const timeStr = `${String(inTime.getHours()).padStart(2,'0')}:${String(inTime.getMinutes()).padStart(2,'0')}`;
-                    document.getElementById('todayCheckinTime').textContent = timeStr;
-                    
-                    const isLate = data.status === 'late';
-                    document.getElementById('todayCheckinStatus').textContent = isLate ? '⚠️ 遲到' : '✅ 準時';
-                    document.getElementById('todayCheckinCard').style.background = isLate ? '#FEE2E2' : '#D1FAE5';
-                    document.getElementById('todayCheckinTime').style.color = isLate ? '#EF4444' : '#059669';
-                    
-                    if (badgeEl) {
-                        badgeEl.textContent = '✅ 已打卡';
-                        badgeEl.style.background = '#D1FAE5';
-                        badgeEl.style.color = '#065F46';
-                    }
-                } else {
-                    if (badgeEl) {
-                        badgeEl.textContent = '⏳ 未打卡';
-                        badgeEl.style.background = '#FEF3C7';
-                        badgeEl.style.color = '#92400E';
-                    }
+                const isLate = data.is_late || data.status === 'late';
+                document.getElementById('todayCheckinStatus').textContent = isLate ? '⚠️ 遲到' : '✅ 準時';
+                document.getElementById('todayCheckinCard').style.background = isLate ? '#FEE2E2' : '#D1FAE5';
+                document.getElementById('todayCheckinTime').style.color = isLate ? '#EF4444' : '#059669';
+
+                if (badgeEl) {
+                    badgeEl.textContent = '✅ 已打卡';
+                    badgeEl.style.background = '#D1FAE5';
+                    badgeEl.style.color = '#065F46';
                 }
-
-                if (data?.check_out_time) {
-                    const outTime = new Date(data.check_out_time);
-                    const timeStr = `${String(outTime.getHours()).padStart(2,'0')}:${String(outTime.getMinutes()).padStart(2,'0')}`;
-                    document.getElementById('todayCheckoutTime').textContent = timeStr;
-                    document.getElementById('todayCheckoutStatus').textContent = '✅ 已下班';
+            } else {
+                if (badgeEl) {
+                    badgeEl.textContent = '⏳ 未打卡';
+                    badgeEl.style.background = '#FEF3C7';
+                    badgeEl.style.color = '#92400E';
                 }
-            } catch(e) { console.error('載入今日狀態失敗', e); }
+            }
+
+            if (data?.check_out_time) {
+                const outTime = new Date(data.check_out_time);
+                const timeStr = `${String(outTime.getHours()).padStart(2,'0')}:${String(outTime.getMinutes()).padStart(2,'0')}`;
+                document.getElementById('todayCheckoutTime').textContent = timeStr;
+                document.getElementById('todayCheckoutStatus').textContent = '✅ 已下班';
+            }
         }
 
         // 載入員工類型（正職/兼職）
@@ -294,19 +263,25 @@
                 if (isLoggedIn) {
                     showPage('homePage');
                     updateTodayInfo();
-                    preloadGPS();
-                    loadTodayStatus();
-                    loadEmployeeType();
                     initBottomNav();
-                    applyFeatureVisibility();
-                    loadAnnouncements();
-                    checkForcedAnnouncements();
-                    
-                    const isAdmin = await checkIsAdmin();
-                    if (isAdmin) {
+
+                    // checkIsAdmin 現在是同步的，直接判斷
+                    if (checkIsAdmin()) {
                         const adminEntry = document.getElementById('adminEntry');
                         if (adminEntry) adminEntry.style.display = 'block';
                     }
+
+                    // [優化] loadTodayStatus 直接使用已取得的 todayAttendance，不再額外查詢
+                    loadTodayStatus();
+
+                    // [優化] 平行發送所有獨立的 API 請求
+                    Promise.all([
+                        loadEmployeeType(),
+                        loadAnnouncements(),
+                        checkForcedAnnouncements()
+                    ].map(p => Promise.resolve(p).catch(e => console.error(e))));
+                    applyFeatureVisibility();
+                    preloadGPS();
                 } else {
                     showPage('bindPage');
                 }

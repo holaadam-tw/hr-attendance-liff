@@ -68,11 +68,11 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
     return R * c;
 }
 
-// 狀態顯示
-function showStatus(el, type, msg) { 
+// 狀態顯示（預設純文字，useHTML=true 時允許 HTML）
+function showStatus(el, type, msg, useHTML = false) {
     if (!el) return;
-    el.className = `status-box show ${type}`; 
-    el.innerHTML = msg; 
+    el.className = `status-box show ${type}`;
+    if (useHTML) { el.innerHTML = msg; } else { el.textContent = msg; }
 }
 
 // [BUG FIX] Toast — 改進：避免重疊、限制同時顯示數量
@@ -90,6 +90,43 @@ function showToast(msg) {
     setTimeout(() => {
         if (t.parentNode) t.remove();
     }, 3000); 
+}
+
+// 按鈕 loading 狀態（防重複提交）
+function setBtnLoading(btn, loading, originalText) {
+    if (!btn) return;
+    if (loading) {
+        btn._originalText = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = '⏳ 處理中...';
+        btn.style.opacity = '0.6';
+    } else {
+        btn.disabled = false;
+        btn.textContent = originalText || btn._originalText || '提交';
+        btn.style.opacity = '1';
+    }
+}
+
+// HTML 跳脫（防 XSS）
+function escapeHTML(str) {
+    if (!str) return '';
+    const div = document.createElement('div');
+    div.textContent = String(str);
+    return div.innerHTML;
+}
+
+// 動態填入年度選項（當年 + 前2年）
+function populateYearSelect(selectId) {
+    const sel = document.getElementById(selectId);
+    if (!sel) return;
+    const now = new Date();
+    const currentYear = now.toLocaleString('en-US', { timeZone: 'Asia/Taipei', year: 'numeric' });
+    for (let y = parseInt(currentYear); y >= parseInt(currentYear) - 2; y--) {
+        const opt = document.createElement('option');
+        opt.value = y;
+        opt.textContent = y;
+        sel.appendChild(opt);
+    }
 }
 
 // 友善錯誤訊息
@@ -156,19 +193,45 @@ function updateUserInfo(data) {
     }
 }
 
-// ===== 系統設定 =====
+// ===== 系統設定（含快取） =====
+let _settingsCache = null; // { key: value, ... }
+
 async function loadSettings() {
     try {
-        const { data, error } = await sb.from('hr_settings')
-            .select('value')
-            .eq('key', 'office_locations')
-            .maybeSingle();
-        if (!error && data) {
-            officeLocations = data.value || [];
+        // 優先從 sessionStorage 讀取快取（跨頁共用，減少 API 呼叫）
+        const cached = sessionStorage.getItem('hr_settings_cache');
+        if (cached) {
+            try {
+                _settingsCache = JSON.parse(cached);
+                officeLocations = _settingsCache['office_locations'] || [];
+                return;
+            } catch(e) { sessionStorage.removeItem('hr_settings_cache'); }
         }
-    } catch (e) { 
-        console.error('載入地點失敗', e); 
+
+        // 一次查出所有 hr_settings，避免多次查詢
+        const { data, error } = await sb.from('hr_settings')
+            .select('key, value');
+        if (!error && data) {
+            _settingsCache = {};
+            data.forEach(row => { _settingsCache[row.key] = row.value; });
+            officeLocations = _settingsCache['office_locations'] || [];
+            // 寫入 sessionStorage（關閉瀏覽器自動清除）
+            try { sessionStorage.setItem('hr_settings_cache', JSON.stringify(_settingsCache)); } catch(e) {}
+        }
+    } catch (e) {
+        console.error('載入設定失敗', e);
     }
+}
+
+// 清除設定快取（管理員修改設定後呼叫）
+function invalidateSettingsCache() {
+    _settingsCache = null;
+    try { sessionStorage.removeItem('hr_settings_cache'); } catch(e) {}
+}
+
+// 從快取取得 hr_settings 的值，避免重複查詢 DB
+function getCachedSetting(key) {
+    return _settingsCache ? _settingsCache[key] : null;
 }
 
 // ===== GPS 功能 =====
@@ -367,13 +430,10 @@ async function checkLeaveAvailability(startDate, endDate) {
     if (!currentEmployee || !sb) return { ok: true };
     
     try {
-        // 1. 讀取最大同時請假人數設定
+        // 1. 從快取讀取最大同時請假人數設定
         let maxConcurrent = 2; // 預設
-        try {
-            const { data: setting } = await sb.from('hr_settings')
-                .select('value').eq('key', 'max_concurrent_leave').maybeSingle();
-            if (setting?.value?.max) maxConcurrent = setting.value.max;
-        } catch(e) {}
+        const concurrentSetting = getCachedSetting('max_concurrent_leave');
+        if (concurrentSetting?.max) maxConcurrent = concurrentSetting.max;
 
         // 2. 查詢日期範圍內所有已核准/待審假單（排除自己）
         const { data: leaves } = await sb.from('leave_requests')
@@ -402,16 +462,15 @@ async function checkLeaveAvailability(startDate, endDate) {
             if (count > maxDayConflict) maxDayConflict = count;
         }
 
-        // 4. 查排班資料，看該日是否人手不足
+        // 4. 查排班資料，看該日是否人手不足（用 count 避免拉全部員工資料）
         let staffWarning = '';
         try {
-            const { data: totalEmps } = await sb.from('employees').select('id').eq('status', 'active');
-            const totalCount = totalEmps?.length || 0;
-            
+            const { count: totalCount } = await sb.from('employees').select('id', { count: 'exact', head: true }).eq('status', 'active');
+
             if (totalCount > 0 && maxDayConflict + 1 >= totalCount) {
                 staffWarning = `⚠️ 若核准此假，最少只剩 ${totalCount - maxDayConflict - 1} 人上班`;
             }
-        } catch(e) {}
+        } catch(e) { console.warn('查詢員工人數失敗', e); }
 
         // 5. 判斷是否超過上限
         const wouldExceed = (maxDayConflict + 1) > maxConcurrent;
@@ -441,13 +500,16 @@ async function submitLeave() {
     const end = document.getElementById('leaveEndDate')?.value;
     const reason = document.getElementById('leaveReason')?.value;
     if (!start || !end || !reason) return showToast('請填寫完整');
-    
+
     if (new Date(end) < new Date(start)) {
         return showToast('❌ 結束日期不能早於開始日期');
     }
-    
+
+    const submitBtn = document.getElementById('leaveSubmitBtn');
+    setBtnLoading(submitBtn, true);
+
     const statusEl = document.getElementById('leaveStatus');
-    if (statusEl) { statusEl.className = 'status-box show info'; statusEl.innerHTML = '⏳ 檢查人力狀態中...'; }
+    if (statusEl) { statusEl.className = 'status-box show info'; statusEl.textContent = '⏳ 檢查人力狀態中...'; }
 
     // 先檢查是否超過同時請假上限
     const check = await checkLeaveAvailability(start, end);
@@ -456,19 +518,20 @@ async function submitLeave() {
         // 自動駁回
         if (statusEl) {
             statusEl.className = 'status-box show error';
-            statusEl.innerHTML = `${check.message}<br><span style="font-size:12px;color:#94A3B8;margin-top:4px;display:block;">已有同事請假：${check.conflicts.map(c => `${c.date}(${c.names.join(',')})`).slice(0,3).join('、')}</span>`;
+            statusEl.innerHTML = `${escapeHTML(check.message)}<br><span style="font-size:12px;color:#94A3B8;margin-top:4px;display:block;">已有同事請假：${check.conflicts.map(c => `${escapeHTML(c.date)}(${c.names.map(n => escapeHTML(n)).join(',')})`).slice(0,3).join('、')}</span>`;
         }
         showToast('❌ 該日期請假人數已達上限');
+        setBtnLoading(submitBtn, false, '📤 提交申請');
         return;
     }
-    
+
     try {
         const { error } = await sb.from('leave_requests').insert({
-            employee_id: currentEmployee.id, leave_type: type, 
+            employee_id: currentEmployee.id, leave_type: type,
             start_date: start, end_date: end, reason: reason, status: 'pending'
         });
         if (error) throw error;
-        showToast('✅ 申請成功'); 
+        showToast('✅ 申請成功');
         loadLeaveHistory();
         if (statusEl) {
             statusEl.className = 'status-box show success';
@@ -478,12 +541,14 @@ async function submitLeave() {
         // 清除衝突提示
         const warn = document.getElementById('leaveConflictWarn');
         if (warn) warn.style.display = 'none';
-        
+
         // 通知管理員
         const typeNames = { annual:'特休', sick:'病假', personal:'事假', compensatory:'補休' };
         sendAdminNotify(`🔔 ${currentEmployee.name} 申請${typeNames[type]||type}\n📅 ${start} ~ ${end}\n📝 ${reason || '無附原因'}`);
-    } catch(e) { 
-        showToast('❌ 申請失敗：' + friendlyError(e)); 
+    } catch(e) {
+        showToast('❌ 申請失敗：' + friendlyError(e));
+    } finally {
+        setBtnLoading(submitBtn, false, '📤 提交申請');
     }
 }
 
@@ -496,8 +561,8 @@ async function loadLeaveHistory() {
         try {
             const { data } = await sb.rpc('get_leave_history', { p_line_user_id: liffProfile.userId, p_limit: 10 });
             if (data) records = data;
-        } catch(e) {}
-        
+        } catch(e) { console.warn('get_leave_history RPC 失敗，改用直接查表', e); }
+
         // 如果 RPC 沒有資料，直接查表（含 rejected）
         if (records.length === 0) {
             const { data } = await sb.from('leave_requests')
@@ -509,36 +574,36 @@ async function loadLeaveHistory() {
         }
         
         if (!records || records.length === 0) { 
-            list.innerHTML = '<p style="text-align:center;color:#999;">尚無記錄</p>'; 
-            return; 
+            list.innerHTML = '<p class="text-center-muted">尚無記錄</p>';
+            return;
         }
-        
+
         const typeMap = { 'annual': '特休', 'sick': '病假', 'personal': '事假', 'compensatory': '補休' };
         const statusMap = { 'pending': '⏳ 待審', 'approved': '✅ 通過', 'rejected': '❌ 拒絕' };
         const statusColor = { 'pending': '#F59E0B', 'approved': '#059669', 'rejected': '#DC2626' };
-        
+
         list.innerHTML = records.map(r => `
-            <div class="attendance-item" style="border-left:3px solid ${statusColor[r.status] || '#ccc'};">
+            <div class="attendance-item" style="border-left-color:${statusColor[r.status] || '#ccc'};">
                 <div class="date">
-                    <span>${typeMap[r.leave_type] || r.leave_type}</span>
+                    <span>${escapeHTML(typeMap[r.leave_type] || r.leave_type)}</span>
                     <span class="badge ${r.status === 'approved' ? 'badge-success' : r.status === 'rejected' ? 'badge-danger' : 'badge-warning'}">
-                        ${statusMap[r.status] || r.status}
+                        ${statusMap[r.status] || escapeHTML(r.status)}
                     </span>
                 </div>
                 <div class="details">
-                    <span>${r.start_date} ~ ${r.end_date}</span>
+                    <span>${escapeHTML(r.start_date)} ~ ${escapeHTML(r.end_date)}</span>
                     <span>${r.days || 1} 天</span>
                 </div>
-                <div style="font-size:12px;color:#666;margin-top:4px;">${r.reason || ''}</div>
-                ${r.status === 'rejected' && r.rejection_reason ? 
-                    `<div style="font-size:12px;color:#DC2626;margin-top:4px;padding:6px 8px;background:#FEF2F2;border-radius:6px;">
-                        ❌ 拒絕原因：${r.rejection_reason}
+                <div class="text-sm-muted">${escapeHTML(r.reason)}</div>
+                ${r.status === 'rejected' && r.rejection_reason ?
+                    `<div class="rejection-box">
+                        ❌ 拒絕原因：${escapeHTML(r.rejection_reason)}
                     </div>` : ''}
             </div>
         `).join('');
-    } catch(e) { 
-        console.error(e); 
-        list.innerHTML = '<p style="text-align:center;color:#ef4444;">載入失敗</p>';
+    } catch(e) {
+        console.error(e);
+        list.innerHTML = '<p class="text-center-error">載入失敗</p>';
     }
 }
 
@@ -566,9 +631,11 @@ async function submitMakeupPunch() {
     }
     
     const reason = `[${{'forgot':'忘記打卡','field':'外出公務','phone_dead':'手機沒電','system_error':'系統故障','other':'其他'}[reasonType] || reasonType}] ${reasonText || ''}`.trim();
-    
+
     const statusEl = document.getElementById('mpStatus');
-    
+    const mpBtn = document.querySelector('#makeupPunchPage .btn-primary') || document.querySelector('[onclick="submitMakeupPunch()"]');
+    setBtnLoading(mpBtn, true);
+
     try {
         const { error } = await sb.from('makeup_punch_requests').insert({
             employee_id: currentEmployee.id,
@@ -579,19 +646,21 @@ async function submitMakeupPunch() {
             status: 'pending'
         });
         if (error) throw error;
-        
+
         showToast('✅ 補打卡申請已提交');
-        if (statusEl) { statusEl.className = 'status-box show success'; statusEl.innerHTML = '✅ 申請已提交，等待審核'; }
+        if (statusEl) { statusEl.className = 'status-box show success'; statusEl.textContent = '✅ 申請已提交，等待審核'; }
         loadMakeupHistory();
-        
+
         // 通知管理員
         sendAdminNotify(`🔔 ${currentEmployee.name} 申請補打卡\n📅 ${date} ${type === 'clock_in' ? '上班' : '下班'} ${time}\n📝 ${reason}`);
-        
+
         // 清空表單
         if (document.getElementById('mpReasonText')) document.getElementById('mpReasonText').value = '';
     } catch(e) {
         console.error(e);
         showToast('❌ 申請失敗：' + friendlyError(e));
+    } finally {
+        setBtnLoading(mpBtn, false, '📤 提交補打卡申請');
     }
 }
 
@@ -607,44 +676,43 @@ async function loadMakeupHistory() {
             .limit(10);
         
         if (!data || data.length === 0) {
-            list.innerHTML = '<p style="text-align:center;color:#999;font-size:13px;">尚無補打卡記錄</p>';
+            list.innerHTML = '<p class="text-center-muted-sm">尚無補打卡記錄</p>';
             return;
         }
-        
+
         const statusMap = { 'pending': '⏳ 待審', 'approved': '✅ 通過', 'rejected': '❌ 拒絕' };
         const statusColor = { 'pending': '#F59E0B', 'approved': '#059669', 'rejected': '#DC2626' };
         const typeMap = { 'clock_in': '上班', 'clock_out': '下班' };
-        
+
         list.innerHTML = data.map(r => `
-            <div class="attendance-item" style="border-left:3px solid ${statusColor[r.status] || '#ccc'};">
+            <div class="attendance-item" style="border-left-color:${statusColor[r.status] || '#ccc'};">
                 <div class="date">
-                    <span>${r.punch_date} ${typeMap[r.punch_type] || ''} ${r.punch_time || ''}</span>
+                    <span>${escapeHTML(r.punch_date)} ${escapeHTML(typeMap[r.punch_type])} ${escapeHTML(r.punch_time)}</span>
                     <span class="badge ${r.status === 'approved' ? 'badge-success' : r.status === 'rejected' ? 'badge-danger' : 'badge-warning'}">
-                        ${statusMap[r.status] || r.status}
+                        ${statusMap[r.status] || escapeHTML(r.status)}
                     </span>
                 </div>
-                <div style="font-size:12px;color:#666;margin-top:4px;">${r.reason || ''}</div>
-                ${r.status === 'approved' ? '<div style="font-size:11px;color:#059669;margin-top:2px;">✅ 已寫入出勤記錄</div>' : ''}
-                ${r.status === 'rejected' && r.rejection_reason ? 
-                    `<div style="font-size:12px;color:#DC2626;margin-top:4px;padding:6px 8px;background:#FEF2F2;border-radius:6px;">❌ ${r.rejection_reason}</div>` : ''}
+                <div class="text-sm-muted">${escapeHTML(r.reason)}</div>
+                ${r.status === 'approved' ? '<div class="text-xs-success">✅ 已寫入出勤記錄</div>' : ''}
+                ${r.status === 'rejected' && r.rejection_reason ?
+                    `<div class="rejection-box">❌ ${escapeHTML(r.rejection_reason)}</div>` : ''}
             </div>
         `).join('');
     } catch(e) {
         console.error(e);
-        list.innerHTML = '<p style="text-align:center;color:#ef4444;">載入失敗</p>';
+        list.innerHTML = '<p class="text-center-error">載入失敗</p>';
     }
 }
 
 // ===== LINE Notify 推播 =====
 async function sendAdminNotify(message) {
     try {
-        const { data: setting } = await sb.from('hr_settings')
-            .select('value').eq('key', 'line_notify_token').maybeSingle();
-        if (!setting?.value?.token) return;
+        const setting = getCachedSetting('line_notify_token');
+        if (!setting?.token) return;
         
         // 透過 Supabase Edge Function 發送（避免 CORS）
         await sb.functions.invoke('send-line-notify', {
-            body: { token: setting.value.token, message }
+            body: { token: setting.token, message }
         });
     } catch(e) {
         console.log('LINE Notify 發送失敗（非必要）', e);
@@ -669,17 +737,16 @@ async function loadAnnouncements() {
     if (!el) return;
     
     try {
-        const todayStr = fmtDate(new Date());
-        const { data } = await sb.from('hr_settings')
-            .select('value').eq('key', 'announcements').maybeSingle();
-        
-        if (!data?.value?.items || data.value.items.length === 0) {
+        const todayStr = getTaiwanDate();
+        const annData = getCachedSetting('announcements');
+
+        if (!annData?.items || annData.items.length === 0) {
             el.style.display = 'none';
             return;
         }
         
         // 過濾有效公告（未過期）
-        const active = data.value.items.filter(a => !a.expire_date || a.expire_date >= todayStr);
+        const active = annData.items.filter(a => !a.expire_date || a.expire_date >= todayStr);
         if (active.length === 0) { el.style.display = 'none'; return; }
         
         const pinned = active.filter(a => a.pinned);
@@ -694,202 +761,14 @@ async function loadAnnouncements() {
                 'urgent': { bg: '#FEF2F2', color: '#DC2626', icon: '🚨' },
                 'event': { bg: '#F5F3FF', color: '#7C3AED', icon: '🎉' }
             }[a.type] || { bg: '#F1F5F9', color: '#64748B', icon: '📌' };
-            
-            return `<div style="padding:10px 14px;background:${typeStyle.bg};border-radius:10px;margin-bottom:8px;font-size:13px;color:${typeStyle.color};line-height:1.5;">
-                <div style="font-weight:800;">${typeStyle.icon} ${a.title}</div>
-                ${a.content ? `<div style="font-size:12px;opacity:0.8;margin-top:2px;">${a.content}</div>` : ''}
-                ${a.expire_date ? `<div style="font-size:10px;opacity:0.5;margin-top:2px;">有效至 ${a.expire_date}</div>` : ''}
+
+            return `<div class="ann-block" style="background:${typeStyle.bg};color:${typeStyle.color};">
+                <div class="ann-title">${typeStyle.icon} ${escapeHTML(a.title)}</div>
+                ${a.content ? `<div class="ann-content">${escapeHTML(a.content)}</div>` : ''}
+                ${a.expire_date ? `<div class="ann-expire">有效至 ${escapeHTML(a.expire_date)}</div>` : ''}
             </div>`;
         }).join('');
     } catch(e) { el.style.display = 'none'; }
-}
-
-// ===== 加班申請 =====
-async function submitOvertime() {
-    if (!currentEmployee) return showToast('❌ 請先登入');
-    const date = document.getElementById('otDate')?.value;
-    const hours = parseFloat(document.getElementById('otHours')?.value);
-    const reason = document.getElementById('otReason')?.value;
-    const compType = document.getElementById('otCompType')?.value || 'pay';
-    const statusEl = document.getElementById('otStatus');
-    
-    if (!date || !hours || !reason) return showToast('❌ 請填寫完整');
-    if (hours <= 0 || hours > 12) return showToast('❌ 加班時數需為 0.5~12 小時');
-    
-    try {
-        const { error } = await sb.from('overtime_requests').insert({
-            employee_id: currentEmployee.id,
-            ot_date: date,
-            planned_hours: hours,
-            reason: reason,
-            compensation_type: compType,
-            status: 'pending'
-        });
-        if (error) throw error;
-        
-        showToast('✅ 加班申請已提交');
-        if (statusEl) { statusEl.className = 'status-box show success'; statusEl.innerHTML = '✅ 已提交，等待審核'; }
-        loadOvertimeHistory();
-        
-        const compLabel = compType === 'pay' ? '加班費' : '補休';
-        sendAdminNotify(`🔔 ${currentEmployee.name} 申請加班\n📅 ${date}（${hours}小時）\n💰 ${compLabel}\n📝 ${reason}`);
-        
-        if (document.getElementById('otReason')) document.getElementById('otReason').value = '';
-    } catch(e) {
-        showToast('❌ 申請失敗：' + friendlyError(e));
-    }
-}
-
-async function loadOvertimeHistory() {
-    const list = document.getElementById('overtimeHistoryList');
-    if (!currentEmployee || !list) return;
-    
-    try {
-        const { data } = await sb.from('overtime_requests')
-            .select('*')
-            .eq('employee_id', currentEmployee.id)
-            .order('created_at', { ascending: false })
-            .limit(10);
-        
-        if (!data || data.length === 0) {
-            list.innerHTML = '<p style="text-align:center;color:#999;font-size:13px;">尚無加班記錄</p>';
-            return;
-        }
-        
-        const statusMap = { pending:'⏳ 待審', approved:'✅ 通過', rejected:'❌ 拒絕' };
-        const statusColor = { pending:'#F59E0B', approved:'#059669', rejected:'#DC2626' };
-        const compMap = { pay:'💰 加班費', comp_leave:'🏖 補休' };
-        
-        list.innerHTML = data.map(r => `
-            <div class="attendance-item" style="border-left:3px solid ${statusColor[r.status] || '#ccc'};">
-                <div class="date">
-                    <span>📅 ${r.ot_date}（${r.planned_hours}h）</span>
-                    <span class="badge" style="background:${statusColor[r.status]}20;color:${statusColor[r.status]};">${statusMap[r.status]}</span>
-                </div>
-                <div style="display:flex;gap:8px;margin-top:4px;">
-                    <span style="font-size:11px;padding:2px 8px;background:#F5F3FF;border-radius:6px;color:#7C3AED;">${compMap[r.compensation_type] || r.compensation_type}</span>
-                    ${r.actual_hours != null ? `<span style="font-size:11px;padding:2px 8px;background:#ECFDF5;border-radius:6px;color:#059669;">實際 ${r.actual_hours}h</span>` : ''}
-                </div>
-                <div style="font-size:12px;color:#666;margin-top:4px;">${r.reason || ''}</div>
-                ${r.status === 'rejected' && r.rejection_reason ? 
-                    `<div style="font-size:12px;color:#DC2626;margin-top:4px;padding:6px 8px;background:#FEF2F2;border-radius:6px;">❌ ${r.rejection_reason}</div>` : ''}
-            </div>
-        `).join('');
-    } catch(e) {
-        list.innerHTML = '<p style="text-align:center;color:#ef4444;">載入失敗</p>';
-    }
-}
-
-// ===== 勞健保級距查表 =====
-async function getInsuranceBracket(monthlySalary) {
-    try {
-        const { data } = await sb.from('insurance_brackets')
-            .select('*')
-            .eq('active', true)
-            .lte('min_salary', Math.round(monthlySalary))
-            .gte('max_salary', Math.round(monthlySalary))
-            .limit(1)
-            .single();
-        
-        if (data) {
-            return {
-                insured_salary: data.insured_salary,
-                labor_self: Math.round(data.insured_salary * data.labor_rate * data.labor_self_ratio),
-                health_self: Math.round(data.insured_salary * data.health_rate * data.health_self_ratio),
-                labor_rate: data.labor_rate,
-                health_rate: data.health_rate
-            };
-        }
-    } catch(e) { console.log('級距查表失敗，使用預設', e); }
-    
-    // Fallback：直接算（舊邏輯）
-    return {
-        insured_salary: monthlySalary,
-        labor_self: Math.round(monthlySalary * 0.125 * 0.2),
-        health_self: Math.round(monthlySalary * 0.0517 * 0.3),
-        labor_rate: 0.125,
-        health_rate: 0.0517
-    };
-}
-
-// ===== 公告強制簽署 =====
-async function checkPendingAcknowledgments() {
-    if (!currentEmployee) return;
-    
-    try {
-        const { data: settings } = await sb.from('hr_settings')
-            .select('value').eq('key', 'announcements').maybeSingle();
-        
-        if (!settings?.value?.items) return;
-        
-        const todayStr = fmtDate(new Date());
-        const forceRead = settings.value.items.filter(a => 
-            a.require_ack && 
-            (!a.expire_date || a.expire_date >= todayStr)
-        );
-        
-        if (forceRead.length === 0) return;
-        
-        // 查哪些還沒簽
-        const { data: acked } = await sb.from('announcement_acknowledgments')
-            .select('announcement_id')
-            .eq('employee_id', currentEmployee.id);
-        
-        const ackedIds = new Set((acked || []).map(a => a.announcement_id));
-        const pending = forceRead.filter(a => !ackedIds.has(a.id));
-        
-        if (pending.length === 0) return;
-        
-        // 顯示第一個未簽署公告
-        showAckModal(pending[0]);
-    } catch(e) { console.log('公告簽署檢查失敗', e); }
-}
-
-function showAckModal(announcement) {
-    const typeIcon = { info:'📢', warning:'⚠️', urgent:'🚨', event:'🎉' };
-    const existing = document.getElementById('ackOverlay');
-    if (existing) existing.remove();
-    
-    const overlay = document.createElement('div');
-    overlay.id = 'ackOverlay';
-    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
-    
-    overlay.innerHTML = `
-        <div style="background:#fff;border-radius:20px;max-width:400px;width:100%;max-height:80vh;overflow-y:auto;padding:24px;">
-            <div style="text-align:center;font-size:32px;margin-bottom:12px;">${typeIcon[announcement.type] || '📌'}</div>
-            <h2 style="text-align:center;font-size:18px;font-weight:900;color:#0F172A;margin-bottom:12px;">${announcement.title}</h2>
-            ${announcement.content ? `<div style="font-size:14px;color:#475569;line-height:1.8;padding:16px;background:#F8FAFC;border-radius:12px;margin-bottom:16px;white-space:pre-wrap;">${announcement.content}</div>` : ''}
-            <div style="font-size:11px;color:#94A3B8;text-align:center;margin-bottom:16px;">
-                發布者：${announcement.created_by || '管理員'} · ${announcement.created_at ? new Date(announcement.created_at).toLocaleDateString() : ''}
-            </div>
-            <button onclick="acknowledgeAnnouncement('${announcement.id}')" style="width:100%;padding:14px;background:linear-gradient(135deg,#4F46E5,#7C3AED);color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:800;cursor:pointer;">
-                ✅ 我已閱讀並了解
-            </button>
-            <p style="font-size:10px;color:#94A3B8;text-align:center;margin-top:8px;">必須確認後才能繼續使用系統</p>
-        </div>
-    `;
-    
-    document.body.appendChild(overlay);
-}
-
-async function acknowledgeAnnouncement(announcementId) {
-    if (!currentEmployee) return;
-    
-    try {
-        await sb.from('announcement_acknowledgments').insert({
-            announcement_id: announcementId,
-            employee_id: currentEmployee.id
-        });
-        
-        const overlay = document.getElementById('ackOverlay');
-        if (overlay) overlay.remove();
-        showToast('✅ 已確認');
-        
-        // 檢查是否還有其他待簽署
-        setTimeout(() => checkPendingAcknowledgments(), 500);
-    } catch(e) {
-        showToast('❌ 確認失敗');
-    }
 }
 
 // ===== 月度出勤查詢 =====
@@ -903,7 +782,7 @@ async function loadMonthlyAttendance() {
     const year = parseInt(yearEl.value);
     const month = parseInt(monthEl.value);
     
-    list.innerHTML = '<p style="text-align:center;color:#666;">查詢中...</p>';
+    list.innerHTML = '<p class="text-center-gray">查詢中...</p>';
     
     try {
         const { data, error } = await sb.rpc('get_monthly_attendance', {
@@ -914,7 +793,7 @@ async function loadMonthlyAttendance() {
         
         if (error) throw error;
         if (!data || data.length === 0) {
-            list.innerHTML = `<p style="text-align:center;color:#999;">${year}年${month}月 無記錄</p>`;
+            list.innerHTML = `<p class="text-center-muted">${year}年${month}月 無記錄</p>`;
             return;
         }
         
@@ -934,7 +813,7 @@ async function loadMonthlyAttendance() {
                 .gte('start_date', monthStart)
                 .lte('start_date', monthEnd);
             if (leaveData) leaveDays = leaveData.reduce((s, r) => s + (parseFloat(r.days) || 0), 0);
-        } catch(e) {}
+        } catch(e) { console.warn('查詢當月請假天數失敗', e); }
         
         let html = `
             <div class="lunch-summary" style="margin-bottom:15px;">
@@ -974,7 +853,7 @@ async function loadMonthlyAttendance() {
                         lateMinutes = `<span style="font-size:11px;color:#ef4444;margin-left:4px;">遲到 ${diffMin} 分鐘</span>`;
                     }
                 }
-            } catch(e) {}
+            } catch(e) { console.warn('計算遲到分鐘數失敗', e); }
             
             return `
                 <div class="attendance-item ${r.is_late ? 'late' : 'normal'}">
@@ -986,14 +865,14 @@ async function loadMonthlyAttendance() {
                         <span>上班: ${checkInTime}${lateMinutes}</span>
                         <span>下班: ${checkOutTime}</span>
                     </div>
-                    ${r.photo_url ? `<div style="margin-top:5px;"><a href="${r.photo_url}" target="_blank" style="font-size:12px;color:#667eea;">📷 查看照片</a></div>` : ''}
+                    ${r.photo_url ? `<div style="margin-top:5px;"><a href="${escapeHTML(r.photo_url)}" target="_blank" rel="noopener" class="photo-link">📷 查看照片</a></div>` : ''}
                 </div>
             `;
         }).join('');
         list.innerHTML = html;
     } catch (err) { 
         console.error(err); 
-        list.innerHTML = `<p style="text-align:center;color:#ef4444;">查詢失敗：${friendlyError(err)}</p>`; 
+        list.innerHTML = `<p class="text-center-error">查詢失敗：${friendlyError(err)}</p>`;
     }
 }
 
@@ -1073,14 +952,14 @@ function renderLocationList() {
     if (!listEl) return;
     
     if (officeLocations.length === 0) {
-        listEl.innerHTML = '<p style="color:#999;text-align:center;">尚未設定地點</p>';
+        listEl.innerHTML = '<p class="text-center-muted">尚未設定地點</p>';
         return;
     }
     listEl.innerHTML = officeLocations.map((loc, index) => `
         <div class="stat-row" style="align-items:center;">
             <div style="text-align:left;">
-                <div style="font-weight:bold;">${loc.name}</div>
-                <div style="font-size:11px;color:#999;">範圍: ${loc.radius}m</div>
+                <div style="font-weight:bold;">${escapeHTML(loc.name)}</div>
+                <div style="font-size:11px;color:#999;">範圍: ${escapeHTML(String(loc.radius))}m</div>
             </div>
             <button onclick="deleteLocation(${index})" class="btn-danger" style="font-size:12px;padding:6px 12px;">刪除</button>
         </div>
@@ -1143,6 +1022,7 @@ async function saveLocationsToDB(newLocations) {
         if (!data.success) { showToast('❌ ' + data.error); return; }
         
         officeLocations = newLocations;
+        invalidateSettingsCache();
         showToast('✅ 設定已更新');
         renderLocationList();
         preloadGPS(); 
@@ -1172,41 +1052,16 @@ function calculateAndUpdateMonthsWorked(hireDate, targetElement) {
 }
 
 // ===== 管理員功能 =====
-async function checkIsAdmin() {
-    if (!liffProfile) return false;
-    
-    try {
-        const { data, error } = await sb.from('employees')
-            .select('role')
-            .eq('line_user_id', liffProfile.userId)
-            .eq('is_active', true)
-            .maybeSingle();
-        
-        if (error || !data) return false;
-        return data.role === 'admin';
-    } catch (err) {
-        console.error('檢查管理員權限失敗:', err);
-        return false;
-    }
+// [優化] 直接從已載入的 currentEmployee 判斷，不再額外查詢 DB
+function checkIsAdmin() {
+    if (!currentEmployee) return false;
+    return currentEmployee.role === 'admin';
 }
 
-async function getAdminInfo() {
-    if (!liffProfile) return null;
-    
-    try {
-        const { data, error } = await sb.from('employees')
-            .select('*')
-            .eq('line_user_id', liffProfile.userId)
-            .eq('role', 'admin')
-            .eq('is_active', true)
-            .maybeSingle();
-        
-        if (error || !data) return null;
-        return data;
-    } catch (err) {
-        console.error('取得管理員資訊失敗:', err);
-        return null;
-    }
+// [優化] 直接從已載入的 currentEmployee 取得，不再額外查詢 DB
+function getAdminInfo() {
+    if (!currentEmployee || currentEmployee.role !== 'admin') return null;
+    return currentEmployee;
 }
 
 async function updateEmployeeRole(employeeId, newRole) {
@@ -1244,24 +1099,39 @@ async function adjustEmployeeBonus(employeeId, year, bonusAmount, reason) {
     }
 }
 
-// ===== 底部導航列（管理員限定） =====
-// 所有頁面的 bottom-nav 預設 display:none，登入後由此函數判斷
-async function initBottomNav() {
-    const nav = document.querySelector('.bottom-nav');
-    if (!nav) return;
-    
-    try {
-        const isAdmin = await checkIsAdmin();
-        if (isAdmin) {
-            nav.style.display = 'flex';
-        } else {
-            nav.style.display = 'none';
-            // 移除 bottom padding（非管理員不需要留空間）
-            document.querySelector('.container')?.style.setProperty('padding-bottom', '16px');
-        }
-    } catch(e) {
-        nav.style.display = 'none';
+// ===== 底部導航列（管理員限定，動態產生） =====
+function initBottomNav() {
+    const isAdmin = checkIsAdmin();
+
+    // 移除頁面上既有的靜態 bottom-nav（避免重複）
+    document.querySelectorAll('.bottom-nav').forEach(n => n.remove());
+
+    if (!isAdmin) {
+        document.querySelector('.container')?.style.setProperty('padding-bottom', '16px');
+        return;
     }
+
+    // 判斷當前頁面以標記 active
+    const page = window.location.pathname.split('/').pop() || 'index.html';
+    const items = [
+        { href: 'index.html',          icon: '🏠', label: '首頁' },
+        { href: 'schedule.html',       icon: '📅', label: '班表' },
+        { href: 'checkin.html?type=in', icon: '📍', label: '打卡' },
+        { href: 'salary.html',         icon: '💰', label: '薪資' },
+        { href: 'admin.html',          icon: '⚙️', label: '管理' }
+    ];
+
+    const nav = document.createElement('nav');
+    nav.className = 'bottom-nav';
+    nav.style.display = 'flex';
+    nav.innerHTML = items.map(it => {
+        const isActive = page === it.href.split('?')[0];
+        return `<a class="nav-item${isActive ? ' active' : ''}" onclick="window.location.href='${it.href}'">
+            <span class="nav-icon">${it.icon}</span><span class="nav-label">${it.label}</span>
+        </a>`;
+    }).join('');
+
+    document.body.appendChild(nav);
 }
 
 // ===== 功能顯示設定 =====
@@ -1273,23 +1143,15 @@ const DEFAULT_FEATURES = {
     attendance: true    // 考勤查詢
 };
 
-async function getFeatureVisibility() {
-    try {
-        const { data } = await sb.from('hr_settings')
-            .select('value')
-            .eq('key', 'feature_visibility')
-            .maybeSingle();
-        
-        if (data?.value) {
-            return { ...DEFAULT_FEATURES, ...data.value };
-        }
-    } catch(e) {}
+function getFeatureVisibility() {
+    const val = getCachedSetting('feature_visibility');
+    if (val) return { ...DEFAULT_FEATURES, ...val };
     return DEFAULT_FEATURES;
 }
 
 // 根據設定隱藏首頁「中間選單」項目（不影響底部導航列）
-async function applyFeatureVisibility() {
-    const features = await getFeatureVisibility();
+function applyFeatureVisibility() {
+    const features = getFeatureVisibility();
     
     // 只控制首頁中間的 menu-grid 選單 icon
     const menuMap = {
@@ -1317,10 +1179,13 @@ async function submitOvertime() {
     const reason = document.getElementById('otReason')?.value;
     const compType = document.getElementById('otCompType')?.value || 'pay';
     const statusEl = document.getElementById('otStatus');
-    
+
     if (!date || !hours || hours <= 0) return showToast('❌ 請填寫日期與時數');
     if (hours > 12) return showToast('❌ 加班時數不可超過 12 小時');
-    
+
+    const otBtn = document.querySelector('[onclick="submitOvertime()"]');
+    setBtnLoading(otBtn, true);
+
     try {
         const { error } = await sb.from('overtime_requests').insert({
             employee_id: currentEmployee.id,
@@ -1331,15 +1196,17 @@ async function submitOvertime() {
             status: 'pending'
         });
         if (error) throw error;
-        
+
         showToast('✅ 加班申請已提交');
-        if (statusEl) { statusEl.className = 'status-box show success'; statusEl.innerHTML = '✅ 申請已提交，等待審核'; }
+        if (statusEl) { statusEl.className = 'status-box show success'; statusEl.textContent = '✅ 申請已提交，等待審核'; }
         loadOvertimeHistory();
-        
+
         const compLabel = compType === 'pay' ? '加班費' : '補休';
         sendAdminNotify(`🔔 ${currentEmployee.name} 申請加班\n📅 ${date} ${hours}小時\n💰 ${compLabel}\n📝 ${reason || '無附原因'}`);
     } catch(e) {
         showToast('❌ 申請失敗：' + friendlyError(e));
+    } finally {
+        setBtnLoading(otBtn, false, '📤 提交加班申請');
     }
 }
 
@@ -1355,31 +1222,31 @@ async function loadOvertimeHistory() {
             .limit(10);
         
         if (!data || data.length === 0) {
-            list.innerHTML = '<p style="text-align:center;color:#999;font-size:13px;">尚無加班記錄</p>';
+            list.innerHTML = '<p class="text-center-muted-sm">尚無加班記錄</p>';
             return;
         }
-        
+
         const statusMap = { pending: '⏳ 待審', approved: '✅ 通過', rejected: '❌ 拒絕' };
         const statusColor = { pending: '#F59E0B', approved: '#059669', rejected: '#DC2626' };
-        
+
         list.innerHTML = data.map(r => {
             const comp = r.compensation_type === 'pay' ? '💰 加班費' : '🏖️ 換補休';
             const finalH = r.final_hours != null ? ` → 計薪 ${r.final_hours}h` : '';
             return `
-            <div class="attendance-item" style="border-left:3px solid ${statusColor[r.status] || '#ccc'};">
+            <div class="attendance-item" style="border-left-color:${statusColor[r.status] || '#ccc'};">
                 <div class="date">
-                    <span>📅 ${r.ot_date} · ${r.planned_hours}h · ${comp}</span>
+                    <span>📅 ${escapeHTML(r.ot_date)} · ${r.planned_hours}h · ${comp}</span>
                     <span class="badge ${r.status === 'approved' ? 'badge-success' : r.status === 'rejected' ? 'badge-danger' : 'badge-warning'}">
-                        ${statusMap[r.status]}${finalH}
+                        ${statusMap[r.status] || escapeHTML(r.status)}${finalH}
                     </span>
                 </div>
-                <div style="font-size:12px;color:#666;margin-top:4px;">${r.reason || ''}</div>
-                ${r.status === 'approved' && r.approved_hours ? `<div style="font-size:11px;color:#059669;margin-top:2px;">核准 ${r.approved_hours}h${r.actual_hours != null ? ` · 實際 ${r.actual_hours}h` : ''}${finalH}</div>` : ''}
-                ${r.status === 'rejected' && r.rejection_reason ? `<div style="font-size:12px;color:#DC2626;margin-top:4px;padding:6px 8px;background:#FEF2F2;border-radius:6px;">❌ ${r.rejection_reason}</div>` : ''}
+                <div class="text-sm-muted">${escapeHTML(r.reason)}</div>
+                ${r.status === 'approved' && r.approved_hours ? `<div class="text-xs-success">核准 ${r.approved_hours}h${r.actual_hours != null ? ` · 實際 ${r.actual_hours}h` : ''}${finalH}</div>` : ''}
+                ${r.status === 'rejected' && r.rejection_reason ? `<div class="rejection-box">❌ ${escapeHTML(r.rejection_reason)}</div>` : ''}
             </div>`;
         }).join('');
     } catch(e) {
-        list.innerHTML = '<p style="text-align:center;color:#ef4444;">載入失敗</p>';
+        list.innerHTML = '<p class="text-center-error">載入失敗</p>';
     }
 }
 
@@ -1401,12 +1268,11 @@ async function writeAuditLog(action, targetTable, targetId, targetName, details 
 async function checkForcedAnnouncements() {
     if (!currentEmployee) return;
     try {
-        const { data: settingData } = await sb.from('hr_settings')
-            .select('value').eq('key', 'announcements').maybeSingle();
-        if (!settingData?.value?.items) return;
+        const settingValue = getCachedSetting('announcements');
+        if (!settingValue?.items) return;
         
-        const todayStr = fmtDate(new Date());
-        const forced = settingData.value.items.filter(a => 
+        const todayStr = getTaiwanDate();
+        const forced = settingValue.items.filter(a =>
             a.require_ack && (!a.expire_date || a.expire_date >= todayStr)
         );
         if (forced.length === 0) return;
@@ -1441,12 +1307,12 @@ function showForcedAnnouncementModal(announcement) {
     modal.innerHTML = `
         <div style="background:#fff;border-radius:20px;max-width:380px;width:100%;padding:24px;animation:pageIn 0.3s ease-out;">
             <div style="text-align:center;font-size:36px;margin-bottom:12px;">${typeIcon}</div>
-            <h3 style="text-align:center;font-size:18px;font-weight:800;color:${typeColor};margin-bottom:12px;">${announcement.title}</h3>
-            ${announcement.content ? `<div style="font-size:14px;color:#374151;line-height:1.8;padding:14px;background:#F8FAFC;border-radius:12px;margin-bottom:16px;max-height:300px;overflow-y:auto;">${announcement.content.replace(/\n/g, '<br>')}</div>` : ''}
+            <h3 style="text-align:center;font-size:18px;font-weight:800;color:${typeColor};margin-bottom:12px;">${escapeHTML(announcement.title)}</h3>
+            ${announcement.content ? `<div style="font-size:14px;color:#374151;line-height:1.8;padding:14px;background:#F8FAFC;border-radius:12px;margin-bottom:16px;max-height:300px;overflow-y:auto;white-space:pre-wrap;">${escapeHTML(announcement.content)}</div>` : ''}
             <div style="font-size:11px;color:#94A3B8;text-align:center;margin-bottom:16px;">
-                發布者：${announcement.created_by || '-'} · ${announcement.created_at ? new Date(announcement.created_at).toLocaleDateString() : ''}
+                發布者：${escapeHTML(announcement.created_by || '-')} · ${announcement.created_at ? new Date(announcement.created_at).toLocaleDateString() : ''}
             </div>
-            <button id="forcedAckBtn" onclick="acknowledgeForcedAnnouncement('${announcement.id}')" 
+            <button id="forcedAckBtn" onclick="acknowledgeForcedAnnouncement('${escapeHTML(announcement.id)}')"
                 style="width:100%;padding:14px;border:none;border-radius:12px;background:${typeColor};color:#fff;font-size:15px;font-weight:800;cursor:pointer;">
                 ✅ 我已閱讀並確認
             </button>

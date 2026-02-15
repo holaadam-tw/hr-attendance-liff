@@ -98,10 +98,7 @@
                 <h2>🎁 年終獎金試算</h2>
                 <div class="form-group">
                     <label>試算年度</label>
-                    <select id="bonusYear" onchange="loadAllBonusStats()">
-                        <option value="2026">2026</option>
-                        <option value="2025">2025</option>
-                    </select>
+                    <select id="bonusYear" onchange="loadAllBonusStats()"></select>
                 </div>
                 
                 <div class="lunch-summary">
@@ -778,7 +775,7 @@
                 
                 if (!data) {
                     console.log('❌ 找不到管理員資料，LINE ID:', liffProfile?.userId);
-                    showStatus(statusEl, 'error', '❌ 您沒有管理員權限<br><small style="opacity:0.7">LINE ID: ' + (liffProfile?.userId || '未知') + '</small>');
+                    showStatus(statusEl, 'error', '❌ 您沒有管理員權限<br><small style="opacity:0.7">LINE ID: ' + escapeHTML(liffProfile?.userId || '未知') + '</small>', true);
                     setTimeout(() => { window.location.href = 'index.html'; }, 5000);
                     return;
                 }
@@ -790,7 +787,8 @@
                 await loadSettings();
                 
                 showStatus(statusEl, 'success', '✅ 權限驗證通過');
-                setTimeout(() => { 
+                populateYearSelect('bonusYear');
+                setTimeout(() => {
                     showPage('adminHomePage');
                     document.getElementById('bottomNav').style.display = 'flex';
                 }, 800);
@@ -1231,7 +1229,7 @@
                         </div>`;
                     return;
                 }
-                const todayStr = fmtDate(new Date());
+                const todayStr = getTaiwanDate();
                 const { data: todayLeaves } = await sb.from('leave_requests').select('id')
                     .in('status', ['approved','pending'])
                     .lte('start_date', todayStr).gte('end_date', todayStr);
@@ -1331,7 +1329,7 @@
             const typeColor = { annual:'#DBEAFE', sick:'#FEE2E2', personal:'#FEF3C7', compensatory:'#E0E7FF' };
             const typeEmoji = { annual:'🏖', sick:'🤒', personal:'📋', compensatory:'💤' };
             let totalLeaves = 0;
-            const todayStr = fmtDate(new Date());
+            const todayStr = getTaiwanDate();
             let todayAvail = employees.length;
             let overDays = [];
 

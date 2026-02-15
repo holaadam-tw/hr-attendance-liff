@@ -44,25 +44,6 @@
         </div>
     </div>
 
-    <!-- 底部導航列 -->
-    <nav class="bottom-nav" style="display:none;">
-        <a class="nav-item" onclick="window.location.href='index.html'">
-            <span class="nav-icon">🏠</span><span class="nav-label">首頁</span>
-        </a>
-        <a class="nav-item" onclick="window.location.href='schedule.html'">
-            <span class="nav-icon">📅</span><span class="nav-label">班表</span>
-        </a>
-        <a class="nav-item active">
-            <span class="nav-icon">📍</span><span class="nav-label">打卡</span>
-        </a>
-        <a class="nav-item" onclick="window.location.href='salary.html'">
-            <span class="nav-icon">💰</span><span class="nav-label">薪資</span>
-        </a>
-        <a class="nav-item" onclick="window.location.href='admin.html'">
-            <span class="nav-icon">⚙️</span><span class="nav-label">管理</span>
-        </a>
-    </nav>
-
     <script src="common.js"></script>
     <script>
         let currentCheckInType = 'in';
@@ -303,7 +284,7 @@
                     }
                     await sb.from('lunch_orders').upsert({
                         employee_id: currentEmployee.id,
-                        order_date: fmtDate(new Date()),
+                        order_date: getTaiwanDate(),
                         is_vegetarian: false,
                         status: 'cancelled',
                         notes: '不訂購，補助NT$50'
@@ -311,7 +292,7 @@
                 } else {
                     await sb.from('lunch_orders').upsert({
                         employee_id: currentEmployee.id,
-                        order_date: fmtDate(new Date()),
+                        order_date: getTaiwanDate(),
                         is_vegetarian: selectedLunch === 'vegetarian',
                         status: 'ordered',
                         notes: ''

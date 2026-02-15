@@ -149,15 +149,15 @@
             <!-- ====== 薪資試算器 ====== -->
             <div id="salaryCalcView" class="salary-view">
                 <div class="card">
-                    <div style="font-size:14px;font-weight:800;color:var(--dark);margin-bottom:14px;">選擇計薪方式</div>
+                    <div class="text-heading-sm">選擇計薪方式</div>
                     <div class="calc-mode">
-                        <div class="calc-mode-btn active" onclick="setCalcMode('monthly')">
+                        <div class="calc-mode-btn active" onclick="setCalcMode('monthly', this)">
                             <span class="cm-icon">📅</span><span class="cm-label">月薪制</span><span class="cm-desc">固定月薪</span>
                         </div>
-                        <div class="calc-mode-btn" onclick="setCalcMode('daily')">
+                        <div class="calc-mode-btn" onclick="setCalcMode('daily', this)">
                             <span class="cm-icon">📆</span><span class="cm-label">日薪制</span><span class="cm-desc">按天計算</span>
                         </div>
-                        <div class="calc-mode-btn" onclick="setCalcMode('hourly')">
+                        <div class="calc-mode-btn" onclick="setCalcMode('hourly', this)">
                             <span class="cm-icon">⏰</span><span class="cm-label">時薪制</span><span class="cm-desc">按時計算</span>
                         </div>
                     </div>
@@ -269,7 +269,7 @@
                 <div class="calc-detail-card"><div class="calc-detail-title">⏰ 加班費計算（勞基法 §24）</div><div id="calcOTRows"></div></div>
 
                 <div class="card" style="padding:16px;">
-                    <div style="font-size:14px;font-weight:800;color:var(--dark);margin-bottom:12px;">🏥 勞健保說明</div>
+                    <div class="text-heading-sm">🏥 勞健保說明</div>
                     <div style="font-size:13px;color:var(--gray);line-height:1.8;">
                         <b style="color:var(--dark);">勞保</b>：投保級距 × 12.5% × 自付 20%<br>
                         <b style="color:var(--dark);">健保</b>：投保級距 × 5.17% × 自付 30%<br>
@@ -283,14 +283,6 @@
             </div>
         </div>
     </div>
-
-    <nav class="bottom-nav" style="display:none;">
-        <a class="nav-item" onclick="window.location.href='index.html'"><span class="nav-icon">🏠</span><span class="nav-label">首頁</span></a>
-        <a class="nav-item" onclick="window.location.href='schedule.html'"><span class="nav-icon">📅</span><span class="nav-label">班表</span></a>
-        <a class="nav-item" onclick="window.location.href='checkin.html?type=in'"><span class="nav-icon">📍</span><span class="nav-label">打卡</span></a>
-        <a class="nav-item active"><span class="nav-icon">💰</span><span class="nav-label">薪資</span></a>
-        <a class="nav-item" onclick="window.location.href='admin.html'"><span class="nav-icon">⚙️</span><span class="nav-label">管理</span></a>
-    </nav>
 
     <script src="common.js"></script>
     <script>
@@ -415,11 +407,11 @@
             document.getElementById('chartLegend').innerHTML = income.map((d,i) => `<span class="legend-item"><span class="legend-dot" style="background:${CHART_COLORS[i]}"></span>${d.label}</span>`).join('');
             
             document.getElementById('incomeRows').innerHTML = income.map(i =>
-                `<div class="detail-row"><span class="dl">${i.label}${i.desc ? `<br><span style="font-size:11px;color:#94A3B8;">${i.desc}</span>` : ''}</span><span class="dv">${formatNT(i.value)}</span></div>`
+                `<div class="detail-row"><span class="dl">${i.label}${i.desc ? `<br><span class="text-sm-secondary">${i.desc}</span>` : ''}</span><span class="dv">${formatNT(i.value)}</span></div>`
             ).join('');
             
             document.getElementById('deductRows').innerHTML = deduct.map(i =>
-                `<div class="detail-row"><span class="dl">${i.label}${i.desc ? `<br><span style="font-size:11px;color:#94A3B8;">${i.desc}</span>` : ''}</span><span class="dv deduct">-${formatNT(i.value)}</span></div>`
+                `<div class="detail-row"><span class="dl">${i.label}${i.desc ? `<br><span class="text-sm-secondary">${i.desc}</span>` : ''}</span><span class="dv deduct">-${formatNT(i.value)}</span></div>`
             ).join('');
         }
 
@@ -469,10 +461,10 @@
         }
 
         // ===== Salary Calculator =====
-        function setCalcMode(mode) {
+        function setCalcMode(mode, el) {
             calcMode = mode;
             document.querySelectorAll('.calc-mode-btn').forEach(b => b.classList.remove('active'));
-            event.currentTarget.classList.add('active');
+            if (el) el.classList.add('active');
             document.getElementById('rowMonthly').style.display = mode === 'monthly' ? 'flex' : 'none';
             document.getElementById('rowDaily').style.display = mode === 'daily' ? 'flex' : 'none';
             document.getElementById('rowHourly').style.display = mode === 'hourly' ? 'flex' : 'none';
