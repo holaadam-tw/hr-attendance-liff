@@ -1019,13 +1019,16 @@
                 (leaveRes.data || []).forEach(l => { if (!leaveMap[l.employee_id]) leaveMap[l.employee_id] = 0; leaveMap[l.employee_id] += (parseFloat(l.days) || 0); });
 
                 const yearEnd = new Date(year, 11, 31);
+                const today = new Date();
+                const cutoffDate = yearEnd < today ? yearEnd : today; // 年度已結束用年底，未結束用今天
                 bonusEmployees = (empRes.data || []).map(emp => {
                     const baseSalary = salaryMap[emp.id] || 0;
                     const lateCount = lateMap[emp.id] || 0;
                     const leaveDays = leaveMap[emp.id] || 0;
                     let tenureRatio = 1.0;
                     if (emp.hire_date) {
-                        const days = Math.max(0, (yearEnd - new Date(emp.hire_date)) / 86400000);
+                        const hireDate = new Date(emp.hire_date);
+                        const days = Math.max(0, (cutoffDate - hireDate) / 86400000);
                         tenureRatio = Math.min(days / 365, 1.0);
                     }
                     let attendanceGrade = 'B';
