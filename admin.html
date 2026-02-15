@@ -91,26 +91,38 @@
             </div>
         </div>
 
-        <!-- 年終獎金試算頁面 -->
+        <!-- 年終獎金試算頁面 (混合精算) -->
         <div id="bonusPage" class="page">
             <button class="btn btn-secondary" onclick="showPage('adminHomePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
             <div class="checkin-page">
                 <h2>🎁 年終獎金試算</h2>
                 <div class="form-group">
                     <label>試算年度</label>
-                    <select id="bonusYear" onchange="loadAllBonusStats()"></select>
+                    <select id="bonusYear" onchange="loadHybridBonusData()"></select>
                 </div>
-                
-                <div class="lunch-summary">
+
+                <div id="bonusLoading" style="text-align:center;color:#666;padding:30px;display:none;">⏳ 載入中...</div>
+
+                <div class="lunch-summary" id="bonusSummary" style="display:none;">
                     <h3 style="margin-bottom:15px;">📈 試算摘要</h3>
                     <div class="stat-row"><span>符合資格人數</span><span id="eligibleCount">0</span></div>
-                    <div class="stat-row"><span>未符合資格人數</span><span id="ineligibleCount">0</span></div>
                     <div class="stat-row"><span>總預算</span><span id="totalBudget">$0</span></div>
                     <div class="stat-row"><span>平均獎金</span><span id="avgBonus">$0</span></div>
                 </div>
 
-                <div id="bonusList" style="margin-top:20px;">
-                    <p style="text-align:center;color:#666;">載入中...</p>
+                <div id="matrixRef" style="display:none;">
+                    <div onclick="toggleMatrixRef()" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#F5F3FF;border-radius:12px;margin-bottom:10px;">
+                        <span style="font-weight:700;font-size:13px;color:#4F46E5;">📊 獎金矩陣參考表</span>
+                        <span id="matrixRefArrow" style="font-size:12px;color:#4F46E5;">▼</span>
+                    </div>
+                    <div id="matrixRefBody" style="display:none;overflow-x:auto;margin-bottom:16px;"></div>
+                </div>
+
+                <div id="bonusList" style="margin-top:10px;"></div>
+
+                <div id="bonusActions" style="display:none;margin-top:20px;">
+                    <button class="btn btn-success" onclick="saveAllBonuses()" id="saveAllBonusBtn">💾 儲存全部獎金</button>
+                    <button class="btn btn-secondary" onclick="exportBonusCSV()" style="margin-top:8px;">📊 匯出 CSV</button>
                 </div>
             </div>
         </div>
@@ -606,7 +618,20 @@
     <script src="common.js"></script>
     <script>
         let currentAdminEmployee = null;
-        let allBonusStats = [];
+
+        // ===== 混合精算獎金系統 =====
+        const BONUS_MATRIX = {
+            S: { A: 2.0, B: 1.8, C: 1.5 },
+            A: { A: 1.5, B: 1.3, C: 1.0 },
+            B: { A: 1.0, B: 0.8, C: 0.5 }
+        };
+        const FULL_ATTENDANCE_BONUS = 3000;
+        const LATE_PENALTY_PER = 200;
+        const GRADE_LABELS = { A: '全勤', B: '正常', C: '待加強' };
+        const PERF_LABELS = { S: '卓越', A: '優良', B: '普通' };
+        let bonusEmployees = [];
+        let bonusPerformance = {};
+        let bonusAdjustments = {};
 
         // 本地日期格式化（避免 toISOString 時區偏移）
         function fmtDate(d) {
@@ -618,7 +643,7 @@
             document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
             document.getElementById(id).classList.add('active');
             
-            if (id === 'bonusPage') loadAllBonusStats();
+            if (id === 'bonusPage') loadHybridBonusData();
             if (id === 'locationPage') renderLocationList();
             if (id === 'employeePage') loadEmployeeList();
             if (id === 'leaveApprovalPage') loadLeaveApprovals('pending');
@@ -816,78 +841,210 @@
             }
         }
 
-        // 載入獎金統計
-        async function loadAllBonusStats() {
+        // ===== 混合精算獎金系統 =====
+        async function loadHybridBonusData() {
             const yearEl = document.getElementById('bonusYear');
             const listEl = document.getElementById('bonusList');
+            const loadingEl = document.getElementById('bonusLoading');
+            const summaryEl = document.getElementById('bonusSummary');
+            const actionsEl = document.getElementById('bonusActions');
+            const matrixRefEl = document.getElementById('matrixRef');
             if (!yearEl || !listEl) return;
-
             const year = parseInt(yearEl.value);
-            listEl.innerHTML = '<p style="text-align:center;color:#666;">載入中...</p>';
+
+            if (loadingEl) loadingEl.style.display = 'block';
+            if (summaryEl) summaryEl.style.display = 'none';
+            if (actionsEl) actionsEl.style.display = 'none';
+            if (matrixRefEl) matrixRefEl.style.display = 'none';
+            listEl.innerHTML = '';
 
             try {
-                const { data, error } = await sb.rpc('get_all_year_end_stats', { p_year: year });
-                if (error) throw error;
-                
-                allBonusStats = data || [];
-                
-                const eligible = allBonusStats.filter(emp => emp.bonus_status === '符合資格');
-                const ineligible = allBonusStats.filter(emp => emp.bonus_status !== '符合資格');
-                const totalBudget = allBonusStats.reduce((sum, emp) => sum + (emp.suggested_bonus || 0), 0);
-                
-                document.getElementById('eligibleCount').textContent = eligible.length;
-                document.getElementById('ineligibleCount').textContent = ineligible.length;
-                document.getElementById('totalBudget').textContent = `$${totalBudget.toLocaleString()}`;
-                document.getElementById('avgBonus').textContent = eligible.length > 0 
-                    ? `$${Math.round(totalBudget / eligible.length).toLocaleString()}` : '$0';
+                const [empRes, salaryRes, attRes, leaveRes] = await Promise.all([
+                    sb.from('employees').select('id, name, employee_number, department, hire_date').eq('is_active', true).order('department').order('name'),
+                    sb.from('salary_settings').select('employee_id, base_salary').eq('is_current', true),
+                    sb.from('attendance').select('employee_id, is_late').gte('date', `${year}-01-01`).lte('date', `${year}-12-31`),
+                    sb.from('leave_requests').select('employee_id, days').eq('status', 'approved').gte('start_date', `${year}-01-01`).lte('start_date', `${year}-12-31`)
+                ]);
+                if (empRes.error) throw empRes.error;
 
-                let html = '';
-                allBonusStats.forEach(emp => {
-                    const isEligible = emp.bonus_status === '符合資格';
-                    html += `
-                        <div class="attendance-item ${isEligible ? 'normal' : 'late'}">
-                            <div class="date">
-                                <span>${emp.name} (${emp.employee_number})</span>
-                                <span class="badge ${isEligible ? 'badge-success' : 'badge-warning'}">
-                                    ${isEligible ? '✅ 符合' : '❌ 未符合'}
-                                </span>
-                            </div>
-                            <div class="details">
-                                <span>${emp.department || '-'}</span>
-                                <span style="font-weight:bold;">$${(emp.suggested_bonus || 0).toLocaleString()}</span>
-                            </div>
-                            <div style="font-size:12px;color:#666;margin-top:5px;">
-                                ${emp.bonus_status} · 出勤 ${emp.attendance_rate}% · 遲到 ${emp.late_count}次
-                            </div>
-                            <button class="btn-danger" onclick="adjustBonus('${emp.employee_id}', '${emp.name}', ${emp.suggested_bonus || 0})" style="margin-top:8px;font-size:12px;padding:6px 12px;">
-                                ✏️ 調整獎金
-                            </button>
-                        </div>
-                    `;
+                const salaryMap = {};
+                (salaryRes.data || []).forEach(s => { salaryMap[s.employee_id] = s.base_salary; });
+                const lateMap = {};
+                (attRes.data || []).forEach(a => { if (!lateMap[a.employee_id]) lateMap[a.employee_id] = 0; if (a.is_late) lateMap[a.employee_id]++; });
+                const leaveMap = {};
+                (leaveRes.data || []).forEach(l => { if (!leaveMap[l.employee_id]) leaveMap[l.employee_id] = 0; leaveMap[l.employee_id] += (parseFloat(l.days) || 0); });
+
+                const yearEnd = new Date(year, 11, 31);
+                bonusEmployees = (empRes.data || []).map(emp => {
+                    const baseSalary = salaryMap[emp.id] || 0;
+                    const lateCount = lateMap[emp.id] || 0;
+                    const leaveDays = leaveMap[emp.id] || 0;
+                    let tenureRatio = 1.0;
+                    if (emp.hire_date) {
+                        const days = Math.max(0, (yearEnd - new Date(emp.hire_date)) / 86400000);
+                        tenureRatio = Math.min(days / 365, 1.0);
+                    }
+                    let attendanceGrade = 'B';
+                    if (lateCount === 0 && leaveDays === 0) attendanceGrade = 'A';
+                    else if (lateCount >= 3 || leaveDays >= 3) attendanceGrade = 'C';
+
+                    return { id: emp.id, name: emp.name, employeeNumber: emp.employee_number, department: emp.department, hireDate: emp.hire_date, baseSalary, lateCount, leaveDays, tenureRatio, attendanceGrade, perfRating: bonusPerformance[emp.id] || 'A' };
                 });
-                
-                listEl.innerHTML = html || '<p style="text-align:center;color:#999;">無資料</p>';
 
+                renderBonusCards();
+                updateBonusSummary();
+                renderMatrixRefTable();
+                if (loadingEl) loadingEl.style.display = 'none';
+                if (summaryEl) summaryEl.style.display = 'block';
+                if (actionsEl) actionsEl.style.display = 'block';
+                if (matrixRefEl) matrixRefEl.style.display = 'block';
             } catch (err) {
-                console.error(err);
-                listEl.innerHTML = '<p style="text-align:center;color:#ef4444;">載入失敗</p>';
+                console.error('Bonus load failed:', err);
+                if (loadingEl) loadingEl.style.display = 'none';
+                listEl.innerHTML = '<p style="text-align:center;color:#ef4444;">載入失敗: ' + escapeHTML(friendlyError(err)) + '</p>';
             }
         }
 
-        // 調整獎金
-        function adjustBonus(employeeId, employeeName, currentBonus) {
-            const newBonus = prompt(`調整 ${employeeName} 的獎金金額\n目前: $${currentBonus.toLocaleString()}\n請輸入新金額：`);
-            
-            if (newBonus === null) return;
-            
-            const bonusAmount = parseInt(newBonus);
-            if (isNaN(bonusAmount) || bonusAmount < 0) {
-                showToast('❌ 請輸入有效的金額');
-                return;
+        function calculateBonus(emp) {
+            const perfRating = bonusPerformance[emp.id] || emp.perfRating || 'A';
+            const manualAdj = bonusAdjustments[emp.id] || 0;
+            const multiplier = BONUS_MATRIX[perfRating]?.[emp.attendanceGrade] ?? 1.0;
+            const baseAmount = Math.round(emp.baseSalary * emp.tenureRatio * multiplier);
+            const fullAtt = emp.attendanceGrade === 'A' ? FULL_ATTENDANCE_BONUS : 0;
+            const latePen = emp.lateCount * LATE_PENALTY_PER;
+            const finalAmount = Math.max(0, baseAmount + fullAtt - latePen + manualAdj);
+            return { perfRating, multiplier, baseAmount, fullAtt, latePen, manualAdj, finalAmount };
+        }
+
+        function renderBonusCards() {
+            const listEl = document.getElementById('bonusList');
+            if (!listEl) return;
+            if (bonusEmployees.length === 0) { listEl.innerHTML = '<p style="text-align:center;color:#999;">無員工資料</p>'; return; }
+
+            let html = '';
+            bonusEmployees.forEach(emp => {
+                const c = calculateBonus(emp);
+                html += `
+                <div class="bonus-card grade-${emp.attendanceGrade}" id="bonusCard_${emp.id}">
+                    <div class="bonus-card-header">
+                        <div><span class="bonus-card-name">${escapeHTML(emp.name)}</span><span class="bonus-card-dept">${escapeHTML(emp.department || '-')} (${escapeHTML(emp.employeeNumber)})</span></div>
+                        <span class="bonus-grade-badge bonus-grade-${emp.attendanceGrade}">出勤 ${emp.attendanceGrade} (${GRADE_LABELS[emp.attendanceGrade]})</span>
+                    </div>
+                    <div class="bonus-data-grid">
+                        <div><span class="label">遲到</span></div><div><span class="value">${emp.lateCount} 次</span></div>
+                        <div><span class="label">請假</span></div><div><span class="value">${emp.leaveDays} 天</span></div>
+                        <div><span class="label">底薪</span></div><div><span class="value">$${(emp.baseSalary || 0).toLocaleString()}</span></div>
+                        <div><span class="label">年資比例</span></div><div><span class="value">${(emp.tenureRatio * 100).toFixed(0)}%</span></div>
+                    </div>
+                    <div class="bonus-controls" style="margin-bottom:10px;">
+                        <label style="font-size:12px;font-weight:700;color:#4b5563;white-space:nowrap;">績效評等</label>
+                        <select onchange="updatePerformance('${emp.id}', this.value)">
+                            ${['S','A','B'].map(r => '<option value="' + r + '"' + (c.perfRating === r ? ' selected' : '') + '>' + r + ' (' + PERF_LABELS[r] + ')</option>').join('')}
+                        </select>
+                        <span style="font-size:13px;font-weight:800;color:#4F46E5;white-space:nowrap;">x${c.multiplier}</span>
+                    </div>
+                    <div class="bonus-breakdown">
+                        <div class="row"><span>底薪 x 年資 x 矩陣</span><span>$${c.baseAmount.toLocaleString()}</span></div>
+                        ${c.fullAtt > 0 ? '<div class="row"><span class="plus">+ 全勤獎金</span><span class="plus">+$' + c.fullAtt.toLocaleString() + '</span></div>' : ''}
+                        ${c.latePen > 0 ? '<div class="row"><span class="minus">- 遲到扣款 (' + emp.lateCount + 'x$' + LATE_PENALTY_PER + ')</span><span class="minus">-$' + c.latePen.toLocaleString() + '</span></div>' : ''}
+                        ${c.manualAdj !== 0 ? '<div class="row"><span>' + (c.manualAdj > 0 ? '+' : '') + ' 手動調整</span><span>' + (c.manualAdj > 0 ? '+' : '') + '$' + c.manualAdj.toLocaleString() + '</span></div>' : ''}
+                        <div class="row total"><span>最終金額</span><span>$${c.finalAmount.toLocaleString()}</span></div>
+                    </div>
+                    <div class="bonus-controls">
+                        <label style="font-size:12px;font-weight:700;color:#4b5563;white-space:nowrap;">手動調整</label>
+                        <input type="number" placeholder="±金額" value="${c.manualAdj || ''}" onchange="updateAdjustment('${emp.id}', this.value)">
+                    </div>
+                </div>`;
+            });
+            listEl.innerHTML = html;
+        }
+
+        function updatePerformance(empId, rating) {
+            bonusPerformance[empId] = rating;
+            renderBonusCards();
+            updateBonusSummary();
+        }
+        function updateAdjustment(empId, value) {
+            const val = parseInt(value);
+            bonusAdjustments[empId] = isNaN(val) ? 0 : val;
+            renderBonusCards();
+            updateBonusSummary();
+        }
+        function updateBonusSummary() {
+            let total = 0, count = 0;
+            bonusEmployees.forEach(emp => { const c = calculateBonus(emp); if (c.finalAmount > 0) { count++; total += c.finalAmount; } });
+            document.getElementById('eligibleCount').textContent = count;
+            document.getElementById('totalBudget').textContent = `$${total.toLocaleString()}`;
+            document.getElementById('avgBonus').textContent = count > 0 ? `$${Math.round(total / count).toLocaleString()}` : '$0';
+        }
+        function toggleMatrixRef() {
+            const body = document.getElementById('matrixRefBody');
+            const arrow = document.getElementById('matrixRefArrow');
+            if (body.style.display === 'none') { body.style.display = 'block'; arrow.textContent = '▲'; }
+            else { body.style.display = 'none'; arrow.textContent = '▼'; }
+        }
+        function renderMatrixRefTable() {
+            const el = document.getElementById('matrixRefBody');
+            if (!el) return;
+            let html = '<table class="matrix-table"><thead><tr><th>績效＼出勤</th>';
+            ['A','B','C'].forEach(g => { html += `<th>${g} (${GRADE_LABELS[g]})</th>`; });
+            html += '</tr></thead><tbody>';
+            ['S','A','B'].forEach(p => {
+                html += `<tr><th>${p} (${PERF_LABELS[p]})</th>`;
+                ['A','B','C'].forEach(g => { html += `<td>${BONUS_MATRIX[p][g]}x</td>`; });
+                html += '</tr>';
+            });
+            html += '</tbody></table><div style="font-size:11px;color:#94A3B8;">公式: 底薪 x 年資比 x 矩陣倍率 + 全勤$3,000(A級) - 遲到$200/次 + 手動調整</div>';
+            el.innerHTML = html;
+        }
+
+        async function saveAllBonuses() {
+            const yearEl = document.getElementById('bonusYear');
+            if (!yearEl) return;
+            const year = parseInt(yearEl.value);
+            const btn = document.getElementById('saveAllBonusBtn');
+            if (!confirm(`確定要儲存 ${year} 年全部員工的獎金資料？`)) return;
+            setBtnLoading(btn, true);
+            try {
+                const records = bonusEmployees.map(emp => {
+                    const c = calculateBonus(emp);
+                    return {
+                        employee_id: emp.id, year, base_amount: c.baseAmount,
+                        adjustment: c.manualAdj, final_bonus: c.finalAmount,
+                        manager_adjustment: c.manualAdj,
+                        months_worked: Math.round(emp.tenureRatio * 12 * 10) / 10,
+                        is_approved: true,
+                        ai_recommendation: JSON.stringify({ attendance_grade: emp.attendanceGrade, performance_rating: c.perfRating, matrix_multiplier: c.multiplier, full_attendance_bonus: c.fullAtt, late_penalty: c.latePen, base_salary: emp.baseSalary, tenure_ratio: emp.tenureRatio }),
+                        updated_at: new Date().toISOString()
+                    };
+                });
+                const { error } = await sb.from('annual_bonus').upsert(records, { onConflict: 'employee_id,year' });
+                if (error) throw error;
+                writeAuditLog('save_bonus', 'annual_bonus', null, `${year}年獎金`, { count: records.length, total: records.reduce((s, r) => s + r.final_bonus, 0) });
+                showToast(`✅ 已儲存 ${records.length} 筆獎金資料`);
+            } catch (err) {
+                console.error('Save bonus failed:', err);
+                showToast('❌ 儲存失敗: ' + friendlyError(err));
+            } finally {
+                setBtnLoading(btn, false, '💾 儲存全部獎金');
             }
-            
-            showToast(`✅ ${employeeName} 的獎金已調整為 $${bonusAmount.toLocaleString()}`);
-            loadAllBonusStats();
+        }
+
+        function exportBonusCSV() {
+            const yearEl = document.getElementById('bonusYear');
+            if (!yearEl) return;
+            const year = parseInt(yearEl.value);
+            const rows = [['工號','姓名','部門','底薪','年資比','出勤等級','績效評等','矩陣倍數','基本獎金','全勤獎金','遲到扣款','手動調整','最終獎金']];
+            bonusEmployees.forEach(emp => {
+                const c = calculateBonus(emp);
+                rows.push([emp.employeeNumber, emp.name, emp.department || '-', emp.baseSalary, (emp.tenureRatio * 100).toFixed(0) + '%', emp.attendanceGrade + '(' + GRADE_LABELS[emp.attendanceGrade] + ')', c.perfRating + '(' + PERF_LABELS[c.perfRating] + ')', c.multiplier, c.baseAmount, c.fullAtt, c.latePen, c.manualAdj, c.finalAmount]);
+            });
+            const csv = '\uFEFF' + rows.map(r => r.map(c => `"${String(c ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+            a.download = `獎金試算_${year}.csv`;
+            a.click();
+            showToast(`✅ 獎金試算_${year}.csv（${rows.length - 1} 筆）`);
         }
 
         // 員工 Modal
@@ -2051,8 +2208,12 @@
                     fn = `便當報表_${ms}.csv`;
                 } else if (type === 'bonus') {
                     const { data } = await sb.from('annual_bonus').select('*, employees(name, employee_number, department)').eq('year',y);
-                    rows.push(['工號','姓名','部門','年資(月)','基本獎金','調整','最終']);
-                    (data||[]).forEach(r => rows.push([r.employees?.employee_number,r.employees?.name,r.employees?.department,r.months_worked,r.base_amount,r.adjustment||0,(r.base_amount||0)+(r.adjustment||0)]));
+                    rows.push(['工號','姓名','部門','年資(月)','基本獎金','調整','最終','詳細']);
+                    (data||[]).forEach(r => {
+                        let detail = '';
+                        try { const d = JSON.parse(r.ai_recommendation); detail = `${d.performance_rating}/${d.attendance_grade} x${d.matrix_multiplier}`; } catch(e) {}
+                        rows.push([r.employees?.employee_number,r.employees?.name,r.employees?.department,r.months_worked,r.base_amount,r.adjustment||0,r.final_bonus||0,detail]);
+                    });
                     fn = `獎金報表_${y}.csv`;
                 }
                 

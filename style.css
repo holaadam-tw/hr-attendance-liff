@@ -416,3 +416,30 @@ body {
 ::-webkit-scrollbar { width: 3px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 4px; }
+
+/* ===== Bonus Cards ===== */
+.bonus-card { background:var(--white);border-radius:16px;padding:16px;margin-bottom:12px;box-shadow:var(--shadow-sm);border-left:4px solid var(--border); }
+.bonus-card.grade-A { border-left-color:var(--success); }
+.bonus-card.grade-B { border-left-color:var(--info); }
+.bonus-card.grade-C { border-left-color:var(--warning); }
+.bonus-card-header { display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:4px; }
+.bonus-card-name { font-weight:800;font-size:15px;color:var(--dark); }
+.bonus-card-dept { font-size:12px;color:var(--gray);margin-left:6px; }
+.bonus-grade-badge { display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700; }
+.bonus-grade-A { background:var(--success-bg);color:var(--success-text); }
+.bonus-grade-B { background:var(--info-bg);color:var(--info-text); }
+.bonus-grade-C { background:var(--warning-bg);color:var(--warning-text); }
+.bonus-data-grid { display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:12px;color:var(--gray);margin-bottom:10px; }
+.bonus-data-grid .label { font-weight:600; }
+.bonus-data-grid .value { text-align:right;font-weight:700;color:var(--dark); }
+.bonus-breakdown { background:#F8FAFC;border-radius:10px;padding:10px 12px;font-size:12px;margin-bottom:10px; }
+.bonus-breakdown .row { display:flex;justify-content:space-between;padding:3px 0; }
+.bonus-breakdown .row.total { border-top:1px dashed #CBD5E1;padding-top:6px;margin-top:4px;font-weight:800;font-size:14px;color:var(--dark); }
+.bonus-breakdown .plus { color:#059669; }
+.bonus-breakdown .minus { color:#DC2626; }
+.bonus-controls { display:flex;gap:8px;align-items:center; }
+.bonus-controls select { flex:1;padding:8px;border:2px solid var(--border);border-radius:10px;font-size:13px;background:#FAFBFC; }
+.bonus-controls input[type="number"] { width:100px;padding:8px;border:2px solid var(--border);border-radius:10px;font-size:13px;text-align:right;background:#FAFBFC; }
+.matrix-table { width:100%;border-collapse:collapse;font-size:12px;margin-bottom:8px; }
+.matrix-table th,.matrix-table td { border:1px solid var(--border);padding:8px;text-align:center; }
+.matrix-table th { background:#F1F5F9;font-weight:700;font-size:11px; }
