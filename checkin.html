@@ -123,7 +123,7 @@
                 showToast(`✅ ${typeText}成功！@${rpcData.location_name || '公司'}`);
                 
                 // 上班打卡且10點前 → 彈出便當訂購
-                if (currentCheckInType === 'in' && new Date().getHours() < 10) {
+                if (currentCheckInType === 'in' && new Date().getHours() < 9) {
                     showLunchPopup();
                 } else {
                     setTimeout(() => { window.location.href = 'index.html'; }, 1500);
@@ -216,8 +216,8 @@
                             <div id="checkVeg" style="width:22px;height:22px;border:2px solid #CBD5E1;border-radius:50%;transition:all 0.2s;"></div>
                         </div>
                         <div class="lunch-opt" onclick="selectLunch('none')" style="display:flex;align-items:center;gap:12px;padding:14px;border:2px solid #E5E7EB;border-radius:14px;cursor:pointer;transition:all 0.2s;">
-                            <span style="font-size:28px;">💰</span>
-                            <div style="flex:1;"><b style="font-size:14px;">不訂購</b><br><span style="font-size:11px;color:#059669;">補助 NT$ 50</span></div>
+                            <span style="font-size:28px;">🚫</span>
+                            <div style="flex:1;"><b style="font-size:14px;">不訂購</b><br><span style="font-size:11px;color:#94A3B8;">今日不需要便當</span></div>
                             <div id="checkNone" style="width:22px;height:22px;border:2px solid #CBD5E1;border-radius:50%;transition:all 0.2s;"></div>
                         </div>
                     </div>
@@ -258,7 +258,7 @@
             const btn = document.getElementById('lunchConfirmBtn');
             btn.disabled = false;
             btn.style.background = 'linear-gradient(135deg,#4F46E5,#7C3AED)';
-            const labels = { regular: '✅ 確認訂購葷食便當', vegetarian: '✅ 確認訂購素食便當', none: '✅ 確認不訂購（補助 $50）' };
+            const labels = { regular: '✅ 確認訂購葷食便當', vegetarian: '✅ 確認訂購素食便當', none: '✅ 確認不訂購' };
             btn.textContent = labels[type];
         }
 
@@ -269,7 +269,7 @@
             const msgs = {
                 regular: '確定訂購「葷食便當」？',
                 vegetarian: '確定訂購「素食便當」？',
-                none: '確定不訂購便當？\n將獲得 NT$ 50 午餐補助'
+                none: '確定不訂購便當？'
             };
             if (!confirm(msgs[selectedLunch])) return;
             
@@ -278,7 +278,7 @@
             
             try {
                 if (selectedLunch === 'none') {
-                    // 取消訂購，記錄補助
+                    // 不訂購
                     if (typeof submitLunchOrder === 'function') {
                         // 使用 common.js 的函數
                     }
@@ -287,7 +287,7 @@
                         order_date: getTaiwanDate(),
                         is_vegetarian: false,
                         status: 'cancelled',
-                        notes: '不訂購，補助NT$50'
+                        notes: '今日不訂購'
                     }, { onConflict: 'employee_id,order_date' });
                 } else {
                     await sb.from('lunch_orders').upsert({
@@ -299,8 +299,8 @@
                     }, { onConflict: 'employee_id,order_date' });
                 }
                 
-                const emoji = { regular: '🍖', vegetarian: '🥗', none: '💰' };
-                showToast(`${emoji[selectedLunch]} ${selectedLunch === 'none' ? '已取消訂購（補助$50）' : '便當訂購成功！'}`);
+                const emoji = { regular: '🍖', vegetarian: '🥗', none: '🚫' };
+                showToast(`${emoji[selectedLunch]} ${selectedLunch === 'none' ? '已確認不訂購' : '便當訂購成功！'}`);
             } catch(e) {
                 console.error(e);
                 showToast('⚠️ 訂購失敗，請到便當訂購頁面重試');

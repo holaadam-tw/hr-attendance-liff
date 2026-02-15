@@ -39,6 +39,33 @@
                     <div class="stat-row"><span>🍖 葷食</span><span id="regularCount">0</span></div>
                 </div>
 
+                <!-- 便當管理員報表（僅指定人員可見） -->
+                <div id="lunchManagerReport" style="display:none;">
+                    <div class="lunch-summary" style="margin-top:12px;">
+                        <h3 style="margin-bottom:12px;">📋 訂購明細報表</h3>
+                        <div style="display:flex;gap:6px;margin-bottom:12px;">
+                            <div style="flex:1;text-align:center;padding:10px;background:#ECFDF5;border-radius:10px;">
+                                <div style="font-size:20px;font-weight:900;color:#059669;" id="rptTotal">0</div>
+                                <div style="font-size:10px;font-weight:600;color:#059669;">已訂購</div>
+                            </div>
+                            <div style="flex:1;text-align:center;padding:10px;background:#EFF6FF;border-radius:10px;">
+                                <div style="font-size:20px;font-weight:900;color:#2563EB;" id="rptRegular">0</div>
+                                <div style="font-size:10px;font-weight:600;color:#2563EB;">🍖 葷食</div>
+                            </div>
+                            <div style="flex:1;text-align:center;padding:10px;background:#F5F3FF;border-radius:10px;">
+                                <div style="font-size:20px;font-weight:900;color:#7C3AED;" id="rptVeg">0</div>
+                                <div style="font-size:10px;font-weight:600;color:#7C3AED;">🥗 素食</div>
+                            </div>
+                            <div style="flex:1;text-align:center;padding:10px;background:#FEF2F2;border-radius:10px;">
+                                <div style="font-size:20px;font-weight:900;color:#DC2626;" id="rptNone">0</div>
+                                <div style="font-size:10px;font-weight:600;color:#DC2626;">🚫 不訂</div>
+                            </div>
+                        </div>
+                        <div id="lunchReportList" style="max-height:400px;overflow-y:auto;"></div>
+                        <button onclick="exportLunchCSV()" style="width:100%;margin-top:12px;padding:12px;border:none;border-radius:10px;background:linear-gradient(135deg,#4F46E5,#7C3AED);color:#fff;font-weight:700;font-size:13px;cursor:pointer;">📥 匯出今日便當 CSV</button>
+                    </div>
+                </div>
+
                 <!-- 訂購表單 -->
                 <div id="lunchForm">
                     <div class="form-group"><label>訂購日期</label><input type="date" id="lunchDate"></div>
@@ -56,8 +83,8 @@
                             <div class="lunch-check choice-check" id="lunchCheckVeg"></div>
                         </div>
                         <div class="lunch-choice choice-card" onclick="selectLunchType('none')">
-                            <span style="font-size:28px;">💰</span>
-                            <div class="flex-1"><b>不訂購</b><br><span style="font-size:11px;color:#059669;">可獲得 NT$ 50 午餐補助</span></div>
+                            <span style="font-size:28px;">🚫</span>
+                            <div class="flex-1"><b>不訂購</b><br><span style="font-size:11px;color:#94A3B8;">今日不需要便當</span></div>
                             <div class="lunch-check choice-check" id="lunchCheckNone"></div>
                         </div>
                     </div>
@@ -121,14 +148,14 @@
             document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
             document.getElementById(id).classList.add('active');
             
-            if(id==='lunchPage') { loadLunchSummary(); checkMyOrder(); checkDeadline(); }
+            if(id==='lunchPage') { loadLunchSummary(); checkMyOrder(); checkDeadline(); loadLunchManagerReport(); }
             if(id==='settingsPage') renderLocationList();
         }
 
         // ===== 便當訂購 =====
         let selectedLunchType = null;
         let myCurrentOrder = null;
-        const LUNCH_DEADLINE_HOUR = 10; // 10:00 截止
+        const LUNCH_DEADLINE_HOUR = 9; // 9:00 截止
 
         function checkDeadline() {
             const el = document.getElementById('lunchDeadline');
@@ -170,8 +197,8 @@
                 card.classList.remove('hidden');
                 const isVeg = data.is_vegetarian;
                 const isCancelled = data.status === 'cancelled';
-                const emoji = isCancelled ? '💰' : (isVeg ? '🥗' : '🍖');
-                const label = isCancelled ? '不訂購（補助 $50）' : (isVeg ? '素食便當' : '葷食便當');
+                const emoji = isCancelled ? '🚫' : (isVeg ? '🥗' : '🍖');
+                const label = isCancelled ? '不訂購' : (isVeg ? '素食便當' : '葷食便當');
                 const statusColor = isCancelled ? '#EA580C' : '#059669';
                 
                 content.innerHTML = `
@@ -214,7 +241,7 @@
             
             const btn = document.getElementById('lunchSubmitBtn');
             btn.disabled = false; btn.style.opacity = '1';
-            const labels = { regular: '✅ 確認訂購葷食便當', vegetarian: '✅ 確認訂購素食便當', none: '✅ 確認不訂購（補助 $50）' };
+            const labels = { regular: '✅ 確認訂購葷食便當', vegetarian: '✅ 確認訂購素食便當', none: '✅ 確認不訂購' };
             btn.textContent = labels[type];
         }
 
@@ -223,7 +250,7 @@
             const dateEl = document.getElementById('lunchDate');
             if (!dateEl?.value) return showToast('請選擇日期');
             
-            const msgs = { regular:'確定訂購「葷食便當」？', vegetarian:'確定訂購「素食便當」？', none:'確定不訂購便當？\n將獲得 NT$ 50 午餐補助' };
+            const msgs = { regular:'確定訂購「葷食便當」？', vegetarian:'確定訂購「素食便當」？', none:'確定不訂購便當？' };
             if (!confirm(msgs[selectedLunchType])) return;
             
             try {
@@ -232,10 +259,10 @@
                     order_date: dateEl.value,
                     is_vegetarian: selectedLunchType === 'vegetarian',
                     status: selectedLunchType === 'none' ? 'cancelled' : 'ordered',
-                    notes: document.getElementById('lunchNotes')?.value || (selectedLunchType === 'none' ? '不訂購，補助NT$50' : '')
+                    notes: document.getElementById('lunchNotes')?.value || (selectedLunchType === 'none' ? '今日不訂購' : '')
                 }, { onConflict: 'employee_id,order_date' });
                 
-                showToast(selectedLunchType === 'none' ? '💰 已取消訂購（補助$50）' : '✅ 訂購成功！');
+                showToast(selectedLunchType === 'none' ? '🚫 已確認不訂購' : '✅ 訂購成功！');
                 checkMyOrder();
                 loadLunchSummary();
             } catch(e) { showToast('❌ 訂購失敗：' + friendlyError(e)); }
@@ -260,17 +287,106 @@
 
         async function cancelLunchOrder() {
             if (!myCurrentOrder) return;
-            if (!confirm('確定取消訂購？\n將獲得 NT$ 50 午餐補助')) return;
+            if (!confirm('確定取消訂購？')) return;
             
             try {
                 await sb.from('lunch_orders').update({
                     status: 'cancelled',
-                    notes: '取消訂購，補助NT$50'
+                    notes: '取消訂購'
                 }).eq('id', myCurrentOrder.id);
                 
-                showToast('💰 已取消（補助$50）');
+                showToast('🚫 已取消訂購');
                 checkMyOrder(); loadLunchSummary();
             } catch(e) { showToast('❌ 取消失敗'); }
+        }
+
+        // ===== 便當管理員報表 =====
+        let lunchReportData = [];
+
+        function checkIsLunchManager() {
+            if (!currentEmployee) return false;
+            const setting = getCachedSetting('lunch_managers');
+            if (!setting?.employee_ids) return false;
+            return setting.employee_ids.includes(currentEmployee.id);
+        }
+
+        async function loadLunchManagerReport() {
+            const reportEl = document.getElementById('lunchManagerReport');
+            if (!reportEl) return;
+            // 管理員也可以看
+            const isAdmin = currentEmployee?.role === 'admin';
+            if (!checkIsLunchManager() && !isAdmin) { reportEl.style.display = 'none'; return; }
+
+            reportEl.style.display = 'block';
+            const todayStr = getTaiwanDate(0);
+
+            try {
+                const { data, error } = await sb.from('lunch_orders')
+                    .select('*, employees(name, employee_number)')
+                    .eq('order_date', todayStr);
+                if (error) throw error;
+                lunchReportData = data || [];
+
+                const ordered = lunchReportData.filter(o => o.status === 'ordered');
+                const cancelled = lunchReportData.filter(o => o.status === 'cancelled');
+                const veg = ordered.filter(o => o.is_vegetarian);
+                const regular = ordered.filter(o => !o.is_vegetarian);
+
+                document.getElementById('rptTotal').textContent = ordered.length;
+                document.getElementById('rptRegular').textContent = regular.length;
+                document.getElementById('rptVeg').textContent = veg.length;
+                document.getElementById('rptNone').textContent = cancelled.length;
+
+                const listEl = document.getElementById('lunchReportList');
+                if (lunchReportData.length === 0) {
+                    listEl.innerHTML = '<p style="text-align:center;color:#94A3B8;font-size:13px;padding:16px;">今日尚無訂購記錄</p>';
+                    return;
+                }
+
+                const sorted = [...regular.sort((a,b) => (a.employees?.name||'').localeCompare(b.employees?.name||'')),
+                                ...veg.sort((a,b) => (a.employees?.name||'').localeCompare(b.employees?.name||'')),
+                                ...cancelled.sort((a,b) => (a.employees?.name||'').localeCompare(b.employees?.name||''))];
+
+                listEl.innerHTML = sorted.map(o => {
+                    const isCancelled = o.status === 'cancelled';
+                    const emoji = isCancelled ? '🚫' : (o.is_vegetarian ? '🥗' : '🍖');
+                    const label = isCancelled ? '不訂購' : (o.is_vegetarian ? '素食' : '葷食');
+                    const color = isCancelled ? '#94A3B8' : (o.is_vegetarian ? '#7C3AED' : '#2563EB');
+                    return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #F1F5F9;">
+                        <span style="font-size:20px;">${emoji}</span>
+                        <div style="flex:1;">
+                            <div style="font-weight:700;font-size:13px;">${escapeHTML(o.employees?.name || '?')}</div>
+                            <div style="font-size:11px;color:#94A3B8;">${escapeHTML(o.employees?.employee_number || '')}</div>
+                        </div>
+                        <span style="font-size:12px;font-weight:700;color:${color};">${label}</span>
+                    </div>`;
+                }).join('');
+            } catch(e) {
+                console.error('便當報表載入失敗', e);
+                document.getElementById('lunchReportList').innerHTML = '<p style="color:#ef4444;text-align:center;">載入失敗</p>';
+            }
+        }
+
+        function exportLunchCSV() {
+            if (lunchReportData.length === 0) return showToast('無資料可匯出');
+            const todayStr = getTaiwanDate(0);
+            const rows = [['日期','工號','姓名','類型','狀態','備註']];
+            lunchReportData.forEach(o => {
+                rows.push([
+                    o.order_date,
+                    o.employees?.employee_number || '',
+                    o.employees?.name || '',
+                    o.is_vegetarian ? '素食' : '葷食',
+                    o.status === 'cancelled' ? '不訂購' : '已訂購',
+                    o.notes || o.special_requirements || ''
+                ]);
+            });
+            const csv = '\uFEFF' + rows.map(r => r.map(c => `"${String(c??'').replace(/"/g,'""')}"`).join(',')).join('\n');
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+            a.download = `便當訂購_${todayStr}.csv`;
+            a.click();
+            showToast(`✅ 已匯出 便當訂購_${todayStr}.csv`);
         }
 
         // 頁面載入完成後初始化

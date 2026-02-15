@@ -52,6 +52,31 @@ function fmtDate(d) {
     return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 
+// 貨幣顯示格式化（NT$ 千分位）
+function formatNT(n) { return 'NT$ ' + Math.abs(Math.round(n)).toLocaleString(); }
+
+// 金額輸入框千分位格式化（綁定到 input 事件）
+function formatMoneyInput(el) {
+    if (!el || el._moneyFormatted) return;
+    el._moneyFormatted = true;
+    el.addEventListener('input', function() {
+        const raw = this.value.replace(/[^\d]/g, '');
+        this.value = raw ? parseInt(raw, 10).toLocaleString() : '';
+    });
+}
+
+// 解析帶逗點的金額字串為數字
+function parseMoney(str) {
+    if (typeof str === 'number') return str;
+    return parseFloat(String(str || '0').replace(/[^\d.-]/g, '')) || 0;
+}
+
+// 將數字格式化為千分位字串（不含 NT$ 前綴）
+function toMoneyStr(n) {
+    if (!n && n !== 0) return '';
+    return Math.round(Number(n)).toLocaleString();
+}
+
 // 計算距離 (Haversine)
 function calculateDistance(lat1, lon1, lat2, lon2) {
     const R = 6371e3; 
@@ -383,24 +408,27 @@ async function handleBind() {
 
 // ===== 便當功能 =====
 async function loadLunchSummary() {
-    const dateStr = getTaiwanDate(0); // 今天（與 checkMyOrder 一致）
+    const dateStr = getTaiwanDate(0);
     const lunchDateEl = document.getElementById('lunchDate');
     if (lunchDateEl && !lunchDateEl.value) lunchDateEl.value = dateStr;
-    
+
     try {
-        const { data } = await sb.rpc('get_lunch_summary', { p_date: dateStr });
-        if (data) {
-            const el = (id) => document.getElementById(id);
-            if (el('totalOrders')) el('totalOrders').textContent = data.total_orders || 0;
-            if (el('vegCount')) el('vegCount').textContent = data.vegetarian_count || 0;
-            if (el('regularCount')) el('regularCount').textContent = data.regular_count || 0;
-            if (data.is_lunar_vegetarian_day) {
-                if (el('lunarNotice')) el('lunarNotice').classList.add('show');
-                if (el('lunchVegetarian')) el('lunchVegetarian').checked = true;
-            }
-        }
-    } catch(e) { 
-        console.error('便當統計失敗', e); 
+        const { data, error } = await sb.from('lunch_orders')
+            .select('id, is_vegetarian, status')
+            .eq('order_date', dateStr);
+
+        if (error) throw error;
+
+        const orders = (data || []).filter(o => o.status === 'ordered');
+        const vegCount = orders.filter(o => o.is_vegetarian).length;
+        const regularCount = orders.filter(o => !o.is_vegetarian).length;
+
+        const el = (id) => document.getElementById(id);
+        if (el('totalOrders')) el('totalOrders').textContent = orders.length;
+        if (el('vegCount')) el('vegCount').textContent = vegCount;
+        if (el('regularCount')) el('regularCount').textContent = regularCount;
+    } catch(e) {
+        console.error('便當統計失敗', e);
     }
 }
 

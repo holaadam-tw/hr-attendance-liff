@@ -55,7 +55,7 @@
 
         .calc-input-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
         .calc-input-row label { width: 80px; font-size: 13px; font-weight: 600; color: var(--gray); flex-shrink: 0; }
-        .calc-input-row input[type="number"] { flex: 1; padding: 12px; border: 2px solid var(--border); border-radius: 10px; font-size: 16px; font-weight: 700; text-align: right; }
+        .calc-input-row input[type="number"], .calc-input-row input[type="text"] { flex: 1; padding: 12px; border: 2px solid var(--border); border-radius: 10px; font-size: 16px; font-weight: 700; text-align: right; }
         .calc-input-row input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 4px rgba(79,70,229,0.08); }
         .calc-input-row .unit { font-size: 13px; color: var(--gray); font-weight: 600; width: 30px; }
 
@@ -165,17 +165,17 @@
                     <div id="calcInputs">
                         <div class="calc-input-row" id="rowMonthly">
                             <label>月薪</label>
-                            <input type="number" id="calcBase" value="35000" oninput="calculateSalary()">
+                            <input type="text" inputmode="numeric" id="calcBase" value="35,000" oninput="calculateSalary()">
                             <span class="unit">元</span>
                         </div>
                         <div class="calc-input-row" id="rowDaily" style="display:none;">
                             <label>日薪</label>
-                            <input type="number" id="calcDaily" value="1500" oninput="calculateSalary()">
+                            <input type="text" inputmode="numeric" id="calcDaily" value="1,500" oninput="calculateSalary()">
                             <span class="unit">元</span>
                         </div>
                         <div class="calc-input-row" id="rowHourly" style="display:none;">
                             <label>時薪</label>
-                            <input type="number" id="calcHourly" value="190" oninput="calculateSalary()">
+                            <input type="text" inputmode="numeric" id="calcHourly" value="190" oninput="calculateSalary()">
                             <span class="unit">元</span>
                         </div>
                         <div class="calc-input-row">
@@ -205,7 +205,7 @@
                         </div>
                         <div class="calc-input-row">
                             <label>全勤獎金</label>
-                            <input type="number" id="calcBonus" value="2000" oninput="calculateSalary()">
+                            <input type="text" inputmode="numeric" id="calcBonus" value="2,000" oninput="calculateSalary()">
                             <span class="unit">元</span>
                         </div>
 
@@ -217,7 +217,7 @@
                         </div>
                         <div class="calc-input-row">
                             <label id="posLabel">月額</label>
-                            <input type="number" id="calcPosition" value="5000" oninput="calculateSalary()">
+                            <input type="text" inputmode="numeric" id="calcPosition" value="5,000" oninput="calculateSalary()">
                             <span class="unit">元</span>
                         </div>
 
@@ -229,7 +229,7 @@
                         </div>
                         <div class="calc-input-row">
                             <label id="mealLabel">月額</label>
-                            <input type="number" id="calcMeal" value="2400" oninput="calculateSalary()">
+                            <input type="text" inputmode="numeric" id="calcMeal" value="2,400" oninput="calculateSalary()">
                             <span class="unit">元</span>
                         </div>
 
@@ -297,7 +297,6 @@
         let mealMode = 'fixed';
 
         const CHART_COLORS = ['#4F46E5','#F59E0B','#10B981','#3B82F6','#8B5CF6','#EC4899','#06B6D4'];
-        function formatNT(n) { return 'NT$ ' + Math.abs(Math.round(n)).toLocaleString(); }
 
         // ===== Tab Switch =====
         function switchSalaryView(view) {
@@ -493,23 +492,23 @@
         function calculateSalary() {
             const days = parseFloat(document.getElementById('calcDays').value) || 0;
             const otHours = parseFloat(document.getElementById('calcOT').value) || 0;
-            const bonus = parseFloat(document.getElementById('calcBonus').value) || 0;
+            const bonus = parseMoney(document.getElementById('calcBonus').value);
             const pensionRate = parseFloat(document.getElementById('calcPension').value) || 0;
-            const posVal = parseFloat(document.getElementById('calcPosition').value) || 0;
-            const mealVal = parseFloat(document.getElementById('calcMeal').value) || 0;
+            const posVal = parseMoney(document.getElementById('calcPosition').value);
+            const mealVal = parseMoney(document.getElementById('calcMeal').value);
 
             let monthSalary, dailyRate, hourlyRate;
 
             if (calcMode === 'monthly') {
-                monthSalary = parseFloat(document.getElementById('calcBase').value) || 0;
+                monthSalary = parseMoney(document.getElementById('calcBase').value);
                 dailyRate = Math.round(monthSalary / 30);
                 hourlyRate = Math.round(dailyRate / 8);
             } else if (calcMode === 'daily') {
-                dailyRate = parseFloat(document.getElementById('calcDaily').value) || 0;
+                dailyRate = parseMoney(document.getElementById('calcDaily').value);
                 hourlyRate = Math.round(dailyRate / 8);
                 monthSalary = dailyRate * days;
             } else {
-                hourlyRate = parseFloat(document.getElementById('calcHourly').value) || 0;
+                hourlyRate = parseMoney(document.getElementById('calcHourly').value);
                 const hpd = parseFloat(document.getElementById('calcHoursDay').value) || 8;
                 dailyRate = hourlyRate * hpd;
                 monthSalary = dailyRate * days;
@@ -679,19 +678,19 @@
                             if (data) {
                                 if (data.salary_type === 'hourly') {
                                     calcMode = 'hourly';
-                                    document.getElementById('calcHourly').value = Math.round(data.base_salary / 30 / 8);
+                                    document.getElementById('calcHourly').value = toMoneyStr(Math.round(data.base_salary / 30 / 8));
                                 } else if (data.salary_type === 'daily') {
                                     calcMode = 'daily';
-                                    document.getElementById('calcDaily').value = Math.round(data.base_salary / 30);
+                                    document.getElementById('calcDaily').value = toMoneyStr(Math.round(data.base_salary / 30));
                                 } else {
                                     calcMode = 'monthly';
-                                    document.getElementById('calcBase').value = data.base_salary || 35000;
+                                    document.getElementById('calcBase').value = toMoneyStr(data.base_salary || 35000);
                                 }
 
-                                if (data.meal_allowance != null) document.getElementById('calcMeal').value = data.meal_allowance;
-                                if (data.full_attendance_bonus != null) document.getElementById('calcBonus').value = data.full_attendance_bonus;
+                                if (data.meal_allowance != null) document.getElementById('calcMeal').value = toMoneyStr(data.meal_allowance);
+                                if (data.full_attendance_bonus != null) document.getElementById('calcBonus').value = toMoneyStr(data.full_attendance_bonus);
                                 if (data.pension_self_rate != null) document.getElementById('calcPension').value = data.pension_self_rate;
-                                if (data.position_allowance != null) document.getElementById('calcPosition').value = data.position_allowance;
+                                if (data.position_allowance != null) document.getElementById('calcPosition').value = toMoneyStr(data.position_allowance);
 
                                 document.querySelectorAll('.calc-mode-btn').forEach(b => b.classList.remove('active'));
                                 const mi = { monthly: 0, daily: 1, hourly: 2 };
@@ -704,6 +703,10 @@
                         }
                     } catch(e) { console.log('Auto-detect:', e.message); }
 
+                    // 金額欄位套用千分位格式化
+                    ['calcBase','calcDaily','calcHourly','calcBonus','calcPosition','calcMeal'].forEach(id => {
+                        formatMoneyInput(document.getElementById(id));
+                    });
                     calculateSalary();
                 } else window.location.href = 'index.html';
             } else { document.getElementById('loadingPage').style.display = 'none'; loadSalary(); calculateSalary(); }
