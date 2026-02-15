@@ -118,6 +118,13 @@
                     <div id="matrixRefBody" style="display:none;overflow-x:auto;margin-bottom:16px;"></div>
                 </div>
 
+                <div class="form-group" id="bonusEmpSelect" style="display:none;">
+                    <label>選擇員工</label>
+                    <select id="bonusEmpDropdown" onchange="renderSelectedBonusCard()">
+                        <option value="_all">📋 全部員工總覽</option>
+                    </select>
+                </div>
+
                 <div id="bonusList" style="margin-top:10px;"></div>
 
                 <div id="bonusActions" style="display:none;margin-top:20px;">
@@ -891,13 +898,15 @@
                     return { id: emp.id, name: emp.name, employeeNumber: emp.employee_number, department: emp.department, hireDate: emp.hire_date, baseSalary, lateCount, leaveDays, tenureRatio, attendanceGrade, perfRating: bonusPerformance[emp.id] || 'A' };
                 });
 
-                renderBonusCards();
+                populateBonusEmpDropdown();
+                renderSelectedBonusCard();
                 updateBonusSummary();
                 renderMatrixRefTable();
                 if (loadingEl) loadingEl.style.display = 'none';
                 if (summaryEl) summaryEl.style.display = 'block';
                 if (actionsEl) actionsEl.style.display = 'block';
                 if (matrixRefEl) matrixRefEl.style.display = 'block';
+                document.getElementById('bonusEmpSelect').style.display = 'block';
             } catch (err) {
                 console.error('Bonus load failed:', err);
                 if (loadingEl) loadingEl.style.display = 'none';
@@ -916,58 +925,93 @@
             return { perfRating, multiplier, baseAmount, fullAtt, latePen, manualAdj, finalAmount };
         }
 
-        function renderBonusCards() {
-            const listEl = document.getElementById('bonusList');
-            if (!listEl) return;
-            if (bonusEmployees.length === 0) { listEl.innerHTML = '<p style="text-align:center;color:#999;">無員工資料</p>'; return; }
-
-            let html = '';
+        function populateBonusEmpDropdown() {
+            const sel = document.getElementById('bonusEmpDropdown');
+            if (!sel) return;
+            const prev = sel.value;
+            sel.innerHTML = '<option value="_all">📋 全部員工總覽</option>';
             bonusEmployees.forEach(emp => {
                 const c = calculateBonus(emp);
-                html += `
-                <div class="bonus-card grade-${emp.attendanceGrade}" id="bonusCard_${emp.id}">
-                    <div class="bonus-card-header">
-                        <div><span class="bonus-card-name">${escapeHTML(emp.name)}</span><span class="bonus-card-dept">${escapeHTML(emp.department || '-')} (${escapeHTML(emp.employeeNumber)})</span></div>
-                        <span class="bonus-grade-badge bonus-grade-${emp.attendanceGrade}">出勤 ${emp.attendanceGrade} (${GRADE_LABELS[emp.attendanceGrade]})</span>
-                    </div>
-                    <div class="bonus-data-grid">
-                        <div><span class="label">遲到</span></div><div><span class="value">${emp.lateCount} 次</span></div>
-                        <div><span class="label">請假</span></div><div><span class="value">${emp.leaveDays} 天</span></div>
-                        <div><span class="label">底薪</span></div><div><span class="value">$${(emp.baseSalary || 0).toLocaleString()}</span></div>
-                        <div><span class="label">年資比例</span></div><div><span class="value">${(emp.tenureRatio * 100).toFixed(0)}%</span></div>
-                    </div>
-                    <div class="bonus-controls" style="margin-bottom:10px;">
-                        <label style="font-size:12px;font-weight:700;color:#4b5563;white-space:nowrap;">績效評等</label>
-                        <select onchange="updatePerformance('${emp.id}', this.value)">
-                            ${['S','A','B'].map(r => '<option value="' + r + '"' + (c.perfRating === r ? ' selected' : '') + '>' + r + ' (' + PERF_LABELS[r] + ')</option>').join('')}
-                        </select>
-                        <span style="font-size:13px;font-weight:800;color:#4F46E5;white-space:nowrap;">x${c.multiplier}</span>
-                    </div>
-                    <div class="bonus-breakdown">
-                        <div class="row"><span>底薪 x 年資 x 矩陣</span><span>$${c.baseAmount.toLocaleString()}</span></div>
-                        ${c.fullAtt > 0 ? '<div class="row"><span class="plus">+ 全勤獎金</span><span class="plus">+$' + c.fullAtt.toLocaleString() + '</span></div>' : ''}
-                        ${c.latePen > 0 ? '<div class="row"><span class="minus">- 遲到扣款 (' + emp.lateCount + 'x$' + LATE_PENALTY_PER + ')</span><span class="minus">-$' + c.latePen.toLocaleString() + '</span></div>' : ''}
-                        ${c.manualAdj !== 0 ? '<div class="row"><span>' + (c.manualAdj > 0 ? '+' : '') + ' 手動調整</span><span>' + (c.manualAdj > 0 ? '+' : '') + '$' + c.manualAdj.toLocaleString() + '</span></div>' : ''}
-                        <div class="row total"><span>最終金額</span><span>$${c.finalAmount.toLocaleString()}</span></div>
-                    </div>
-                    <div class="bonus-controls">
-                        <label style="font-size:12px;font-weight:700;color:#4b5563;white-space:nowrap;">手動調整</label>
-                        <input type="number" placeholder="±金額" value="${c.manualAdj || ''}" onchange="updateAdjustment('${emp.id}', this.value)">
-                    </div>
-                </div>`;
+                sel.innerHTML += `<option value="${emp.id}">${escapeHTML(emp.name)}（${escapeHTML(emp.department || '-')}）— $${c.finalAmount.toLocaleString()}</option>`;
             });
+            if (prev && sel.querySelector(`option[value="${prev}"]`)) sel.value = prev;
+        }
+
+        function renderSelectedBonusCard() {
+            const listEl = document.getElementById('bonusList');
+            const sel = document.getElementById('bonusEmpDropdown');
+            if (!listEl || !sel) return;
+            if (bonusEmployees.length === 0) { listEl.innerHTML = '<p style="text-align:center;color:#999;">無員工資料</p>'; return; }
+
+            const selectedId = sel.value;
+            if (selectedId === '_all') { renderAllBonusSummaryTable(); return; }
+
+            const emp = bonusEmployees.find(e => e.id === selectedId);
+            if (!emp) { listEl.innerHTML = ''; return; }
+            const c = calculateBonus(emp);
+
+            listEl.innerHTML = `
+            <div class="bonus-card grade-${emp.attendanceGrade}">
+                <div class="bonus-card-header">
+                    <div><span class="bonus-card-name">${escapeHTML(emp.name)}</span><span class="bonus-card-dept">${escapeHTML(emp.department || '-')} (${escapeHTML(emp.employeeNumber)})</span></div>
+                    <span class="bonus-grade-badge bonus-grade-${emp.attendanceGrade}">出勤 ${emp.attendanceGrade} (${GRADE_LABELS[emp.attendanceGrade]})</span>
+                </div>
+                <div class="bonus-data-grid">
+                    <div><span class="label">遲到</span></div><div><span class="value">${emp.lateCount} 次</span></div>
+                    <div><span class="label">請假</span></div><div><span class="value">${emp.leaveDays} 天</span></div>
+                    <div><span class="label">底薪</span></div><div><span class="value">$${(emp.baseSalary || 0).toLocaleString()}</span></div>
+                    <div><span class="label">年資比例</span></div><div><span class="value">${(emp.tenureRatio * 100).toFixed(0)}%</span></div>
+                </div>
+                <div class="bonus-controls" style="margin-bottom:10px;">
+                    <label style="font-size:12px;font-weight:700;color:#4b5563;white-space:nowrap;">績效評等</label>
+                    <select onchange="updatePerformance('${emp.id}', this.value)">
+                        ${['S','A','B'].map(r => '<option value="' + r + '"' + (c.perfRating === r ? ' selected' : '') + '>' + r + ' (' + PERF_LABELS[r] + ')</option>').join('')}
+                    </select>
+                    <span style="font-size:13px;font-weight:800;color:#4F46E5;white-space:nowrap;">x${c.multiplier}</span>
+                </div>
+                <div class="bonus-breakdown">
+                    <div class="row"><span>底薪 x 年資 x 矩陣</span><span>$${c.baseAmount.toLocaleString()}</span></div>
+                    ${c.fullAtt > 0 ? '<div class="row"><span class="plus">+ 全勤獎金</span><span class="plus">+$' + c.fullAtt.toLocaleString() + '</span></div>' : ''}
+                    ${c.latePen > 0 ? '<div class="row"><span class="minus">- 遲到扣款 (' + emp.lateCount + 'x$' + LATE_PENALTY_PER + ')</span><span class="minus">-$' + c.latePen.toLocaleString() + '</span></div>' : ''}
+                    ${c.manualAdj !== 0 ? '<div class="row"><span>' + (c.manualAdj > 0 ? '+' : '') + ' 手動調整</span><span>' + (c.manualAdj > 0 ? '+' : '') + '$' + c.manualAdj.toLocaleString() + '</span></div>' : ''}
+                    <div class="row total"><span>最終金額</span><span>$${c.finalAmount.toLocaleString()}</span></div>
+                </div>
+                <div class="bonus-controls">
+                    <label style="font-size:12px;font-weight:700;color:#4b5563;white-space:nowrap;">手動調整</label>
+                    <input type="number" placeholder="±金額" value="${c.manualAdj || ''}" onchange="updateAdjustment('${emp.id}', this.value)">
+                </div>
+            </div>`;
+        }
+
+        function renderAllBonusSummaryTable() {
+            const listEl = document.getElementById('bonusList');
+            if (!listEl) return;
+            let html = '<div style="overflow-x:auto;"><table class="matrix-table"><thead><tr><th style="text-align:left;">姓名</th><th>出勤</th><th>績效</th><th>倍率</th><th style="text-align:right;">獎金</th></tr></thead><tbody>';
+            bonusEmployees.forEach(emp => {
+                const c = calculateBonus(emp);
+                html += `<tr style="cursor:pointer;" onclick="document.getElementById('bonusEmpDropdown').value='${emp.id}';renderSelectedBonusCard();">
+                    <td style="text-align:left;font-weight:700;">${escapeHTML(emp.name)}</td>
+                    <td><span class="bonus-grade-badge bonus-grade-${emp.attendanceGrade}" style="font-size:10px;padding:2px 6px;">${emp.attendanceGrade}</span></td>
+                    <td>${c.perfRating}</td>
+                    <td>x${c.multiplier}</td>
+                    <td style="text-align:right;font-weight:700;">$${c.finalAmount.toLocaleString()}</td>
+                </tr>`;
+            });
+            html += '</tbody></table></div>';
             listEl.innerHTML = html;
         }
 
         function updatePerformance(empId, rating) {
             bonusPerformance[empId] = rating;
-            renderBonusCards();
+            populateBonusEmpDropdown();
+            renderSelectedBonusCard();
             updateBonusSummary();
         }
         function updateAdjustment(empId, value) {
             const val = parseInt(value);
             bonusAdjustments[empId] = isNaN(val) ? 0 : val;
-            renderBonusCards();
+            populateBonusEmpDropdown();
+            renderSelectedBonusCard();
             updateBonusSummary();
         }
         function updateBonusSummary() {
