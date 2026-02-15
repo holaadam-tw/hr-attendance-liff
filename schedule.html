@@ -188,8 +188,25 @@
             return data;
         }
 
+        let isFixedDayShift = false;
+
         // Load schedule from Supabase (fallback to demo)
         async function loadSchedule() {
+            // 先檢查排班模式
+            try {
+                if (typeof sb !== 'undefined') {
+                    const { data: modeData } = await sb.from('hr_settings').select('value').eq('key', 'scheduling_mode').maybeSingle();
+                    if (modeData?.value?.mode === 'fixed') {
+                        isFixedDayShift = true;
+                        applyFixedDayShiftUI();
+                        return;
+                    }
+                }
+            } catch(e) {}
+
+            isFixedDayShift = false;
+            restoreShiftUI();
+
             try {
                 if (typeof sb !== 'undefined' && currentEmployee) {
                     const { data, error } = await sb.rpc('get_employee_schedule', {
@@ -220,6 +237,35 @@
             scheduleData = generateDemoSchedule(currentYear, currentMonth);
             renderCalendar();
             renderShiftList();
+        }
+
+        function applyFixedDayShiftUI() {
+            // 固定日班：生成全月日班資料
+            const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+            scheduleData = {};
+            for (let d = 1; d <= daysInMonth; d++) {
+                const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                const dow = new Date(currentYear, currentMonth, d).getDay();
+                if (dow === 0 || dow === 6) {
+                    scheduleData[dateStr] = { code: 'OFF', name: '休息', time: '休息日' };
+                } else {
+                    scheduleData[dateStr] = { code: 'DAY', name: '固定日班', time: '08:00 - 17:00' };
+                }
+            }
+            renderCalendar();
+            renderShiftList();
+            // 隱藏換班按鈕和換班區塊
+            const swapBtn = document.querySelector('.swap-btn');
+            if (swapBtn) swapBtn.style.display = 'none';
+            const swapCard = document.getElementById('swapList')?.closest('.card');
+            if (swapCard) swapCard.style.display = 'none';
+        }
+
+        function restoreShiftUI() {
+            const swapBtn = document.querySelector('.swap-btn');
+            if (swapBtn) swapBtn.style.display = '';
+            const swapCard = document.getElementById('swapList')?.closest('.card');
+            if (swapCard) swapCard.style.display = '';
         }
 
         function renderCalendar() {

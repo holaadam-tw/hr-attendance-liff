@@ -581,6 +581,25 @@
                         <div id="maxLeaveSaveStatus" style="margin-top:8px;text-align:center;font-size:13px;display:none;"></div>
                     </div>
 
+                    <div style="background:#fff;border-radius:14px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,0.08);margin-bottom:16px;">
+                        <div style="font-size:14px;font-weight:800;color:#0F172A;margin-bottom:12px;">🏢 排班模式</div>
+                        <p style="font-size:12px;color:#94A3B8;margin-bottom:12px;">選擇公司的班別制度，影響排班表與員工班表頁面</p>
+                        <div style="display:flex;gap:8px;margin-bottom:12px;">
+                            <div id="modeShift" onclick="selectSchedulingMode('shift')" style="flex:1;padding:14px 12px;border:2px solid #4F46E5;border-radius:12px;cursor:pointer;text-align:center;background:#EEF2FF;transition:all 0.2s;">
+                                <div style="font-size:24px;margin-bottom:6px;">🔄</div>
+                                <div style="font-size:13px;font-weight:800;color:#4F46E5;">排班制</div>
+                                <div style="font-size:10px;color:#94A3B8;margin-top:4px;">服務業、餐飲、零售<br>早/中/晚輪班</div>
+                            </div>
+                            <div id="modeFixed" onclick="selectSchedulingMode('fixed')" style="flex:1;padding:14px 12px;border:2px solid #E5E7EB;border-radius:12px;cursor:pointer;text-align:center;background:#fff;transition:all 0.2s;">
+                                <div style="font-size:24px;margin-bottom:6px;">☀️</div>
+                                <div style="font-size:13px;font-weight:800;color:#94A3B8;">固定日班</div>
+                                <div style="font-size:10px;color:#94A3B8;margin-top:4px;">一般辦公室<br>固定 08:00-17:00</div>
+                            </div>
+                        </div>
+                        <button onclick="saveSchedulingMode()" style="width:100%;padding:12px;border:none;border-radius:10px;background:linear-gradient(135deg,#4F46E5,#7C3AED);color:#fff;font-weight:700;font-size:14px;cursor:pointer;">💾 儲存排班模式</button>
+                        <div id="schedModeSaveStatus" style="margin-top:8px;text-align:center;font-size:13px;display:none;"></div>
+                    </div>
+
                     <div style="background:#fff;border-radius:14px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,0.08);">
                         <div style="font-size:14px;font-weight:800;color:#0F172A;margin-bottom:12px;">📊 目前人力概況</div>
                         <div id="staffOverview" style="font-size:13px;color:#64748B;line-height:1.8;">載入中...</div>
@@ -660,7 +679,7 @@
             if (id === 'announcementPage') loadAnnouncementList();
             if (id === 'auditLogPage') loadAuditLogs();
             if (id === 'featurePage') { loadFeatureSettings(); loadNotifyToken(); }
-            if (id === 'staffMgrPage') { loadShiftMgr(); loadMaxLeaveSetting(); loadStaffOverview(); }
+            if (id === 'staffMgrPage') { loadShiftMgr(); loadMaxLeaveSetting(); loadStaffOverview(); loadSchedulingMode(); }
         }
 
         // ===== 功能管理 =====
@@ -971,7 +990,7 @@
                 </div>
                 <div class="bonus-breakdown">
                     <div class="row" style="font-size:11px;color:#94A3B8;padding-bottom:6px;">
-                        <span><a href="salary.html" style="color:#4F46E5;text-decoration:underline;">底薪$${(emp.baseSalary||0).toLocaleString()}</a> x 年資${(emp.tenureRatio*100).toFixed(0)}% x 倍率${c.multiplier}</span>
+                        <span><a href="salary.html" style="color:#4F46E5;text-decoration:underline;">底薪$${(emp.baseSalary||0).toLocaleString()}</a> x <a onclick="showPage('employeePage')" style="color:#4F46E5;text-decoration:underline;cursor:pointer;">年資${(emp.tenureRatio*100).toFixed(0)}%</a> x 倍率${c.multiplier}</span>
                         <span>$${c.baseAmount.toLocaleString()}</span>
                     </div>
                     ${c.fullAtt > 0 ? '<div class="row"><span class="plus">+ 全勤獎金</span><span class="plus">+$' + c.fullAtt.toLocaleString() + '</span></div>' : ''}
@@ -1415,6 +1434,86 @@
                 }
                 statusEl.style.display = 'block'; statusEl.style.color = '#059669'; statusEl.textContent = '✅ 已儲存';
                 setTimeout(() => { statusEl.style.display = 'none'; }, 2000);
+            } catch(e) {
+                statusEl.style.display = 'block'; statusEl.style.color = '#DC2626'; statusEl.textContent = '❌ 儲存失敗';
+            }
+        }
+
+        // ===== 排班模式設定 =====
+        let currentSchedulingMode = 'shift'; // 預設排班制
+
+        async function loadSchedulingMode() {
+            try {
+                const { data } = await sb.from('hr_settings').select('value').eq('key', 'scheduling_mode').maybeSingle();
+                if (data?.value?.mode) { currentSchedulingMode = data.value.mode; }
+            } catch(e) {}
+            applySchedulingModeUI();
+        }
+
+        function selectSchedulingMode(mode) {
+            currentSchedulingMode = mode;
+            applySchedulingModeUI();
+        }
+
+        function applySchedulingModeUI() {
+            const shiftEl = document.getElementById('modeShift');
+            const fixedEl = document.getElementById('modeFixed');
+            if (!shiftEl || !fixedEl) return;
+            if (currentSchedulingMode === 'shift') {
+                shiftEl.style.border = '2px solid #4F46E5'; shiftEl.style.background = '#EEF2FF';
+                shiftEl.querySelector('div:nth-child(2)').style.color = '#4F46E5';
+                fixedEl.style.border = '2px solid #E5E7EB'; fixedEl.style.background = '#fff';
+                fixedEl.querySelector('div:nth-child(2)').style.color = '#94A3B8';
+            } else {
+                fixedEl.style.border = '2px solid #4F46E5'; fixedEl.style.background = '#EEF2FF';
+                fixedEl.querySelector('div:nth-child(2)').style.color = '#4F46E5';
+                shiftEl.style.border = '2px solid #E5E7EB'; shiftEl.style.background = '#fff';
+                shiftEl.querySelector('div:nth-child(2)').style.color = '#94A3B8';
+            }
+            applyShiftTabMode();
+        }
+
+        function applyShiftTabMode() {
+            const shiftContent = document.getElementById('tabShift');
+            if (!shiftContent) return;
+            let notice = document.getElementById('fixedModeNotice');
+            if (currentSchedulingMode === 'fixed') {
+                if (!notice) {
+                    notice = document.createElement('div');
+                    notice.id = 'fixedModeNotice';
+                    notice.style.cssText = 'background:#EEF2FF;border-radius:14px;padding:20px;text-align:center;';
+                    notice.innerHTML = '<div style="font-size:32px;margin-bottom:8px;">☀️</div>' +
+                        '<div style="font-size:15px;font-weight:800;color:#4F46E5;margin-bottom:8px;">固定日班制</div>' +
+                        '<div style="font-size:13px;color:#64748B;line-height:1.6;">所有員工統一上班時間<br><b>08:00 - 17:00</b></div>' +
+                        '<div style="font-size:11px;color:#94A3B8;margin-top:12px;">如需排班請至「人力設定」切換為排班制</div>';
+                    shiftContent.insertBefore(notice, shiftContent.firstChild);
+                }
+                notice.style.display = 'block';
+                Array.from(shiftContent.children).forEach(el => {
+                    if (el.id !== 'fixedModeNotice') el.style.display = 'none';
+                });
+            } else {
+                if (notice) notice.style.display = 'none';
+                Array.from(shiftContent.children).forEach(el => {
+                    if (el.id !== 'fixedModeNotice') el.style.display = '';
+                });
+            }
+        }
+
+        async function saveSchedulingMode() {
+            const statusEl = document.getElementById('schedModeSaveStatus');
+            try {
+                const { data: existing } = await sb.from('hr_settings').select('id').eq('key', 'scheduling_mode').maybeSingle();
+                const val = { mode: currentSchedulingMode };
+                if (existing) {
+                    await sb.from('hr_settings').update({ value: val, updated_at: new Date().toISOString() }).eq('key', 'scheduling_mode');
+                } else {
+                    await sb.from('hr_settings').insert({ key: 'scheduling_mode', value: val, description: '排班模式：shift=排班制, fixed=固定日班' });
+                }
+                statusEl.style.display = 'block'; statusEl.style.color = '#059669';
+                statusEl.textContent = '✅ 已儲存 — ' + (currentSchedulingMode === 'shift' ? '排班制' : '固定日班');
+                setTimeout(() => { statusEl.style.display = 'none'; }, 2000);
+                if (typeof writeAuditLog === 'function') writeAuditLog('update_scheduling_mode', { mode: currentSchedulingMode });
             } catch(e) {
                 statusEl.style.display = 'block'; statusEl.style.color = '#DC2626'; statusEl.textContent = '❌ 儲存失敗';
             }
