@@ -198,7 +198,9 @@
                     const { data: modeData } = await sb.from('system_settings').select('value').eq('key', 'scheduling_mode').maybeSingle();
                     if (modeData?.value?.mode === 'fixed') {
                         isFixedDayShift = true;
-                        applyFixedDayShiftUI();
+                        const fStart = modeData.value.start || '08:00';
+                        const fEnd = modeData.value.end || '17:00';
+                        applyFixedDayShiftUI(fStart, fEnd);
                         return;
                     }
                 }
@@ -239,8 +241,9 @@
             renderShiftList();
         }
 
-        function applyFixedDayShiftUI() {
-            // 固定日班：生成全月日班資料
+        function applyFixedDayShiftUI(startTime, endTime) {
+            startTime = startTime || '08:00'; endTime = endTime || '17:00';
+            const shiftName = startTime < '12:00' ? '固定早班' : startTime < '18:00' ? '固定中班' : '固定晚班';
             const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
             scheduleData = {};
             for (let d = 1; d <= daysInMonth; d++) {
@@ -249,7 +252,7 @@
                 if (dow === 0 || dow === 6) {
                     scheduleData[dateStr] = { code: 'OFF', name: '休息', time: '休息日' };
                 } else {
-                    scheduleData[dateStr] = { code: 'DAY', name: '固定日班', time: '08:00 - 17:00' };
+                    scheduleData[dateStr] = { code: 'DAY', name: shiftName, time: startTime + ' - ' + endTime };
                 }
             }
             renderCalendar();

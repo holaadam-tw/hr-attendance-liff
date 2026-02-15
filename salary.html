@@ -479,10 +479,10 @@
         let cachedBrackets = [];
         async function loadInsuranceBrackets() {
             try {
-                const { data } = await sb.from('insurance_brackets')
+                const { data, error } = await sb.from('insurance_brackets')
                     .select('*').eq('is_active', true).order('salary_min');
-                if (data && data.length > 0) cachedBrackets = data;
-            } catch(e) { console.log('級距表載入失敗，使用預設計算'); }
+                if (!error && data && data.length > 0) cachedBrackets = data;
+            } catch(e) { /* 級距表不存在時使用預設公式計算 */ }
         }
         function lookupBracket(salary) {
             if (cachedBrackets.length === 0) return null;

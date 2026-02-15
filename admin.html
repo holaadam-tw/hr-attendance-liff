@@ -690,8 +690,28 @@
                             </div>
                             <div id="modeFixed" onclick="selectSchedulingMode('fixed')" style="flex:1;padding:14px 12px;border:2px solid #E5E7EB;border-radius:12px;cursor:pointer;text-align:center;background:#fff;transition:all 0.2s;">
                                 <div style="font-size:24px;margin-bottom:6px;">☀️</div>
-                                <div id="modeFixedLabel" style="font-size:13px;font-weight:800;color:#94A3B8;">固定日班</div>
-                                <div style="font-size:10px;color:#94A3B8;margin-top:4px;">一般辦公室<br>固定 08:00-17:00</div>
+                                <div id="modeFixedLabel" style="font-size:13px;font-weight:800;color:#94A3B8;">固定班</div>
+                                <div style="font-size:10px;color:#94A3B8;margin-top:4px;">固定時段上班<br>可自訂時間</div>
+                            </div>
+                        </div>
+                        <!-- 固定班設定（選擇固定班時顯示） -->
+                        <div id="fixedShiftConfig" style="display:none;margin-bottom:12px;">
+                            <div style="font-size:12px;font-weight:700;color:#4b5563;margin-bottom:8px;">固定班別設定</div>
+                            <div style="display:flex;gap:6px;margin-bottom:10px;">
+                                <button onclick="setFixedPreset('08:00','17:00')" class="fixedPresetBtn" style="flex:1;padding:8px;border:1px solid #E5E7EB;border-radius:8px;background:#fff;font-size:11px;font-weight:700;cursor:pointer;color:#4F46E5;">☀️ 早班</button>
+                                <button onclick="setFixedPreset('13:00','22:00')" class="fixedPresetBtn" style="flex:1;padding:8px;border:1px solid #E5E7EB;border-radius:8px;background:#fff;font-size:11px;font-weight:700;cursor:pointer;color:#F59E0B;">🌤️ 中班</button>
+                                <button onclick="setFixedPreset('22:00','07:00')" class="fixedPresetBtn" style="flex:1;padding:8px;border:1px solid #E5E7EB;border-radius:8px;background:#fff;font-size:11px;font-weight:700;cursor:pointer;color:#8B5CF6;">🌙 晚班</button>
+                            </div>
+                            <div style="display:flex;gap:8px;align-items:center;">
+                                <div style="flex:1;">
+                                    <label style="font-size:11px;color:#94A3B8;display:block;margin-bottom:4px;">上班時間</label>
+                                    <input type="time" id="fixedStartTime" value="08:00" style="width:100%;padding:10px;border:1px solid #E5E7EB;border-radius:8px;font-size:14px;font-weight:700;">
+                                </div>
+                                <span style="margin-top:16px;font-weight:700;color:#94A3B8;">~</span>
+                                <div style="flex:1;">
+                                    <label style="font-size:11px;color:#94A3B8;display:block;margin-bottom:4px;">下班時間</label>
+                                    <input type="time" id="fixedEndTime" value="17:00" style="width:100%;padding:10px;border:1px solid #E5E7EB;border-radius:8px;font-size:14px;font-weight:700;">
+                                </div>
                             </div>
                         </div>
                         <button onclick="saveSchedulingMode()" style="width:100%;padding:12px;border:none;border-radius:10px;background:linear-gradient(135deg,#4F46E5,#7C3AED);color:#fff;font-weight:700;font-size:14px;cursor:pointer;">💾 儲存排班模式</button>
@@ -1658,12 +1678,20 @@
 
         // ===== 排班模式設定 =====
         let currentSchedulingMode = 'shift'; // 預設排班制
+        let fixedShiftStart = '08:00';
+        let fixedShiftEnd = '17:00';
 
         async function loadSchedulingMode() {
             try {
                 const { data } = await sb.from('system_settings').select('value').eq('key', 'scheduling_mode').maybeSingle();
                 if (data?.value?.mode) { currentSchedulingMode = data.value.mode; }
+                if (data?.value?.start) { fixedShiftStart = data.value.start; }
+                if (data?.value?.end) { fixedShiftEnd = data.value.end; }
             } catch(e) {}
+            const startEl = document.getElementById('fixedStartTime');
+            const endEl = document.getElementById('fixedEndTime');
+            if (startEl) startEl.value = fixedShiftStart;
+            if (endEl) endEl.value = fixedShiftEnd;
             applySchedulingModeUI();
         }
 
@@ -1672,22 +1700,33 @@
             applySchedulingModeUI();
         }
 
+        function setFixedPreset(start, end) {
+            document.getElementById('fixedStartTime').value = start;
+            document.getElementById('fixedEndTime').value = end;
+            document.querySelectorAll('.fixedPresetBtn').forEach(b => { b.style.background = '#fff'; b.style.border = '1px solid #E5E7EB'; });
+            event.target.closest('.fixedPresetBtn').style.background = '#EEF2FF';
+            event.target.closest('.fixedPresetBtn').style.border = '2px solid #4F46E5';
+        }
+
         function applySchedulingModeUI() {
             const shiftEl = document.getElementById('modeShift');
             const fixedEl = document.getElementById('modeFixed');
             const shiftLabel = document.getElementById('modeShiftLabel');
             const fixedLabel = document.getElementById('modeFixedLabel');
+            const fixedConfig = document.getElementById('fixedShiftConfig');
             if (!shiftEl || !fixedEl) return;
             if (currentSchedulingMode === 'shift') {
                 shiftEl.style.border = '2px solid #4F46E5'; shiftEl.style.background = '#EEF2FF';
                 if (shiftLabel) shiftLabel.style.color = '#4F46E5';
                 fixedEl.style.border = '2px solid #E5E7EB'; fixedEl.style.background = '#fff';
                 if (fixedLabel) fixedLabel.style.color = '#94A3B8';
+                if (fixedConfig) fixedConfig.style.display = 'none';
             } else {
                 fixedEl.style.border = '2px solid #4F46E5'; fixedEl.style.background = '#EEF2FF';
                 if (fixedLabel) fixedLabel.style.color = '#4F46E5';
                 shiftEl.style.border = '2px solid #E5E7EB'; shiftEl.style.background = '#fff';
                 if (shiftLabel) shiftLabel.style.color = '#94A3B8';
+                if (fixedConfig) fixedConfig.style.display = 'block';
             }
             applyShiftTabMode();
         }
@@ -1697,16 +1736,18 @@
             if (!shiftContent) return;
             let notice = document.getElementById('fixedModeNotice');
             if (currentSchedulingMode === 'fixed') {
+                const st = document.getElementById('fixedStartTime')?.value || fixedShiftStart;
+                const et = document.getElementById('fixedEndTime')?.value || fixedShiftEnd;
                 if (!notice) {
                     notice = document.createElement('div');
                     notice.id = 'fixedModeNotice';
                     notice.style.cssText = 'background:#EEF2FF;border-radius:14px;padding:20px;text-align:center;';
-                    notice.innerHTML = '<div style="font-size:32px;margin-bottom:8px;">☀️</div>' +
-                        '<div style="font-size:15px;font-weight:800;color:#4F46E5;margin-bottom:8px;">固定日班制</div>' +
-                        '<div style="font-size:13px;color:#64748B;line-height:1.6;">所有員工統一上班時間<br><b>08:00 - 17:00</b></div>' +
-                        '<div style="font-size:11px;color:#94A3B8;margin-top:12px;">如需排班請至「人力設定」切換為排班制</div>';
                     shiftContent.insertBefore(notice, shiftContent.firstChild);
                 }
+                notice.innerHTML = '<div style="font-size:32px;margin-bottom:8px;">☀️</div>' +
+                    '<div style="font-size:15px;font-weight:800;color:#4F46E5;margin-bottom:8px;">固定班制</div>' +
+                    '<div style="font-size:13px;color:#64748B;line-height:1.6;">所有員工統一上班時間<br><b>' + st + ' - ' + et + '</b></div>' +
+                    '<div style="font-size:11px;color:#94A3B8;margin-top:12px;">如需排班請至「人力設定」切換為排班制</div>';
                 notice.style.display = 'block';
                 Array.from(shiftContent.children).forEach(el => {
                     if (el.id !== 'fixedModeNotice') el.style.display = 'none';
@@ -1722,17 +1763,22 @@
         async function saveSchedulingMode() {
             const statusEl = document.getElementById('schedModeSaveStatus');
             try {
+                const st = document.getElementById('fixedStartTime')?.value || '08:00';
+                const et = document.getElementById('fixedEndTime')?.value || '17:00';
+                fixedShiftStart = st; fixedShiftEnd = et;
                 const { data: existing } = await sb.from('system_settings').select('id').eq('key', 'scheduling_mode').maybeSingle();
-                const val = { mode: currentSchedulingMode };
+                const val = { mode: currentSchedulingMode, start: st, end: et };
                 if (existing) {
                     await sb.from('system_settings').update({ value: val, updated_at: new Date().toISOString() }).eq('key', 'scheduling_mode');
                 } else {
-                    await sb.from('system_settings').insert({ key: 'scheduling_mode', value: val, description: '排班模式：shift=排班制, fixed=固定日班' });
+                    await sb.from('system_settings').insert({ key: 'scheduling_mode', value: val, description: '排班模式：shift=排班制, fixed=固定班' });
                 }
+                const modeLabel = currentSchedulingMode === 'shift' ? '排班制' : `固定班 ${st}-${et}`;
                 statusEl.style.display = 'block'; statusEl.style.color = '#059669';
-                statusEl.textContent = '✅ 已儲存 — ' + (currentSchedulingMode === 'shift' ? '排班制' : '固定日班');
+                statusEl.textContent = '✅ 已儲存 — ' + modeLabel;
                 setTimeout(() => { statusEl.style.display = 'none'; }, 2000);
-                if (typeof writeAuditLog === 'function') writeAuditLog('update_scheduling_mode', { mode: currentSchedulingMode });
+                applyShiftTabMode();
+                if (typeof writeAuditLog === 'function') writeAuditLog('update_scheduling_mode', val);
             } catch(e) {
                 statusEl.style.display = 'block'; statusEl.style.color = '#DC2626'; statusEl.textContent = '❌ 儲存失敗';
             }
