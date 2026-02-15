@@ -970,7 +970,10 @@
                     <span style="font-size:13px;font-weight:800;color:#4F46E5;white-space:nowrap;">x${c.multiplier}</span>
                 </div>
                 <div class="bonus-breakdown">
-                    <div class="row"><span>底薪 x 年資 x 矩陣</span><span>$${c.baseAmount.toLocaleString()}</span></div>
+                    <div class="row" style="font-size:11px;color:#94A3B8;padding-bottom:6px;">
+                        <span><a href="salary.html" style="color:#4F46E5;text-decoration:underline;">底薪$${(emp.baseSalary||0).toLocaleString()}</a> x 年資${(emp.tenureRatio*100).toFixed(0)}% x 倍率${c.multiplier}</span>
+                        <span>$${c.baseAmount.toLocaleString()}</span>
+                    </div>
                     ${c.fullAtt > 0 ? '<div class="row"><span class="plus">+ 全勤獎金</span><span class="plus">+$' + c.fullAtt.toLocaleString() + '</span></div>' : ''}
                     ${c.latePen > 0 ? '<div class="row"><span class="minus">- 遲到扣款 (' + emp.lateCount + 'x$' + LATE_PENALTY_PER + ')</span><span class="minus">-$' + c.latePen.toLocaleString() + '</span></div>' : ''}
                     ${c.manualAdj !== 0 ? '<div class="row"><span>' + (c.manualAdj > 0 ? '+' : '') + ' 手動調整</span><span>' + (c.manualAdj > 0 ? '+' : '') + '$' + c.manualAdj.toLocaleString() + '</span></div>' : ''}
