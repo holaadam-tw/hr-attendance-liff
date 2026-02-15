@@ -247,6 +247,7 @@
                         <span class="cr-label">預估實領</span>
                         <span class="cr-value" id="crNet">NT$ 0</span>
                     </div>
+                    <div id="crFormula" style="text-align:center;font-size:11px;color:rgba(255,255,255,0.6);padding:4px 0 2px;"></div>
                     <div class="calc-result-divider"></div>
                     <div class="calc-result-row">
                         <span class="cr-label">總收入</span>
@@ -256,6 +257,8 @@
                         <span class="cr-label">總扣款</span>
                         <span class="cr-value" id="crDeduct">-NT$ 0</span>
                     </div>
+                    <div class="calc-result-divider"></div>
+                    <div id="crInsuranceBracket" style="text-align:center;font-size:11px;color:rgba(255,255,255,0.5);padding:4px 0 0;"></div>
                 </div>
 
                 <div class="calc-detail-card">
@@ -550,8 +553,10 @@
             const net = gross - totalDeduct;
 
             document.getElementById('crNet').textContent = formatNT(net);
+            document.getElementById('crFormula').textContent = `= ${formatNT(gross)}（收入）- ${formatNT(totalDeduct)}（扣款）`;
             document.getElementById('crGross').textContent = formatNT(gross);
             document.getElementById('crDeduct').textContent = '-' + formatNT(totalDeduct);
+            document.getElementById('crInsuranceBracket').textContent = `投保級距：${formatNT(insuredAmt)}`;
             document.getElementById('cvMonth').textContent = formatNT(monthSalary);
             document.getElementById('cvDay').textContent = formatNT(dailyRate) + ' /天';
             document.getElementById('cvHour').textContent = formatNT(hourlyRate) + ' /時';

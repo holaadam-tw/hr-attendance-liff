@@ -241,6 +241,13 @@
                             <input type="date" id="newEmployeeHireDate">
                         </div>
                         <div class="form-group">
+                            <label>僱用類型</label>
+                            <select id="newEmployeeType">
+                                <option value="fulltime">正職</option>
+                                <option value="parttime">兼職</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
                             <label>角色權限</label>
                             <select id="newEmployeeRole">
                                 <option value="user">一般員工</option>
@@ -278,6 +285,97 @@
                             2. 輸入工號和驗證碼<br>
                             3. 完成綁定即可使用系統
                         </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 薪資設定 Modal -->
+        <div id="salarySettingModal" class="modal" style="display:none;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>💰 薪資設定</h3>
+                    <button class="modal-close" onclick="closeSalarySettingModal()">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div id="salarySettingEmpName" style="font-size:15px;font-weight:800;color:#0F172A;margin-bottom:16px;text-align:center;"></div>
+                    <div class="form-group">
+                        <label>計薪方式</label>
+                        <select id="ssSalaryType" onchange="onSalaryTypeChange()">
+                            <option value="monthly">月薪制</option>
+                            <option value="daily">日薪制</option>
+                            <option value="hourly">時薪制</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label id="ssBaseLabel">基本月薪</label>
+                        <input type="number" id="ssBaseSalary" placeholder="例如：35000">
+                    </div>
+                    <div class="form-group">
+                        <label>伙食津貼（月）</label>
+                        <input type="number" id="ssMealAllowance" placeholder="例如：2400" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label>職務加給（月）</label>
+                        <input type="number" id="ssPositionAllowance" placeholder="例如：5000" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label>全勤獎金</label>
+                        <input type="number" id="ssFullAttBonus" placeholder="例如：2000" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label>勞退自提 %</label>
+                        <input type="number" id="ssPensionRate" min="0" max="6" placeholder="0~6" value="0">
+                    </div>
+                    <div style="display:flex;gap:10px;margin-top:20px;">
+                        <button onclick="saveSalarySetting()" class="btn btn-success" style="flex:1;">💾 儲存薪資</button>
+                        <button onclick="closeSalarySettingModal()" class="btn btn-secondary" style="flex:1;">取消</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 編輯員工 Modal -->
+        <div id="editEmployeeModal" class="modal" style="display:none;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>✏️ 編輯員工</h3>
+                    <button class="modal-close" onclick="closeEditEmployeeModal()">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="editEmpId">
+                    <div class="form-group">
+                        <label>姓名</label>
+                        <input type="text" id="editEmpName">
+                    </div>
+                    <div class="form-group">
+                        <label>部門</label>
+                        <select id="editEmpDept">
+                            <option value="管理部">管理部</option>
+                            <option value="業務部">業務部</option>
+                            <option value="技術部">技術部</option>
+                            <option value="人事部">人事部</option>
+                            <option value="財務部">財務部</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>職位</label>
+                        <input type="text" id="editEmpPosition" placeholder="例如：專員">
+                    </div>
+                    <div class="form-group">
+                        <label>到職日期</label>
+                        <input type="date" id="editEmpHireDate">
+                    </div>
+                    <div class="form-group">
+                        <label>僱用類型</label>
+                        <select id="editEmpType">
+                            <option value="fulltime">正職</option>
+                            <option value="parttime">兼職</option>
+                        </select>
+                    </div>
+                    <div style="display:flex;gap:10px;margin-top:20px;">
+                        <button onclick="saveEditEmployee()" class="btn btn-success" style="flex:1;">💾 儲存</button>
+                        <button onclick="closeEditEmployeeModal()" class="btn btn-secondary" style="flex:1;">取消</button>
                     </div>
                 </div>
             </div>
@@ -587,12 +685,12 @@
                         <div style="display:flex;gap:8px;margin-bottom:12px;">
                             <div id="modeShift" onclick="selectSchedulingMode('shift')" style="flex:1;padding:14px 12px;border:2px solid #4F46E5;border-radius:12px;cursor:pointer;text-align:center;background:#EEF2FF;transition:all 0.2s;">
                                 <div style="font-size:24px;margin-bottom:6px;">🔄</div>
-                                <div style="font-size:13px;font-weight:800;color:#4F46E5;">排班制</div>
+                                <div id="modeShiftLabel" style="font-size:13px;font-weight:800;color:#4F46E5;">排班制</div>
                                 <div style="font-size:10px;color:#94A3B8;margin-top:4px;">服務業、餐飲、零售<br>早/中/晚輪班</div>
                             </div>
                             <div id="modeFixed" onclick="selectSchedulingMode('fixed')" style="flex:1;padding:14px 12px;border:2px solid #E5E7EB;border-radius:12px;cursor:pointer;text-align:center;background:#fff;transition:all 0.2s;">
                                 <div style="font-size:24px;margin-bottom:6px;">☀️</div>
-                                <div style="font-size:13px;font-weight:800;color:#94A3B8;">固定日班</div>
+                                <div id="modeFixedLabel" style="font-size:13px;font-weight:800;color:#94A3B8;">固定日班</div>
                                 <div style="font-size:10px;color:#94A3B8;margin-top:4px;">一般辦公室<br>固定 08:00-17:00</div>
                             </div>
                         </div>
@@ -1135,6 +1233,7 @@
                 position: document.getElementById('newEmployeePosition').value.trim() || '員工',
                 id_card_last_4: document.getElementById('newEmployeeCode').value.trim(),
                 hire_date: document.getElementById('newEmployeeHireDate').value,
+                employment_type: document.getElementById('newEmployeeType').value || 'fulltime',
                 role: document.getElementById('newEmployeeRole').value,
                 is_active: true,
                 status: 'active',
@@ -1222,18 +1321,17 @@
                                 <span style="font-size:12px;">驗證碼: ${emp.id_card_last_4 || '未設定'}</span>
                             </div>
                             <div style="font-size:12px;color:#666;margin-top:5px;">
-                                到職: ${emp.hire_date || '未設定'} · ${emp.line_user_id ? '✅ 已綁定' : '⏳ 未綁定'}
+                                到職: ${emp.hire_date || '未設定'} · ${emp.employment_type === 'parttime' ? '兼職' : '正職'} · ${emp.line_user_id ? '✅ 已綁定' : '⏳ 未綁定'}
                             </div>
-                            ${emp.line_user_id ? `
-                                <div style="margin-top:8px;display:flex;gap:8px;">
-                                    <button class="btn-success-sm" onclick="updateEmployeeRoleAdmin('${emp.id}', 'admin', '${emp.name}')" style="flex:1;padding:8px 12px;border:none;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;${emp.role === 'admin' ? 'opacity:0.4;pointer-events:none;' : ''}">
-                                        設為管理員
+                            <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;">
+                                <button onclick="openEditEmployeeModal('${emp.id}')" style="padding:7px 12px;border:1px solid #E5E7EB;border-radius:8px;background:#fff;font-size:11px;font-weight:700;cursor:pointer;color:#4F46E5;">✏️ 編輯</button>
+                                <button onclick="openSalarySettingModal('${emp.id}','${escapeHTML(emp.name)}')" style="padding:7px 12px;border:1px solid #E5E7EB;border-radius:8px;background:#fff;font-size:11px;font-weight:700;cursor:pointer;color:#059669;">💰 薪資</button>
+                                ${emp.line_user_id ? `
+                                    <button onclick="updateEmployeeRoleAdmin('${emp.id}', '${emp.role === 'admin' ? 'user' : 'admin'}', '${escapeHTML(emp.name)}')" style="padding:7px 12px;border:1px solid #E5E7EB;border-radius:8px;background:#fff;font-size:11px;font-weight:700;cursor:pointer;color:#EA580C;">
+                                        ${emp.role === 'admin' ? '取消管理員' : '設為管理員'}
                                     </button>
-                                    <button class="btn-danger" onclick="updateEmployeeRoleAdmin('${emp.id}', 'user', '${emp.name}')" style="flex:1;padding:8px 12px;border-radius:10px;font-size:12px;font-weight:700;${emp.role !== 'admin' ? 'opacity:0.4;pointer-events:none;' : ''}">
-                                        取消管理員
-                                    </button>
-                                </div>
-                            ` : ''}
+                                ` : ''}
+                            </div>
                         </div>
                     `;
                 });
@@ -1272,6 +1370,124 @@
                 const text = item.textContent.toLowerCase();
                 item.style.display = text.includes(searchTerm) ? 'block' : 'none';
             });
+        }
+
+        // ===== 薪資設定 Modal =====
+        let currentSalaryEmpId = null;
+
+        async function openSalarySettingModal(empId, empName) {
+            currentSalaryEmpId = empId;
+            document.getElementById('salarySettingEmpName').textContent = empName + ' 的薪資設定';
+            // 清空
+            document.getElementById('ssSalaryType').value = 'monthly';
+            document.getElementById('ssBaseSalary').value = '';
+            document.getElementById('ssMealAllowance').value = '0';
+            document.getElementById('ssPositionAllowance').value = '0';
+            document.getElementById('ssFullAttBonus').value = '0';
+            document.getElementById('ssPensionRate').value = '0';
+            onSalaryTypeChange();
+            // 讀取現有設定
+            try {
+                const { data } = await sb.from('salary_settings')
+                    .select('*')
+                    .eq('employee_id', empId)
+                    .eq('is_current', true)
+                    .maybeSingle();
+                if (data) {
+                    document.getElementById('ssSalaryType').value = data.salary_type || 'monthly';
+                    document.getElementById('ssBaseSalary').value = data.base_salary || '';
+                    document.getElementById('ssMealAllowance').value = data.meal_allowance || 0;
+                    document.getElementById('ssPositionAllowance').value = data.position_allowance || 0;
+                    document.getElementById('ssFullAttBonus').value = data.full_attendance_bonus || 0;
+                    document.getElementById('ssPensionRate').value = data.pension_self_rate || 0;
+                    onSalaryTypeChange();
+                }
+            } catch(e) {}
+            document.getElementById('salarySettingModal').style.display = 'flex';
+        }
+
+        function closeSalarySettingModal() {
+            document.getElementById('salarySettingModal').style.display = 'none';
+            currentSalaryEmpId = null;
+        }
+
+        function onSalaryTypeChange() {
+            const t = document.getElementById('ssSalaryType').value;
+            const labels = { monthly: '基本月薪', daily: '基本日薪', hourly: '基本時薪' };
+            document.getElementById('ssBaseLabel').textContent = labels[t] || '基本月薪';
+        }
+
+        async function saveSalarySetting() {
+            if (!currentSalaryEmpId) return;
+            const base = parseFloat(document.getElementById('ssBaseSalary').value);
+            if (!base || base <= 0) { showToast('⚠️ 請輸入基本薪資'); return; }
+
+            const record = {
+                employee_id: currentSalaryEmpId,
+                salary_type: document.getElementById('ssSalaryType').value,
+                base_salary: base,
+                meal_allowance: parseFloat(document.getElementById('ssMealAllowance').value) || 0,
+                position_allowance: parseFloat(document.getElementById('ssPositionAllowance').value) || 0,
+                full_attendance_bonus: parseFloat(document.getElementById('ssFullAttBonus').value) || 0,
+                pension_self_rate: parseFloat(document.getElementById('ssPensionRate').value) || 0,
+                is_current: true,
+                updated_at: new Date().toISOString()
+            };
+
+            try {
+                // 先將舊的設為非當前
+                await sb.from('salary_settings').update({ is_current: false }).eq('employee_id', currentSalaryEmpId).eq('is_current', true);
+                // 新增當前設定
+                const { error } = await sb.from('salary_settings').insert(record);
+                if (error) throw error;
+                showToast('✅ 薪資設定已儲存');
+                closeSalarySettingModal();
+                if (typeof writeAuditLog === 'function') writeAuditLog('update_salary_setting', { employee_id: currentSalaryEmpId, base_salary: base });
+            } catch(e) {
+                showToast('❌ 儲存失敗: ' + friendlyError(e));
+            }
+        }
+
+        // ===== 編輯員工 Modal =====
+        async function openEditEmployeeModal(empId) {
+            document.getElementById('editEmpId').value = empId;
+            try {
+                const { data } = await sb.from('employees').select('*').eq('id', empId).single();
+                if (data) {
+                    document.getElementById('editEmpName').value = data.name || '';
+                    document.getElementById('editEmpDept').value = data.department || '管理部';
+                    document.getElementById('editEmpPosition').value = data.position || '';
+                    document.getElementById('editEmpHireDate').value = data.hire_date || '';
+                    document.getElementById('editEmpType').value = data.employment_type || 'fulltime';
+                }
+            } catch(e) {}
+            document.getElementById('editEmployeeModal').style.display = 'flex';
+        }
+
+        function closeEditEmployeeModal() {
+            document.getElementById('editEmployeeModal').style.display = 'none';
+        }
+
+        async function saveEditEmployee() {
+            const empId = document.getElementById('editEmpId').value;
+            if (!empId) return;
+            const updates = {
+                name: document.getElementById('editEmpName').value.trim(),
+                department: document.getElementById('editEmpDept').value,
+                position: document.getElementById('editEmpPosition').value.trim(),
+                hire_date: document.getElementById('editEmpHireDate').value,
+                employment_type: document.getElementById('editEmpType').value
+            };
+            if (!updates.name) { showToast('⚠️ 姓名不可為空'); return; }
+            try {
+                const { error } = await sb.from('employees').update(updates).eq('id', empId);
+                if (error) throw error;
+                showToast('✅ 員工資料已更新');
+                closeEditEmployeeModal();
+                loadEmployeeList();
+            } catch(e) {
+                showToast('❌ 更新失敗: ' + friendlyError(e));
+            }
         }
 
         // 請假審核
@@ -1458,17 +1674,19 @@
         function applySchedulingModeUI() {
             const shiftEl = document.getElementById('modeShift');
             const fixedEl = document.getElementById('modeFixed');
+            const shiftLabel = document.getElementById('modeShiftLabel');
+            const fixedLabel = document.getElementById('modeFixedLabel');
             if (!shiftEl || !fixedEl) return;
             if (currentSchedulingMode === 'shift') {
                 shiftEl.style.border = '2px solid #4F46E5'; shiftEl.style.background = '#EEF2FF';
-                shiftEl.querySelector('div:nth-child(2)').style.color = '#4F46E5';
+                if (shiftLabel) shiftLabel.style.color = '#4F46E5';
                 fixedEl.style.border = '2px solid #E5E7EB'; fixedEl.style.background = '#fff';
-                fixedEl.querySelector('div:nth-child(2)').style.color = '#94A3B8';
+                if (fixedLabel) fixedLabel.style.color = '#94A3B8';
             } else {
                 fixedEl.style.border = '2px solid #4F46E5'; fixedEl.style.background = '#EEF2FF';
-                fixedEl.querySelector('div:nth-child(2)').style.color = '#4F46E5';
+                if (fixedLabel) fixedLabel.style.color = '#4F46E5';
                 shiftEl.style.border = '2px solid #E5E7EB'; shiftEl.style.background = '#fff';
-                shiftEl.querySelector('div:nth-child(2)').style.color = '#94A3B8';
+                if (shiftLabel) shiftLabel.style.color = '#94A3B8';
             }
             applyShiftTabMode();
         }
