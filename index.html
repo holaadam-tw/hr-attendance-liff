@@ -268,8 +268,8 @@
                     updateTodayInfo();
                     initBottomNav();
 
-                    // checkIsAdmin 現在是同步的，直接判斷
-                    if (checkIsAdmin()) {
+                    // admin 和 manager 都可進管理後台
+                    if (currentEmployee && (currentEmployee.role === 'admin' || currentEmployee.role === 'manager')) {
                         const adminEntry = document.getElementById('adminEntry');
                         if (adminEntry) adminEntry.style.display = 'block';
                     }

@@ -49,58 +49,58 @@
             </div>
 
             <div class="menu-grid">
-                <div class="menu-item" onclick="showPage('bonusPage')">
+                <div class="menu-item" data-require="admin" onclick="showPage('bonusPage')">
                     <div class="icon">🎁</div><div class="label">年終獎金試算</div>
                 </div>
-                <div class="menu-item" onclick="showPage('payrollPage')">
+                <div class="menu-item" data-require="admin" onclick="showPage('payrollPage')">
                     <div class="icon">💰</div><div class="label">薪資發放</div>
                 </div>
-                <div class="menu-item" onclick="showPage('locationPage')">
+                <div class="menu-item" data-require="admin" onclick="showPage('locationPage')">
                     <div class="icon">📍</div><div class="label">地點管理</div>
                 </div>
                 <div class="menu-item" onclick="showPage('employeePage')">
                     <div class="icon">👥</div><div class="label">員工管理</div>
                 </div>
-                <div class="menu-item" onclick="showPage('leaveApprovalPage')">
+                <div class="menu-item" data-require="admin" onclick="showPage('leaveApprovalPage')">
                     <div class="icon">✅</div><div class="label">請假審核</div>
                 </div>
-                <div class="menu-item" onclick="showPage('makeupApprovalPage')">
+                <div class="menu-item" data-require="admin" onclick="showPage('makeupApprovalPage')">
                     <div class="icon">🔧</div><div class="label">補打卡審核</div>
                 </div>
-                <div class="menu-item" onclick="showPage('overtimeApprovalPage')">
+                <div class="menu-item" data-require="admin" onclick="showPage('overtimeApprovalPage')">
                     <div class="icon">⏰</div><div class="label">加班審核</div>
                 </div>
-                <div class="menu-item" onclick="showPage('swapApprovalPage')">
+                <div class="menu-item" data-require="admin" onclick="showPage('swapApprovalPage')">
                     <div class="icon">🔄</div><div class="label">換班審核</div>
                 </div>
-                <div class="menu-item" onclick="showPage('announcementPage')">
+                <div class="menu-item" data-require="admin" onclick="showPage('announcementPage')">
                     <div class="icon">📢</div><div class="label">公告管理</div>
                 </div>
-                <div class="menu-item" onclick="showPage('reportPage')">
+                <div class="menu-item" data-require="admin" onclick="showPage('reportPage')">
                     <div class="icon">📊</div><div class="label">報表匯出</div>
                 </div>
-                <div class="menu-item" onclick="showPage('staffMgrPage')">
+                <div class="menu-item" data-require="admin" onclick="showPage('staffMgrPage')">
                     <div class="icon">📋</div><div class="label">人力管理</div>
                 </div>
                 <div class="menu-item" onclick="showPage('lunchMgrPage')">
                     <div class="icon">🍱</div><div class="label">便當管理</div>
                 </div>
-                <div class="menu-item" onclick="showPage('clientPage')">
+                <div class="menu-item" data-require="admin" onclick="showPage('clientPage')">
                     <div class="icon">🏢</div><div class="label">客戶管理</div>
                 </div>
-                <div class="menu-item" onclick="showPage('fieldWorkApprovalPage')">
+                <div class="menu-item" data-require="admin" onclick="showPage('fieldWorkApprovalPage')">
                     <div class="icon">📍</div><div class="label">外勤審核</div>
                 </div>
-                <div class="menu-item" onclick="showPage('insurancePage')">
+                <div class="menu-item" data-require="admin" onclick="showPage('insurancePage')">
                     <div class="icon">🏥</div><div class="label">勞健保級距</div>
                 </div>
-                <div class="menu-item" onclick="showPage('companyPage')">
+                <div class="menu-item" data-require="admin" onclick="showPage('companyPage')">
                     <div class="icon">🏛️</div><div class="label">公司管理</div>
                 </div>
-                <div class="menu-item" onclick="showPage('featurePage')">
+                <div class="menu-item" data-require="admin" onclick="showPage('featurePage')">
                     <div class="icon">🎛️</div><div class="label">功能管理</div>
                 </div>
-                <div class="menu-item" onclick="showPage('auditLogPage')">
+                <div class="menu-item" data-require="admin" onclick="showPage('auditLogPage')">
                     <div class="icon">📜</div><div class="label">操作日誌</div>
                 </div>
                 <div class="menu-item" onclick="window.location.href='index.html'">
@@ -1264,7 +1264,7 @@
                 const { data, error } = await sb.from('employees')
                     .select('*')
                     .eq('line_user_id', liffProfile.userId)
-                    .eq('role', 'admin')
+                    .in('role', ['admin', 'manager'])
                     .eq('is_active', true)
                     .maybeSingle();
 
@@ -1275,8 +1275,8 @@
                 }
                 
                 if (!data) {
-                    console.log('❌ 找不到管理員資料，LINE ID:', liffProfile?.userId);
-                    showStatus(statusEl, 'error', '❌ 您沒有管理員權限<br><small style="opacity:0.7">LINE ID: ' + escapeHTML(liffProfile?.userId || '未知') + '</small>', true);
+                    console.log('❌ 找不到管理員/主管資料，LINE ID:', liffProfile?.userId);
+                    showStatus(statusEl, 'error', '❌ 您沒有管理權限<br><small style="opacity:0.7">LINE ID: ' + escapeHTML(liffProfile?.userId || '未知') + '</small>', true);
                     setTimeout(() => { window.location.href = 'index.html'; }, 5000);
                     return;
                 }
@@ -1292,6 +1292,7 @@
                 setTimeout(() => {
                     showPage('adminHomePage');
                     document.getElementById('bottomNav').style.display = 'flex';
+                    applyRoleVisibility();
                 }, 800);
 
             } catch (err) {
@@ -1303,18 +1304,31 @@
 
         // [BUG FIX] 修正管理員頭像顯示 — 有圖片時不應顯示 emoji
         function updateAdminInfo(data) {
+            const roleLabel = data.role === 'admin' ? '管理員' : '主管';
             document.getElementById('adminName').textContent = data.name;
-            document.getElementById('adminDept').textContent = `${data.department || '系統管理'} · 管理員`;
+            document.getElementById('adminDept').textContent = `${data.department || '系統管理'} · ${roleLabel}`;
             document.getElementById('adminId').textContent = `ID: ${data.employee_number}`;
-            
+
             const avatar = document.getElementById('adminAvatar');
             if (liffProfile?.pictureUrl) {
                 avatar.style.backgroundImage = `url(${liffProfile.pictureUrl})`;
                 avatar.style.backgroundSize = 'cover';
                 avatar.textContent = '';
             } else {
-                avatar.textContent = '👑';
+                avatar.textContent = data.role === 'admin' ? '👑' : '👤';
             }
+        }
+
+        // 依角色隱藏無權限的選單項目
+        function applyRoleVisibility() {
+            if (!currentAdminEmployee) return;
+            const role = currentAdminEmployee.role;
+            if (role === 'admin') return; // admin 看全部
+
+            // manager 只看沒有 data-require="admin" 的項目
+            document.querySelectorAll('.menu-grid .menu-item[data-require="admin"]').forEach(el => {
+                el.style.display = 'none';
+            });
         }
 
         // ===== 混合精算獎金系統 =====
