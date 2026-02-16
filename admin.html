@@ -471,11 +471,15 @@
                         <label>到期日 (選填，留空永久顯示)</label>
                         <input type="date" id="annExpire">
                     </div>
-                    <div class="form-group">
-                        <label style="display:flex;align-items:center;gap:8px;"><input type="checkbox" id="annPinned"> 📌 置頂</label>
-                    </div>
-                    <div class="form-group">
-                        <label style="display:flex;align-items:center;gap:8px;"><input type="checkbox" id="annRequireAck"> ✍️ 強制閱讀簽署（員工必須確認才能使用系統）</label>
+                    <div class="form-group" style="display:flex;flex-direction:column;gap:10px;">
+                        <label style="display:flex;align-items:center;gap:10px;padding:12px;background:#F8FAFC;border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;">
+                            <input type="checkbox" id="annPinned" style="width:20px;height:20px;accent-color:#4F46E5;flex-shrink:0;">
+                            📌 置頂
+                        </label>
+                        <label style="display:flex;align-items:center;gap:10px;padding:12px;background:#F8FAFC;border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;">
+                            <input type="checkbox" id="annRequireAck" style="width:20px;height:20px;accent-color:#4F46E5;flex-shrink:0;">
+                            ✍️ 強制閱讀簽署（員工必須確認才能使用系統）
+                        </label>
                     </div>
                     <button class="btn btn-primary" onclick="publishAnnouncement()">📤 發布公告</button>
                 </div>
