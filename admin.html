@@ -61,17 +61,8 @@
                 <div class="menu-item" onclick="showPage('employeePage')">
                     <div class="icon">👥</div><div class="label">員工管理</div>
                 </div>
-                <div class="menu-item" data-require="admin" onclick="showPage('leaveApprovalPage')">
-                    <div class="icon">✅</div><div class="label">請假審核</div>
-                </div>
-                <div class="menu-item" data-require="admin" onclick="showPage('makeupApprovalPage')">
-                    <div class="icon">🔧</div><div class="label">補打卡審核</div>
-                </div>
-                <div class="menu-item" data-require="admin" onclick="showPage('overtimeApprovalPage')">
-                    <div class="icon">⏰</div><div class="label">加班審核</div>
-                </div>
-                <div class="menu-item" data-require="admin" onclick="showPage('swapApprovalPage')">
-                    <div class="icon">🔄</div><div class="label">換班審核</div>
+                <div class="menu-item" data-require="admin" onclick="showPage('approvalCenterPage')">
+                    <div class="icon">📋</div><div class="label">審核中心</div>
                 </div>
                 <div class="menu-item" data-require="admin" onclick="showPage('announcementPage')">
                     <div class="icon">📢</div><div class="label">公告管理</div>
@@ -102,9 +93,6 @@
                 </div>
                 <div class="menu-item" data-require="admin" onclick="showPage('insurancePage')">
                     <div class="icon">🏥</div><div class="label">勞健保級距</div>
-                </div>
-                <div class="menu-item" data-require="admin" onclick="showPage('companyPage')">
-                    <div class="icon">🏛️</div><div class="label">公司管理</div>
                 </div>
                 <div class="menu-item" data-require="admin" onclick="showPage('featurePage')">
                     <div class="icon">🎛️</div><div class="label">功能管理</div>
@@ -409,32 +397,54 @@
         </div>
 
         <!-- 請假審核頁面 -->
-        <div id="leaveApprovalPage" class="page">
+        <!-- ====== 審核中心（合併：請假/補打卡/加班/換班） ====== -->
+        <div id="approvalCenterPage" class="page">
             <button class="btn btn-secondary" onclick="showPage('adminHomePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
             <div class="checkin-page">
-                <h2>✅ 請假審核</h2>
-                <div class="tabs">
-                    <button class="tab-btn active" onclick="switchLeaveTab('pending')">待審核</button>
-                    <button class="tab-btn inactive" onclick="switchLeaveTab('approved')">已通過</button>
-                    <button class="tab-btn inactive" onclick="switchLeaveTab('rejected')">已拒絕</button>
+                <h2>📋 審核中心</h2>
+                <!-- 審核類型切換 -->
+                <div style="display:flex;gap:4px;margin-bottom:16px;background:#F1F5F9;border-radius:10px;padding:3px;">
+                    <button class="aprTab aprTabActive" onclick="switchApprovalType('leave',this)" style="flex:1;padding:10px;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;background:#fff;color:#4F46E5;box-shadow:0 1px 4px rgba(0,0,0,0.08);">✅ 請假</button>
+                    <button class="aprTab" onclick="switchApprovalType('makeup',this)" style="flex:1;padding:10px;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;background:transparent;color:#94A3B8;">🔧 補打卡</button>
+                    <button class="aprTab" onclick="switchApprovalType('overtime',this)" style="flex:1;padding:10px;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;background:transparent;color:#94A3B8;">⏰ 加班</button>
+                    <button class="aprTab" onclick="switchApprovalType('swap',this)" style="flex:1;padding:10px;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;background:transparent;color:#94A3B8;">🔄 換班</button>
                 </div>
-                <div id="leaveApprovalList">
-                    <p style="text-align:center;color:#666;">載入中...</p>
-                </div>
-            </div>
-        </div>
 
-        <!-- ====== 補打卡審核 ====== -->
-        <div id="makeupApprovalPage" class="page">
-            <button class="btn btn-secondary" onclick="showPage('adminHomePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
-            <div class="checkin-page">
-                <h2>🔧 補打卡審核</h2>
-                <div class="tabs">
-                    <button class="tab-btn active" onclick="switchMakeupTab('pending')">待審核</button>
-                    <button class="tab-btn inactive" onclick="switchMakeupTab('approved')">已通過</button>
-                    <button class="tab-btn inactive" onclick="switchMakeupTab('rejected')">已拒絕</button>
+                <!-- 請假審核 -->
+                <div id="aprLeave" class="aprContent">
+                    <div class="tabs" id="leaveApprovalTabs">
+                        <button class="tab-btn active" onclick="switchLeaveTab('pending')">待審核</button>
+                        <button class="tab-btn inactive" onclick="switchLeaveTab('approved')">已通過</button>
+                        <button class="tab-btn inactive" onclick="switchLeaveTab('rejected')">已拒絕</button>
+                    </div>
+                    <div id="leaveApprovalList"><p style="text-align:center;color:#666;">載入中...</p></div>
                 </div>
-                <div id="makeupApprovalList"><p style="text-align:center;color:#666;">載入中...</p></div>
+
+                <!-- 補打卡審核 -->
+                <div id="aprMakeup" class="aprContent" style="display:none;">
+                    <div class="tabs" id="makeupApprovalTabs">
+                        <button class="tab-btn active" onclick="switchMakeupTab('pending')">待審核</button>
+                        <button class="tab-btn inactive" onclick="switchMakeupTab('approved')">已通過</button>
+                        <button class="tab-btn inactive" onclick="switchMakeupTab('rejected')">已拒絕</button>
+                    </div>
+                    <div id="makeupApprovalList"><p style="text-align:center;color:#666;">載入中...</p></div>
+                </div>
+
+                <!-- 加班審核 -->
+                <div id="aprOvertime" class="aprContent" style="display:none;">
+                    <div class="tabs" id="overtimeApprovalTabs">
+                        <button class="tab-btn active" onclick="switchOtTab('pending')">待審核</button>
+                        <button class="tab-btn inactive" onclick="switchOtTab('approved')">已通過</button>
+                        <button class="tab-btn inactive" onclick="switchOtTab('rejected')">已拒絕</button>
+                    </div>
+                    <div id="otApprovalList"><p style="text-align:center;color:#666;">載入中...</p></div>
+                </div>
+
+                <!-- 換班審核 -->
+                <div id="aprSwap" class="aprContent" style="display:none;">
+                    <p style="color:#94A3B8;font-size:12px;margin-bottom:12px;">雙方同意後才會出現在此列表</p>
+                    <div id="swapApprovalList"><p style="text-align:center;color:#666;">載入中...</p></div>
+                </div>
             </div>
         </div>
 
@@ -478,29 +488,6 @@
             </div>
         </div>
 
-        <!-- ====== 加班審核 ====== -->
-        <div id="overtimeApprovalPage" class="page">
-            <button class="btn btn-secondary" onclick="showPage('adminHomePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
-            <div class="checkin-page">
-                <h2>⏰ 加班審核</h2>
-                <div class="tabs">
-                    <button class="tab-btn active" onclick="switchOtTab('pending')">待審核</button>
-                    <button class="tab-btn inactive" onclick="switchOtTab('approved')">已通過</button>
-                    <button class="tab-btn inactive" onclick="switchOtTab('rejected')">已拒絕</button>
-                </div>
-                <div id="otApprovalList"><p style="text-align:center;color:#666;">載入中...</p></div>
-            </div>
-        </div>
-
-        <!-- ====== 換班審核 ====== -->
-        <div id="swapApprovalPage" class="page">
-            <button class="btn btn-secondary" onclick="showPage('adminHomePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
-            <div class="checkin-page">
-                <h2>🔄 換班審核</h2>
-                <p style="color:#94A3B8;font-size:12px;margin-bottom:12px;">雙方同意後才會出現在此列表</p>
-                <div id="swapApprovalList"><p style="text-align:center;color:#666;">載入中...</p></div>
-            </div>
-        </div>
 
         <!-- ====== 操作日誌 ====== -->
         <div id="auditLogPage" class="page">
@@ -961,44 +948,6 @@
             </div>
         </div>
 
-        <!-- 公司管理頁面 -->
-        <div id="companyPage" class="page">
-            <button class="btn btn-secondary" onclick="showPage('adminHomePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
-            <div class="checkin-page">
-                <h2>🏛️ 公司管理</h2>
-
-                <div style="display:flex;gap:8px;margin-bottom:12px;">
-                    <input type="text" id="companySearch" placeholder="搜尋公司..." oninput="filterCompanies()" style="flex:1;padding:10px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;">
-                    <button class="btn btn-primary" onclick="showCompanyModal()" style="white-space:nowrap;font-size:13px;padding:10px 16px;">+ 新增</button>
-                </div>
-
-                <div id="companyList">
-                    <p style="text-align:center;color:#94A3B8;font-size:13px;padding:16px;">載入中...</p>
-                </div>
-            </div>
-
-            <!-- 公司新增/編輯 Modal -->
-            <div id="companyModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:999;overflow-y:auto;">
-                <div style="background:#fff;margin:60px auto;max-width:450px;border-radius:16px;padding:24px;">
-                    <h3 id="companyModalTitle" style="margin-bottom:16px;">新增公司</h3>
-                    <input type="hidden" id="companyEditId">
-                    <div class="form-group"><label>公司代碼 *</label><input type="text" id="companyCode" placeholder="例：HR_SYSTEM_001" style="text-transform:uppercase;"></div>
-                    <div class="form-group"><label>公司名稱 *</label><input type="text" id="companyName" placeholder="公司全名"></div>
-                    <div class="form-group">
-                        <label>狀態</label>
-                        <select id="companyIsActive" style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;">
-                            <option value="true">啟用</option>
-                            <option value="false">停用</option>
-                        </select>
-                    </div>
-                    <div style="display:flex;gap:8px;">
-                        <button class="btn btn-success" onclick="saveCompany()" style="flex:1;">💾 儲存</button>
-                        <button class="btn btn-secondary" onclick="closeCompanyModal()" style="flex:1;">取消</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
         <!-- 外勤審核頁面 -->
         <div id="fieldWorkApprovalPage" class="page">
             <button class="btn btn-secondary" onclick="showPage('adminHomePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
@@ -1318,10 +1267,7 @@
             if (id === 'bonusPage') loadHybridBonusData();
             if (id === 'locationPage') renderLocationList();
             if (id === 'employeePage') loadEmployeeList();
-            if (id === 'leaveApprovalPage') loadLeaveApprovals('pending');
-            if (id === 'makeupApprovalPage') loadMakeupApprovals('pending');
-            if (id === 'overtimeApprovalPage') loadOtApprovals('pending');
-            if (id === 'swapApprovalPage') loadSwapApprovals();
+            if (id === 'approvalCenterPage') { switchApprovalType('leave', document.querySelector('.aprTab')); }
             if (id === 'announcementPage') loadAnnouncementList();
             if (id === 'auditLogPage') loadAuditLogs();
             if (id === 'featurePage') { loadFeatureSettings(); loadNotifyToken(); }
@@ -1331,7 +1277,6 @@
             if (id === 'clientPage') { loadClientList(); loadServiceItemList(); }
             if (id === 'fieldWorkApprovalPage') { initFieldWorkApproval(); }
             if (id === 'insurancePage') { loadInsuranceBrackets(); }
-            if (id === 'companyPage') { loadCompanyList(); }
             if (id === 'salesTargetPage') { initSalesTargetPage(); }
             if (id === 'storeManagePage') { loadStoreList(); }
             if (id === 'orderManagePage') { initOrderManage(); }
@@ -1347,7 +1292,7 @@
             { key: 'store_ordering', label: '線上點餐/預約',  desc: '線上預約與點餐服務',   icon: '🛍️' }
         ];
         let companyAllowedFeatures = null;
-        let featureState = { leave: true, lunch: true, attendance: true, fieldwork: false, sales_target: false, store_ordering: false };
+        let featureState = { leave: true, lunch: true, attendance: true, fieldwork: true, sales_target: true, store_ordering: false };
 
         // LINE Notify 設定
         async function loadNotifyToken() {
@@ -1404,7 +1349,7 @@
 
             // 根據平台允許的功能，動態產生 toggle 卡片
             const allowed = companyAllowedFeatures || {};
-            const defaultAllowed = { leave: true, lunch: true, attendance: true, fieldwork: false, sales_target: false, store_ordering: false };
+            const defaultAllowed = { leave: true, lunch: true, attendance: true, fieldwork: true, sales_target: true, store_ordering: false };
             const visibleFeatures = ADMIN_FEATURE_LIST.filter(f => {
                 return companyAllowedFeatures ? (allowed[f.key] === true) : (defaultAllowed[f.key] !== false);
             });
@@ -1471,6 +1416,9 @@
                         .insert({ key: 'feature_visibility', value: featureState, description: '員工可見功能設定' });
                 }
                 
+                // 清除快取，讓員工端下次載入時取得最新設定
+                invalidateSettingsCache();
+
                 const el = document.getElementById('featureSaveStatus');
                 el.style.display = 'block';
                 el.textContent = featureState[key] ? '✅ 已開啟' : '⛔ 已關閉';
@@ -2126,9 +2074,36 @@
             }
         }
 
+        // ===== 審核中心 =====
+        function switchApprovalType(type, btn) {
+            // 隱藏所有審核內容
+            document.querySelectorAll('.aprContent').forEach(el => el.style.display = 'none');
+            // 重設所有頂層 tab 樣式
+            document.querySelectorAll('.aprTab').forEach(t => {
+                t.style.background = 'transparent';
+                t.style.color = '#94A3B8';
+                t.style.boxShadow = 'none';
+            });
+            // 啟用選中的 tab
+            if (btn) {
+                btn.style.background = '#fff';
+                btn.style.color = '#4F46E5';
+                btn.style.boxShadow = '0 1px 4px rgba(0,0,0,0.08)';
+            }
+            // 顯示對應內容
+            const map = { leave: 'aprLeave', makeup: 'aprMakeup', overtime: 'aprOvertime', swap: 'aprSwap' };
+            const target = document.getElementById(map[type]);
+            if (target) target.style.display = 'block';
+            // 載入資料
+            if (type === 'leave') loadLeaveApprovals('pending');
+            if (type === 'makeup') loadMakeupApprovals('pending');
+            if (type === 'overtime') loadOtApprovals('pending');
+            if (type === 'swap') loadSwapApprovals();
+        }
+
         // 請假審核
         function switchLeaveTab(status) {
-            document.querySelectorAll('#leaveApprovalPage .tab-btn').forEach(btn => {
+            document.querySelectorAll('#leaveApprovalTabs .tab-btn').forEach(btn => {
                 btn.className = 'tab-btn inactive';
             });
             event.target.className = 'tab-btn active';
@@ -3555,9 +3530,10 @@
 
         // ===== 補打卡審核 =====
         function switchMakeupTab(status) {
-            document.querySelectorAll('#makeupApprovalPage .tab-btn').forEach(btn => {
-                btn.className = 'tab-btn ' + (btn.textContent.includes(status === 'pending' ? '待審' : status === 'approved' ? '已通過' : '已拒絕') ? 'active' : 'inactive');
+            document.querySelectorAll('#makeupApprovalTabs .tab-btn').forEach(btn => {
+                btn.className = 'tab-btn inactive';
             });
+            event.target.className = 'tab-btn active';
             loadMakeupApprovals(status);
         }
 
@@ -3768,9 +3744,10 @@
 
         // ===== 加班審核 =====
         function switchOtTab(status) {
-            document.querySelectorAll('#overtimeApprovalPage .tab-btn').forEach(btn => {
-                btn.className = 'tab-btn ' + (btn.textContent.includes(status === 'pending' ? '待審' : status === 'approved' ? '已通過' : '已拒絕') ? 'active' : 'inactive');
+            document.querySelectorAll('#overtimeApprovalTabs .tab-btn').forEach(btn => {
+                btn.className = 'tab-btn inactive';
             });
+            event.target.className = 'tab-btn active';
             loadOtApprovals(status);
         }
 

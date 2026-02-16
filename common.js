@@ -1181,8 +1181,8 @@ const DEFAULT_FEATURES = {
     leave: true,        // 我要請假
     lunch: true,        // 便當訂購
     attendance: true,   // 考勤查詢
-    fieldwork: false,   // 外勤打卡
-    sales_target: false,// 業務目標
+    fieldwork: true,    // 外勤打卡
+    sales_target: true, // 業務目標
     store_ordering: false // 線上點餐
 };
 
@@ -1216,22 +1216,11 @@ function getFeatureVisibility() {
 function applyFeatureVisibility() {
     const features = getFeatureVisibility();
 
-    // 只控制首頁中間的 menu-grid 選單 icon
-    const menuMap = {
-        'records.html': 'leave',                    // 📝 我要請假
-        'services.html': 'lunch',                   // 🍱 便當訂購
-        'records.html#attendance': 'attendance',     // 📊 考勤查詢
-        'services.html#fieldwork': 'fieldwork',      // 📍 外勤打卡
-        'services.html#sales': 'sales_target'        // 📊 業務週報
-    };
-
-    document.querySelectorAll('.menu-grid .menu-item').forEach(item => {
-        if (item.classList.contains('admin-only')) return; // 跳過管理員按鈕
-        const onclick = item.getAttribute('onclick') || '';
-        for (const [url, feature] of Object.entries(menuMap)) {
-            if (onclick.includes(url) && features[feature] === false) {
-                item.style.display = 'none';
-            }
+    // 用 data-feature 屬性精確控制每個選單項目
+    document.querySelectorAll('.menu-grid .menu-item[data-feature]').forEach(item => {
+        const key = item.getAttribute('data-feature');
+        if (key && features[key] === false) {
+            item.style.display = 'none';
         }
     });
 }

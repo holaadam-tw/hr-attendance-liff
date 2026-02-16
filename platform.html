@@ -121,7 +121,7 @@
                         <div style="font-weight:700;font-size:13px;margin-bottom:10px;">🎛️ 功能開關</div>
                         <div style="display:flex;gap:6px;margin-bottom:10px;">
                             <button type="button" onclick="applyFeaturePreset('general')" style="flex:1;padding:8px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;font-size:12px;font-weight:700;cursor:pointer;color:#4F46E5;">🏢 一般公司</button>
-                            <button type="button" onclick="applyFeaturePreset('service')" style="flex:1;padding:8px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;font-size:12px;font-weight:700;cursor:pointer;color:#059669;">🛍️ 服務業</button>
+                            <button type="button" onclick="applyFeaturePreset('catering')" style="flex:1;padding:8px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;font-size:12px;font-weight:700;cursor:pointer;color:#059669;">🍽️ 餐飲業</button>
                             <button type="button" onclick="applyFeaturePreset('all')" style="flex:1;padding:8px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;font-size:12px;font-weight:700;cursor:pointer;color:#D97706;">✅ 全開</button>
                         </div>
                         <div id="pFeatureToggles" style="display:flex;flex-direction:column;gap:8px;"></div>
@@ -172,9 +172,9 @@
         ];
 
         const FEATURE_PRESETS = {
-            general: { leave: true, lunch: true, attendance: true, fieldwork: false, sales_target: false, store_ordering: false },
-            service: { leave: true, lunch: true, attendance: true, fieldwork: true, sales_target: true, store_ordering: true },
-            all:     { leave: true, lunch: true, attendance: true, fieldwork: true, sales_target: true, store_ordering: true }
+            general:  { leave: true, lunch: true, attendance: true, fieldwork: true, sales_target: true, store_ordering: false },
+            catering: { leave: true, lunch: false, attendance: true, fieldwork: false, sales_target: false, store_ordering: true },
+            all:      { leave: true, lunch: true, attendance: true, fieldwork: true, sales_target: true, store_ordering: true }
         };
 
         function applyFeaturePreset(name) {
@@ -184,7 +184,7 @@
                 const cb = document.getElementById('pFt_' + f.key);
                 if (cb) cb.checked = !!preset[f.key];
             });
-            const labels = { general: '一般公司', service: '服務業', all: '全部開啟' };
+            const labels = { general: '一般公司', catering: '餐飲業', all: '全部開啟' };
             showToast('✅ 已套用「' + (labels[name] || name) + '」預設');
         }
 
@@ -325,7 +325,7 @@
             document.getElementById('pStatus').value = editData?.status || 'active';
 
             // 功能開關
-            const features = editData?.features || { leave: true, lunch: true, attendance: true, fieldwork: false, sales_target: false, store_ordering: false };
+            const features = editData?.features || { leave: true, lunch: true, attendance: true, fieldwork: true, sales_target: true, store_ordering: false };
             const togglesEl = document.getElementById('pFeatureToggles');
             togglesEl.innerHTML = FEATURE_LIST.map(f => `
                 <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">

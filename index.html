@@ -111,20 +111,23 @@
 
             <!-- 精簡選單（移除與底部導航重複的項目）-->
             <div class="menu-grid">
-                <div class="menu-item" onclick="window.location.href='records.html'">
+                <div class="menu-item" data-feature="leave" onclick="window.location.href='records.html'">
                     <div class="icon">📝</div><div class="label">我要請假</div>
                 </div>
-                <div class="menu-item" onclick="window.location.href='services.html'">
+                <div class="menu-item" data-feature="lunch" onclick="window.location.href='services.html'">
                     <div class="icon">🍱</div><div class="label">便當訂購</div>
                 </div>
-                <div class="menu-item" onclick="window.location.href='records.html#attendance'">
+                <div class="menu-item" data-feature="attendance" onclick="window.location.href='records.html#attendance'">
                     <div class="icon">📊</div><div class="label">考勤查詢</div>
                 </div>
-                <div class="menu-item" onclick="window.location.href='services.html#fieldwork'">
+                <div class="menu-item" data-feature="fieldwork" onclick="window.location.href='services.html#fieldwork'">
                     <div class="icon">📍</div><div class="label">外勤打卡</div>
                 </div>
                 <div class="menu-item" data-feature="sales_target" onclick="window.location.href='services.html#sales'">
                     <div class="icon">📊</div><div class="label">業務週報</div>
+                </div>
+                <div class="menu-item" data-feature="store_ordering" onclick="window.location.href='order.html'">
+                    <div class="icon">🛍️</div><div class="label">線上點餐</div>
                 </div>
                 <!-- 管理員專用 -->
                 <div class="menu-item admin-only" id="adminEntry" style="display:none;" onclick="window.location.href='admin.html'">
