@@ -442,22 +442,16 @@
         async function loadSalary() {
             document.getElementById('salaryMonthLabel').textContent = `${salaryYear}年 ${salaryMonth+1}月`;
             try {
-                if (typeof sb !== 'undefined' && liffProfile) {
-                    // 先嘗試 RPC
-                    const { data, error } = await sb.rpc('get_employee_payroll', { p_line_user_id: liffProfile.userId, p_year: salaryYear, p_month: salaryMonth+1 });
-                    if (!error && data?.success && data.data) { showSalaryContent(); renderSalary(data.data); return; }
-
-                    // 再嘗試直接查表
-                    if (currentEmployee) {
-                        const { data: p } = await sb.from('payroll').select('*').eq('employee_id', currentEmployee.id).eq('year', salaryYear).eq('month', salaryMonth+1).eq('is_published', true).maybeSingle();
-                        if (p) {
-                            if (p.calculation_details && typeof p.calculation_details === 'string') {
-                                try { p.calculation_details = JSON.parse(p.calculation_details); } catch(e) {}
-                            }
-                            showSalaryContent();
-                            renderSalary(p);
-                            return;
+                if (typeof sb !== 'undefined' && currentEmployee) {
+                    // 只讀取管理員已發布的薪資（is_published = true）
+                    const { data: p } = await sb.from('payroll').select('*').eq('employee_id', currentEmployee.id).eq('year', salaryYear).eq('month', salaryMonth+1).eq('is_published', true).maybeSingle();
+                    if (p) {
+                        if (p.calculation_details && typeof p.calculation_details === 'string') {
+                            try { p.calculation_details = JSON.parse(p.calculation_details); } catch(e) {}
                         }
+                        showSalaryContent();
+                        renderSalary(p);
+                        return;
                     }
                 }
             } catch(e) { console.log('載入薪資失敗:', e.message); }
