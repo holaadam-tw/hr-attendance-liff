@@ -47,10 +47,14 @@ CREATE TABLE IF NOT EXISTS platform_admins (
 
 -- RLS
 ALTER TABLE platform_admins ENABLE ROW LEVEL SECURITY;
-CREATE POLICY IF NOT EXISTS "allow_select_platform_admins" ON platform_admins FOR SELECT USING (true);
-CREATE POLICY IF NOT EXISTS "allow_insert_platform_admins" ON platform_admins FOR INSERT WITH CHECK (true);
-CREATE POLICY IF NOT EXISTS "allow_update_platform_admins" ON platform_admins FOR UPDATE USING (true) WITH CHECK (true);
-CREATE POLICY IF NOT EXISTS "allow_delete_platform_admins" ON platform_admins FOR DELETE USING (true);
+DROP POLICY IF EXISTS "allow_select_platform_admins" ON platform_admins;
+CREATE POLICY "allow_select_platform_admins" ON platform_admins FOR SELECT USING (true);
+DROP POLICY IF EXISTS "allow_insert_platform_admins" ON platform_admins;
+CREATE POLICY "allow_insert_platform_admins" ON platform_admins FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "allow_update_platform_admins" ON platform_admins;
+CREATE POLICY "allow_update_platform_admins" ON platform_admins FOR UPDATE USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "allow_delete_platform_admins" ON platform_admins;
+CREATE POLICY "allow_delete_platform_admins" ON platform_admins FOR DELETE USING (true);
 
 -- 記錄 migration
 INSERT INTO _migrations (filename) VALUES ('006_multi_tenant.sql')

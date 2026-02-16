@@ -21,10 +21,14 @@ CREATE TABLE IF NOT EXISTS sales_targets (
 
 -- RLS
 ALTER TABLE sales_targets ENABLE ROW LEVEL SECURITY;
-CREATE POLICY IF NOT EXISTS "allow_select_sales_targets" ON sales_targets FOR SELECT USING (true);
-CREATE POLICY IF NOT EXISTS "allow_insert_sales_targets" ON sales_targets FOR INSERT WITH CHECK (true);
-CREATE POLICY IF NOT EXISTS "allow_update_sales_targets" ON sales_targets FOR UPDATE USING (true) WITH CHECK (true);
-CREATE POLICY IF NOT EXISTS "allow_delete_sales_targets" ON sales_targets FOR DELETE USING (true);
+DROP POLICY IF EXISTS "allow_select_sales_targets" ON sales_targets;
+CREATE POLICY "allow_select_sales_targets" ON sales_targets FOR SELECT USING (true);
+DROP POLICY IF EXISTS "allow_insert_sales_targets" ON sales_targets;
+CREATE POLICY "allow_insert_sales_targets" ON sales_targets FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "allow_update_sales_targets" ON sales_targets;
+CREATE POLICY "allow_update_sales_targets" ON sales_targets FOR UPDATE USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "allow_delete_sales_targets" ON sales_targets;
+CREATE POLICY "allow_delete_sales_targets" ON sales_targets FOR DELETE USING (true);
 
 -- ========================
 -- 2. 業務活動紀錄
@@ -45,10 +49,14 @@ CREATE TABLE IF NOT EXISTS sales_activities (
 
 -- RLS
 ALTER TABLE sales_activities ENABLE ROW LEVEL SECURITY;
-CREATE POLICY IF NOT EXISTS "allow_select_sales_activities" ON sales_activities FOR SELECT USING (true);
-CREATE POLICY IF NOT EXISTS "allow_insert_sales_activities" ON sales_activities FOR INSERT WITH CHECK (true);
-CREATE POLICY IF NOT EXISTS "allow_update_sales_activities" ON sales_activities FOR UPDATE USING (true) WITH CHECK (true);
-CREATE POLICY IF NOT EXISTS "allow_delete_sales_activities" ON sales_activities FOR DELETE USING (true);
+DROP POLICY IF EXISTS "allow_select_sales_activities" ON sales_activities;
+CREATE POLICY "allow_select_sales_activities" ON sales_activities FOR SELECT USING (true);
+DROP POLICY IF EXISTS "allow_insert_sales_activities" ON sales_activities;
+CREATE POLICY "allow_insert_sales_activities" ON sales_activities FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "allow_update_sales_activities" ON sales_activities;
+CREATE POLICY "allow_update_sales_activities" ON sales_activities FOR UPDATE USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "allow_delete_sales_activities" ON sales_activities;
+CREATE POLICY "allow_delete_sales_activities" ON sales_activities FOR DELETE USING (true);
 
 -- 記錄 migration
 INSERT INTO _migrations (filename) VALUES ('007_sales_targets.sql')

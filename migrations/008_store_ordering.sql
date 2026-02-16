@@ -29,10 +29,14 @@ CREATE TABLE IF NOT EXISTS store_profiles (
 );
 
 ALTER TABLE store_profiles ENABLE ROW LEVEL SECURITY;
-CREATE POLICY IF NOT EXISTS "allow_select_store_profiles" ON store_profiles FOR SELECT USING (true);
-CREATE POLICY IF NOT EXISTS "allow_insert_store_profiles" ON store_profiles FOR INSERT WITH CHECK (true);
-CREATE POLICY IF NOT EXISTS "allow_update_store_profiles" ON store_profiles FOR UPDATE USING (true) WITH CHECK (true);
-CREATE POLICY IF NOT EXISTS "allow_delete_store_profiles" ON store_profiles FOR DELETE USING (true);
+DROP POLICY IF EXISTS "allow_select_store_profiles" ON store_profiles;
+CREATE POLICY "allow_select_store_profiles" ON store_profiles FOR SELECT USING (true);
+DROP POLICY IF EXISTS "allow_insert_store_profiles" ON store_profiles;
+CREATE POLICY "allow_insert_store_profiles" ON store_profiles FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "allow_update_store_profiles" ON store_profiles;
+CREATE POLICY "allow_update_store_profiles" ON store_profiles FOR UPDATE USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "allow_delete_store_profiles" ON store_profiles;
+CREATE POLICY "allow_delete_store_profiles" ON store_profiles FOR DELETE USING (true);
 
 -- ========================
 -- 2. 菜單分類
@@ -47,10 +51,14 @@ CREATE TABLE IF NOT EXISTS menu_categories (
 );
 
 ALTER TABLE menu_categories ENABLE ROW LEVEL SECURITY;
-CREATE POLICY IF NOT EXISTS "allow_select_menu_categories" ON menu_categories FOR SELECT USING (true);
-CREATE POLICY IF NOT EXISTS "allow_insert_menu_categories" ON menu_categories FOR INSERT WITH CHECK (true);
-CREATE POLICY IF NOT EXISTS "allow_update_menu_categories" ON menu_categories FOR UPDATE USING (true) WITH CHECK (true);
-CREATE POLICY IF NOT EXISTS "allow_delete_menu_categories" ON menu_categories FOR DELETE USING (true);
+DROP POLICY IF EXISTS "allow_select_menu_categories" ON menu_categories;
+CREATE POLICY "allow_select_menu_categories" ON menu_categories FOR SELECT USING (true);
+DROP POLICY IF EXISTS "allow_insert_menu_categories" ON menu_categories;
+CREATE POLICY "allow_insert_menu_categories" ON menu_categories FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "allow_update_menu_categories" ON menu_categories;
+CREATE POLICY "allow_update_menu_categories" ON menu_categories FOR UPDATE USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "allow_delete_menu_categories" ON menu_categories;
+CREATE POLICY "allow_delete_menu_categories" ON menu_categories FOR DELETE USING (true);
 
 -- ========================
 -- 3. 菜單品項
@@ -72,10 +80,14 @@ CREATE TABLE IF NOT EXISTS menu_items (
 );
 
 ALTER TABLE menu_items ENABLE ROW LEVEL SECURITY;
-CREATE POLICY IF NOT EXISTS "allow_select_menu_items" ON menu_items FOR SELECT USING (true);
-CREATE POLICY IF NOT EXISTS "allow_insert_menu_items" ON menu_items FOR INSERT WITH CHECK (true);
-CREATE POLICY IF NOT EXISTS "allow_update_menu_items" ON menu_items FOR UPDATE USING (true) WITH CHECK (true);
-CREATE POLICY IF NOT EXISTS "allow_delete_menu_items" ON menu_items FOR DELETE USING (true);
+DROP POLICY IF EXISTS "allow_select_menu_items" ON menu_items;
+CREATE POLICY "allow_select_menu_items" ON menu_items FOR SELECT USING (true);
+DROP POLICY IF EXISTS "allow_insert_menu_items" ON menu_items;
+CREATE POLICY "allow_insert_menu_items" ON menu_items FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "allow_update_menu_items" ON menu_items;
+CREATE POLICY "allow_update_menu_items" ON menu_items FOR UPDATE USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "allow_delete_menu_items" ON menu_items;
+CREATE POLICY "allow_delete_menu_items" ON menu_items FOR DELETE USING (true);
 
 -- ========================
 -- 4. 訂單
@@ -100,10 +112,14 @@ CREATE TABLE IF NOT EXISTS orders (
 );
 
 ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
-CREATE POLICY IF NOT EXISTS "allow_select_orders" ON orders FOR SELECT USING (true);
-CREATE POLICY IF NOT EXISTS "allow_insert_orders" ON orders FOR INSERT WITH CHECK (true);
-CREATE POLICY IF NOT EXISTS "allow_update_orders" ON orders FOR UPDATE USING (true) WITH CHECK (true);
-CREATE POLICY IF NOT EXISTS "allow_delete_orders" ON orders FOR DELETE USING (true);
+DROP POLICY IF EXISTS "allow_select_orders" ON orders;
+CREATE POLICY "allow_select_orders" ON orders FOR SELECT USING (true);
+DROP POLICY IF EXISTS "allow_insert_orders" ON orders;
+CREATE POLICY "allow_insert_orders" ON orders FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "allow_update_orders" ON orders;
+CREATE POLICY "allow_update_orders" ON orders FOR UPDATE USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "allow_delete_orders" ON orders;
+CREATE POLICY "allow_delete_orders" ON orders FOR DELETE USING (true);
 
 -- ========================
 -- 5. 預約
@@ -128,10 +144,14 @@ CREATE TABLE IF NOT EXISTS bookings (
 );
 
 ALTER TABLE bookings ENABLE ROW LEVEL SECURITY;
-CREATE POLICY IF NOT EXISTS "allow_select_bookings" ON bookings FOR SELECT USING (true);
-CREATE POLICY IF NOT EXISTS "allow_insert_bookings" ON bookings FOR INSERT WITH CHECK (true);
-CREATE POLICY IF NOT EXISTS "allow_update_bookings" ON bookings FOR UPDATE USING (true) WITH CHECK (true);
-CREATE POLICY IF NOT EXISTS "allow_delete_bookings" ON bookings FOR DELETE USING (true);
+DROP POLICY IF EXISTS "allow_select_bookings" ON bookings;
+CREATE POLICY "allow_select_bookings" ON bookings FOR SELECT USING (true);
+DROP POLICY IF EXISTS "allow_insert_bookings" ON bookings;
+CREATE POLICY "allow_insert_bookings" ON bookings FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "allow_update_bookings" ON bookings;
+CREATE POLICY "allow_update_bookings" ON bookings FOR UPDATE USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "allow_delete_bookings" ON bookings;
+CREATE POLICY "allow_delete_bookings" ON bookings FOR DELETE USING (true);
 
 -- 記錄 migration
 INSERT INTO _migrations (filename) VALUES ('008_store_ordering.sql')
