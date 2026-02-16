@@ -348,16 +348,12 @@
                     <input type="tel" id="qaClientPhone" placeholder="例：02-12345678" style="width:100%;padding:12px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;box-sizing:border-box;">
                 </div>
                 <div class="form-group">
-                    <label>地址</label>
-                    <input type="text" id="qaClientAddress" placeholder="自動取得或手動輸入" style="width:100%;padding:12px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;box-sizing:border-box;">
-                </div>
-                <div class="form-group">
-                    <label>GPS 座標</label>
-                    <div style="display:flex;gap:8px;align-items:center;">
-                        <input type="text" id="qaClientLat" placeholder="緯度" readonly style="flex:1;padding:10px;border:1px solid #E2E8F0;border-radius:10px;font-size:13px;background:#F8FAFC;box-sizing:border-box;">
-                        <input type="text" id="qaClientLng" placeholder="經度" readonly style="flex:1;padding:10px;border:1px solid #E2E8F0;border-radius:10px;font-size:13px;background:#F8FAFC;box-sizing:border-box;">
-                    </div>
-                    <button type="button" onclick="qaGetGPS()" style="width:100%;margin-top:8px;padding:10px;border:1px solid #4F46E5;border-radius:10px;background:#EEF2FF;color:#4F46E5;font-weight:600;font-size:13px;cursor:pointer;">📍 取得目前位置</button>
+                    <label>地址 <span style="font-size:11px;color:#94A3B8;font-weight:400;">或使用定位，擇一即可</span></label>
+                    <input type="text" id="qaClientAddress" placeholder="輸入地址" style="width:100%;padding:12px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;box-sizing:border-box;">
+                    <input type="hidden" id="qaClientLat">
+                    <input type="hidden" id="qaClientLng">
+                    <button type="button" onclick="qaGetGPS()" style="width:100%;margin-top:8px;padding:10px;border:1px solid #4F46E5;border-radius:10px;background:#EEF2FF;color:#4F46E5;font-weight:600;font-size:13px;cursor:pointer;">📍 用目前位置取代地址</button>
+                    <div id="qaGpsStatus" style="font-size:12px;color:#059669;margin-top:4px;display:none;"></div>
                 </div>
                 <div style="display:flex;gap:8px;margin-top:16px;">
                     <button onclick="closeQuickAddClientModal()" style="flex:1;padding:14px;border:1px solid #E2E8F0;border-radius:10px;background:#fff;font-weight:600;font-size:14px;cursor:pointer;color:#64748B;">取消</button>
@@ -804,11 +800,21 @@
         }
 
         async function qaGetGPS() {
+            const statusEl = document.getElementById('qaGpsStatus');
             try {
                 const loc = await getGPS();
                 document.getElementById('qaClientLat').value = loc.latitude.toFixed(6);
                 document.getElementById('qaClientLng').value = loc.longitude.toFixed(6);
-                showToast('📍 已取得位置');
+                if (statusEl) { statusEl.textContent = '✅ 已取得定位'; statusEl.style.display = 'block'; }
+                // 反向地理編碼填入地址
+                try {
+                    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${loc.latitude}&lon=${loc.longitude}&format=json&accept-language=zh-TW`);
+                    const geo = await res.json();
+                    if (geo.display_name) {
+                        document.getElementById('qaClientAddress').value = geo.display_name.split(',').slice(0, 3).join('');
+                        if (statusEl) statusEl.textContent = '✅ 已取得定位及地址';
+                    }
+                } catch(e) {}
             } catch(e) {
                 console.warn('GPS 取得失敗', e);
                 showToast('⚠️ 無法取得位置，請手動輸入地址');
@@ -828,7 +834,6 @@
                 longitude: parseFloat(document.getElementById('qaClientLng').value) || null,
                 is_active: true
             };
-            if (currentCompanyId) record.company_id = currentCompanyId;
 
             try {
                 const { data, error } = await sb.from('clients').insert(record).select().single();
@@ -1372,7 +1377,6 @@
             if (!name) return showToast('請輸入產品名稱');
             try {
                 const record = { name, code: name.substring(0, 10).toUpperCase(), is_active: true };
-                if (currentCompanyId) record.company_id = currentCompanyId;
                 const { data, error } = await sb.from('service_items').insert(record).select().single();
                 if (error) throw error;
                 input.value = '';
