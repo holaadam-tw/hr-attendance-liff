@@ -5023,16 +5023,18 @@
             if (currentCompanyId) record.company_id = currentCompanyId;
             try {
                 const editId = document.getElementById('storeEditId').value;
+                let res;
                 if (editId) {
                     record.updated_at = new Date().toISOString();
-                    await sb.from('store_profiles').update(record).eq('id', editId);
+                    res = await sb.from('store_profiles').update(record).eq('id', editId);
                 } else {
-                    await sb.from('store_profiles').insert(record);
+                    res = await sb.from('store_profiles').insert(record);
                 }
+                if (res.error) throw res.error;
                 showToast('✅ 商店已儲存');
                 closeStoreModal();
                 await loadRestaurantList();
-            } catch(e) { showToast('❌ 儲存失敗：' + friendlyError(e)); }
+            } catch(e) { showToast('❌ 儲存失敗：' + (e.message || e)); }
         }
 
         function showStoreQR(storeId) {

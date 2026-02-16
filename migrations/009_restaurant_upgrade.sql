@@ -5,6 +5,11 @@
 -- ============================================================
 
 -- ========================
+-- 0. store_profiles.client_id 改為可選（餐飲業不需要綁客戶）
+-- ========================
+ALTER TABLE store_profiles ALTER COLUMN client_id DROP NOT NULL;
+
+-- ========================
 -- 1. orders 表新增欄位
 -- ========================
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS pickup_number INTEGER;
