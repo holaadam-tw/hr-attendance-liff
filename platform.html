@@ -177,12 +177,34 @@
             all:      { leave: true, lunch: true, attendance: true, fieldwork: true, sales_target: true, store_ordering: true }
         };
 
+        function togglePFeatureCard(card) {
+            const on = card.dataset.checked === 'true';
+            const box = card.querySelector('div');
+            if (on) {
+                card.dataset.checked = 'false';
+                card.style.borderColor = '#E5E7EB'; card.style.background = '#F8FAFC';
+                box.style.borderColor = '#CBD5E1'; box.style.background = '#fff'; box.textContent = '';
+            } else {
+                card.dataset.checked = 'true';
+                card.style.borderColor = '#4F46E5'; card.style.background = '#F5F3FF';
+                box.style.borderColor = '#4F46E5'; box.style.background = '#4F46E5'; box.textContent = '✓';
+            }
+        }
+
         function applyFeaturePreset(name) {
             const preset = FEATURE_PRESETS[name];
             if (!preset) return;
             FEATURE_LIST.forEach(f => {
-                const cb = document.getElementById('pFt_' + f.key);
-                if (cb) cb.checked = !!preset[f.key];
+                const card = document.getElementById('pFt_' + f.key);
+                if (!card) return;
+                const on = !!preset[f.key];
+                card.dataset.checked = String(on);
+                const box = card.querySelector('div');
+                card.style.borderColor = on ? '#4F46E5' : '#E5E7EB';
+                card.style.background = on ? '#F5F3FF' : '#F8FAFC';
+                box.style.borderColor = on ? '#4F46E5' : '#CBD5E1';
+                box.style.background = on ? '#4F46E5' : '#fff';
+                box.textContent = on ? '✓' : '';
             });
             const labels = { general: '一般公司', catering: '餐飲業', all: '全部開啟' };
             showToast('✅ 已套用「' + (labels[name] || name) + '」預設');
@@ -327,12 +349,14 @@
             // 功能開關
             const features = editData?.features || { leave: true, lunch: true, attendance: true, fieldwork: true, sales_target: true, store_ordering: false };
             const togglesEl = document.getElementById('pFeatureToggles');
-            togglesEl.innerHTML = FEATURE_LIST.map(f => `
-                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-                    <input type="checkbox" id="pFt_${f.key}" ${features[f.key] ? 'checked' : ''} style="width:18px;height:18px;">
-                    <span style="font-size:13px;">${f.icon} ${f.label}</span>
-                </label>
-            `).join('');
+            togglesEl.innerHTML = FEATURE_LIST.map(f => {
+                const on = !!features[f.key];
+                return `<div id="pFt_${f.key}" data-key="${f.key}" onclick="togglePFeatureCard(this)" data-checked="${on}"
+                    style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:${on ? '#F5F3FF' : '#F8FAFC'};border:2px solid ${on ? '#4F46E5' : '#E5E7EB'};border-radius:12px;cursor:pointer;transition:all 0.2s;">
+                    <div style="width:24px;height:24px;border:2px solid ${on ? '#4F46E5' : '#CBD5E1'};border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:${on ? '#4F46E5' : '#fff'};color:#fff;font-size:14px;transition:all 0.2s;">${on ? '✓' : ''}</div>
+                    <span style="font-size:13px;font-weight:600;">${f.icon} ${f.label}</span>
+                </div>`;
+            }).join('');
 
             document.getElementById('pCompanyModal').style.display = 'block';
         }
@@ -352,7 +376,7 @@
 
             const features = {};
             FEATURE_LIST.forEach(f => {
-                features[f.key] = document.getElementById('pFt_' + f.key)?.checked || false;
+                features[f.key] = document.getElementById('pFt_' + f.key)?.dataset.checked === 'true';
             });
 
             const row = {

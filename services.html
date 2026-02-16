@@ -1346,19 +1346,32 @@
             const el = document.getElementById('saProductList');
             if (!el) return;
             if (!fwServiceItems || fwServiceItems.length === 0) {
-                el.innerHTML = '<span style="color:#94A3B8;font-size:13px;">無產品項目</span>';
+                el.innerHTML = '<span style="color:#94A3B8;font-size:13px;">無產品項目，請點 +新增</span>';
                 return;
             }
             // 讀取上次勾選的產品（localStorage 持久化）
             let lastProducts = [];
             try { lastProducts = JSON.parse(localStorage.getItem('sa_last_products') || '[]'); } catch(e) {}
             el.innerHTML = fwServiceItems.map(s => {
-                const checked = lastProducts.includes(s.id) ? 'checked' : '';
-                return `<label style="display:flex;align-items:center;gap:6px;padding:6px 10px;background:#fff;border:1px solid #E2E8F0;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;">
-                    <input type="checkbox" class="saProductCb" value="${s.id}" ${checked} style="width:16px;height:16px;accent-color:#4F46E5;">
+                const on = lastProducts.includes(s.id);
+                return `<div class="saProductCard" data-id="${s.id}" onclick="toggleProductCard(this)"
+                    style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:${on ? '#F5F3FF' : '#fff'};border:2px solid ${on ? '#4F46E5' : '#E5E7EB'};border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;transition:all 0.2s;">
+                    <div style="width:22px;height:22px;border:2px solid ${on ? '#4F46E5' : '#CBD5E1'};border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:${on ? '#4F46E5' : '#fff'};color:#fff;font-size:14px;transition:all 0.2s;">${on ? '✓' : ''}</div>
                     ${escapeHTML(s.name)}
-                </label>`;
+                </div>`;
             }).join('');
+        }
+
+        function toggleProductCard(card) {
+            const box = card.querySelector('div');
+            const isOn = card.style.borderColor === 'rgb(79, 70, 229)';
+            if (isOn) {
+                card.style.borderColor = '#E5E7EB'; card.style.background = '#fff';
+                box.style.borderColor = '#CBD5E1'; box.style.background = '#fff'; box.textContent = '';
+            } else {
+                card.style.borderColor = '#4F46E5'; card.style.background = '#F5F3FF';
+                box.style.borderColor = '#4F46E5'; box.style.background = '#4F46E5'; box.textContent = '✓';
+            }
         }
 
         function toggleProductAddRow() {
@@ -1405,7 +1418,9 @@
 
             // 收集勾選的產品
             const checkedProducts = [];
-            document.querySelectorAll('.saProductCb:checked').forEach(cb => checkedProducts.push(cb.value));
+            document.querySelectorAll('.saProductCard').forEach(card => {
+                if (card.style.borderColor === 'rgb(79, 70, 229)') checkedProducts.push(card.dataset.id);
+            });
             // 儲存本次勾選，供下次預設
             localStorage.setItem('sa_last_products', JSON.stringify(checkedProducts));
 
