@@ -1287,8 +1287,7 @@
             { key: 'leave',          label: '我要請假',      desc: '請假申請與記錄查詢',   icon: '📝' },
             { key: 'lunch',          label: '便當訂購',      desc: '每日午餐訂購管理',     icon: '🍱' },
             { key: 'attendance',     label: '考勤查詢',      desc: '出勤月曆與記錄查詢',   icon: '📊' },
-            { key: 'fieldwork',      label: '外勤打卡',      desc: '外勤 GPS 打卡功能',   icon: '📍' },
-            { key: 'sales_target',   label: '業務目標/週報',  desc: '業務目標追蹤與週報',   icon: '🎯' },
+            { key: 'fieldwork,sales_target', label: '外勤/業務', desc: '外勤打卡、業務目標與週報', icon: '📍' },
             { key: 'store_ordering', label: '線上點餐/預約',  desc: '線上預約與點餐服務',   icon: '🛍️' }
         ];
         let companyAllowedFeatures = null;
@@ -1351,7 +1350,11 @@
             const allowed = companyAllowedFeatures || {};
             const defaultAllowed = { leave: true, lunch: true, attendance: true, fieldwork: true, sales_target: true, store_ordering: false };
             const visibleFeatures = ADMIN_FEATURE_LIST.filter(f => {
-                return companyAllowedFeatures ? (allowed[f.key] === true) : (defaultAllowed[f.key] !== false);
+                const keys = f.key.split(',');
+                if (companyAllowedFeatures) {
+                    return keys.some(k => allowed[k.trim()] === true);
+                }
+                return keys.some(k => defaultAllowed[k.trim()] !== false);
             });
 
             const container = document.getElementById('featureToggles');
@@ -1361,9 +1364,11 @@
             }
 
             container.innerHTML = visibleFeatures.map(f => {
-                const on = featureState[f.key] !== false;
+                const keys = f.key.split(',');
+                const on = keys.some(k => featureState[k.trim()] !== false);
+                const cardId = f.key.replace(',', '_');
                 return `
-                <div class="feature-toggle-card" id="ftCard_${f.key}" onclick="toggleFeature('${f.key}')"
+                <div class="feature-toggle-card" id="ftCard_${cardId}" onclick="toggleFeature('${f.key}')"
                      style="display:flex;align-items:center;gap:14px;padding:16px;background:${on ? '#F5F3FF' : '#fff'};border:2px solid ${on ? '#4F46E5' : '#E5E7EB'};border-radius:14px;cursor:pointer;transition:all 0.2s;">
                     <span style="font-size:28px;">${f.icon}</span>
                     <div style="flex:1;">
@@ -1378,12 +1383,14 @@
         }
 
         function updateToggleCard(key) {
-            const card = document.getElementById('ftCard_' + key);
+            const cardId = key.replace(',', '_');
+            const card = document.getElementById('ftCard_' + cardId);
             if (!card) return;
-            const on = featureState[key] !== false;
+            const keys = key.split(',');
+            const on = keys.some(k => featureState[k.trim()] !== false);
             const indicator = card.querySelector('.ft-indicator');
             const dot = indicator?.querySelector('div');
-            
+
             if (on) {
                 card.style.borderColor = '#4F46E5';
                 card.style.background = '#F5F3FF';
@@ -1398,7 +1405,11 @@
         }
 
         async function toggleFeature(key) {
-            featureState[key] = !featureState[key];
+            const keys = key.split(',');
+            // 判斷目前是開還是關（任一子 key 開啟 = 開）
+            const currentlyOn = keys.some(k => featureState[k.trim()] !== false);
+            // 全部子 key 一起切換
+            keys.forEach(k => { featureState[k.trim()] = !currentlyOn; });
             updateToggleCard(key);
             
             try {
