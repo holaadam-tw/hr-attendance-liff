@@ -1217,9 +1217,11 @@ function applyFeatureVisibility() {
     const features = getFeatureVisibility();
 
     // 用 data-feature 屬性精確控制每個選單項目
+    // 支援逗號分隔多 key（OR 邏輯：任一為 true 就顯示）
     document.querySelectorAll('.menu-grid .menu-item[data-feature]').forEach(item => {
-        const key = item.getAttribute('data-feature');
-        if (key && features[key] === false) {
+        const keys = item.getAttribute('data-feature').split(',');
+        const visible = keys.some(k => features[k.trim()] !== false);
+        if (!visible) {
             item.style.display = 'none';
         }
     });
