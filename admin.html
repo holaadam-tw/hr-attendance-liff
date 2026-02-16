@@ -85,6 +85,12 @@
                 <div class="menu-item" onclick="showPage('lunchMgrPage')">
                     <div class="icon">🍱</div><div class="label">便當管理</div>
                 </div>
+                <div class="menu-item" onclick="showPage('clientPage')">
+                    <div class="icon">🏢</div><div class="label">客戶管理</div>
+                </div>
+                <div class="menu-item" onclick="showPage('fieldWorkApprovalPage')">
+                    <div class="icon">📍</div><div class="label">外勤審核</div>
+                </div>
                 <div class="menu-item" onclick="showPage('featurePage')">
                     <div class="icon">🎛️</div><div class="label">功能管理</div>
                 </div>
@@ -615,6 +621,9 @@
                     <div class="menu-item" onclick="exportReport('payroll')">
                         <div class="icon">💰</div><div class="label">薪資報表</div>
                     </div>
+                    <div class="menu-item" onclick="showPage('fieldWorkApprovalPage')">
+                        <div class="icon">📍</div><div class="label">外勤報表</div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -843,6 +852,118 @@
                 </div>
             </div>
         </div>
+        <!-- 客戶管理頁面 -->
+        <div id="clientPage" class="page">
+            <button class="btn btn-secondary" onclick="showPage('adminHomePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
+            <div class="checkin-page">
+                <h2>🏢 客戶管理</h2>
+
+                <div style="display:flex;gap:8px;margin-bottom:12px;">
+                    <input type="text" id="clientSearch" placeholder="搜尋公司名稱..." oninput="filterClients()" style="flex:1;padding:10px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;">
+                    <button class="btn btn-primary" onclick="showClientModal()" style="white-space:nowrap;font-size:13px;padding:10px 16px;">+ 新增</button>
+                </div>
+
+                <div id="clientList">
+                    <p style="text-align:center;color:#94A3B8;font-size:13px;padding:16px;">載入中...</p>
+                </div>
+
+                <!-- 服務項目管理 -->
+                <div class="lunch-summary" style="margin-top:20px;">
+                    <h3 style="margin-bottom:10px;">🔧 服務項目管理</h3>
+                    <div id="serviceItemList"></div>
+                    <div style="display:flex;gap:8px;margin-top:10px;">
+                        <input type="text" id="newServiceItemName" placeholder="新增服務項目名稱" style="flex:1;padding:10px;border:1px solid #E2E8F0;border-radius:10px;font-size:13px;">
+                        <button class="btn btn-success" onclick="addServiceItem()" style="font-size:12px;padding:8px 14px;white-space:nowrap;">新增</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 客戶新增/編輯 Modal -->
+            <div id="clientModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:999;overflow-y:auto;">
+                <div style="background:#fff;margin:40px auto;max-width:500px;border-radius:16px;padding:24px;">
+                    <h3 id="clientModalTitle" style="margin-bottom:16px;">新增客戶</h3>
+                    <input type="hidden" id="clientEditId">
+                    <div class="form-group"><label>公司名稱 *</label><input type="text" id="clientCompanyName" placeholder="公司名稱"></div>
+                    <div class="form-group"><label>聯絡人</label><input type="text" id="clientContactName" placeholder="聯絡人姓名"></div>
+                    <div class="form-group"><label>電話</label><input type="text" id="clientPhone" placeholder="電話"></div>
+                    <div class="form-group"><label>地址</label><input type="text" id="clientAddress" placeholder="地址"></div>
+                    <div class="form-group">
+                        <label>GPS 座標</label>
+                        <div style="display:flex;gap:8px;">
+                            <input type="text" id="clientLat" placeholder="緯度" style="flex:1;">
+                            <input type="text" id="clientLng" placeholder="經度" style="flex:1;">
+                        </div>
+                        <button class="btn btn-secondary" onclick="getClientGPS()" style="margin-top:6px;font-size:12px;padding:8px;">📍 抓取目前位置</button>
+                    </div>
+                    <div class="form-group">
+                        <label>分類</label>
+                        <select id="clientCategory" style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;">
+                            <option value="general">一般</option>
+                            <option value="vip">VIP ⭐</option>
+                        </select>
+                    </div>
+                    <div class="form-group"><label>產業別</label><input type="text" id="clientIndustry" placeholder="例：科技業、製造業"></div>
+                    <div class="form-group"><label>備註</label><textarea id="clientNotes" rows="2" placeholder="備註" style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;resize:vertical;box-sizing:border-box;"></textarea></div>
+                    <div style="display:flex;gap:8px;">
+                        <button class="btn btn-success" onclick="saveClient()" style="flex:1;">💾 儲存</button>
+                        <button class="btn btn-secondary" onclick="closeClientModal()" style="flex:1;">取消</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 外勤審核頁面 -->
+        <div id="fieldWorkApprovalPage" class="page">
+            <button class="btn btn-secondary" onclick="showPage('adminHomePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
+            <div class="checkin-page">
+                <h2>📍 外勤審核</h2>
+
+                <!-- 篩選 -->
+                <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+                    <input type="date" id="fwaDateFrom" style="flex:1;min-width:120px;padding:8px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;">
+                    <input type="date" id="fwaDateTo" style="flex:1;min-width:120px;padding:8px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;">
+                    <select id="fwaStatusFilter" style="padding:8px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;">
+                        <option value="submitted">待審核</option>
+                        <option value="approved">已核准</option>
+                        <option value="rejected">已退回</option>
+                        <option value="">全部</option>
+                    </select>
+                    <button class="btn btn-primary" onclick="loadFieldWorkApprovals()" style="font-size:12px;padding:8px 14px;">查詢</button>
+                </div>
+
+                <!-- 統計 -->
+                <div style="display:flex;gap:8px;margin-bottom:12px;">
+                    <div style="flex:1;text-align:center;padding:8px;background:#DBEAFE;border-radius:8px;">
+                        <div style="font-size:18px;font-weight:900;color:#1E40AF;" id="fwaTotal">0</div>
+                        <div style="font-size:10px;color:#1E40AF;">總筆數</div>
+                    </div>
+                    <div style="flex:1;text-align:center;padding:8px;background:#FEF3C7;border-radius:8px;">
+                        <div style="font-size:18px;font-weight:900;color:#92400E;" id="fwaPending">0</div>
+                        <div style="font-size:10px;color:#92400E;">待審核</div>
+                    </div>
+                    <div style="flex:1;text-align:center;padding:8px;background:#D1FAE5;border-radius:8px;">
+                        <div style="font-size:18px;font-weight:900;color:#059669;" id="fwaTotalHours">0</div>
+                        <div style="font-size:10px;color:#059669;">總工時(h)</div>
+                    </div>
+                </div>
+
+                <div id="fwaList">
+                    <p style="text-align:center;color:#94A3B8;font-size:13px;padding:16px;">請選擇日期查詢</p>
+                </div>
+
+                <button class="btn btn-secondary" onclick="exportFieldWorkCSV()" style="width:100%;margin-top:12px;font-size:13px;padding:12px;">📥 匯出外勤 CSV</button>
+            </div>
+
+            <!-- 明細 Modal -->
+            <div id="fwaDetailModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:999;overflow-y:auto;">
+                <div style="background:#fff;margin:30px auto;max-width:500px;border-radius:16px;padding:24px;">
+                    <div id="fwaDetailContent"></div>
+                    <div id="fwaDetailActions" style="display:flex;gap:8px;margin-top:16px;"></div>
+                    <button class="btn btn-secondary" onclick="closeFwaDetailModal()" style="width:100%;margin-top:8px;font-size:13px;">關閉</button>
+                </div>
+            </div>
+        </div>
+
     </div>
     <nav class="bottom-nav" id="bottomNav" style="display:none;">
         <a class="nav-item" onclick="window.location.href='index.html'">
@@ -908,6 +1029,8 @@
             if (id === 'staffMgrPage') { loadShiftMgr(); loadMaxLeaveSetting(); loadStaffOverview(); loadSchedulingMode(); }
             if (id === 'lunchMgrPage') { loadLunchManagers(); loadAdminLunchStats(); }
             if (id === 'payrollPage') { initPayrollPage(); }
+            if (id === 'clientPage') { loadClientList(); loadServiceItemList(); }
+            if (id === 'fieldWorkApprovalPage') { initFieldWorkApproval(); }
         }
 
         // ===== 功能管理 =====
@@ -3462,6 +3585,381 @@
                 writeAuditLog('export',type,null,fn,{rows:rows.length-1});
                 showToast(`✅ ${fn}（${rows.length-1} 筆）`);
             } catch(e) { showToast('❌ 匯出失敗：'+friendlyError(e)); }
+        }
+
+        // ===== 客戶管理 =====
+        let adminClients = [];
+
+        async function loadClientList() {
+            try {
+                const { data } = await sb.from('clients').select('*').order('company_name');
+                adminClients = data || [];
+                renderClientList(adminClients);
+            } catch(e) { console.error('載入客戶失敗', e); }
+        }
+
+        function filterClients() {
+            const q = (document.getElementById('clientSearch')?.value || '').toLowerCase();
+            const filtered = q ? adminClients.filter(c => c.company_name.toLowerCase().includes(q)) : adminClients;
+            renderClientList(filtered);
+        }
+
+        function renderClientList(list) {
+            const el = document.getElementById('clientList');
+            if (!el) return;
+            if (list.length === 0) {
+                el.innerHTML = '<p style="text-align:center;color:#94A3B8;font-size:13px;padding:16px;">無客戶資料</p>';
+                return;
+            }
+            el.innerHTML = list.map(c => {
+                const catBadge = c.category === 'vip'
+                    ? '<span style="background:#FEF3C7;color:#92400E;padding:2px 8px;border-radius:6px;font-size:10px;font-weight:700;">VIP ⭐</span>'
+                    : '<span style="background:#F1F5F9;color:#64748B;padding:2px 8px;border-radius:6px;font-size:10px;font-weight:700;">一般</span>';
+                return `<div style="background:#fff;border:1px solid #E2E8F0;border-radius:12px;padding:14px;margin-bottom:8px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                        <span style="font-weight:700;font-size:14px;">${escapeHTML(c.company_name)}</span>
+                        ${catBadge}
+                    </div>
+                    <div style="font-size:12px;color:#64748B;">
+                        ${c.contact_name ? '👤 ' + escapeHTML(c.contact_name) + ' ' : ''}
+                        ${c.phone ? '📞 ' + escapeHTML(c.phone) : ''}
+                        ${c.industry ? ' · ' + escapeHTML(c.industry) : ''}
+                    </div>
+                    ${c.address ? '<div style="font-size:11px;color:#94A3B8;margin-top:4px;">📍 ' + escapeHTML(c.address) + '</div>' : ''}
+                    <div style="display:flex;gap:6px;margin-top:8px;">
+                        <button class="btn btn-secondary" onclick="editClient('${c.id}')" style="font-size:11px;padding:6px 12px;">編輯</button>
+                        <button class="btn btn-secondary" onclick="toggleClientActive('${c.id}',${c.is_active})" style="font-size:11px;padding:6px 12px;color:${c.is_active ? '#EF4444' : '#059669'};">${c.is_active ? '停用' : '啟用'}</button>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        function showClientModal(id) {
+            document.getElementById('clientModal').style.display = 'block';
+            document.getElementById('clientEditId').value = id || '';
+            document.getElementById('clientModalTitle').textContent = id ? '編輯客戶' : '新增客戶';
+            if (!id) {
+                ['clientCompanyName','clientContactName','clientPhone','clientAddress','clientLat','clientLng','clientIndustry','clientNotes'].forEach(f => {
+                    const el = document.getElementById(f); if (el) el.value = '';
+                });
+                document.getElementById('clientCategory').value = 'general';
+            }
+        }
+
+        function closeClientModal() {
+            document.getElementById('clientModal').style.display = 'none';
+        }
+
+        function editClient(id) {
+            const c = adminClients.find(x => x.id === id);
+            if (!c) return;
+            showClientModal(id);
+            document.getElementById('clientCompanyName').value = c.company_name || '';
+            document.getElementById('clientContactName').value = c.contact_name || '';
+            document.getElementById('clientPhone').value = c.phone || '';
+            document.getElementById('clientAddress').value = c.address || '';
+            document.getElementById('clientLat').value = c.latitude || '';
+            document.getElementById('clientLng').value = c.longitude || '';
+            document.getElementById('clientCategory').value = c.category || 'general';
+            document.getElementById('clientIndustry').value = c.industry || '';
+            document.getElementById('clientNotes').value = c.notes || '';
+        }
+
+        async function getClientGPS() {
+            try {
+                showToast('📍 定位中...');
+                const loc = await getGPS();
+                document.getElementById('clientLat').value = loc.latitude.toFixed(6);
+                document.getElementById('clientLng').value = loc.longitude.toFixed(6);
+                showToast('✅ 座標已取得');
+            } catch(e) { showToast('❌ 定位失敗：' + friendlyError(e)); }
+        }
+
+        async function saveClient() {
+            const name = document.getElementById('clientCompanyName').value.trim();
+            if (!name) return showToast('請輸入公司名稱');
+            const id = document.getElementById('clientEditId').value;
+            const record = {
+                company_name: name,
+                contact_name: document.getElementById('clientContactName').value.trim(),
+                phone: document.getElementById('clientPhone').value.trim(),
+                address: document.getElementById('clientAddress').value.trim(),
+                latitude: parseFloat(document.getElementById('clientLat').value) || null,
+                longitude: parseFloat(document.getElementById('clientLng').value) || null,
+                category: document.getElementById('clientCategory').value,
+                industry: document.getElementById('clientIndustry').value.trim(),
+                notes: document.getElementById('clientNotes').value.trim(),
+                updated_at: new Date().toISOString()
+            };
+            try {
+                if (id) {
+                    const { error } = await sb.from('clients').update(record).eq('id', id);
+                    if (error) throw error;
+                    writeAuditLog('update_client','clients',id,name);
+                    showToast('✅ 客戶已更新');
+                } else {
+                    const { error } = await sb.from('clients').insert(record);
+                    if (error) throw error;
+                    writeAuditLog('create_client','clients',null,name);
+                    showToast('✅ 客戶已新增');
+                }
+                closeClientModal();
+                loadClientList();
+            } catch(e) { showToast('❌ 儲存失敗：' + friendlyError(e)); }
+        }
+
+        async function toggleClientActive(id, isActive) {
+            const action = isActive ? '停用' : '啟用';
+            if (!confirm(`確定${action}此客戶？`)) return;
+            try {
+                const { error } = await sb.from('clients').update({ is_active: !isActive, updated_at: new Date().toISOString() }).eq('id', id);
+                if (error) throw error;
+                showToast(`✅ 已${action}`);
+                loadClientList();
+            } catch(e) { showToast('❌ 操作失敗：' + friendlyError(e)); }
+        }
+
+        // ===== 服務項目管理 =====
+        async function loadServiceItemList() {
+            try {
+                const { data } = await sb.from('service_items').select('*').order('name');
+                const el = document.getElementById('serviceItemList');
+                if (!el) return;
+                if (!data || data.length === 0) {
+                    el.innerHTML = '<p style="color:#94A3B8;font-size:12px;">尚無服務項目</p>';
+                    return;
+                }
+                el.innerHTML = data.map(s =>
+                    `<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #F1F5F9;">
+                        <span style="flex:1;font-size:13px;font-weight:600;">${escapeHTML(s.name)}</span>
+                        <span style="font-size:11px;color:#94A3B8;">${escapeHTML(s.code || '')}</span>
+                        <button onclick="deleteServiceItem('${s.id}','${escapeHTML(s.name)}')" style="background:none;border:none;color:#EF4444;font-size:12px;cursor:pointer;">刪除</button>
+                    </div>`
+                ).join('');
+            } catch(e) { console.error(e); }
+        }
+
+        async function addServiceItem() {
+            const name = document.getElementById('newServiceItemName')?.value.trim();
+            if (!name) return showToast('請輸入服務項目名稱');
+            try {
+                const { error } = await sb.from('service_items').insert({ name, code: name.substring(0, 10).toUpperCase() });
+                if (error) throw error;
+                document.getElementById('newServiceItemName').value = '';
+                showToast('✅ 已新增');
+                loadServiceItemList();
+            } catch(e) { showToast('❌ 新增失敗：' + friendlyError(e)); }
+        }
+
+        async function deleteServiceItem(id, name) {
+            if (!confirm(`確定刪除「${name}」？`)) return;
+            try {
+                const { error } = await sb.from('service_items').update({ is_active: false }).eq('id', id);
+                if (error) throw error;
+                showToast('✅ 已刪除');
+                loadServiceItemList();
+            } catch(e) { showToast('❌ 刪除失敗：' + friendlyError(e)); }
+        }
+
+        // ===== 外勤審核 =====
+        let fwaLogs = [];
+
+        function initFieldWorkApproval() {
+            // 預設日期：今天
+            const today = getTaiwanDate();
+            document.getElementById('fwaDateFrom').value = today;
+            document.getElementById('fwaDateTo').value = today;
+            loadFieldWorkApprovals();
+        }
+
+        async function loadFieldWorkApprovals() {
+            const from = document.getElementById('fwaDateFrom').value;
+            const to = document.getElementById('fwaDateTo').value;
+            const status = document.getElementById('fwaStatusFilter').value;
+            if (!from || !to) return showToast('請選擇日期');
+
+            try {
+                let query = sb.from('field_work_logs')
+                    .select('*, employees(name, employee_number), clients(company_name), service_items(name)')
+                    .gte('work_date', from)
+                    .lte('work_date', to)
+                    .order('work_date', { ascending: false })
+                    .order('arrive_time', { ascending: false });
+                if (status) query = query.eq('status', status);
+
+                const { data, error } = await query;
+                if (error) throw error;
+                fwaLogs = data || [];
+
+                // 統計
+                document.getElementById('fwaTotal').textContent = fwaLogs.length;
+                document.getElementById('fwaPending').textContent = fwaLogs.filter(l => l.status === 'submitted').length;
+                const totalH = fwaLogs.reduce((s, l) => s + (l.work_hours || 0), 0);
+                document.getElementById('fwaTotalHours').textContent = totalH.toFixed(1);
+
+                renderFieldWorkApprovals();
+            } catch(e) {
+                console.error(e);
+                showToast('❌ 查詢失敗：' + friendlyError(e));
+            }
+        }
+
+        function renderFieldWorkApprovals() {
+            const el = document.getElementById('fwaList');
+            if (!el) return;
+            if (fwaLogs.length === 0) {
+                el.innerHTML = '<p style="text-align:center;color:#94A3B8;font-size:13px;padding:16px;">無符合條件的紀錄</p>';
+                return;
+            }
+            el.innerHTML = fwaLogs.map(log => {
+                const statusMap = { draft:'🟡 草稿', submitted:'🔵 待審核', approved:'🟢 已核准', rejected:'🔴 已退回' };
+                const statusLabel = statusMap[log.status] || log.status;
+                const empName = log.employees?.name || '?';
+                const clientName = log.clients?.company_name || '-';
+                const serviceName = log.service_items?.name || '';
+                const arriveT = log.arrive_time ? new Date(log.arrive_time).toLocaleTimeString('zh-TW', { hour:'2-digit', minute:'2-digit' }) : '--:--';
+                const leaveT = log.leave_time ? new Date(log.leave_time).toLocaleTimeString('zh-TW', { hour:'2-digit', minute:'2-digit' }) : '--:--';
+                const hours = log.work_hours ? log.work_hours.toFixed(1) + 'h' : '';
+
+                return `<div style="background:#fff;border:1px solid #E2E8F0;border-radius:12px;padding:14px;margin-bottom:8px;cursor:pointer;" onclick="showFwaDetail('${log.id}')">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                        <span style="font-weight:700;font-size:13px;">${escapeHTML(empName)}</span>
+                        <span style="font-size:12px;">${statusLabel}</span>
+                    </div>
+                    <div style="font-size:12px;color:#475569;margin-bottom:2px;">
+                        🏢 ${escapeHTML(clientName)}
+                        ${serviceName ? ' · ' + escapeHTML(serviceName) : ''}
+                    </div>
+                    <div style="font-size:11px;color:#94A3B8;">
+                        ${log.work_date} ${arriveT} → ${leaveT} ${hours ? '(' + hours + ')' : ''}
+                        ${log.mileage ? ' · ' + log.mileage + 'km' : ''}
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        function showFwaDetail(logId) {
+            const log = fwaLogs.find(l => l.id === logId);
+            if (!log) return;
+            const modal = document.getElementById('fwaDetailModal');
+            const content = document.getElementById('fwaDetailContent');
+            const actions = document.getElementById('fwaDetailActions');
+
+            const empName = log.employees?.name || '?';
+            const empNo = log.employees?.employee_number || '';
+            const clientName = log.clients?.company_name || '-';
+            const serviceName = log.service_items?.name || '-';
+            const arriveT = log.arrive_time ? new Date(log.arrive_time).toLocaleString('zh-TW') : '-';
+            const leaveT = log.leave_time ? new Date(log.leave_time).toLocaleString('zh-TW') : '-';
+
+            let photosHtml = '';
+            if (log.photo_urls && log.photo_urls.length > 0) {
+                photosHtml = '<div style="margin-top:8px;"><b style="font-size:12px;">照片：</b><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;">' +
+                    log.photo_urls.map(url => `<img src="${url}" style="width:100px;height:100px;object-fit:cover;border-radius:8px;border:1px solid #E2E8F0;cursor:pointer;" onclick="window.open('${url}','_blank')">`).join('') +
+                    '</div></div>';
+            }
+
+            let signatureHtml = '';
+            if (log.signature_url) {
+                signatureHtml = `<div style="margin-top:8px;"><b style="font-size:12px;">客戶簽名：</b><br><img src="${log.signature_url}" style="max-width:200px;border:1px solid #E2E8F0;border-radius:8px;margin-top:4px;"></div>`;
+            }
+
+            content.innerHTML = `
+                <h3 style="margin-bottom:12px;">外勤明細</h3>
+                <div style="font-size:13px;line-height:2;">
+                    <div><b>員工：</b>${escapeHTML(empName)} (${escapeHTML(empNo)})</div>
+                    <div><b>客戶：</b>${escapeHTML(clientName)}</div>
+                    <div><b>服務項目：</b>${escapeHTML(serviceName)}</div>
+                    <div><b>日期：</b>${log.work_date}</div>
+                    <div><b>到達：</b>${arriveT}</div>
+                    <div><b>離開：</b>${leaveT}</div>
+                    <div><b>工時：</b>${log.work_hours ? log.work_hours.toFixed(1) + ' 小時' : '-'}</div>
+                    <div><b>里程：</b>${log.mileage || 0} km</div>
+                    ${log.arrive_lat ? `<div><b>到達GPS：</b>${log.arrive_lat.toFixed(5)}, ${log.arrive_lng.toFixed(5)}</div>` : ''}
+                    ${log.leave_lat ? `<div><b>離開GPS：</b>${log.leave_lat.toFixed(5)}, ${log.leave_lng.toFixed(5)}</div>` : ''}
+                    ${log.work_content ? `<div style="margin-top:6px;"><b>工作內容：</b><div style="background:#F8FAFC;padding:8px;border-radius:8px;margin-top:4px;white-space:pre-wrap;">${escapeHTML(log.work_content)}</div></div>` : ''}
+                    ${log.notes ? `<div><b>備註：</b>${escapeHTML(log.notes)}</div>` : ''}
+                </div>
+                ${photosHtml}
+                ${signatureHtml}
+            `;
+
+            if (log.status === 'submitted') {
+                actions.innerHTML = `
+                    <button class="btn btn-success" onclick="approveFieldWork('${log.id}')" style="flex:1;font-size:14px;padding:12px;">✅ 核准</button>
+                    <button class="btn btn-secondary" onclick="rejectFieldWork('${log.id}')" style="flex:1;font-size:14px;padding:12px;color:#EF4444;">❌ 退回</button>
+                `;
+            } else {
+                actions.innerHTML = '';
+            }
+
+            modal.style.display = 'block';
+        }
+
+        function closeFwaDetailModal() {
+            document.getElementById('fwaDetailModal').style.display = 'none';
+        }
+
+        async function approveFieldWork(logId) {
+            if (!confirm('確定核准此筆外勤紀錄？')) return;
+            try {
+                const { error } = await sb.from('field_work_logs').update({
+                    status: 'approved',
+                    updated_at: new Date().toISOString()
+                }).eq('id', logId);
+                if (error) throw error;
+                writeAuditLog('approve_field_work','field_work_logs',logId,'核准');
+                showToast('✅ 已核准');
+                closeFwaDetailModal();
+                loadFieldWorkApprovals();
+            } catch(e) { showToast('❌ 操作失敗：' + friendlyError(e)); }
+        }
+
+        async function rejectFieldWork(logId) {
+            const reason = prompt('退回原因（選填）：');
+            if (reason === null) return;
+            try {
+                const { error } = await sb.from('field_work_logs').update({
+                    status: 'rejected',
+                    notes: reason || '退回',
+                    updated_at: new Date().toISOString()
+                }).eq('id', logId);
+                if (error) throw error;
+                writeAuditLog('reject_field_work','field_work_logs',logId,'退回');
+                showToast('✅ 已退回');
+                closeFwaDetailModal();
+                loadFieldWorkApprovals();
+            } catch(e) { showToast('❌ 操作失敗：' + friendlyError(e)); }
+        }
+
+        function exportFieldWorkCSV() {
+            if (fwaLogs.length === 0) return showToast('無資料可匯出');
+            const rows = [['日期','工號','姓名','客戶','服務項目','到達時間','離開時間','工時','里程(km)','工作內容','狀態','備註']];
+            fwaLogs.forEach(l => {
+                rows.push([
+                    l.work_date,
+                    l.employees?.employee_number || '',
+                    l.employees?.name || '',
+                    l.clients?.company_name || '',
+                    l.service_items?.name || '',
+                    l.arrive_time ? new Date(l.arrive_time).toLocaleString('zh-TW') : '',
+                    l.leave_time ? new Date(l.leave_time).toLocaleString('zh-TW') : '',
+                    l.work_hours || 0,
+                    l.mileage || 0,
+                    l.work_content || '',
+                    l.status,
+                    l.notes || ''
+                ]);
+            });
+            const csv = '\uFEFF' + rows.map(r => r.map(c => `"${String(c??'').replace(/"/g,'""')}"`).join(',')).join('\n');
+            const a = document.createElement('a');
+            const from = document.getElementById('fwaDateFrom').value;
+            const to = document.getElementById('fwaDateTo').value;
+            const fn = `外勤紀錄_${from}_${to}.csv`;
+            a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
+            a.download = fn; a.click();
+            writeAuditLog('export','field_work_logs',null,fn,{rows:rows.length-1});
+            showToast(`✅ 已匯出 ${fn}（${rows.length-1} 筆）`);
         }
 
         // 頁面載入

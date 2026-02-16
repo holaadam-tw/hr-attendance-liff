@@ -95,6 +95,124 @@
             </div>
         </div>
 
+        <!-- 外勤打卡頁面 -->
+        <div id="fieldWorkPage" class="page">
+            <button class="btn btn-secondary" onclick="window.location.href='index.html'" style="width:auto;margin-bottom:10px;">← 返回</button>
+            <div class="checkin-page">
+                <h2>📍 外勤打卡</h2>
+
+                <!-- 今日摘要 -->
+                <div class="lunch-summary" id="fwSummaryCard">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                        <span style="font-weight:700;font-size:14px;">今日外勤</span>
+                        <span id="fwSummaryDate" style="font-size:12px;color:#64748B;"></span>
+                    </div>
+                    <div style="display:flex;gap:8px;">
+                        <div style="flex:1;text-align:center;padding:10px;background:#DBEAFE;border-radius:10px;">
+                            <div style="font-size:20px;font-weight:900;color:#1E40AF;" id="fwStationCount">0</div>
+                            <div style="font-size:10px;font-weight:600;color:#1E40AF;">站次</div>
+                        </div>
+                        <div style="flex:1;text-align:center;padding:10px;background:#D1FAE5;border-radius:10px;">
+                            <div style="font-size:20px;font-weight:900;color:#059669;" id="fwTotalHours">0.0</div>
+                            <div style="font-size:10px;font-weight:600;color:#059669;">工時(h)</div>
+                        </div>
+                        <div style="flex:1;text-align:center;padding:10px;background:#FEF3C7;border-radius:10px;">
+                            <div style="font-size:20px;font-weight:900;color:#92400E;" id="fwTotalKm">0</div>
+                            <div style="font-size:10px;font-weight:600;color:#92400E;">里程(km)</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 報工列表 -->
+                <div id="fwLogList" style="margin-bottom:12px;"></div>
+
+                <!-- 新增報工按鈕 -->
+                <button class="btn btn-primary" id="fwAddBtn" onclick="showFieldWorkForm()" style="font-size:15px;padding:14px;border-radius:14px;">+ 新增外勤打卡</button>
+
+                <!-- 報工表單（預設隱藏） -->
+                <div id="fwFormArea" style="display:none;margin-top:16px;">
+                    <div class="binding-card">
+                        <h3 style="margin-bottom:12px;" id="fwFormTitle">新增外勤打卡</h3>
+
+                        <!-- 客戶選擇 -->
+                        <div class="form-group">
+                            <label>客戶 *</label>
+                            <select id="fwClientSelect" style="width:100%;padding:12px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;">
+                                <option value="">-- 選擇客戶 --</option>
+                            </select>
+                        </div>
+
+                        <!-- 服務項目 -->
+                        <div class="form-group">
+                            <label>服務項目</label>
+                            <select id="fwServiceSelect" style="width:100%;padding:12px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;">
+                                <option value="">-- 選擇服務項目 --</option>
+                            </select>
+                        </div>
+
+                        <!-- 到達打卡 -->
+                        <div id="fwArriveSection">
+                            <button class="btn btn-success" onclick="fwArriveCheckin()" id="fwArriveBtn" style="font-size:14px;padding:14px;">
+                                📍 到達打卡
+                            </button>
+                            <div id="fwArriveInfo" style="display:none;padding:10px;background:#D1FAE5;border-radius:10px;margin-top:8px;font-size:13px;color:#065F46;"></div>
+                        </div>
+
+                        <!-- 工作內容（到達後顯示） -->
+                        <div id="fwContentSection" style="display:none;margin-top:12px;">
+                            <div class="form-group">
+                                <label>工作內容</label>
+                                <textarea id="fwWorkContent" rows="3" placeholder="描述今日工作內容..." style="width:100%;padding:12px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;resize:vertical;box-sizing:border-box;"></textarea>
+                            </div>
+
+                            <!-- 拍照 -->
+                            <div class="form-group">
+                                <label>拍照（最多 3 張）</label>
+                                <div id="fwPhotoPreview" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;"></div>
+                                <button class="btn btn-secondary" onclick="fwCapturePhoto()" id="fwPhotoBtn" style="font-size:13px;padding:10px;">
+                                    📷 拍照
+                                </button>
+                                <!-- 隱藏 file input 備用 -->
+                                <input type="file" id="fwFileInput" accept="image/*" capture="environment" style="display:none;" onchange="fwHandleFileSelect(event)">
+                            </div>
+
+                            <!-- 里程 -->
+                            <div class="form-group">
+                                <label>里程（公里）</label>
+                                <input type="number" id="fwMileage" placeholder="0" min="0" step="0.1" style="width:100%;padding:12px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;box-sizing:border-box;">
+                            </div>
+
+                            <!-- 客戶簽名 -->
+                            <div class="form-group">
+                                <label>客戶簽名</label>
+                                <div id="fwSignatureArea" style="position:relative;">
+                                    <canvas id="fwSignatureCanvas" width="320" height="160" style="border:2px dashed #CBD5E1;border-radius:10px;background:#fff;touch-action:none;width:100%;"></canvas>
+                                    <div style="display:flex;gap:8px;margin-top:6px;">
+                                        <button class="btn btn-secondary" onclick="fwClearSignature()" style="flex:1;font-size:12px;padding:8px;">清除簽名</button>
+                                    </div>
+                                </div>
+                                <div id="fwSignatureStatus" style="font-size:12px;color:#94A3B8;margin-top:4px;"></div>
+                            </div>
+
+                            <!-- 備註 -->
+                            <div class="form-group">
+                                <label>備註</label>
+                                <input type="text" id="fwNotes" placeholder="選填" style="width:100%;padding:12px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;box-sizing:border-box;">
+                            </div>
+
+                            <!-- 離開打卡 -->
+                            <button class="btn btn-primary" onclick="fwLeaveCheckin()" id="fwLeaveBtn" style="font-size:14px;padding:14px;margin-top:8px;">
+                                📍 離開打卡 & 送出
+                            </button>
+                            <div id="fwLeaveInfo" style="display:none;padding:10px;background:#DBEAFE;border-radius:10px;margin-top:8px;font-size:13px;color:#1E40AF;"></div>
+                        </div>
+
+                        <button class="btn btn-secondary" onclick="cancelFieldWorkForm()" style="margin-top:12px;font-size:13px;">取消</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- 系統設定頁面 -->
         <div id="settingsPage" class="page">
             <button class="btn btn-secondary" onclick="window.location.href='index.html'" class="btn-auto-mb">← 返回</button>
@@ -147,9 +265,10 @@
         function showPage(id) {
             document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
             document.getElementById(id).classList.add('active');
-            
+
             if(id==='lunchPage') { loadLunchSummary(); checkMyOrder(); checkDeadline(); loadLunchManagerReport(); }
             if(id==='settingsPage') renderLocationList();
+            if(id==='fieldWorkPage') initFieldWorkPage();
         }
 
         // ===== 便當訂購 =====
@@ -389,6 +508,367 @@
             showToast(`✅ 已匯出 便當訂購_${todayStr}.csv`);
         }
 
+        // ===== 外勤打卡 =====
+        let fwClients = [];
+        let fwServiceItems = [];
+        let fwLogs = [];
+        let fwCurrentLogId = null;   // 正在編輯的 draft
+        let fwPhotoUrls = [];        // 本次拍照 URL
+        let fwSignatureCtx = null;
+        let fwSigning = false;
+
+        async function initFieldWorkPage() {
+            const dateEl = document.getElementById('fwSummaryDate');
+            if (dateEl) dateEl.textContent = getTaiwanDate();
+            fwPhotoUrls = [];
+            fwCurrentLogId = null;
+            await Promise.all([loadClients(), loadServiceItems(), loadFieldWorkLogs()]);
+        }
+
+        async function loadClients() {
+            try {
+                const { data } = await sb.from('clients').select('*').eq('is_active', true).order('company_name');
+                fwClients = data || [];
+                const sel = document.getElementById('fwClientSelect');
+                if (!sel) return;
+                sel.innerHTML = '<option value="">-- 選擇客戶 --</option>' +
+                    fwClients.map(c => `<option value="${c.id}">${escapeHTML(c.company_name)}${c.category === 'vip' ? ' ⭐' : ''}</option>`).join('');
+            } catch(e) { console.error('載入客戶失敗', e); }
+        }
+
+        async function loadServiceItems() {
+            try {
+                const { data } = await sb.from('service_items').select('*').eq('is_active', true).order('name');
+                fwServiceItems = data || [];
+                const sel = document.getElementById('fwServiceSelect');
+                if (!sel) return;
+                sel.innerHTML = '<option value="">-- 選擇服務項目 --</option>' +
+                    fwServiceItems.map(s => `<option value="${s.id}">${escapeHTML(s.name)}</option>`).join('');
+            } catch(e) { console.error('載入服務項目失敗', e); }
+        }
+
+        async function loadFieldWorkLogs() {
+            if (!currentEmployee) return;
+            try {
+                const todayStr = getTaiwanDate();
+                const { data } = await sb.from('field_work_logs')
+                    .select('*, clients(company_name), service_items(name)')
+                    .eq('employee_id', currentEmployee.id)
+                    .eq('work_date', todayStr)
+                    .order('created_at', { ascending: false });
+                fwLogs = data || [];
+                renderFieldWorkLogs();
+                updateFieldWorkSummary();
+            } catch(e) { console.error('載入報工紀錄失敗', e); }
+        }
+
+        function updateFieldWorkSummary() {
+            const completed = fwLogs.filter(l => l.status !== 'draft');
+            document.getElementById('fwStationCount').textContent = fwLogs.length;
+            const totalH = fwLogs.reduce((s, l) => s + (l.work_hours || 0), 0);
+            document.getElementById('fwTotalHours').textContent = totalH.toFixed(1);
+            const totalKm = fwLogs.reduce((s, l) => s + (l.mileage || 0), 0);
+            document.getElementById('fwTotalKm').textContent = Math.round(totalKm);
+        }
+
+        function renderFieldWorkLogs() {
+            const el = document.getElementById('fwLogList');
+            if (!el) return;
+            if (fwLogs.length === 0) {
+                el.innerHTML = '<p style="text-align:center;color:#94A3B8;font-size:13px;padding:16px;">今日尚無外勤紀錄</p>';
+                return;
+            }
+            el.innerHTML = fwLogs.map(log => {
+                const statusMap = { draft:'🟡 進行中', submitted:'🔵 已送出', approved:'🟢 已核准', rejected:'🔴 退回' };
+                const statusLabel = statusMap[log.status] || log.status;
+                const clientName = log.clients?.company_name || '未選擇客戶';
+                const serviceName = log.service_items?.name || '';
+                const arriveT = log.arrive_time ? new Date(log.arrive_time).toLocaleTimeString('zh-TW', { hour:'2-digit', minute:'2-digit' }) : '--:--';
+                const leaveT = log.leave_time ? new Date(log.leave_time).toLocaleTimeString('zh-TW', { hour:'2-digit', minute:'2-digit' }) : '--:--';
+                const hours = log.work_hours ? log.work_hours.toFixed(1) + 'h' : '';
+                return `<div style="background:#fff;border:1px solid #E2E8F0;border-radius:12px;padding:14px;margin-bottom:8px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                        <span style="font-weight:700;font-size:14px;">${escapeHTML(clientName)}</span>
+                        <span style="font-size:12px;">${statusLabel}</span>
+                    </div>
+                    <div style="font-size:12px;color:#64748B;">
+                        ${serviceName ? '<span style="background:#EFF6FF;color:#2563EB;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600;">' + escapeHTML(serviceName) + '</span> ' : ''}
+                        ${arriveT} → ${leaveT} ${hours ? '(' + hours + ')' : ''}
+                        ${log.mileage ? ' · ' + log.mileage + 'km' : ''}
+                    </div>
+                    ${log.work_content ? '<div style="font-size:12px;color:#475569;margin-top:6px;white-space:pre-wrap;">' + escapeHTML(log.work_content).substring(0, 80) + '</div>' : ''}
+                    ${log.status === 'draft' ? '<button class="btn btn-primary" onclick="resumeFieldWork(\'' + log.id + '\')" style="font-size:12px;padding:8px;margin-top:8px;">繼續填寫</button>' : ''}
+                </div>`;
+            }).join('');
+        }
+
+        function showFieldWorkForm() {
+            fwCurrentLogId = null;
+            fwPhotoUrls = [];
+            document.getElementById('fwFormArea').style.display = 'block';
+            document.getElementById('fwAddBtn').style.display = 'none';
+            document.getElementById('fwFormTitle').textContent = '新增外勤打卡';
+            // Reset form
+            document.getElementById('fwClientSelect').value = '';
+            document.getElementById('fwServiceSelect').value = '';
+            document.getElementById('fwArriveBtn').style.display = 'block';
+            document.getElementById('fwArriveInfo').style.display = 'none';
+            document.getElementById('fwContentSection').style.display = 'none';
+            document.getElementById('fwPhotoPreview').innerHTML = '';
+            const mileageEl = document.getElementById('fwMileage');
+            if (mileageEl) mileageEl.value = '';
+            const contentEl = document.getElementById('fwWorkContent');
+            if (contentEl) contentEl.value = '';
+            const notesEl = document.getElementById('fwNotes');
+            if (notesEl) notesEl.value = '';
+            document.getElementById('fwLeaveInfo').style.display = 'none';
+            initSignatureCanvas();
+        }
+
+        function cancelFieldWorkForm() {
+            document.getElementById('fwFormArea').style.display = 'none';
+            document.getElementById('fwAddBtn').style.display = 'block';
+        }
+
+        async function resumeFieldWork(logId) {
+            const log = fwLogs.find(l => l.id === logId);
+            if (!log) return;
+            fwCurrentLogId = logId;
+            fwPhotoUrls = log.photo_urls || [];
+            showFieldWorkForm();
+            document.getElementById('fwFormTitle').textContent = '繼續外勤打卡';
+            document.getElementById('fwClientSelect').value = log.client_id || '';
+            document.getElementById('fwServiceSelect').value = log.service_item_id || '';
+            // 已到達
+            if (log.arrive_time) {
+                document.getElementById('fwArriveBtn').style.display = 'none';
+                const t = new Date(log.arrive_time).toLocaleTimeString('zh-TW', { hour:'2-digit', minute:'2-digit' });
+                document.getElementById('fwArriveInfo').style.display = 'block';
+                document.getElementById('fwArriveInfo').textContent = `✅ 已到達 ${t}`;
+                document.getElementById('fwContentSection').style.display = 'block';
+                const contentEl = document.getElementById('fwWorkContent');
+                if (contentEl) contentEl.value = log.work_content || '';
+                const mileageEl = document.getElementById('fwMileage');
+                if (mileageEl) mileageEl.value = log.mileage || '';
+                const notesEl = document.getElementById('fwNotes');
+                if (notesEl) notesEl.value = log.notes || '';
+                renderPhotoPreview();
+            }
+        }
+
+        // ---- 到達打卡 ----
+        async function fwArriveCheckin() {
+            const clientId = document.getElementById('fwClientSelect').value;
+            if (!clientId) return showToast('請先選擇客戶');
+            const btn = document.getElementById('fwArriveBtn');
+            btn.disabled = true; btn.textContent = '📍 定位中...';
+            try {
+                const loc = await getGPS();
+                const now = new Date().toISOString();
+                const serviceId = document.getElementById('fwServiceSelect').value || null;
+
+                const record = {
+                    employee_id: currentEmployee.id,
+                    client_id: clientId,
+                    service_item_id: serviceId,
+                    work_date: getTaiwanDate(),
+                    arrive_time: now,
+                    arrive_lat: loc.latitude,
+                    arrive_lng: loc.longitude,
+                    status: 'draft'
+                };
+
+                const { data, error } = await sb.from('field_work_logs').insert(record).select().single();
+                if (error) throw error;
+                fwCurrentLogId = data.id;
+
+                btn.style.display = 'none';
+                const infoEl = document.getElementById('fwArriveInfo');
+                const t = new Date(now).toLocaleTimeString('zh-TW', { hour:'2-digit', minute:'2-digit' });
+                infoEl.style.display = 'block';
+                infoEl.textContent = `✅ 到達 ${t}（GPS: ${loc.latitude.toFixed(5)}, ${loc.longitude.toFixed(5)}）`;
+                document.getElementById('fwContentSection').style.display = 'block';
+                showToast('📍 到達打卡成功');
+                loadFieldWorkLogs();
+            } catch(e) {
+                console.error(e);
+                showToast('❌ 打卡失敗：' + friendlyError(e));
+                btn.disabled = false; btn.textContent = '📍 到達打卡';
+            }
+        }
+
+        // ---- 拍照 ----
+        async function fwCapturePhoto() {
+            if (fwPhotoUrls.length >= 3) return showToast('最多 3 張照片');
+            // 用 file input（行動裝置會開啟相機）
+            document.getElementById('fwFileInput').click();
+        }
+
+        async function fwHandleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            try {
+                showToast('☁️ 上傳中...');
+                // 壓縮
+                const bitmap = await createImageBitmap(file);
+                const MAX_W = 800, MAX_H = 600;
+                let cw = bitmap.width, ch = bitmap.height;
+                if (cw > MAX_W) { ch = Math.round(ch * MAX_W / cw); cw = MAX_W; }
+                if (ch > MAX_H) { cw = Math.round(cw * MAX_H / ch); ch = MAX_H; }
+                const canvas = document.createElement('canvas');
+                canvas.width = cw; canvas.height = ch;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(bitmap, 0, 0, cw, ch);
+                const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.6));
+
+                const fileName = `fieldwork/${currentEmployee.employee_number}_${Date.now()}.jpg`;
+                const { error } = await sb.storage.from(CONFIG.BUCKET).upload(fileName, blob);
+                if (error) throw error;
+                const { data: urlData } = sb.storage.from(CONFIG.BUCKET).getPublicUrl(fileName);
+                const url = urlData?.publicUrl || urlData?.publicURL;
+                fwPhotoUrls.push(url);
+                renderPhotoPreview();
+
+                // 更新 DB
+                if (fwCurrentLogId) {
+                    await sb.from('field_work_logs').update({ photo_urls: fwPhotoUrls }).eq('id', fwCurrentLogId);
+                }
+                showToast('✅ 照片已上傳');
+            } catch(e) {
+                console.error(e);
+                showToast('❌ 上傳失敗：' + friendlyError(e));
+            }
+            event.target.value = '';
+        }
+
+        function renderPhotoPreview() {
+            const el = document.getElementById('fwPhotoPreview');
+            if (!el) return;
+            el.innerHTML = fwPhotoUrls.map((url, i) =>
+                `<div style="position:relative;width:80px;height:80px;">
+                    <img src="${url}" style="width:80px;height:80px;object-fit:cover;border-radius:8px;border:1px solid #E2E8F0;">
+                    <button onclick="fwRemovePhoto(${i})" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#EF4444;color:#fff;border:none;font-size:12px;cursor:pointer;line-height:20px;text-align:center;">×</button>
+                </div>`
+            ).join('');
+            const photoBtn = document.getElementById('fwPhotoBtn');
+            if (photoBtn) photoBtn.style.display = fwPhotoUrls.length >= 3 ? 'none' : 'block';
+        }
+
+        function fwRemovePhoto(idx) {
+            fwPhotoUrls.splice(idx, 1);
+            renderPhotoPreview();
+            if (fwCurrentLogId) {
+                sb.from('field_work_logs').update({ photo_urls: fwPhotoUrls }).eq('id', fwCurrentLogId);
+            }
+        }
+
+        // ---- 簽名板 ----
+        function initSignatureCanvas() {
+            const canvas = document.getElementById('fwSignatureCanvas');
+            if (!canvas) return;
+            fwSignatureCtx = canvas.getContext('2d');
+            fwSignatureCtx.clearRect(0, 0, canvas.width, canvas.height);
+            fwSignatureCtx.lineWidth = 2;
+            fwSignatureCtx.lineCap = 'round';
+            fwSignatureCtx.strokeStyle = '#0F172A';
+            fwSigning = false;
+            document.getElementById('fwSignatureStatus').textContent = '請在上方區域簽名';
+
+            const getPos = (e) => {
+                const rect = canvas.getBoundingClientRect();
+                const scaleX = canvas.width / rect.width;
+                const scaleY = canvas.height / rect.height;
+                const touch = e.touches ? e.touches[0] : e;
+                return { x: (touch.clientX - rect.left) * scaleX, y: (touch.clientY - rect.top) * scaleY };
+            };
+
+            const start = (e) => { e.preventDefault(); fwSigning = true; const p = getPos(e); fwSignatureCtx.beginPath(); fwSignatureCtx.moveTo(p.x, p.y); };
+            const move = (e) => { if (!fwSigning) return; e.preventDefault(); const p = getPos(e); fwSignatureCtx.lineTo(p.x, p.y); fwSignatureCtx.stroke(); };
+            const end = () => { fwSigning = false; };
+
+            canvas.onmousedown = start; canvas.onmousemove = move; canvas.onmouseup = end; canvas.onmouseleave = end;
+            canvas.ontouchstart = start; canvas.ontouchmove = move; canvas.ontouchend = end;
+        }
+
+        function fwClearSignature() {
+            const canvas = document.getElementById('fwSignatureCanvas');
+            if (!canvas || !fwSignatureCtx) return;
+            fwSignatureCtx.clearRect(0, 0, canvas.width, canvas.height);
+            document.getElementById('fwSignatureStatus').textContent = '已清除，請重新簽名';
+        }
+
+        async function fwUploadSignature() {
+            const canvas = document.getElementById('fwSignatureCanvas');
+            if (!canvas) return null;
+            // 檢查是否有畫過
+            const blank = document.createElement('canvas');
+            blank.width = canvas.width; blank.height = canvas.height;
+            if (canvas.toDataURL() === blank.toDataURL()) return null; // 空白
+
+            const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
+            const fileName = `signatures/${currentEmployee.employee_number}_${Date.now()}.png`;
+            const { error } = await sb.storage.from(CONFIG.BUCKET).upload(fileName, blob);
+            if (error) throw error;
+            const { data: urlData } = sb.storage.from(CONFIG.BUCKET).getPublicUrl(fileName);
+            return urlData?.publicUrl || urlData?.publicURL;
+        }
+
+        // ---- 離開打卡 ----
+        async function fwLeaveCheckin() {
+            if (!fwCurrentLogId) return showToast('請先完成到達打卡');
+            const btn = document.getElementById('fwLeaveBtn');
+            btn.disabled = true; btn.textContent = '📍 定位中...';
+            try {
+                const loc = await getGPS();
+                const now = new Date().toISOString();
+
+                // 上傳簽名
+                let signatureUrl = null;
+                try { signatureUrl = await fwUploadSignature(); } catch(e) { console.warn('簽名上傳失敗', e); }
+
+                // 計算工時
+                const logData = fwLogs.find(l => l.id === fwCurrentLogId);
+                let workHours = 0;
+                if (logData?.arrive_time) {
+                    workHours = (new Date(now) - new Date(logData.arrive_time)) / 3600000;
+                    workHours = Math.round(workHours * 10) / 10;
+                }
+
+                const updateData = {
+                    leave_time: now,
+                    leave_lat: loc.latitude,
+                    leave_lng: loc.longitude,
+                    work_hours: workHours,
+                    work_content: document.getElementById('fwWorkContent')?.value || '',
+                    mileage: parseFloat(document.getElementById('fwMileage')?.value) || 0,
+                    notes: document.getElementById('fwNotes')?.value || '',
+                    photo_urls: fwPhotoUrls,
+                    status: 'submitted',
+                    updated_at: now
+                };
+                if (signatureUrl) updateData.signature_url = signatureUrl;
+
+                const { error } = await sb.from('field_work_logs').update(updateData).eq('id', fwCurrentLogId);
+                if (error) throw error;
+
+                const infoEl = document.getElementById('fwLeaveInfo');
+                const t = new Date(now).toLocaleTimeString('zh-TW', { hour:'2-digit', minute:'2-digit' });
+                infoEl.style.display = 'block';
+                infoEl.textContent = `✅ 離開 ${t} · 工時 ${workHours.toFixed(1)}h`;
+                showToast(`📍 離開打卡完成，工時 ${workHours.toFixed(1)} 小時`);
+
+                btn.style.display = 'none';
+                setTimeout(() => {
+                    cancelFieldWorkForm();
+                    loadFieldWorkLogs();
+                }, 1500);
+            } catch(e) {
+                console.error(e);
+                showToast('❌ 離開打卡失敗：' + friendlyError(e));
+                btn.disabled = false; btn.textContent = '📍 離開打卡 & 送出';
+            }
+        }
+
         // 頁面載入完成後初始化
         window.addEventListener('load', async () => {
             // 確保 common.js 中的函數已載入
@@ -400,8 +880,9 @@
             // 根據 hash 決定顯示哪個頁面
             const hash = window.location.hash || '#lunch';
             let pageId = 'lunchPage';
-            
+
             if (hash === '#settings') pageId = 'settingsPage';
+            if (hash === '#fieldwork') pageId = 'fieldWorkPage';
 
             const initialized = await initializeLiff();
             if (initialized) {
