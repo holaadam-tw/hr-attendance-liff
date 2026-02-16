@@ -13,6 +13,7 @@ let liffProfile = null;
 let currentEmployee = null;
 let currentCompanyId = null;    // 多租戶：當前公司 ID
 let currentCompanyFeatures = null; // 多租戶：當前公司功能設定
+let currentCompanyName = null;     // 多租戶：當前公司名稱
 let videoStream = null;
 let cachedLocation = null;
 let currentBindMode = 'id_card';
@@ -190,10 +191,11 @@ async function checkUserStatus() {
             if (currentCompanyId) {
                 try {
                     const { data: company } = await sb.from('companies')
-                        .select('features, status')
+                        .select('name, features, status')
                         .eq('id', currentCompanyId)
                         .maybeSingle();
                     currentCompanyFeatures = company?.features || null;
+                    currentCompanyName = company?.name || null;
                 } catch(e) { console.log('載入公司功能設定失敗', e); }
             }
             updateUserInfo(data);

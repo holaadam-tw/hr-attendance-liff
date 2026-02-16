@@ -48,6 +48,7 @@
         <div id="homePage" class="page">
             <!-- 用戶卡片 -->
             <div class="user-card">
+                <div id="homeCompanyName" style="font-size:13px;font-weight:700;color:#4F46E5;margin-bottom:8px;display:none;"></div>
                 <div class="user-info">
                     <div class="avatar" id="userAvatar">?</div>
                     <div class="user-details">
@@ -270,6 +271,12 @@
                     showPage('homePage');
                     updateTodayInfo();
                     initBottomNav();
+
+                    // 顯示公司名稱
+                    if (currentCompanyName) {
+                        const el = document.getElementById('homeCompanyName');
+                        if (el) { el.textContent = currentCompanyName; el.style.display = 'block'; }
+                    }
 
                     // admin 和 manager 都可進管理後台
                     if (currentEmployee && (currentEmployee.role === 'admin' || currentEmployee.role === 'manager')) {
