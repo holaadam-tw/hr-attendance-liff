@@ -262,14 +262,27 @@
                         lat = loc.latitude; lon = loc.longitude;
                     } catch(e) { /* GPS 失敗，使用預設座標 */ }
                 }
-                const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code&timezone=Asia%2FTaipei`);
-                const json = await res.json();
-                const temp = Math.round(json.current.temperature_2m);
-                const code = json.current.weather_code;
+                // 天氣 + 地名同時取得
+                const [weatherRes, geoRes] = await Promise.all([
+                    fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code&timezone=Asia%2FTaipei`),
+                    fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&zoom=10&accept-language=zh-TW`).catch(() => null)
+                ]);
+                const weather = await weatherRes.json();
+                const temp = Math.round(weather.current.temperature_2m);
+                const code = weather.current.weather_code;
                 const desc = WMO_WEATHER[code] || '🌡️';
+                // 取地名（市/區）
+                let city = '';
+                try {
+                    if (geoRes?.ok) {
+                        const geo = await geoRes.json();
+                        city = geo.address?.city || geo.address?.county || geo.address?.town || geo.address?.state || '';
+                        city = city.replace(/市$|縣$/, ''); // 台北市 → 台北
+                    }
+                } catch(e) {}
                 const el = document.getElementById('weatherInfo');
                 if (el) {
-                    el.textContent = `${desc} ${temp}°C`;
+                    el.textContent = `${city ? city + ' ' : ''}${desc} ${temp}°C`;
                     el.style.display = 'inline';
                 }
             } catch(e) { console.log('天氣載入失敗', e); }
