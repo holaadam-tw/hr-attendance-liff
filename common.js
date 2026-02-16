@@ -1221,10 +1221,16 @@ function applyFeatureVisibility() {
     // 用 data-feature 屬性精確控制每個選單項目
     // 支援逗號分隔多 key（OR 邏輯：任一為 true 就顯示）
     document.querySelectorAll('.menu-grid .menu-item[data-feature]').forEach(item => {
-        const keys = item.getAttribute('data-feature').split(',');
-        const visible = keys.some(k => features[k.trim()] !== false);
+        const keys = item.getAttribute('data-feature').split(',').map(k => k.trim());
+        const visible = keys.some(k => features[k] !== false);
         if (!visible) {
             item.style.display = 'none';
+        }
+        // 職位限制：外勤/業務只有「業務」職位才看得到
+        if (visible && (keys.includes('fieldwork') || keys.includes('sales_target'))) {
+            if (currentEmployee && currentEmployee.position !== '業務') {
+                item.style.display = 'none';
+            }
         }
     });
 }

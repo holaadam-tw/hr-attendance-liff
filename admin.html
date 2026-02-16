@@ -373,7 +373,16 @@
                     </div>
                     <div class="form-group">
                         <label>職位</label>
-                        <input type="text" id="editEmpPosition" placeholder="例如：專員">
+                        <select id="editEmpPosition">
+                            <option value="">-- 選擇職位 --</option>
+                            <option value="業務">業務</option>
+                            <option value="行政">行政</option>
+                            <option value="工程">工程</option>
+                            <option value="主管">主管</option>
+                            <option value="倉管">倉管</option>
+                            <option value="客服">客服</option>
+                            <option value="會計">會計</option>
+                        </select>
                     </div>
                     <div class="form-group">
                         <label>到職日期</label>
@@ -5116,8 +5125,8 @@
                 document.getElementById('stDefaultCall').value = defaultTarget?.call_target || 0;
                 document.getElementById('stDefaultVisit').value = defaultTarget?.visit_target || 0;
 
-                // 載入所有業務員（role = user 或全部）
-                let empQuery = sb.from('employees').select('id, name, employee_number, role').eq('is_active', true);
+                // 只載入「業務」職位員工
+                let empQuery = sb.from('employees').select('id, name, employee_number, role, position').eq('is_active', true).eq('position', '業務');
                 if (currentCompanyId) empQuery = empQuery.eq('company_id', currentCompanyId);
                 const { data: employees } = await empQuery.order('name');
                 stEmployees = employees || [];
