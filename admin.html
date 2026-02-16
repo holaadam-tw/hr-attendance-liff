@@ -664,39 +664,7 @@
                 <p style="color:#6b7280;font-size:13px;margin-bottom:16px;">控制員工首頁<b>中間選單</b>顯示哪些功能</p>
                 
                 <div id="featureToggles" style="display:flex;flex-direction:column;gap:12px;">
-                    <!-- 請假 -->
-                    <div class="feature-toggle-card" id="ftCard_leave" onclick="toggleFeature('leave')" style="display:flex;align-items:center;gap:14px;padding:16px;background:#fff;border:2px solid #E5E7EB;border-radius:14px;cursor:pointer;transition:all 0.2s;">
-                        <span style="font-size:28px;">📝</span>
-                        <div style="flex:1;">
-                            <div style="font-weight:800;font-size:14px;color:#0F172A;">我要請假</div>
-                            <div style="font-size:12px;color:#94A3B8;margin-top:2px;">請假申請與記錄查詢</div>
-                        </div>
-                        <div class="ft-indicator" style="width:44px;height:26px;border-radius:13px;background:#4F46E5;position:relative;transition:background 0.3s;">
-                            <div style="width:20px;height:20px;border-radius:50%;background:#fff;position:absolute;top:3px;right:3px;transition:all 0.3s;box-shadow:0 1px 3px rgba(0,0,0,0.2);"></div>
-                        </div>
-                    </div>
-                    <!-- 便當 -->
-                    <div class="feature-toggle-card" id="ftCard_lunch" onclick="toggleFeature('lunch')" style="display:flex;align-items:center;gap:14px;padding:16px;background:#fff;border:2px solid #E5E7EB;border-radius:14px;cursor:pointer;transition:all 0.2s;">
-                        <span style="font-size:28px;">🍱</span>
-                        <div style="flex:1;">
-                            <div style="font-weight:800;font-size:14px;color:#0F172A;">便當訂購</div>
-                            <div style="font-size:12px;color:#94A3B8;margin-top:2px;">每日午餐訂購管理</div>
-                        </div>
-                        <div class="ft-indicator" style="width:44px;height:26px;border-radius:13px;background:#4F46E5;position:relative;transition:background 0.3s;">
-                            <div style="width:20px;height:20px;border-radius:50%;background:#fff;position:absolute;top:3px;right:3px;transition:all 0.3s;box-shadow:0 1px 3px rgba(0,0,0,0.2);"></div>
-                        </div>
-                    </div>
-                    <!-- 考勤 -->
-                    <div class="feature-toggle-card" id="ftCard_attendance" onclick="toggleFeature('attendance')" style="display:flex;align-items:center;gap:14px;padding:16px;background:#fff;border:2px solid #E5E7EB;border-radius:14px;cursor:pointer;transition:all 0.2s;">
-                        <span style="font-size:28px;">📊</span>
-                        <div style="flex:1;">
-                            <div style="font-weight:800;font-size:14px;color:#0F172A;">考勤查詢</div>
-                            <div style="font-size:12px;color:#94A3B8;margin-top:2px;">出勤月曆與記錄查詢</div>
-                        </div>
-                        <div class="ft-indicator" style="width:44px;height:26px;border-radius:13px;background:#4F46E5;position:relative;transition:background 0.3s;">
-                            <div style="width:20px;height:20px;border-radius:50%;background:#fff;position:absolute;top:3px;right:3px;transition:all 0.3s;box-shadow:0 1px 3px rgba(0,0,0,0.2);"></div>
-                        </div>
-                    </div>
+                    <p id="featureLoadingHint" style="text-align:center;color:#94A3B8;font-size:13px;">載入中...</p>
                 </div>
                 <div id="featureSaveStatus" style="margin-top:12px;text-align:center;font-size:13px;color:#059669;display:none;">✅ 已儲存</div>
                 <p style="color:#94A3B8;font-size:12px;margin-top:16px;text-align:center;">💡 底部導航列（首頁/班表/打卡/薪資/管理）為管理員專屬，不受此設定影響</p>
@@ -1370,7 +1338,16 @@
         }
 
         // ===== 功能管理 =====
-        let featureState = { leave: true, lunch: true, attendance: true };
+        const ADMIN_FEATURE_LIST = [
+            { key: 'leave',          label: '我要請假',      desc: '請假申請與記錄查詢',   icon: '📝' },
+            { key: 'lunch',          label: '便當訂購',      desc: '每日午餐訂購管理',     icon: '🍱' },
+            { key: 'attendance',     label: '考勤查詢',      desc: '出勤月曆與記錄查詢',   icon: '📊' },
+            { key: 'fieldwork',      label: '外勤打卡',      desc: '外勤 GPS 打卡功能',   icon: '📍' },
+            { key: 'sales_target',   label: '業務目標/週報',  desc: '業務目標追蹤與週報',   icon: '🎯' },
+            { key: 'store_ordering', label: '線上點餐/預約',  desc: '線上預約與點餐服務',   icon: '🛍️' }
+        ];
+        let companyAllowedFeatures = null;
+        let featureState = { leave: true, lunch: true, attendance: true, fieldwork: false, sales_target: false, store_ordering: false };
 
         // LINE Notify 設定
         async function loadNotifyToken() {
@@ -1420,14 +1397,39 @@
                     .select('value')
                     .eq('key', 'feature_visibility')
                     .maybeSingle();
-                
                 if (data?.value) {
                     featureState = { ...featureState, ...data.value };
                 }
             } catch(e) {}
-            
-            // 更新卡片顯示
-            ['leave', 'lunch', 'attendance'].forEach(key => updateToggleCard(key));
+
+            // 根據平台允許的功能，動態產生 toggle 卡片
+            const allowed = companyAllowedFeatures || {};
+            const defaultAllowed = { leave: true, lunch: true, attendance: true, fieldwork: false, sales_target: false, store_ordering: false };
+            const visibleFeatures = ADMIN_FEATURE_LIST.filter(f => {
+                return companyAllowedFeatures ? (allowed[f.key] === true) : (defaultAllowed[f.key] !== false);
+            });
+
+            const container = document.getElementById('featureToggles');
+            if (visibleFeatures.length === 0) {
+                container.innerHTML = '<p style="text-align:center;color:#94A3B8;font-size:13px;">目前無可管理的功能，請聯繫平台管理員開通。</p>';
+                return;
+            }
+
+            container.innerHTML = visibleFeatures.map(f => {
+                const on = featureState[f.key] !== false;
+                return `
+                <div class="feature-toggle-card" id="ftCard_${f.key}" onclick="toggleFeature('${f.key}')"
+                     style="display:flex;align-items:center;gap:14px;padding:16px;background:${on ? '#F5F3FF' : '#fff'};border:2px solid ${on ? '#4F46E5' : '#E5E7EB'};border-radius:14px;cursor:pointer;transition:all 0.2s;">
+                    <span style="font-size:28px;">${f.icon}</span>
+                    <div style="flex:1;">
+                        <div style="font-weight:800;font-size:14px;color:#0F172A;">${f.label}</div>
+                        <div style="font-size:12px;color:#94A3B8;margin-top:2px;">${f.desc}</div>
+                    </div>
+                    <div class="ft-indicator" style="width:44px;height:26px;border-radius:13px;background:${on ? '#4F46E5' : '#CBD5E1'};position:relative;transition:background 0.3s;">
+                        <div style="width:20px;height:20px;border-radius:50%;background:#fff;position:absolute;top:3px;${on ? 'right:3px;' : 'left:3px;'}transition:all 0.3s;box-shadow:0 1px 3px rgba(0,0,0,0.2);"></div>
+                    </div>
+                </div>`;
+            }).join('');
         }
 
         function updateToggleCard(key) {
@@ -1520,16 +1522,28 @@
 
                 currentAdminEmployee = data;
                 updateAdminInfo(data);
-                
+
                 // 載入系統設定（地點等）
                 await loadSettings();
-                
+
+                // 載入公司功能設定（平台管理員設定的允許功能）
+                if (data.company_id) {
+                    try {
+                        const { data: compData } = await sb.from('companies')
+                            .select('features')
+                            .eq('id', data.company_id)
+                            .maybeSingle();
+                        companyAllowedFeatures = compData?.features || null;
+                    } catch(e) { console.log('載入公司功能設定失敗', e); }
+                }
+
                 showStatus(statusEl, 'success', '✅ 權限驗證通過');
                 populateYearSelect('bonusYear');
                 setTimeout(() => {
                     showPage('adminHomePage');
                     document.getElementById('bottomNav').style.display = 'flex';
                     applyRoleVisibility();
+                    applyAdminFeatureVisibility();
                 }, 800);
 
             } catch (err) {
@@ -1565,6 +1579,17 @@
             // manager 只看沒有 data-require="admin" 的項目
             document.querySelectorAll('.menu-grid .menu-item[data-require="admin"]').forEach(el => {
                 el.style.display = 'none';
+            });
+        }
+
+        // 依公司功能隱藏未開啟的選單項目
+        function applyAdminFeatureVisibility() {
+            if (!companyAllowedFeatures) return;
+            document.querySelectorAll('.menu-grid .menu-item[data-feature]').forEach(el => {
+                const feature = el.getAttribute('data-feature');
+                if (feature && companyAllowedFeatures[feature] !== true) {
+                    el.style.display = 'none';
+                }
             });
         }
 

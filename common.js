@@ -1187,12 +1187,29 @@ const DEFAULT_FEATURES = {
 };
 
 function getFeatureVisibility() {
-    // 優先使用公司功能設定（由平台管理員控制）
-    if (currentCompanyFeatures) return { ...DEFAULT_FEATURES, ...currentCompanyFeatures };
-    // Fallback 到 system_settings
-    const val = getCachedSetting('feature_visibility');
-    if (val) return { ...DEFAULT_FEATURES, ...val };
-    return DEFAULT_FEATURES;
+    // 雙層 AND 邏輯：平台允許 AND 管理員開啟 → 才顯示
+    let result = { ...DEFAULT_FEATURES };
+
+    // 第一層：平台管理員設定（companies.features）
+    if (currentCompanyFeatures) {
+        for (const key of Object.keys(result)) {
+            if (currentCompanyFeatures[key] === true) result[key] = true;
+            if (currentCompanyFeatures[key] === false) result[key] = false;
+        }
+    }
+
+    // 第二層：公司管理員設定（system_settings.feature_visibility）
+    // 只能進一步關閉平台允許的功能，不能開啟平台禁止的功能
+    const adminSettings = getCachedSetting('feature_visibility');
+    if (adminSettings) {
+        for (const key of Object.keys(result)) {
+            if (result[key] === true && adminSettings[key] === false) {
+                result[key] = false;
+            }
+        }
+    }
+
+    return result;
 }
 
 // 根據設定隱藏首頁「中間選單」項目（不影響底部導航列）

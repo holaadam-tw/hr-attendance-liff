@@ -119,6 +119,11 @@
                     <!-- 功能開關 -->
                     <div style="margin-top:16px;padding:14px;background:#F8FAFC;border-radius:12px;">
                         <div style="font-weight:700;font-size:13px;margin-bottom:10px;">🎛️ 功能開關</div>
+                        <div style="display:flex;gap:6px;margin-bottom:10px;">
+                            <button type="button" onclick="applyFeaturePreset('general')" style="flex:1;padding:8px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;font-size:12px;font-weight:700;cursor:pointer;color:#4F46E5;">🏢 一般公司</button>
+                            <button type="button" onclick="applyFeaturePreset('service')" style="flex:1;padding:8px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;font-size:12px;font-weight:700;cursor:pointer;color:#059669;">🛍️ 服務業</button>
+                            <button type="button" onclick="applyFeaturePreset('all')" style="flex:1;padding:8px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;font-size:12px;font-weight:700;cursor:pointer;color:#D97706;">✅ 全開</button>
+                        </div>
                         <div id="pFeatureToggles" style="display:flex;flex-direction:column;gap:8px;"></div>
                     </div>
 
@@ -165,6 +170,23 @@
             { key: 'sales_target', label: '業務目標', icon: '🎯' },
             { key: 'store_ordering', label: '線上點餐/預約', icon: '🛍️' }
         ];
+
+        const FEATURE_PRESETS = {
+            general: { leave: true, lunch: true, attendance: true, fieldwork: false, sales_target: false, store_ordering: false },
+            service: { leave: true, lunch: true, attendance: true, fieldwork: true, sales_target: true, store_ordering: true },
+            all:     { leave: true, lunch: true, attendance: true, fieldwork: true, sales_target: true, store_ordering: true }
+        };
+
+        function applyFeaturePreset(name) {
+            const preset = FEATURE_PRESETS[name];
+            if (!preset) return;
+            FEATURE_LIST.forEach(f => {
+                const cb = document.getElementById('pFt_' + f.key);
+                if (cb) cb.checked = !!preset[f.key];
+            });
+            const labels = { general: '一般公司', service: '服務業', all: '全部開啟' };
+            showToast('✅ 已套用「' + (labels[name] || name) + '」預設');
+        }
 
         function showPage(id) {
             document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
