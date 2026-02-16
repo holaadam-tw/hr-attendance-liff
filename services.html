@@ -137,9 +137,12 @@
                         <!-- 客戶選擇 -->
                         <div class="form-group">
                             <label>客戶 *</label>
-                            <select id="fwClientSelect" style="width:100%;padding:12px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;">
-                                <option value="">-- 選擇客戶 --</option>
-                            </select>
+                            <div style="display:flex;gap:8px;">
+                                <select id="fwClientSelect" style="flex:1;padding:12px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;">
+                                    <option value="">-- 選擇客戶 --</option>
+                                </select>
+                                <button type="button" onclick="showQuickAddClientModal()" style="padding:12px 16px;border:none;border-radius:10px;background:linear-gradient(135deg,#4F46E5,#7C3AED);color:#fff;font-weight:700;font-size:14px;cursor:pointer;white-space:nowrap;">+ 新增</button>
+                            </div>
                         </div>
 
                         <!-- 服務項目 -->
@@ -213,6 +216,135 @@
             </div>
         </div>
 
+        <!-- 業務週報頁面 -->
+        <div id="salesActivityPage" class="page">
+            <button class="btn btn-secondary" onclick="window.location.href='index.html'" style="width:auto;margin-bottom:10px;">← 返回</button>
+            <div class="checkin-page">
+                <h2>📊 業務週報</h2>
+
+                <!-- 週切換 -->
+                <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:16px;">
+                    <button onclick="salesChangeWeek(-1)" style="padding:8px 14px;border:1px solid #E2E8F0;border-radius:10px;background:#fff;cursor:pointer;font-size:16px;">←</button>
+                    <span id="salesWeekLabel" style="font-weight:700;font-size:14px;min-width:180px;text-align:center;"></span>
+                    <button onclick="salesChangeWeek(1)" style="padding:8px 14px;border:1px solid #E2E8F0;border-radius:10px;background:#fff;cursor:pointer;font-size:16px;">→</button>
+                </div>
+
+                <!-- 本週進度 -->
+                <div class="lunch-summary" id="salesProgressCard">
+                    <h3 style="margin-bottom:12px;font-size:14px;">🎯 本週進度</h3>
+                    <div style="margin-bottom:12px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                            <span style="font-size:13px;">📞 電話拜訪</span>
+                            <span id="salesCallText" style="font-size:13px;font-weight:700;">0 / 0</span>
+                        </div>
+                        <div style="width:100%;height:8px;background:#E2E8F0;border-radius:4px;overflow:hidden;">
+                            <div id="salesCallBar" style="height:100%;background:linear-gradient(90deg,#4F46E5,#7C3AED);border-radius:4px;transition:width 0.3s;width:0%;"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                            <span style="font-size:13px;">🏢 實地拜訪</span>
+                            <span id="salesVisitText" style="font-size:13px;font-weight:700;">0 / 0</span>
+                        </div>
+                        <div style="width:100%;height:8px;background:#E2E8F0;border-radius:4px;overflow:hidden;">
+                            <div id="salesVisitBar" style="height:100%;background:linear-gradient(90deg,#059669,#10B981);border-radius:4px;transition:width 0.3s;width:0%;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 快速記錄按鈕 -->
+                <div style="display:flex;gap:8px;margin-bottom:16px;">
+                    <button onclick="showSalesActivityModal('call')" style="flex:1;padding:14px;border:none;border-radius:12px;background:linear-gradient(135deg,#4F46E5,#7C3AED);color:#fff;font-weight:700;font-size:14px;cursor:pointer;">📞 記錄電話</button>
+                    <button onclick="showSalesActivityModal('visit')" style="flex:1;padding:14px;border:none;border-radius:12px;background:linear-gradient(135deg,#059669,#10B981);color:#fff;font-weight:700;font-size:14px;cursor:pointer;">🏢 記錄拜訪</button>
+                </div>
+
+                <!-- 本週活動列表 -->
+                <div id="salesActivityList"></div>
+            </div>
+        </div>
+
+        <!-- 新增業務活動 Modal -->
+        <div id="salesActivityModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9999;align-items:center;justify-content:center;padding:20px;">
+            <div style="background:#fff;border-radius:16px;width:100%;max-width:400px;max-height:90vh;overflow-y:auto;padding:24px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+                    <h3 id="salesModalTitle" style="margin:0;font-size:18px;">📞 記錄電話拜訪</h3>
+                    <button onclick="closeSalesActivityModal()" style="background:none;border:none;font-size:24px;cursor:pointer;color:#94A3B8;padding:0;line-height:1;">×</button>
+                </div>
+                <input type="hidden" id="saType" value="call">
+                <div class="form-group">
+                    <label>客戶（選填）</label>
+                    <select id="saClientSelect" style="width:100%;padding:12px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;">
+                        <option value="">-- 不指定 --</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>說明 *</label>
+                    <textarea id="saDescription" rows="3" placeholder="例：介紹新產品方案" style="width:100%;padding:12px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;resize:vertical;box-sizing:border-box;"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>時長（分鐘）</label>
+                    <input type="number" id="saDuration" placeholder="例：30" min="0" style="width:100%;padding:12px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;box-sizing:border-box;">
+                </div>
+                <div class="form-group">
+                    <label>結果</label>
+                    <select id="saResult" style="width:100%;padding:12px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;">
+                        <option value="">-- 選擇結果 --</option>
+                        <option value="interested">🟢 有興趣</option>
+                        <option value="follow-up">🟡 需追蹤</option>
+                        <option value="closed">🎉 成交</option>
+                        <option value="rejected">🔴 拒絕</option>
+                        <option value="no-answer">⚪ 未接</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>備註</label>
+                    <input type="text" id="saNotes" placeholder="選填" style="width:100%;padding:12px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;box-sizing:border-box;">
+                </div>
+                <div style="display:flex;gap:8px;margin-top:16px;">
+                    <button onclick="closeSalesActivityModal()" style="flex:1;padding:14px;border:1px solid #E2E8F0;border-radius:10px;background:#fff;font-weight:600;font-size:14px;cursor:pointer;color:#64748B;">取消</button>
+                    <button onclick="saveSalesActivity()" style="flex:1;padding:14px;border:none;border-radius:10px;background:linear-gradient(135deg,#059669,#10B981);color:#fff;font-weight:700;font-size:14px;cursor:pointer;">💾 儲存</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 快速新增客戶 Modal -->
+        <div id="quickAddClientModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9999;display:none;align-items:center;justify-content:center;padding:20px;">
+            <div style="background:#fff;border-radius:16px;width:100%;max-width:400px;max-height:90vh;overflow-y:auto;padding:24px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+                    <h3 style="margin:0;font-size:18px;">🏢 快速新增客戶</h3>
+                    <button onclick="closeQuickAddClientModal()" style="background:none;border:none;font-size:24px;cursor:pointer;color:#94A3B8;padding:0;line-height:1;">×</button>
+                </div>
+                <div class="form-group">
+                    <label>公司名稱 *</label>
+                    <input type="text" id="qaClientName" placeholder="例：台北科技有限公司" style="width:100%;padding:12px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;box-sizing:border-box;">
+                </div>
+                <div class="form-group">
+                    <label>聯絡人</label>
+                    <input type="text" id="qaClientContact" placeholder="例：王小明" style="width:100%;padding:12px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;box-sizing:border-box;">
+                </div>
+                <div class="form-group">
+                    <label>電話</label>
+                    <input type="tel" id="qaClientPhone" placeholder="例：02-12345678" style="width:100%;padding:12px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;box-sizing:border-box;">
+                </div>
+                <div class="form-group">
+                    <label>地址</label>
+                    <input type="text" id="qaClientAddress" placeholder="自動取得或手動輸入" style="width:100%;padding:12px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;box-sizing:border-box;">
+                </div>
+                <div class="form-group">
+                    <label>GPS 座標</label>
+                    <div style="display:flex;gap:8px;align-items:center;">
+                        <input type="text" id="qaClientLat" placeholder="緯度" readonly style="flex:1;padding:10px;border:1px solid #E2E8F0;border-radius:10px;font-size:13px;background:#F8FAFC;box-sizing:border-box;">
+                        <input type="text" id="qaClientLng" placeholder="經度" readonly style="flex:1;padding:10px;border:1px solid #E2E8F0;border-radius:10px;font-size:13px;background:#F8FAFC;box-sizing:border-box;">
+                    </div>
+                    <button type="button" onclick="qaGetGPS()" style="width:100%;margin-top:8px;padding:10px;border:1px solid #4F46E5;border-radius:10px;background:#EEF2FF;color:#4F46E5;font-weight:600;font-size:13px;cursor:pointer;">📍 取得目前位置</button>
+                </div>
+                <div style="display:flex;gap:8px;margin-top:16px;">
+                    <button onclick="closeQuickAddClientModal()" style="flex:1;padding:14px;border:1px solid #E2E8F0;border-radius:10px;background:#fff;font-weight:600;font-size:14px;cursor:pointer;color:#64748B;">取消</button>
+                    <button onclick="saveQuickClient()" style="flex:1;padding:14px;border:none;border-radius:10px;background:linear-gradient(135deg,#059669,#10B981);color:#fff;font-weight:700;font-size:14px;cursor:pointer;">💾 儲存</button>
+                </div>
+            </div>
+        </div>
+
         <!-- 系統設定頁面 -->
         <div id="settingsPage" class="page">
             <button class="btn btn-secondary" onclick="window.location.href='index.html'" class="btn-auto-mb">← 返回</button>
@@ -269,6 +401,7 @@
             if(id==='lunchPage') { loadLunchSummary(); checkMyOrder(); checkDeadline(); loadLunchManagerReport(); checkLunarNotice(); }
             if(id==='settingsPage') renderLocationList();
             if(id==='fieldWorkPage') initFieldWorkPage();
+            if(id==='salesActivityPage') { loadClients().then(() => initSalesPage()); }
         }
 
         // ===== 農曆日曆（初一/十五提醒） =====
@@ -614,6 +747,68 @@
             } catch(e) { console.error('載入客戶失敗', e); }
         }
 
+        // ===== 快速新增客戶 =====
+        function showQuickAddClientModal() {
+            const modal = document.getElementById('quickAddClientModal');
+            modal.style.display = 'flex';
+            // 清空表單
+            document.getElementById('qaClientName').value = '';
+            document.getElementById('qaClientContact').value = '';
+            document.getElementById('qaClientPhone').value = '';
+            document.getElementById('qaClientAddress').value = '';
+            document.getElementById('qaClientLat').value = '';
+            document.getElementById('qaClientLng').value = '';
+            // 自動取得 GPS
+            qaGetGPS();
+        }
+
+        function closeQuickAddClientModal() {
+            document.getElementById('quickAddClientModal').style.display = 'none';
+        }
+
+        async function qaGetGPS() {
+            try {
+                const loc = await getGPS();
+                document.getElementById('qaClientLat').value = loc.latitude.toFixed(6);
+                document.getElementById('qaClientLng').value = loc.longitude.toFixed(6);
+                showToast('📍 已取得位置');
+            } catch(e) {
+                console.warn('GPS 取得失敗', e);
+                showToast('⚠️ 無法取得位置，請手動輸入地址');
+            }
+        }
+
+        async function saveQuickClient() {
+            const name = document.getElementById('qaClientName').value.trim();
+            if (!name) return showToast('請輸入公司名稱');
+
+            const record = {
+                company_name: name,
+                contact_person: document.getElementById('qaClientContact').value.trim() || null,
+                phone: document.getElementById('qaClientPhone').value.trim() || null,
+                address: document.getElementById('qaClientAddress').value.trim() || null,
+                latitude: parseFloat(document.getElementById('qaClientLat').value) || null,
+                longitude: parseFloat(document.getElementById('qaClientLng').value) || null,
+                is_active: true
+            };
+            if (currentCompanyId) record.company_id = currentCompanyId;
+
+            try {
+                const { data, error } = await sb.from('clients').insert(record).select().single();
+                if (error) throw error;
+
+                showToast('✅ 客戶已新增');
+                closeQuickAddClientModal();
+
+                // 刷新下拉並自動選中
+                await loadClients();
+                document.getElementById('fwClientSelect').value = data.id;
+            } catch(e) {
+                console.error(e);
+                showToast('❌ 新增失敗：' + friendlyError(e));
+            }
+        }
+
         async function loadServiceItems() {
             try {
                 const { data } = await sb.from('service_items').select('*').eq('is_active', true).order('name');
@@ -947,6 +1142,177 @@
             }
         }
 
+        // ===== 業務週報 =====
+        let salesCurrentWeekStart = null; // Date object for Monday
+        let salesTarget = { call_target: 0, visit_target: 0 };
+        let salesActivities = [];
+
+        function getMonday(d) {
+            const date = new Date(d);
+            const day = date.getDay();
+            const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+            date.setDate(diff);
+            date.setHours(0, 0, 0, 0);
+            return date;
+        }
+
+        function formatDate(d) {
+            return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+        }
+
+        function getSunday(monday) {
+            const sun = new Date(monday);
+            sun.setDate(sun.getDate() + 6);
+            return sun;
+        }
+
+        async function initSalesPage() {
+            salesCurrentWeekStart = getMonday(new Date());
+            await loadSalesWeekData();
+        }
+
+        function salesChangeWeek(offset) {
+            salesCurrentWeekStart.setDate(salesCurrentWeekStart.getDate() + offset * 7);
+            loadSalesWeekData();
+        }
+
+        async function loadSalesWeekData() {
+            if (!currentEmployee) return;
+            const monday = formatDate(salesCurrentWeekStart);
+            const sunday = formatDate(getSunday(salesCurrentWeekStart));
+
+            // 更新週標籤
+            document.getElementById('salesWeekLabel').textContent =
+                `${monday.substring(5).replace('-','/')} ~ ${sunday.substring(5).replace('-','/')}`;
+
+            // 載入目標（先找個人，再找全員預設）
+            try {
+                let { data: target } = await sb.from('sales_targets')
+                    .select('*')
+                    .eq('employee_id', currentEmployee.id)
+                    .eq('week_start', monday)
+                    .maybeSingle();
+
+                if (!target) {
+                    // 找全員預設（employee_id IS NULL）
+                    const { data: defaultTarget } = await sb.from('sales_targets')
+                        .select('*')
+                        .is('employee_id', null)
+                        .eq('week_start', monday)
+                        .maybeSingle();
+                    target = defaultTarget;
+                }
+                salesTarget = target || { call_target: 0, visit_target: 0 };
+            } catch(e) { console.error('載入目標失敗', e); }
+
+            // 載入本週活動
+            try {
+                const { data } = await sb.from('sales_activities')
+                    .select('*, clients(company_name)')
+                    .eq('employee_id', currentEmployee.id)
+                    .gte('activity_date', monday)
+                    .lte('activity_date', sunday)
+                    .order('created_at', { ascending: false });
+                salesActivities = data || [];
+            } catch(e) { console.error('載入活動失敗', e); }
+
+            renderSalesProgress();
+            renderSalesActivityList();
+            // 填充客戶下拉
+            const sel = document.getElementById('saClientSelect');
+            if (sel) {
+                sel.innerHTML = '<option value="">-- 不指定 --</option>' +
+                    fwClients.map(c => `<option value="${c.id}">${escapeHTML(c.company_name)}</option>`).join('');
+            }
+        }
+
+        function renderSalesProgress() {
+            const callDone = salesActivities.filter(a => a.activity_type === 'call').length;
+            const visitDone = salesActivities.filter(a => a.activity_type === 'visit').length;
+            const callTarget = salesTarget.call_target || 0;
+            const visitTarget = salesTarget.visit_target || 0;
+
+            document.getElementById('salesCallText').textContent = `${callDone} / ${callTarget}`;
+            document.getElementById('salesVisitText').textContent = `${visitDone} / ${visitTarget}`;
+
+            const callPct = callTarget > 0 ? Math.min(100, Math.round(callDone / callTarget * 100)) : 0;
+            const visitPct = visitTarget > 0 ? Math.min(100, Math.round(visitDone / visitTarget * 100)) : 0;
+            document.getElementById('salesCallBar').style.width = callPct + '%';
+            document.getElementById('salesVisitBar').style.width = visitPct + '%';
+        }
+
+        function renderSalesActivityList() {
+            const el = document.getElementById('salesActivityList');
+            if (!el) return;
+            if (salesActivities.length === 0) {
+                el.innerHTML = '<p style="text-align:center;color:#94A3B8;font-size:13px;padding:16px;">本週尚無活動紀錄</p>';
+                return;
+            }
+            const resultMap = { 'interested':'🟢 有興趣', 'follow-up':'🟡 需追蹤', 'closed':'🎉 成交', 'rejected':'🔴 拒絕', 'no-answer':'⚪ 未接' };
+            const typeIcon = { 'call':'📞', 'visit':'🏢', 'other':'📝' };
+            el.innerHTML = salesActivities.map(a => {
+                const icon = typeIcon[a.activity_type] || '📝';
+                const clientName = a.clients?.company_name || '';
+                const resultLabel = a.result ? (resultMap[a.result] || a.result) : '';
+                const dateStr = a.activity_date ? a.activity_date.substring(5).replace('-', '/') : '';
+                return `<div style="background:#fff;border:1px solid #E2E8F0;border-radius:12px;padding:14px;margin-bottom:8px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                        <span style="font-size:14px;">${icon} <b>${escapeHTML(a.description || '')}</b></span>
+                        <span style="font-size:12px;color:#64748B;">${dateStr}</span>
+                    </div>
+                    <div style="font-size:12px;color:#64748B;">
+                        ${clientName ? '<span style="background:#EFF6FF;color:#2563EB;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600;">' + escapeHTML(clientName) + '</span> ' : ''}
+                        ${a.duration_minutes ? a.duration_minutes + '分鐘 ' : ''}
+                        ${resultLabel ? '<span style="font-size:11px;">' + resultLabel + '</span>' : ''}
+                    </div>
+                    ${a.notes ? '<div style="font-size:12px;color:#94A3B8;margin-top:4px;">' + escapeHTML(a.notes) + '</div>' : ''}
+                </div>`;
+            }).join('');
+        }
+
+        function showSalesActivityModal(type) {
+            document.getElementById('saType').value = type;
+            document.getElementById('salesModalTitle').textContent = type === 'call' ? '📞 記錄電話拜訪' : '🏢 記錄實地拜訪';
+            document.getElementById('saDescription').value = '';
+            document.getElementById('saDuration').value = '';
+            document.getElementById('saResult').value = '';
+            document.getElementById('saNotes').value = '';
+            document.getElementById('saClientSelect').value = '';
+            document.getElementById('salesActivityModal').style.display = 'flex';
+        }
+
+        function closeSalesActivityModal() {
+            document.getElementById('salesActivityModal').style.display = 'none';
+        }
+
+        async function saveSalesActivity() {
+            const desc = document.getElementById('saDescription').value.trim();
+            if (!desc) return showToast('請輸入說明');
+
+            const record = {
+                employee_id: currentEmployee.id,
+                activity_type: document.getElementById('saType').value,
+                activity_date: formatDate(new Date()),
+                description: desc,
+                duration_minutes: parseInt(document.getElementById('saDuration').value) || 0,
+                result: document.getElementById('saResult').value || null,
+                notes: document.getElementById('saNotes').value.trim() || null,
+                client_id: document.getElementById('saClientSelect').value || null
+            };
+            if (currentCompanyId) record.company_id = currentCompanyId;
+
+            try {
+                const { error } = await sb.from('sales_activities').insert(record);
+                if (error) throw error;
+                showToast('✅ 活動已記錄');
+                closeSalesActivityModal();
+                await loadSalesWeekData();
+            } catch(e) {
+                console.error(e);
+                showToast('❌ 儲存失敗：' + friendlyError(e));
+            }
+        }
+
         // 頁面載入完成後初始化
         window.addEventListener('load', async () => {
             // 確保 common.js 中的函數已載入
@@ -961,6 +1327,7 @@
 
             if (hash === '#settings') pageId = 'settingsPage';
             if (hash === '#fieldwork') pageId = 'fieldWorkPage';
+            if (hash === '#sales') pageId = 'salesActivityPage';
 
             const initialized = await initializeLiff();
             if (initialized) {

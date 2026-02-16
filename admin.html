@@ -91,6 +91,15 @@
                 <div class="menu-item" data-require="admin" onclick="showPage('fieldWorkApprovalPage')">
                     <div class="icon">📍</div><div class="label">外勤審核</div>
                 </div>
+                <div class="menu-item" data-require="admin" data-feature="sales_target" onclick="showPage('salesTargetPage')">
+                    <div class="icon">🎯</div><div class="label">業務目標</div>
+                </div>
+                <div class="menu-item" data-require="admin" data-feature="store_ordering" onclick="showPage('storeManagePage')">
+                    <div class="icon">🍽️</div><div class="label">商店管理</div>
+                </div>
+                <div class="menu-item" data-require="admin" data-feature="store_ordering" onclick="showPage('orderManagePage')">
+                    <div class="icon">📦</div><div class="label">訂單管理</div>
+                </div>
                 <div class="menu-item" data-require="admin" onclick="showPage('insurancePage')">
                     <div class="icon">🏥</div><div class="label">勞健保級距</div>
                 </div>
@@ -1074,6 +1083,218 @@
             </div>
         </div>
 
+        <!-- ====== 商店管理 ====== -->
+        <div id="storeManagePage" class="page">
+            <button class="btn btn-secondary" onclick="showPage('adminHomePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
+            <div class="checkin-page">
+                <h2>🍽️ 商店管理</h2>
+
+                <button class="btn btn-primary" onclick="showStoreModal()" style="margin-bottom:16px;font-size:13px;padding:12px;">+ 新增商店</button>
+
+                <div id="storeList"><p style="text-align:center;color:#999;">載入中...</p></div>
+            </div>
+        </div>
+
+        <!-- 商店編輯 Modal -->
+        <div id="storeModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9999;align-items:center;justify-content:center;padding:20px;">
+            <div style="background:#fff;border-radius:16px;width:100%;max-width:440px;max-height:90vh;overflow-y:auto;padding:24px;">
+                <h3 id="storeModalTitle" style="margin-bottom:16px;">新增商店</h3>
+                <input type="hidden" id="storeEditId">
+                <div class="form-group">
+                    <label>關聯客戶 *</label>
+                    <select id="storeClientSelect" style="width:100%;padding:12px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;">
+                        <option value="">-- 選擇客戶 --</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>商店名稱 *</label>
+                    <input type="text" id="storeNameInput" placeholder="例：Mike's Cafe" style="width:100%;padding:12px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;box-sizing:border-box;">
+                </div>
+                <div class="form-group">
+                    <label>URL 代碼 (slug)</label>
+                    <input type="text" id="storeSlugInput" placeholder="例：mikes-cafe（英文小寫+連字號）" style="width:100%;padding:12px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;box-sizing:border-box;">
+                </div>
+                <div class="form-group">
+                    <label>商店類型</label>
+                    <select id="storeTypeSelect" style="width:100%;padding:12px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;">
+                        <option value="restaurant">餐飲</option>
+                        <option value="service">服務業</option>
+                        <option value="retail">零售</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>說明</label>
+                    <input type="text" id="storeDescInput" placeholder="選填" style="width:100%;padding:12px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;box-sizing:border-box;">
+                </div>
+                <div class="form-group">
+                    <label>電話</label>
+                    <input type="tel" id="storePhoneInput" placeholder="選填" style="width:100%;padding:12px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;box-sizing:border-box;">
+                </div>
+                <div class="form-group">
+                    <label>地址</label>
+                    <input type="text" id="storeAddressInput" placeholder="選填" style="width:100%;padding:12px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;box-sizing:border-box;">
+                </div>
+                <div class="form-group">
+                    <label>主題色</label>
+                    <input type="color" id="storeColorInput" value="#4F46E5" style="width:60px;height:40px;border:none;cursor:pointer;">
+                </div>
+                <div style="display:flex;gap:8px;margin-top:16px;">
+                    <button onclick="closeStoreModal()" style="flex:1;padding:14px;border:1px solid #E2E8F0;border-radius:10px;background:#fff;font-weight:600;cursor:pointer;color:#64748B;">取消</button>
+                    <button onclick="saveStore()" style="flex:1;padding:14px;border:none;border-radius:10px;background:linear-gradient(135deg,#059669,#10B981);color:#fff;font-weight:700;cursor:pointer;">💾 儲存</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 菜單管理 Modal -->
+        <div id="menuManageModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9999;align-items:flex-start;justify-content:center;padding:10px;overflow-y:auto;">
+            <div style="background:#fff;border-radius:16px;width:100%;max-width:500px;max-height:95vh;overflow-y:auto;padding:24px;margin:auto;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+                    <h3 id="menuManageTitle" style="margin:0;">菜單管理</h3>
+                    <button onclick="closeMenuManage()" style="background:none;border:none;font-size:24px;cursor:pointer;color:#94A3B8;">×</button>
+                </div>
+
+                <!-- 分類管理 -->
+                <div style="background:#F8FAFC;border-radius:12px;padding:14px;margin-bottom:16px;">
+                    <div style="font-weight:700;font-size:14px;margin-bottom:8px;">📂 分類</div>
+                    <div id="menuCatList" style="margin-bottom:8px;"></div>
+                    <div style="display:flex;gap:8px;">
+                        <input type="text" id="newCatName" placeholder="新分類名稱" style="flex:1;padding:8px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;box-sizing:border-box;">
+                        <button onclick="addMenuCategory()" style="padding:8px 14px;border:none;border-radius:8px;background:#4F46E5;color:#fff;font-weight:600;font-size:13px;cursor:pointer;">+ 新增</button>
+                    </div>
+                </div>
+
+                <!-- 品項管理 -->
+                <div style="font-weight:700;font-size:14px;margin-bottom:8px;">🍽️ 品項</div>
+                <button onclick="showMenuItemForm()" style="width:100%;padding:10px;border:1px dashed #4F46E5;border-radius:10px;background:#EEF2FF;color:#4F46E5;font-weight:600;font-size:13px;cursor:pointer;margin-bottom:12px;">+ 新增品項</button>
+                <div id="menuItemList"></div>
+
+                <!-- 新增/編輯品項表單 -->
+                <div id="menuItemForm" style="display:none;background:#F8FAFC;border-radius:12px;padding:14px;margin-top:12px;">
+                    <input type="hidden" id="miEditId">
+                    <div class="form-group">
+                        <label style="font-size:12px;">品名 *</label>
+                        <input type="text" id="miName" placeholder="例：招牌牛肉麵" style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;box-sizing:border-box;">
+                    </div>
+                    <div class="form-group">
+                        <label style="font-size:12px;">分類</label>
+                        <select id="miCategory" style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;"></select>
+                    </div>
+                    <div class="form-group">
+                        <label style="font-size:12px;">價格 *</label>
+                        <input type="number" id="miPrice" min="0" placeholder="0" style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;box-sizing:border-box;">
+                    </div>
+                    <div class="form-group">
+                        <label style="font-size:12px;">說明</label>
+                        <input type="text" id="miDesc" placeholder="選填" style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;box-sizing:border-box;">
+                    </div>
+                    <div style="display:flex;gap:8px;">
+                        <button onclick="cancelMenuItemForm()" style="flex:1;padding:10px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;font-size:13px;cursor:pointer;">取消</button>
+                        <button onclick="saveMenuItem()" style="flex:1;padding:10px;border:none;border-radius:8px;background:#059669;color:#fff;font-weight:600;font-size:13px;cursor:pointer;">儲存</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- QR Code Modal -->
+        <div id="storeQRModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9999;display:none;align-items:center;justify-content:center;padding:20px;">
+            <div style="background:#fff;border-radius:16px;padding:24px;text-align:center;max-width:360px;width:100%;">
+                <h3 id="storeQRTitle" style="margin-bottom:12px;"></h3>
+                <div id="storeQRCode" style="display:inline-block;margin-bottom:12px;"></div>
+                <p id="storeQRUrl" style="font-size:12px;color:#64748B;word-break:break-all;margin-bottom:12px;"></p>
+                <button onclick="closeStoreQR()" style="padding:12px 24px;border:1px solid #E2E8F0;border-radius:10px;background:#fff;font-weight:600;cursor:pointer;">關閉</button>
+            </div>
+        </div>
+
+        <!-- ====== 訂單管理 ====== -->
+        <div id="orderManagePage" class="page">
+            <button class="btn btn-secondary" onclick="showPage('adminHomePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
+            <div class="checkin-page">
+                <h2>📦 訂單管理</h2>
+
+                <!-- 篩選 -->
+                <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+                    <select id="omStoreFilter" style="flex:1;min-width:120px;padding:8px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;">
+                        <option value="">全部商店</option>
+                    </select>
+                    <select id="omStatusFilter" style="padding:8px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;">
+                        <option value="">全部狀態</option>
+                        <option value="pending" selected>待處理</option>
+                        <option value="confirmed">已確認</option>
+                        <option value="preparing">準備中</option>
+                        <option value="ready">可取餐</option>
+                        <option value="completed">已完成</option>
+                        <option value="cancelled">已取消</option>
+                    </select>
+                    <button class="btn btn-primary" onclick="loadOrderList()" style="font-size:12px;padding:8px 14px;">查詢</button>
+                </div>
+
+                <!-- 統計 -->
+                <div style="display:flex;gap:8px;margin-bottom:12px;">
+                    <div style="flex:1;text-align:center;padding:8px;background:#FEF3C7;border-radius:8px;">
+                        <div style="font-size:18px;font-weight:900;color:#92400E;" id="omPendingCount">0</div>
+                        <div style="font-size:10px;color:#92400E;">待處理</div>
+                    </div>
+                    <div style="flex:1;text-align:center;padding:8px;background:#DBEAFE;border-radius:8px;">
+                        <div style="font-size:18px;font-weight:900;color:#1E40AF;" id="omTodayCount">0</div>
+                        <div style="font-size:10px;color:#1E40AF;">今日訂單</div>
+                    </div>
+                    <div style="flex:1;text-align:center;padding:8px;background:#D1FAE5;border-radius:8px;">
+                        <div style="font-size:18px;font-weight:900;color:#059669;" id="omTodayRevenue">$0</div>
+                        <div style="font-size:10px;color:#059669;">今日營收</div>
+                    </div>
+                </div>
+
+                <div id="orderList"><p style="text-align:center;color:#999;">載入中...</p></div>
+            </div>
+        </div>
+
+        <!-- 訂單明細 Modal -->
+        <div id="orderDetailModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9999;align-items:center;justify-content:center;padding:20px;">
+            <div style="background:#fff;border-radius:16px;width:100%;max-width:420px;max-height:90vh;overflow-y:auto;padding:24px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+                    <h3 id="odTitle" style="margin:0;">訂單明細</h3>
+                    <button onclick="closeOrderDetail()" style="background:none;border:none;font-size:24px;cursor:pointer;color:#94A3B8;">×</button>
+                </div>
+                <div id="odContent"></div>
+                <div id="odActions" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;"></div>
+            </div>
+        </div>
+
+        <!-- ====== 業務目標管理 ====== -->
+        <div id="salesTargetPage" class="page">
+            <button class="btn btn-secondary" onclick="showPage('adminHomePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
+            <div class="checkin-page">
+                <h2>🎯 業務目標管理</h2>
+
+                <!-- 週切換 -->
+                <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:16px;">
+                    <button onclick="stChangeWeek(-1)" style="padding:8px 14px;border:1px solid #E2E8F0;border-radius:10px;background:#fff;cursor:pointer;font-size:16px;">←</button>
+                    <span id="stWeekLabel" style="font-weight:700;font-size:14px;min-width:180px;text-align:center;"></span>
+                    <button onclick="stChangeWeek(1)" style="padding:8px 14px;border:1px solid #E2E8F0;border-radius:10px;background:#fff;cursor:pointer;font-size:16px;">→</button>
+                </div>
+
+                <!-- 設定目標區 -->
+                <div style="background:#fff;border-radius:14px;padding:16px;box-shadow:0 2px 8px rgba(0,0,0,0.06);margin-bottom:16px;">
+                    <div style="font-size:14px;font-weight:800;color:#0F172A;margin-bottom:12px;">🎯 本週全員預設目標</div>
+                    <div style="display:flex;gap:12px;margin-bottom:12px;">
+                        <div style="flex:1;">
+                            <label style="font-size:12px;font-weight:600;color:#64748B;display:block;margin-bottom:4px;">📞 電話拜訪</label>
+                            <input type="number" id="stDefaultCall" min="0" value="0" style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;box-sizing:border-box;">
+                        </div>
+                        <div style="flex:1;">
+                            <label style="font-size:12px;font-weight:600;color:#64748B;display:block;margin-bottom:4px;">🏢 實地拜訪</label>
+                            <input type="number" id="stDefaultVisit" min="0" value="0" style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;box-sizing:border-box;">
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" onclick="saveDefaultTarget()" style="font-size:13px;padding:10px;">💾 儲存預設目標</button>
+                </div>
+
+                <!-- 全員進度總覽 -->
+                <div style="font-size:14px;font-weight:800;color:#0F172A;margin-bottom:12px;">📊 全員進度總覽</div>
+                <div id="stProgressList"><p style="text-align:center;color:#999;">載入中...</p></div>
+            </div>
+        </div>
+
     </div>
     <nav class="bottom-nav" id="bottomNav" style="display:none;">
         <a class="nav-item" onclick="window.location.href='index.html'">
@@ -1143,6 +1364,9 @@
             if (id === 'fieldWorkApprovalPage') { initFieldWorkApproval(); }
             if (id === 'insurancePage') { loadInsuranceBrackets(); }
             if (id === 'companyPage') { loadCompanyList(); }
+            if (id === 'salesTargetPage') { initSalesTargetPage(); }
+            if (id === 'storeManagePage') { loadStoreList(); }
+            if (id === 'orderManagePage') { initOrderManage(); }
         }
 
         // ===== 功能管理 =====
@@ -4352,6 +4576,608 @@
                 } else {
                     showToast('❌ 儲存失敗'); console.error(e);
                 }
+            }
+        }
+
+        // ===== 商店管理 =====
+        let smStores = [];
+        let smCurrentStoreId = null;
+        let smCategories = [];
+        let smItems = [];
+
+        async function loadStoreList() {
+            try {
+                let q = sb.from('store_profiles').select('*, clients(company_name)').order('created_at', { ascending: false });
+                if (currentCompanyId) q = q.eq('company_id', currentCompanyId);
+                const { data } = await q;
+                smStores = data || [];
+                renderStoreList();
+            } catch(e) { console.error(e); }
+        }
+
+        function renderStoreList() {
+            const el = document.getElementById('storeList');
+            if (smStores.length === 0) {
+                el.innerHTML = '<p style="text-align:center;color:#94A3B8;font-size:13px;padding:16px;">尚無商店</p>';
+                return;
+            }
+            const typeLabel = { restaurant:'🍽️ 餐飲', service:'💈 服務', retail:'🛒 零售' };
+            el.innerHTML = smStores.map(s => `
+                <div style="background:#fff;border:1px solid #E2E8F0;border-radius:12px;padding:14px;margin-bottom:8px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                        <span style="font-weight:700;font-size:14px;">${escapeHTML(s.store_name)}</span>
+                        <span style="font-size:11px;color:${s.is_active ? '#059669' : '#94A3B8'};">${s.is_active ? '營業中' : '暫停'}</span>
+                    </div>
+                    <div style="font-size:12px;color:#64748B;margin-bottom:8px;">
+                        ${typeLabel[s.store_type] || s.store_type}
+                        ${s.clients?.company_name ? ' · ' + escapeHTML(s.clients.company_name) : ''}
+                        ${s.store_slug ? ' · <code>' + escapeHTML(s.store_slug) + '</code>' : ''}
+                    </div>
+                    <div style="display:flex;gap:6px;flex-wrap:wrap;">
+                        <button onclick="editStore('${s.id}')" style="padding:6px 12px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;font-size:12px;cursor:pointer;">📝 編輯</button>
+                        <button onclick="openMenuManage('${s.id}')" style="padding:6px 12px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;font-size:12px;cursor:pointer;">🍽️ 菜單</button>
+                        <button onclick="showStoreQR('${s.id}')" style="padding:6px 12px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;font-size:12px;cursor:pointer;">📱 QR</button>
+                        <button onclick="toggleStoreActive('${s.id}', ${!s.is_active})" style="padding:6px 12px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;font-size:12px;cursor:pointer;">${s.is_active ? '⏸️ 暫停' : '▶️ 啟用'}</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function showStoreModal(storeId) {
+            // 載入客戶下拉
+            let cq = sb.from('clients').select('id, company_name').eq('is_active', true).order('company_name');
+            if (currentCompanyId) cq = cq.eq('company_id', currentCompanyId);
+            const { data: clients } = await cq;
+            document.getElementById('storeClientSelect').innerHTML = '<option value="">-- 選擇客戶 --</option>' +
+                (clients || []).map(c => `<option value="${c.id}">${escapeHTML(c.company_name)}</option>`).join('');
+
+            if (storeId) {
+                const s = smStores.find(x => x.id === storeId);
+                if (!s) return;
+                document.getElementById('storeModalTitle').textContent = '編輯商店';
+                document.getElementById('storeEditId').value = s.id;
+                document.getElementById('storeClientSelect').value = s.client_id || '';
+                document.getElementById('storeNameInput').value = s.store_name;
+                document.getElementById('storeSlugInput').value = s.store_slug || '';
+                document.getElementById('storeTypeSelect').value = s.store_type || 'restaurant';
+                document.getElementById('storeDescInput').value = s.description || '';
+                document.getElementById('storePhoneInput').value = s.phone || '';
+                document.getElementById('storeAddressInput').value = s.address || '';
+                document.getElementById('storeColorInput').value = s.theme_color || '#4F46E5';
+            } else {
+                document.getElementById('storeModalTitle').textContent = '新增商店';
+                document.getElementById('storeEditId').value = '';
+                document.getElementById('storeClientSelect').value = '';
+                document.getElementById('storeNameInput').value = '';
+                document.getElementById('storeSlugInput').value = '';
+                document.getElementById('storeTypeSelect').value = 'restaurant';
+                document.getElementById('storeDescInput').value = '';
+                document.getElementById('storePhoneInput').value = '';
+                document.getElementById('storeAddressInput').value = '';
+                document.getElementById('storeColorInput').value = '#4F46E5';
+            }
+            document.getElementById('storeModal').style.display = 'flex';
+        }
+
+        function editStore(id) { showStoreModal(id); }
+        function closeStoreModal() { document.getElementById('storeModal').style.display = 'none'; }
+
+        async function saveStore() {
+            const name = document.getElementById('storeNameInput').value.trim();
+            const clientId = document.getElementById('storeClientSelect').value;
+            if (!name) return showToast('請輸入商店名稱');
+            if (!clientId) return showToast('請選擇關聯客戶');
+
+            const record = {
+                client_id: clientId,
+                store_name: name,
+                store_slug: document.getElementById('storeSlugInput').value.trim().toLowerCase().replace(/[^a-z0-9-]/g, '') || null,
+                store_type: document.getElementById('storeTypeSelect').value,
+                description: document.getElementById('storeDescInput').value.trim() || null,
+                phone: document.getElementById('storePhoneInput').value.trim() || null,
+                address: document.getElementById('storeAddressInput').value.trim() || null,
+                theme_color: document.getElementById('storeColorInput').value
+            };
+            if (currentCompanyId) record.company_id = currentCompanyId;
+
+            try {
+                const editId = document.getElementById('storeEditId').value;
+                if (editId) {
+                    record.updated_at = new Date().toISOString();
+                    await sb.from('store_profiles').update(record).eq('id', editId);
+                } else {
+                    await sb.from('store_profiles').insert(record);
+                }
+                showToast('✅ 商店已儲存');
+                closeStoreModal();
+                await loadStoreList();
+            } catch(e) {
+                console.error(e);
+                showToast('❌ 儲存失敗：' + friendlyError(e));
+            }
+        }
+
+        async function toggleStoreActive(id, active) {
+            try {
+                await sb.from('store_profiles').update({ is_active: active, updated_at: new Date().toISOString() }).eq('id', id);
+                showToast(active ? '✅ 已啟用' : '⏸️ 已暫停');
+                await loadStoreList();
+            } catch(e) { showToast('❌ 操作失敗'); }
+        }
+
+        function showStoreQR(storeId) {
+            const s = smStores.find(x => x.id === storeId);
+            if (!s) return;
+            const slug = s.store_slug || s.id;
+            const url = `${location.origin}/order.html?store=${slug}`;
+            document.getElementById('storeQRTitle').textContent = s.store_name;
+            document.getElementById('storeQRUrl').textContent = url;
+            const qrEl = document.getElementById('storeQRCode');
+            qrEl.innerHTML = '';
+            if (typeof QRCode !== 'undefined') {
+                new QRCode(qrEl, { text: url, width: 200, height: 200 });
+            } else {
+                qrEl.innerHTML = '<p style="color:#94A3B8;">QRCode 元件未載入</p>';
+            }
+            document.getElementById('storeQRModal').style.display = 'flex';
+        }
+
+        function closeStoreQR() { document.getElementById('storeQRModal').style.display = 'none'; }
+
+        // --- 菜單管理 ---
+        async function openMenuManage(storeId) {
+            smCurrentStoreId = storeId;
+            const s = smStores.find(x => x.id === storeId);
+            document.getElementById('menuManageTitle').textContent = (s?.store_name || '') + ' 菜單管理';
+
+            await Promise.all([loadMenuCategories(), loadMenuItems()]);
+            document.getElementById('menuManageModal').style.display = 'flex';
+        }
+
+        function closeMenuManage() {
+            document.getElementById('menuManageModal').style.display = 'none';
+            smCurrentStoreId = null;
+        }
+
+        async function loadMenuCategories() {
+            const { data } = await sb.from('menu_categories')
+                .select('*')
+                .eq('store_id', smCurrentStoreId)
+                .order('sort_order');
+            smCategories = data || [];
+            renderMenuCatList();
+            updateMiCategorySelect();
+        }
+
+        function renderMenuCatList() {
+            const el = document.getElementById('menuCatList');
+            if (smCategories.length === 0) {
+                el.innerHTML = '<p style="font-size:12px;color:#94A3B8;">尚無分類</p>';
+                return;
+            }
+            el.innerHTML = smCategories.map(c => `
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #F1F5F9;">
+                    <span style="font-size:13px;font-weight:600;">${escapeHTML(c.name)}</span>
+                    <button onclick="deleteMenuCategory('${c.id}')" style="background:none;border:none;color:#EF4444;cursor:pointer;font-size:12px;">刪除</button>
+                </div>
+            `).join('');
+        }
+
+        function updateMiCategorySelect() {
+            const sel = document.getElementById('miCategory');
+            sel.innerHTML = '<option value="">-- 不分類 --</option>' +
+                smCategories.map(c => `<option value="${c.id}">${escapeHTML(c.name)}</option>`).join('');
+        }
+
+        async function addMenuCategory() {
+            const name = document.getElementById('newCatName').value.trim();
+            if (!name) return showToast('請輸入分類名稱');
+            try {
+                await sb.from('menu_categories').insert({
+                    store_id: smCurrentStoreId,
+                    name: name,
+                    sort_order: smCategories.length
+                });
+                document.getElementById('newCatName').value = '';
+                showToast('✅ 分類已新增');
+                await loadMenuCategories();
+            } catch(e) { showToast('❌ 新增失敗'); }
+        }
+
+        async function deleteMenuCategory(id) {
+            if (!confirm('確定刪除此分類？（品項不會被刪除）')) return;
+            try {
+                await sb.from('menu_categories').delete().eq('id', id);
+                showToast('✅ 已刪除');
+                await loadMenuCategories();
+            } catch(e) { showToast('❌ 刪除失敗'); }
+        }
+
+        async function loadMenuItems() {
+            const { data } = await sb.from('menu_items')
+                .select('*, menu_categories(name)')
+                .eq('store_id', smCurrentStoreId)
+                .order('sort_order');
+            smItems = data || [];
+            renderMenuItemList();
+        }
+
+        function renderMenuItemList() {
+            const el = document.getElementById('menuItemList');
+            if (smItems.length === 0) {
+                el.innerHTML = '<p style="font-size:12px;color:#94A3B8;text-align:center;">尚無品項</p>';
+                return;
+            }
+            el.innerHTML = smItems.map(i => `
+                <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #F1F5F9;">
+                    <div style="flex:1;min-width:0;">
+                        <div style="font-weight:600;font-size:13px;">${escapeHTML(i.name)} ${!i.is_available ? '<span style="color:#EF4444;font-size:11px;">售完</span>' : ''}</div>
+                        <div style="font-size:11px;color:#64748B;">${i.menu_categories?.name || '未分類'} · $${i.price}</div>
+                    </div>
+                    <button onclick="editMenuItem('${i.id}')" style="padding:4px 10px;border:1px solid #E2E8F0;border-radius:6px;background:#fff;font-size:11px;cursor:pointer;">編輯</button>
+                    <button onclick="toggleItemAvail('${i.id}', ${!i.is_available})" style="padding:4px 10px;border:1px solid #E2E8F0;border-radius:6px;background:#fff;font-size:11px;cursor:pointer;">${i.is_available ? '下架' : '上架'}</button>
+                </div>
+            `).join('');
+        }
+
+        function showMenuItemForm(itemId) {
+            document.getElementById('menuItemForm').style.display = 'block';
+            if (itemId) {
+                const i = smItems.find(x => x.id === itemId);
+                if (!i) return;
+                document.getElementById('miEditId').value = i.id;
+                document.getElementById('miName').value = i.name;
+                document.getElementById('miCategory').value = i.category_id || '';
+                document.getElementById('miPrice').value = i.price;
+                document.getElementById('miDesc').value = i.description || '';
+            } else {
+                document.getElementById('miEditId').value = '';
+                document.getElementById('miName').value = '';
+                document.getElementById('miCategory').value = '';
+                document.getElementById('miPrice').value = '';
+                document.getElementById('miDesc').value = '';
+            }
+        }
+
+        function editMenuItem(id) { showMenuItemForm(id); }
+        function cancelMenuItemForm() { document.getElementById('menuItemForm').style.display = 'none'; }
+
+        async function saveMenuItem() {
+            const name = document.getElementById('miName').value.trim();
+            const price = parseFloat(document.getElementById('miPrice').value);
+            if (!name) return showToast('請輸入品名');
+            if (isNaN(price) || price < 0) return showToast('請輸入有效價格');
+
+            const record = {
+                store_id: smCurrentStoreId,
+                name: name,
+                category_id: document.getElementById('miCategory').value || null,
+                price: price,
+                description: document.getElementById('miDesc').value.trim() || null
+            };
+
+            try {
+                const editId = document.getElementById('miEditId').value;
+                if (editId) {
+                    record.updated_at = new Date().toISOString();
+                    await sb.from('menu_items').update(record).eq('id', editId);
+                } else {
+                    record.sort_order = smItems.length;
+                    await sb.from('menu_items').insert(record);
+                }
+                showToast('✅ 品項已儲存');
+                cancelMenuItemForm();
+                await loadMenuItems();
+            } catch(e) {
+                console.error(e);
+                showToast('❌ 儲存失敗');
+            }
+        }
+
+        async function toggleItemAvail(id, avail) {
+            try {
+                await sb.from('menu_items').update({ is_available: avail, updated_at: new Date().toISOString() }).eq('id', id);
+                showToast(avail ? '✅ 已上架' : '⏸️ 已下架');
+                await loadMenuItems();
+            } catch(e) { showToast('❌ 操作失敗'); }
+        }
+
+        // ===== 訂單管理 =====
+        let omOrders = [];
+
+        async function initOrderManage() {
+            // 填充商店下拉
+            let sq = sb.from('store_profiles').select('id, store_name').eq('is_active', true);
+            if (currentCompanyId) sq = sq.eq('company_id', currentCompanyId);
+            const { data: stores } = await sq;
+            document.getElementById('omStoreFilter').innerHTML = '<option value="">全部商店</option>' +
+                (stores || []).map(s => `<option value="${s.id}">${escapeHTML(s.store_name)}</option>`).join('');
+            await loadOrderList();
+        }
+
+        async function loadOrderList() {
+            try {
+                let q = sb.from('orders').select('*, store_profiles(store_name)').order('created_at', { ascending: false }).limit(100);
+                const storeFilter = document.getElementById('omStoreFilter').value;
+                const statusFilter = document.getElementById('omStatusFilter').value;
+                if (storeFilter) q = q.eq('store_id', storeFilter);
+                if (statusFilter) q = q.eq('status', statusFilter);
+
+                const { data } = await q;
+                omOrders = data || [];
+                renderOrderList();
+                updateOrderStats();
+            } catch(e) { console.error(e); }
+        }
+
+        function updateOrderStats() {
+            const today = fmtDate(new Date());
+            const todayOrders = omOrders.filter(o => o.created_at && o.created_at.startsWith(today));
+            const pending = omOrders.filter(o => o.status === 'pending').length;
+            const revenue = todayOrders.filter(o => o.status !== 'cancelled').reduce((s, o) => s + (parseFloat(o.total) || 0), 0);
+
+            document.getElementById('omPendingCount').textContent = pending;
+            document.getElementById('omTodayCount').textContent = todayOrders.length;
+            document.getElementById('omTodayRevenue').textContent = '$' + revenue;
+        }
+
+        function renderOrderList() {
+            const el = document.getElementById('orderList');
+            if (omOrders.length === 0) {
+                el.innerHTML = '<p style="text-align:center;color:#94A3B8;font-size:13px;padding:16px;">尚無訂單</p>';
+                return;
+            }
+            const statusMap = {
+                pending: { label:'待處理', color:'#92400E', bg:'#FEF3C7' },
+                confirmed: { label:'已確認', color:'#1E40AF', bg:'#DBEAFE' },
+                preparing: { label:'準備中', color:'#7C3AED', bg:'#F5F3FF' },
+                ready: { label:'可取餐', color:'#059669', bg:'#D1FAE5' },
+                completed: { label:'已完成', color:'#64748B', bg:'#F1F5F9' },
+                cancelled: { label:'已取消', color:'#DC2626', bg:'#FEF2F2' }
+            };
+            el.innerHTML = omOrders.map(o => {
+                const st = statusMap[o.status] || { label:o.status, color:'#64748B', bg:'#F1F5F9' };
+                const time = o.created_at ? new Date(o.created_at).toLocaleString('zh-TW', { month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' }) : '';
+                const itemCount = (o.items || []).reduce((s, i) => s + (i.qty || 1), 0);
+                return `<div onclick="showOrderDetail('${o.id}')" style="background:#fff;border:1px solid #E2E8F0;border-radius:12px;padding:14px;margin-bottom:8px;cursor:pointer;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                        <span style="font-weight:700;font-size:14px;">#${escapeHTML(o.order_number)}</span>
+                        <span style="font-size:11px;font-weight:600;padding:2px 10px;border-radius:10px;background:${st.bg};color:${st.color};">${st.label}</span>
+                    </div>
+                    <div style="font-size:12px;color:#64748B;">
+                        ${o.store_profiles?.store_name ? escapeHTML(o.store_profiles.store_name) + ' · ' : ''}
+                        ${escapeHTML(o.customer_name || '?')}
+                        ${o.table_number ? ' · 桌' + escapeHTML(o.table_number) : ''}
+                        · ${itemCount}品 · <b>$${o.total}</b>
+                        · ${time}
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        function showOrderDetail(orderId) {
+            const o = omOrders.find(x => x.id === orderId);
+            if (!o) return;
+            document.getElementById('odTitle').textContent = '#' + o.order_number;
+            const typeLabel = { dine_in:'內用', takeout:'外帶', delivery:'外送' };
+            const items = o.items || [];
+            document.getElementById('odContent').innerHTML = `
+                <div style="margin-bottom:12px;">
+                    <div style="font-size:13px;color:#64748B;">顧客</div>
+                    <div style="font-weight:600;">${escapeHTML(o.customer_name || '?')} ${o.customer_phone ? '· ' + escapeHTML(o.customer_phone) : ''}</div>
+                    <div style="font-size:13px;color:#64748B;">${typeLabel[o.order_type] || ''} ${o.table_number ? '· 桌號 ' + escapeHTML(o.table_number) : ''}</div>
+                </div>
+                <div style="border-top:1px solid #F1F5F9;padding-top:8px;">
+                    ${items.map(i => `<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:14px;">
+                        <span>${escapeHTML(i.name)} x${i.qty}</span>
+                        <span style="font-weight:600;">$${i.subtotal || i.price * i.qty}</span>
+                    </div>`).join('')}
+                    <div style="display:flex;justify-content:space-between;padding:8px 0;border-top:1px solid #E2E8F0;margin-top:4px;font-weight:800;">
+                        <span>合計</span><span>$${o.total}</span>
+                    </div>
+                </div>
+                ${o.notes ? '<div style="margin-top:8px;font-size:13px;color:#64748B;">備註：' + escapeHTML(o.notes) + '</div>' : ''}
+            `;
+
+            // 狀態操作按鈕
+            const actions = [];
+            if (o.status === 'pending') {
+                actions.push(`<button onclick="updateOrderStatus('${o.id}','confirmed')" style="flex:1;padding:10px;border:none;border-radius:10px;background:#2563EB;color:#fff;font-weight:600;cursor:pointer;">✅ 確認</button>`);
+                actions.push(`<button onclick="updateOrderStatus('${o.id}','cancelled')" style="flex:1;padding:10px;border:none;border-radius:10px;background:#EF4444;color:#fff;font-weight:600;cursor:pointer;">❌ 取消</button>`);
+            }
+            if (o.status === 'confirmed') {
+                actions.push(`<button onclick="updateOrderStatus('${o.id}','preparing')" style="flex:1;padding:10px;border:none;border-radius:10px;background:#7C3AED;color:#fff;font-weight:600;cursor:pointer;">🍳 開始準備</button>`);
+            }
+            if (o.status === 'preparing') {
+                actions.push(`<button onclick="updateOrderStatus('${o.id}','ready')" style="flex:1;padding:10px;border:none;border-radius:10px;background:#059669;color:#fff;font-weight:600;cursor:pointer;">🔔 可取餐</button>`);
+            }
+            if (o.status === 'ready') {
+                actions.push(`<button onclick="updateOrderStatus('${o.id}','completed')" style="flex:1;padding:10px;border:none;border-radius:10px;background:#64748B;color:#fff;font-weight:600;cursor:pointer;">✅ 完成</button>`);
+            }
+            document.getElementById('odActions').innerHTML = actions.join('');
+            document.getElementById('orderDetailModal').style.display = 'flex';
+        }
+
+        function closeOrderDetail() { document.getElementById('orderDetailModal').style.display = 'none'; }
+
+        async function updateOrderStatus(orderId, newStatus) {
+            try {
+                await sb.from('orders').update({ status: newStatus, updated_at: new Date().toISOString() }).eq('id', orderId);
+                showToast('✅ 狀態已更新');
+                closeOrderDetail();
+                await loadOrderList();
+            } catch(e) {
+                console.error(e);
+                showToast('❌ 更新失敗');
+            }
+        }
+
+        // ===== 業務目標管理 =====
+        let stWeekStart = null;
+        let stEmployees = [];
+
+        function stGetMonday(d) {
+            const date = new Date(d);
+            const day = date.getDay();
+            const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+            date.setDate(diff);
+            date.setHours(0, 0, 0, 0);
+            return date;
+        }
+
+        function stGetSunday(monday) {
+            const sun = new Date(monday);
+            sun.setDate(sun.getDate() + 6);
+            return sun;
+        }
+
+        async function initSalesTargetPage() {
+            stWeekStart = stGetMonday(new Date());
+            await loadSalesTargetData();
+        }
+
+        function stChangeWeek(offset) {
+            stWeekStart.setDate(stWeekStart.getDate() + offset * 7);
+            loadSalesTargetData();
+        }
+
+        async function loadSalesTargetData() {
+            const monday = fmtDate(stWeekStart);
+            const sunday = fmtDate(stGetSunday(stWeekStart));
+
+            document.getElementById('stWeekLabel').textContent =
+                `${monday.substring(5).replace('-','/')} ~ ${sunday.substring(5).replace('-','/')}`;
+
+            try {
+                // 載入全員預設目標
+                const { data: defaultTarget } = await sb.from('sales_targets')
+                    .select('*')
+                    .is('employee_id', null)
+                    .eq('week_start', monday)
+                    .maybeSingle();
+
+                document.getElementById('stDefaultCall').value = defaultTarget?.call_target || 0;
+                document.getElementById('stDefaultVisit').value = defaultTarget?.visit_target || 0;
+
+                // 載入所有業務員（role = user 或全部）
+                let empQuery = sb.from('employees').select('id, name, employee_number, role').eq('is_active', true);
+                if (currentCompanyId) empQuery = empQuery.eq('company_id', currentCompanyId);
+                const { data: employees } = await empQuery.order('name');
+                stEmployees = employees || [];
+
+                // 載入個人目標
+                const { data: targets } = await sb.from('sales_targets')
+                    .select('*')
+                    .eq('week_start', monday)
+                    .not('employee_id', 'is', null);
+                const targetMap = {};
+                (targets || []).forEach(t => { targetMap[t.employee_id] = t; });
+
+                // 載入本週所有活動
+                const { data: activities } = await sb.from('sales_activities')
+                    .select('employee_id, activity_type')
+                    .gte('activity_date', monday)
+                    .lte('activity_date', sunday);
+
+                // 統計每人達成
+                const activityCount = {};
+                (activities || []).forEach(a => {
+                    if (!activityCount[a.employee_id]) activityCount[a.employee_id] = { call: 0, visit: 0 };
+                    if (a.activity_type === 'call') activityCount[a.employee_id].call++;
+                    if (a.activity_type === 'visit') activityCount[a.employee_id].visit++;
+                });
+
+                renderSalesTargetProgress(targetMap, activityCount, defaultTarget);
+            } catch(e) {
+                console.error('載入業務目標失敗', e);
+                document.getElementById('stProgressList').innerHTML = '<p style="color:#ef4444;text-align:center;">載入失敗</p>';
+            }
+        }
+
+        function renderSalesTargetProgress(targetMap, activityCount, defaultTarget) {
+            const el = document.getElementById('stProgressList');
+            if (stEmployees.length === 0) {
+                el.innerHTML = '<p style="text-align:center;color:#94A3B8;font-size:13px;">尚無員工資料</p>';
+                return;
+            }
+
+            const defCall = defaultTarget?.call_target || 0;
+            const defVisit = defaultTarget?.visit_target || 0;
+
+            el.innerHTML = stEmployees.map(emp => {
+                const t = targetMap[emp.id];
+                const callTarget = t ? t.call_target : defCall;
+                const visitTarget = t ? t.visit_target : defVisit;
+                const done = activityCount[emp.id] || { call: 0, visit: 0 };
+                const callPct = callTarget > 0 ? Math.min(100, Math.round(done.call / callTarget * 100)) : 0;
+                const visitPct = visitTarget > 0 ? Math.min(100, Math.round(done.visit / visitTarget * 100)) : 0;
+
+                return `<div style="background:#fff;border:1px solid #E2E8F0;border-radius:12px;padding:14px;margin-bottom:8px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                        <span style="font-weight:700;font-size:14px;">${escapeHTML(emp.name)}</span>
+                        <span style="font-size:11px;color:#94A3B8;">${escapeHTML(emp.employee_number || '')}</span>
+                    </div>
+                    <div style="display:flex;gap:12px;">
+                        <div style="flex:1;">
+                            <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px;">
+                                <span>📞 電話</span>
+                                <span style="font-weight:700;">${done.call}/${callTarget}</span>
+                            </div>
+                            <div style="width:100%;height:6px;background:#E2E8F0;border-radius:3px;overflow:hidden;">
+                                <div style="height:100%;background:${callPct >= 100 ? '#059669' : '#4F46E5'};width:${callPct}%;border-radius:3px;"></div>
+                            </div>
+                        </div>
+                        <div style="flex:1;">
+                            <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:2px;">
+                                <span>🏢 拜訪</span>
+                                <span style="font-weight:700;">${done.visit}/${visitTarget}</span>
+                            </div>
+                            <div style="width:100%;height:6px;background:#E2E8F0;border-radius:3px;overflow:hidden;">
+                                <div style="height:100%;background:${visitPct >= 100 ? '#059669' : '#10B981'};width:${visitPct}%;border-radius:3px;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        async function saveDefaultTarget() {
+            const callTarget = parseInt(document.getElementById('stDefaultCall').value) || 0;
+            const visitTarget = parseInt(document.getElementById('stDefaultVisit').value) || 0;
+            const weekStart = fmtDate(stWeekStart);
+
+            try {
+                const record = {
+                    employee_id: null,
+                    week_start: weekStart,
+                    call_target: callTarget,
+                    visit_target: visitTarget,
+                    created_by: currentAdminEmployee?.id || null
+                };
+                if (currentCompanyId) record.company_id = currentCompanyId;
+
+                // upsert: employee_id=NULL + week_start unique
+                // 先查有沒有
+                const { data: existing } = await sb.from('sales_targets')
+                    .select('id')
+                    .is('employee_id', null)
+                    .eq('week_start', weekStart)
+                    .maybeSingle();
+
+                if (existing) {
+                    await sb.from('sales_targets').update({
+                        call_target: callTarget,
+                        visit_target: visitTarget
+                    }).eq('id', existing.id);
+                } else {
+                    await sb.from('sales_targets').insert(record);
+                }
+
+                showToast('✅ 預設目標已儲存');
+                await loadSalesTargetData();
+            } catch(e) {
+                console.error(e);
+                showToast('❌ 儲存失敗：' + friendlyError(e));
             }
         }
 

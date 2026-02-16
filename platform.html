@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>🛡️ 平台管理 - SaaS 後台</title>
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="loadingPage" class="loading-screen">
+        <div class="spinner"></div>
+        <p>系統載入中...</p>
+    </div>
+
+    <div class="container">
+        <!-- 權限檢查 -->
+        <div id="permissionPage" class="page active">
+            <div class="card">
+                <div class="bind-header">
+                    <span class="logo">🛡️</span>
+                    <h2>平台管理員驗證</h2>
+                    <p>正在驗證身份...</p>
+                </div>
+                <div id="permissionStatus" class="status-box show info">檢查權限中...</div>
+            </div>
+        </div>
+
+        <!-- 平台首頁 -->
+        <div id="platformHomePage" class="page">
+            <div class="user-card">
+                <div class="user-info">
+                    <div class="avatar" id="platformAvatar">🛡️</div>
+                    <div class="user-details">
+                        <h2 id="platformName">平台管理員</h2>
+                        <p style="font-size:12px;color:#64748B;">SaaS 平台管理</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 儀表板 -->
+            <div class="card" style="padding:16px;margin-bottom:16px;">
+                <div style="font-size:14px;font-weight:700;margin-bottom:12px;">📊 平台概覽</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+                    <div style="text-align:center;padding:12px;background:#DBEAFE;border-radius:10px;">
+                        <div id="statCompanies" style="font-size:24px;font-weight:900;color:#1E40AF;">0</div>
+                        <div style="font-size:11px;color:#1E40AF;">公司數</div>
+                    </div>
+                    <div style="text-align:center;padding:12px;background:#D1FAE5;border-radius:10px;">
+                        <div id="statEmployees" style="font-size:24px;font-weight:900;color:#059669;">0</div>
+                        <div style="font-size:11px;color:#059669;">員工數</div>
+                    </div>
+                    <div style="text-align:center;padding:12px;background:#FEF3C7;border-radius:10px;">
+                        <div id="statPending" style="font-size:24px;font-weight:900;color:#D97706;">0</div>
+                        <div style="font-size:11px;color:#D97706;">待審核</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="menu-grid">
+                <div class="menu-item" onclick="showPage('companyMgrPage')">
+                    <div class="icon">🏢</div><div class="label">公司管理</div>
+                </div>
+                <div class="menu-item" onclick="showPage('pendingPage')">
+                    <div class="icon">📝</div><div class="label">申請審核</div>
+                </div>
+                <div class="menu-item" onclick="window.location.href='index.html'">
+                    <div class="icon">🏠</div><div class="label">返回首頁</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 公司管理頁 -->
+        <div id="companyMgrPage" class="page">
+            <button class="btn btn-secondary" onclick="showPage('platformHomePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
+            <div class="checkin-page">
+                <h2>🏢 公司管理</h2>
+
+                <div style="display:flex;gap:8px;margin-bottom:12px;">
+                    <input type="text" id="pCompanySearch" placeholder="搜尋公司..." oninput="filterPlatformCompanies()" style="flex:1;padding:10px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;">
+                    <button class="btn btn-primary" onclick="showPCompanyModal()" style="white-space:nowrap;font-size:13px;padding:10px 16px;">+ 新增</button>
+                </div>
+
+                <div id="pCompanyList">
+                    <p style="text-align:center;color:#94A3B8;font-size:13px;padding:16px;">載入中...</p>
+                </div>
+            </div>
+
+            <!-- 新增/編輯公司 Modal -->
+            <div id="pCompanyModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:999;overflow-y:auto;">
+                <div style="background:#fff;margin:30px auto;max-width:500px;border-radius:16px;padding:24px;">
+                    <h3 id="pCompanyModalTitle" style="margin-bottom:16px;">新增公司</h3>
+                    <input type="hidden" id="pCompanyEditId">
+                    <div class="form-group"><label>公司代碼 *</label><input type="text" id="pCompanyCode" placeholder="例：COMPANY_001" style="text-transform:uppercase;"></div>
+                    <div class="form-group"><label>公司名稱 *</label><input type="text" id="pCompanyName" placeholder="公司全名"></div>
+                    <div class="form-group"><label>聯絡人</label><input type="text" id="pContactName" placeholder="聯絡人姓名"></div>
+                    <div class="form-group"><label>電話</label><input type="text" id="pContactPhone" placeholder="電話"></div>
+                    <div class="form-group"><label>Email</label><input type="email" id="pContactEmail" placeholder="email@example.com"></div>
+                    <div class="form-group">
+                        <label>方案</label>
+                        <select id="pPlanType" style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;">
+                            <option value="basic">Basic（基本）</option>
+                            <option value="pro">Pro（進階）</option>
+                            <option value="enterprise">Enterprise（企業）</option>
+                        </select>
+                    </div>
+                    <div class="form-group"><label>員工上限</label><input type="number" id="pMaxEmployees" value="50" min="1"></div>
+                    <div class="form-group">
+                        <label>狀態</label>
+                        <select id="pStatus" style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;">
+                            <option value="active">啟用</option>
+                            <option value="pending">待審核</option>
+                            <option value="suspended">暫停</option>
+                        </select>
+                    </div>
+
+                    <!-- 功能開關 -->
+                    <div style="margin-top:16px;padding:14px;background:#F8FAFC;border-radius:12px;">
+                        <div style="font-weight:700;font-size:13px;margin-bottom:10px;">🎛️ 功能開關</div>
+                        <div id="pFeatureToggles" style="display:flex;flex-direction:column;gap:8px;"></div>
+                    </div>
+
+                    <div style="display:flex;gap:8px;margin-top:16px;">
+                        <button class="btn btn-success" onclick="savePCompany()" style="flex:1;">💾 儲存</button>
+                        <button class="btn btn-secondary" onclick="closePCompanyModal()" style="flex:1;">取消</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- QR Code Modal -->
+            <div id="pQrModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:999;display:none;">
+                <div style="background:#fff;margin:80px auto;max-width:350px;border-radius:16px;padding:24px;text-align:center;">
+                    <h3 style="margin-bottom:12px;">📱 員工綁定 QR Code</h3>
+                    <div id="pQrCode" style="display:inline-block;margin-bottom:12px;"></div>
+                    <div id="pQrUrl" style="font-size:11px;color:#94A3B8;word-break:break-all;margin-bottom:12px;"></div>
+                    <button class="btn btn-secondary" onclick="document.getElementById('pQrModal').style.display='none'" style="width:100%;">關閉</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 待審核頁 -->
+        <div id="pendingPage" class="page">
+            <button class="btn btn-secondary" onclick="showPage('platformHomePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
+            <div class="checkin-page">
+                <h2>📝 公司申請審核</h2>
+                <div id="pendingList">
+                    <p style="text-align:center;color:#94A3B8;font-size:13px;padding:16px;">載入中...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="common.js"></script>
+    <script>
+        let currentPlatformAdmin = null;
+        let allPCompanies = [];
+
+        const FEATURE_LIST = [
+            { key: 'leave', label: '請假管理', icon: '📝' },
+            { key: 'lunch', label: '便當訂購', icon: '🍱' },
+            { key: 'attendance', label: '考勤查詢', icon: '📊' },
+            { key: 'fieldwork', label: '外勤打卡', icon: '📍' },
+            { key: 'sales_target', label: '業務目標', icon: '🎯' },
+            { key: 'store_ordering', label: '線上點餐/預約', icon: '🛍️' }
+        ];
+
+        function showPage(id) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            if (id === 'companyMgrPage') loadPCompanyList();
+            if (id === 'pendingPage') loadPendingCompanies();
+            if (id === 'platformHomePage') loadDashboard();
+        }
+
+        // ===== 權限驗證 =====
+        async function checkPlatformPermission() {
+            const statusEl = document.getElementById('permissionStatus');
+            const loadingPage = document.getElementById('loadingPage');
+            try {
+                const initialized = await initializeLiff();
+                if (loadingPage) loadingPage.style.display = 'none';
+                if (!initialized) {
+                    statusEl.className = 'status-box show error';
+                    statusEl.innerHTML = '❌ LIFF 初始化失敗';
+                    return;
+                }
+
+                const { data, error } = await sb.from('platform_admins')
+                    .select('*')
+                    .eq('line_user_id', liffProfile.userId)
+                    .eq('is_active', true)
+                    .maybeSingle();
+
+                if (!data) {
+                    statusEl.className = 'status-box show error';
+                    statusEl.innerHTML = '❌ 您不是平台管理員<br><small style="opacity:0.7;">LINE ID: ' + escapeHTML(liffProfile?.userId || '') + '</small>';
+                    setTimeout(() => { window.location.href = 'index.html'; }, 5000);
+                    return;
+                }
+
+                currentPlatformAdmin = data;
+                document.getElementById('platformName').textContent = data.name;
+                if (liffProfile?.pictureUrl) {
+                    const avatar = document.getElementById('platformAvatar');
+                    avatar.style.backgroundImage = `url(${liffProfile.pictureUrl})`;
+                    avatar.style.backgroundSize = 'cover';
+                    avatar.textContent = '';
+                }
+
+                statusEl.className = 'status-box show success';
+                statusEl.textContent = '✅ 權限驗證通過';
+                setTimeout(() => showPage('platformHomePage'), 800);
+            } catch(e) {
+                if (loadingPage) loadingPage.style.display = 'none';
+                statusEl.className = 'status-box show error';
+                statusEl.innerHTML = '❌ 驗證失敗: ' + (typeof friendlyError === 'function' ? friendlyError(e) : e.message);
+            }
+        }
+
+        // ===== 儀表板 =====
+        async function loadDashboard() {
+            try {
+                const [compRes, empRes] = await Promise.all([
+                    sb.from('companies').select('id, status'),
+                    sb.from('employees').select('id').eq('is_active', true)
+                ]);
+                const companies = compRes.data || [];
+                document.getElementById('statCompanies').textContent = companies.filter(c => c.status === 'active').length;
+                document.getElementById('statEmployees').textContent = (empRes.data || []).length;
+                document.getElementById('statPending').textContent = companies.filter(c => c.status === 'pending').length;
+            } catch(e) { console.error(e); }
+        }
+
+        // ===== 公司管理 =====
+        async function loadPCompanyList() {
+            try {
+                const { data } = await sb.from('companies').select('*').order('created_at', { ascending: false });
+                allPCompanies = data || [];
+
+                // 取得每家公司的員工數
+                const { data: empCounts } = await sb.from('employees').select('company_id').eq('is_active', true);
+                const countMap = {};
+                (empCounts || []).forEach(e => { countMap[e.company_id] = (countMap[e.company_id] || 0) + 1; });
+                allPCompanies.forEach(c => { c._empCount = countMap[c.id] || 0; });
+
+                renderPCompanyList(allPCompanies);
+            } catch(e) { showToast('❌ 載入失敗'); console.error(e); }
+        }
+
+        function filterPlatformCompanies() {
+            const q = (document.getElementById('pCompanySearch').value || '').toLowerCase();
+            renderPCompanyList(allPCompanies.filter(c =>
+                c.name.toLowerCase().includes(q) || (c.code || '').toLowerCase().includes(q)
+            ));
+        }
+
+        function renderPCompanyList(list) {
+            const el = document.getElementById('pCompanyList');
+            if (list.length === 0) { el.innerHTML = '<p style="text-align:center;color:#94A3B8;">無公司資料</p>'; return; }
+
+            const statusColors = { active: ['#D1FAE5','#065F46','啟用'], pending: ['#FEF3C7','#92400E','待審核'], suspended: ['#FEE2E2','#991B1B','暫停'] };
+            const planLabels = { basic: 'Basic', pro: 'Pro', enterprise: 'Enterprise' };
+
+            el.innerHTML = list.map(c => {
+                const [bg, fg, label] = statusColors[c.status] || statusColors.active;
+                const features = c.features || {};
+                const activeFeatures = Object.entries(features).filter(([k,v]) => v).map(([k]) => {
+                    const f = FEATURE_LIST.find(x => x.key === k);
+                    return f ? f.icon : '';
+                }).join(' ');
+
+                return `<div style="background:#fff;border-radius:12px;padding:14px;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
+                    <div style="display:flex;justify-content:space-between;align-items:start;">
+                        <div>
+                            <div style="font-weight:700;font-size:15px;">${escapeHTML(c.name)}</div>
+                            <div style="font-size:12px;color:#64748B;margin-top:2px;">代碼：${escapeHTML(c.code)} ｜ ${planLabels[c.plan_type] || 'Basic'} ｜ 員工 ${c._empCount}/${c.max_employees || 50}</div>
+                            <div style="font-size:11px;margin-top:4px;">${activeFeatures || '無功能'}</div>
+                        </div>
+                        <span style="font-size:11px;padding:2px 8px;border-radius:20px;background:${bg};color:${fg};white-space:nowrap;">${label}</span>
+                    </div>
+                    <div style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;">
+                        <button onclick="editPCompany('${c.id}')" style="padding:6px 12px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;font-size:11px;font-weight:700;cursor:pointer;color:#4F46E5;">✏️ 編輯</button>
+                        <button onclick="showPCompanyQR('${c.id}')" style="padding:6px 12px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;font-size:11px;font-weight:700;cursor:pointer;color:#059669;">📱 QR Code</button>
+                        ${c.status === 'active' ? `<button onclick="togglePCompanyStatus('${c.id}','suspended')" style="padding:6px 12px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;font-size:11px;font-weight:700;cursor:pointer;color:#DC2626;">⏸️ 暫停</button>` : ''}
+                        ${c.status === 'suspended' ? `<button onclick="togglePCompanyStatus('${c.id}','active')" style="padding:6px 12px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;font-size:11px;font-weight:700;cursor:pointer;color:#059669;">▶️ 啟用</button>` : ''}
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        function showPCompanyModal(editData) {
+            document.getElementById('pCompanyEditId').value = editData ? editData.id : '';
+            document.getElementById('pCompanyModalTitle').textContent = editData ? '編輯公司' : '新增公司';
+            document.getElementById('pCompanyCode').value = editData ? editData.code : '';
+            document.getElementById('pCompanyName').value = editData ? editData.name : '';
+            document.getElementById('pContactName').value = editData?.contact_name || '';
+            document.getElementById('pContactPhone').value = editData?.contact_phone || '';
+            document.getElementById('pContactEmail').value = editData?.contact_email || '';
+            document.getElementById('pPlanType').value = editData?.plan_type || 'basic';
+            document.getElementById('pMaxEmployees').value = editData?.max_employees || 50;
+            document.getElementById('pStatus').value = editData?.status || 'active';
+
+            // 功能開關
+            const features = editData?.features || { leave: true, lunch: true, attendance: true, fieldwork: false, sales_target: false, store_ordering: false };
+            const togglesEl = document.getElementById('pFeatureToggles');
+            togglesEl.innerHTML = FEATURE_LIST.map(f => `
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                    <input type="checkbox" id="pFt_${f.key}" ${features[f.key] ? 'checked' : ''} style="width:18px;height:18px;">
+                    <span style="font-size:13px;">${f.icon} ${f.label}</span>
+                </label>
+            `).join('');
+
+            document.getElementById('pCompanyModal').style.display = 'block';
+        }
+
+        function closePCompanyModal() { document.getElementById('pCompanyModal').style.display = 'none'; }
+
+        function editPCompany(id) {
+            const c = allPCompanies.find(x => x.id === id);
+            if (c) showPCompanyModal(c);
+        }
+
+        async function savePCompany() {
+            const id = document.getElementById('pCompanyEditId').value;
+            const code = document.getElementById('pCompanyCode').value.trim().toUpperCase();
+            const name = document.getElementById('pCompanyName').value.trim();
+            if (!code || !name) { showToast('⚠️ 請填寫代碼和名稱'); return; }
+
+            const features = {};
+            FEATURE_LIST.forEach(f => {
+                features[f.key] = document.getElementById('pFt_' + f.key)?.checked || false;
+            });
+
+            const row = {
+                code, name,
+                contact_name: document.getElementById('pContactName').value.trim(),
+                contact_phone: document.getElementById('pContactPhone').value.trim(),
+                contact_email: document.getElementById('pContactEmail').value.trim(),
+                plan_type: document.getElementById('pPlanType').value,
+                max_employees: parseInt(document.getElementById('pMaxEmployees').value) || 50,
+                status: document.getElementById('pStatus').value,
+                features
+            };
+
+            try {
+                if (id) {
+                    const { error } = await sb.from('companies').update(row).eq('id', id);
+                    if (error) throw error;
+                } else {
+                    const { error } = await sb.from('companies').insert(row);
+                    if (error) throw error;
+                }
+                closePCompanyModal();
+                showToast('✅ 已儲存');
+                loadPCompanyList();
+            } catch(e) {
+                if (String(e?.message || e).includes('unique')) {
+                    showToast('⚠️ 公司代碼已存在');
+                } else {
+                    showToast('❌ 儲存失敗'); console.error(e);
+                }
+            }
+        }
+
+        async function togglePCompanyStatus(id, newStatus) {
+            const labels = { active: '啟用', suspended: '暫停' };
+            if (!confirm(`確定將此公司設為「${labels[newStatus]}」？`)) return;
+            try {
+                const { error } = await sb.from('companies').update({ status: newStatus }).eq('id', id);
+                if (error) throw error;
+                showToast('✅ 已更新');
+                loadPCompanyList();
+            } catch(e) { showToast('❌ 更新失敗'); console.error(e); }
+        }
+
+        function showPCompanyQR(id) {
+            const c = allPCompanies.find(x => x.id === id);
+            if (!c) return;
+            const url = `https://liff.line.me/${CONFIG.LIFF_ID}?type=bind&company=${encodeURIComponent(c.code)}`;
+            const qrDiv = document.getElementById('pQrCode');
+            qrDiv.innerHTML = '';
+            new QRCode(qrDiv, { text: url, width: 200, height: 200, colorDark: '#1f2937', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.H });
+            document.getElementById('pQrUrl').textContent = url;
+            document.getElementById('pQrModal').style.display = 'block';
+        }
+
+        // ===== 待審核 =====
+        async function loadPendingCompanies() {
+            try {
+                const { data } = await sb.from('companies').select('*').eq('status', 'pending').order('created_at', { ascending: false });
+                const el = document.getElementById('pendingList');
+                if (!data || data.length === 0) {
+                    el.innerHTML = '<p style="text-align:center;color:#94A3B8;padding:30px;">🎉 無待審核公司</p>';
+                    return;
+                }
+                el.innerHTML = data.map(c => `
+                    <div style="background:#fff;border-radius:12px;padding:14px;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,0.06);">
+                        <div style="font-weight:700;font-size:15px;">${escapeHTML(c.name)}</div>
+                        <div style="font-size:12px;color:#64748B;margin-top:4px;">代碼：${escapeHTML(c.code)}</div>
+                        <div style="font-size:12px;color:#64748B;">聯絡：${escapeHTML(c.contact_name || '-')} ${escapeHTML(c.contact_phone || '')}</div>
+                        <div style="font-size:11px;color:#94A3B8;margin-top:4px;">申請時間：${new Date(c.created_at).toLocaleString('zh-TW')}</div>
+                        <div style="display:flex;gap:8px;margin-top:10px;">
+                            <button onclick="approvePCompany('${c.id}')" class="btn btn-success" style="flex:1;font-size:13px;">✅ 核准</button>
+                            <button onclick="rejectPCompany('${c.id}')" class="btn btn-secondary" style="flex:1;font-size:13px;">❌ 拒絕</button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch(e) { showToast('❌ 載入失敗'); console.error(e); }
+        }
+
+        async function approvePCompany(id) {
+            if (!confirm('確定核准此公司？')) return;
+            try {
+                const { error } = await sb.from('companies').update({ status: 'active' }).eq('id', id);
+                if (error) throw error;
+                showToast('✅ 已核准');
+                loadPendingCompanies();
+                loadDashboard();
+            } catch(e) { showToast('❌ 操作失敗'); }
+        }
+
+        async function rejectPCompany(id) {
+            if (!confirm('確定拒絕此公司申請？（將刪除此記錄）')) return;
+            try {
+                const { error } = await sb.from('companies').delete().eq('id', id);
+                if (error) throw error;
+                showToast('✅ 已拒絕');
+                loadPendingCompanies();
+                loadDashboard();
+            } catch(e) { showToast('❌ 操作失敗'); }
+        }
+
+        // ===== 載入 =====
+        window.addEventListener('load', async () => {
+            if (typeof initializeLiff === 'undefined') {
+                console.error('common.js 未正確載入');
+                return;
+            }
+            checkPlatformPermission();
+        });
+    </script>
+</body>
+</html>

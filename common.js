@@ -11,11 +11,13 @@ const sb = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANO
 // 全域變數
 let liffProfile = null;
 let currentEmployee = null;
+let currentCompanyId = null;    // 多租戶：當前公司 ID
+let currentCompanyFeatures = null; // 多租戶：當前公司功能設定
 let videoStream = null;
 let cachedLocation = null;
 let currentBindMode = 'id_card';
 let todayAttendance = null;
-let officeLocations = []; 
+let officeLocations = [];
 let isProcessing = false;
 
 // ===== 初始化 LIFF =====
@@ -183,6 +185,17 @@ async function checkUserStatus() {
 
         if (data) {
             currentEmployee = data;
+            currentCompanyId = data.company_id || null;
+            // 載入公司功能設定
+            if (currentCompanyId) {
+                try {
+                    const { data: company } = await sb.from('companies')
+                        .select('features, status')
+                        .eq('id', currentCompanyId)
+                        .maybeSingle();
+                    currentCompanyFeatures = company?.features || null;
+                } catch(e) { console.log('載入公司功能設定失敗', e); }
+            }
             updateUserInfo(data);
             await checkTodayAttendance();
             return true;
@@ -1163,15 +1176,20 @@ function initBottomNav() {
 }
 
 // ===== 功能顯示設定 =====
-// 管理員可在 system_settings 中設定哪些功能對員工可見
-// key: 'feature_visibility', value: { leave: true, lunch: true, attendance: true }
+// 優先從 companies.features 讀取（多租戶），fallback 到 system_settings
 const DEFAULT_FEATURES = {
     leave: true,        // 我要請假
     lunch: true,        // 便當訂購
-    attendance: true    // 考勤查詢
+    attendance: true,   // 考勤查詢
+    fieldwork: false,   // 外勤打卡
+    sales_target: false,// 業務目標
+    store_ordering: false // 線上點餐
 };
 
 function getFeatureVisibility() {
+    // 優先使用公司功能設定（由平台管理員控制）
+    if (currentCompanyFeatures) return { ...DEFAULT_FEATURES, ...currentCompanyFeatures };
+    // Fallback 到 system_settings
     const val = getCachedSetting('feature_visibility');
     if (val) return { ...DEFAULT_FEATURES, ...val };
     return DEFAULT_FEATURES;
@@ -1180,14 +1198,16 @@ function getFeatureVisibility() {
 // 根據設定隱藏首頁「中間選單」項目（不影響底部導航列）
 function applyFeatureVisibility() {
     const features = getFeatureVisibility();
-    
+
     // 只控制首頁中間的 menu-grid 選單 icon
     const menuMap = {
-        'records.html': 'leave',        // 📝 我要請假
-        'services.html': 'lunch',       // 🍱 便當訂購  
-        'records.html#attendance': 'attendance'  // 📊 考勤查詢
+        'records.html': 'leave',                    // 📝 我要請假
+        'services.html': 'lunch',                   // 🍱 便當訂購
+        'records.html#attendance': 'attendance',     // 📊 考勤查詢
+        'services.html#fieldwork': 'fieldwork',      // 📍 外勤打卡
+        'services.html#sales': 'sales_target'        // 📊 業務週報
     };
-    
+
     document.querySelectorAll('.menu-grid .menu-item').forEach(item => {
         if (item.classList.contains('admin-only')) return; // 跳過管理員按鈕
         const onclick = item.getAttribute('onclick') || '';
