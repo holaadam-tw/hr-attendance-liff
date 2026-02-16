@@ -427,7 +427,7 @@
                     
                     // 再嘗試直接查表
                     if (currentEmployee) {
-                        const { data: p } = await sb.from('payroll').select('*').eq('employee_id', currentEmployee.id).eq('year', salaryYear).eq('month', salaryMonth+1).maybeSingle();
+                        const { data: p } = await sb.from('payroll').select('*').eq('employee_id', currentEmployee.id).eq('year', salaryYear).eq('month', salaryMonth+1).eq('is_published', true).maybeSingle();
                         if (p) {
                             // 嘗試解析 calculation_details
                             if (p.calculation_details && typeof p.calculation_details === 'string') {

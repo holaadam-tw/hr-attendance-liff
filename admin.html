@@ -52,6 +52,9 @@
                 <div class="menu-item" onclick="showPage('bonusPage')">
                     <div class="icon">🎁</div><div class="label">年終獎金試算</div>
                 </div>
+                <div class="menu-item" onclick="showPage('payrollPage')">
+                    <div class="icon">💰</div><div class="label">薪資發放</div>
+                </div>
                 <div class="menu-item" onclick="showPage('locationPage')">
                     <div class="icon">📍</div><div class="label">地點管理</div>
                 </div>
@@ -523,6 +526,71 @@
             </div>
         </div>
 
+        <!-- ====== 薪資發放頁面 ====== -->
+        <div id="payrollPage" class="page">
+            <button class="btn btn-secondary" onclick="showPage('adminHomePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
+            <div class="checkin-page">
+                <h2>💰 薪資發放</h2>
+
+                <!-- 月份選擇 + 計算按鈕 -->
+                <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px;">
+                    <select id="payrollYear" style="flex:1;padding:10px;border:1px solid #E5E7EB;border-radius:10px;font-size:13px;font-weight:700;"></select>
+                    <select id="payrollMonth" style="flex:1;padding:10px;border:1px solid #E5E7EB;border-radius:10px;font-size:13px;font-weight:700;"></select>
+                    <button id="calcPayrollBtn" onclick="loadPayrollData()" style="padding:10px 16px;border:none;border-radius:10px;background:linear-gradient(135deg,#4F46E5,#7C3AED);color:#fff;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap;">📊 計算薪資</button>
+                </div>
+
+                <!-- Loading -->
+                <div id="payrollLoading" style="display:none;text-align:center;padding:40px;color:#94A3B8;">
+                    <div style="font-size:32px;margin-bottom:8px;">⏳</div>
+                    <div style="font-size:14px;">正在計算全員薪資...</div>
+                </div>
+
+                <!-- 已發布警告 -->
+                <div id="payrollPublishedWarn" style="display:none;background:#FEF3C7;border:1px solid #F59E0B;border-radius:12px;padding:12px;margin-bottom:12px;font-size:13px;color:#92400E;">
+                    ⚠️ 此月份薪資已發布，重新計算將覆蓋現有資料
+                </div>
+
+                <!-- 摘要卡片 -->
+                <div id="payrollSummary" style="display:none;background:linear-gradient(135deg,#4F46E5,#7C3AED);border-radius:16px;padding:20px;color:#fff;margin-bottom:16px;">
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                        <div style="text-align:center;">
+                            <div style="font-size:11px;opacity:0.8;">計算人數</div>
+                            <div id="prEmpCount" style="font-size:22px;font-weight:900;">0</div>
+                        </div>
+                        <div style="text-align:center;">
+                            <div style="font-size:11px;opacity:0.8;">薪資總額</div>
+                            <div id="prTotalNet" style="font-size:22px;font-weight:900;">$0</div>
+                        </div>
+                        <div style="text-align:center;">
+                            <div style="font-size:11px;opacity:0.8;">平均實發</div>
+                            <div id="prAvgNet" style="font-size:22px;font-weight:900;">$0</div>
+                        </div>
+                        <div style="text-align:center;">
+                            <div style="font-size:11px;opacity:0.8;">狀態</div>
+                            <div id="prStatus" style="font-size:16px;font-weight:900;">草稿</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 員工選擇 -->
+                <div id="payrollEmpSelector" style="display:none;margin-bottom:12px;">
+                    <select id="payrollEmpDropdown" onchange="renderPayrollView()" style="width:100%;padding:12px;border:1px solid #E5E7EB;border-radius:12px;font-size:13px;font-weight:700;">
+                        <option value="_all">📋 全部員工總覽</option>
+                    </select>
+                </div>
+
+                <!-- 內容區 -->
+                <div id="payrollContent" style="margin-bottom:16px;"></div>
+
+                <!-- 操作按鈕 -->
+                <div id="payrollActions" style="display:none;flex-direction:column;gap:10px;">
+                    <button id="savePayrollBtn" onclick="saveAllPayroll()" style="width:100%;padding:14px;border:none;border-radius:12px;background:linear-gradient(135deg,#059669,#10B981);color:#fff;font-weight:700;font-size:14px;cursor:pointer;">💾 儲存全部（草稿）</button>
+                    <button id="publishPayrollBtn" onclick="publishPayroll()" style="width:100%;padding:14px;border:none;border-radius:12px;background:linear-gradient(135deg,#DC2626,#EF4444);color:#fff;font-weight:700;font-size:14px;cursor:pointer;">📢 發布薪資（員工可見）</button>
+                    <button onclick="exportPayrollCSV()" style="width:100%;padding:14px;border:none;border-radius:12px;background:linear-gradient(135deg,#0EA5E9,#38BDF8);color:#fff;font-weight:700;font-size:14px;cursor:pointer;">📥 匯出 CSV</button>
+                </div>
+            </div>
+        </div>
+
         <!-- 報表匯出頁面 -->
         <div id="reportPage" class="page">
             <button class="btn btn-secondary" onclick="showPage('adminHomePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
@@ -543,6 +611,9 @@
                     </div>
                     <div class="menu-item" onclick="exportReport('overtime')">
                         <div class="icon">⏰</div><div class="label">加班報表</div>
+                    </div>
+                    <div class="menu-item" onclick="exportReport('payroll')">
+                        <div class="icon">💰</div><div class="label">薪資報表</div>
                     </div>
                 </div>
             </div>
@@ -836,6 +907,7 @@
             if (id === 'featurePage') { loadFeatureSettings(); loadNotifyToken(); }
             if (id === 'staffMgrPage') { loadShiftMgr(); loadMaxLeaveSetting(); loadStaffOverview(); loadSchedulingMode(); }
             if (id === 'lunchMgrPage') { loadLunchManagers(); loadAdminLunchStats(); }
+            if (id === 'payrollPage') { initPayrollPage(); }
         }
 
         // ===== 功能管理 =====
@@ -2105,6 +2177,601 @@
             }
         }
 
+        // ===== 薪資發放 =====
+        let payrollEmployees = [];
+        let payrollAdjustments = {};   // { empId: { amount: 0, note: '' } }
+        let payrollBrackets = [];
+        let payrollIsPublished = false;
+
+        function initPayrollPage() {
+            const yEl = document.getElementById('payrollYear');
+            const mEl = document.getElementById('payrollMonth');
+            if (yEl.options.length > 0) return; // already init
+            const now = new Date();
+            const cy = now.getFullYear();
+            for (let y = cy; y >= cy - 2; y--) yEl.innerHTML += `<option value="${y}">${y} 年</option>`;
+            for (let m = 1; m <= 12; m++) mEl.innerHTML += `<option value="${m}">${m} 月</option>`;
+            // 預設上月
+            const prev = new Date(cy, now.getMonth() - 1, 1);
+            yEl.value = prev.getFullYear();
+            mEl.value = prev.getMonth() + 1;
+        }
+
+        async function loadPayrollData() {
+            const year = parseInt(document.getElementById('payrollYear').value);
+            const month = parseInt(document.getElementById('payrollMonth').value);
+            const startDate = `${year}-${String(month).padStart(2,'0')}-01`;
+            const endDay = new Date(year, month, 0).getDate();
+            const endDate = `${year}-${String(month).padStart(2,'0')}-${String(endDay).padStart(2,'0')}`;
+
+            // UI: show loading
+            const loadEl = document.getElementById('payrollLoading');
+            const sumEl = document.getElementById('payrollSummary');
+            const selEl = document.getElementById('payrollEmpSelector');
+            const actEl = document.getElementById('payrollActions');
+            const contentEl = document.getElementById('payrollContent');
+            const warnEl = document.getElementById('payrollPublishedWarn');
+            loadEl.style.display = 'block';
+            sumEl.style.display = 'none';
+            selEl.style.display = 'none';
+            actEl.style.display = 'none';
+            contentEl.innerHTML = '';
+            warnEl.style.display = 'none';
+            payrollAdjustments = {};
+
+            const btn = document.getElementById('calcPayrollBtn');
+            const origText = btn.textContent;
+            btn.disabled = true; btn.textContent = '⏳ 計算中...';
+
+            try {
+                // 平行查詢（OT 和保險級距用 catch 避免表不存在報錯）
+                const [empRes, salaryRes, attRes, leaveRes, otRes, existRes, bracketRes] = await Promise.all([
+                    sb.from('employees').select('id, name, employee_number, department, is_active').eq('is_active', true),
+                    sb.from('salary_settings').select('*').eq('is_current', true),
+                    sb.from('attendance').select('employee_id, date, is_late, total_work_hours, overtime_hours, check_in_time, check_out_time').gte('date', startDate).lte('date', endDate),
+                    sb.from('leave_requests').select('employee_id, days, leave_type').eq('status', 'approved').gte('start_date', startDate).lte('end_date', endDate),
+                    sb.from('overtime_requests').select('employee_id, hours, ot_date').eq('status', 'approved').gte('ot_date', startDate).lte('ot_date', endDate).then(r => r).catch(() => ({ data: [] })),
+                    sb.from('payroll').select('*').eq('year', year).eq('month', month),
+                    sb.from('insurance_brackets').select('*').eq('is_active', true).order('salary_min').then(r => r).catch(() => ({ data: [] }))
+                ]);
+
+                payrollBrackets = bracketRes.data || [];
+
+                // Build lookup maps
+                const salaryMap = {};
+                (salaryRes.data || []).forEach(s => { salaryMap[s.employee_id] = s; });
+
+                const attMap = {};
+                (attRes.data || []).forEach(a => {
+                    if (!attMap[a.employee_id]) attMap[a.employee_id] = [];
+                    attMap[a.employee_id].push(a);
+                });
+
+                const leaveMap = {};
+                (leaveRes.data || []).forEach(l => {
+                    if (!leaveMap[l.employee_id]) leaveMap[l.employee_id] = { total: 0, personal: 0 };
+                    leaveMap[l.employee_id].total += (l.days || 0);
+                    if (l.leave_type === 'personal') leaveMap[l.employee_id].personal += (l.days || 0);
+                });
+
+                const otMap = {};
+                if ((otRes.data || []).length > 0) {
+                    // 從加班申請表取得核准加班時數
+                    (otRes.data).forEach(o => {
+                        otMap[o.employee_id] = (otMap[o.employee_id] || 0) + (o.hours || 0);
+                    });
+                } else {
+                    // Fallback: 從 attendance.overtime_hours 累計
+                    (attRes.data || []).forEach(a => {
+                        if (a.overtime_hours > 0) {
+                            otMap[a.employee_id] = (otMap[a.employee_id] || 0) + a.overtime_hours;
+                        }
+                    });
+                }
+
+                // 已存在的 payroll（載入手動調整）
+                const existMap = {};
+                (existRes.data || []).forEach(p => {
+                    existMap[p.employee_id] = p;
+                    if (p.manual_adjustment) {
+                        payrollAdjustments[p.employee_id] = { amount: p.manual_adjustment || 0, note: p.adjustment_note || '' };
+                    }
+                });
+
+                // 檢查是否已發布
+                payrollIsPublished = (existRes.data || []).some(p => p.is_published);
+                if (payrollIsPublished) warnEl.style.display = 'block';
+
+                // 計算每位員工
+                payrollEmployees = (empRes.data || []).map(emp => {
+                    const ss = salaryMap[emp.id];
+                    if (!ss) return null; // 無薪資設定 skip
+
+                    const atts = attMap[emp.id] || [];
+                    const leaves = leaveMap[emp.id] || { total: 0, personal: 0 };
+                    const otHours = otMap[emp.id] || 0;
+
+                    return calcEmployeePayroll(emp, ss, atts, leaves, otHours, year, month);
+                }).filter(Boolean);
+
+                // 渲染
+                populatePayrollDropdown();
+                renderPayrollSummary();
+                renderPayrollView();
+
+                loadEl.style.display = 'none';
+                sumEl.style.display = 'block';
+                selEl.style.display = 'block';
+                actEl.style.display = 'flex';
+            } catch(e) {
+                loadEl.style.display = 'none';
+                contentEl.innerHTML = `<p style="text-align:center;color:#DC2626;padding:20px;">❌ 計算失敗：${e.message}</p>`;
+            } finally {
+                btn.disabled = false; btn.textContent = origText;
+            }
+        }
+
+        function prLookupBracket(salary) {
+            if (payrollBrackets.length === 0) return null;
+            const b = payrollBrackets.find(r => salary >= r.salary_min && salary <= r.salary_max);
+            return b || payrollBrackets[payrollBrackets.length - 1];
+        }
+
+        function calcEmployeePayroll(emp, ss, atts, leaves, otHours, year, month) {
+            const salaryType = ss.salary_type || 'monthly';
+            const baseSalary = ss.base_salary || 0;
+            const mealAllowance = ss.meal_allowance || 0;
+            const posAllowance = ss.position_allowance || 0;
+            const fullAttBonus = ss.full_attendance_bonus || 0;
+            const pensionRate = ss.pension_self_rate || 0;
+            const taxRate = ss.tax_rate || 5;
+
+            // 出勤統計
+            const actualDays = atts.filter(a => a.check_in_time).length;
+            const lateCount = atts.filter(a => a.is_late).length;
+            const totalWorkHours = atts.reduce((s, a) => s + (a.total_work_hours || 0), 0);
+            const leaveDays = leaves.total;
+            const personalLeaveDays = leaves.personal;
+
+            // 底薪計算
+            let monthSalary, dailyRate, hourlyRate;
+            if (salaryType === 'monthly') {
+                monthSalary = baseSalary;
+                dailyRate = Math.round(baseSalary / 30);
+                hourlyRate = Math.round(dailyRate / 8);
+            } else if (salaryType === 'daily') {
+                dailyRate = baseSalary;
+                hourlyRate = Math.round(dailyRate / 8);
+                monthSalary = dailyRate * actualDays;
+            } else {
+                hourlyRate = baseSalary;
+                dailyRate = hourlyRate * 8;
+                monthSalary = Math.round(hourlyRate * totalWorkHours);
+            }
+
+            // 津貼（暫以固定方式計算，TODO: 支援 daily mode）
+            const mealAmount = mealAllowance;
+            const posAmount = posAllowance;
+
+            // 全勤獎金
+            const hasFullAtt = (lateCount === 0 && leaveDays === 0);
+            const fullAttAmount = hasFullAtt ? fullAttBonus : 0;
+
+            // 加班費（台灣勞基法 §24）
+            let otPay = 0;
+            if (otHours > 0) {
+                const h1 = Math.min(otHours, 2);
+                const h2 = Math.max(Math.min(otHours - 2, 2), 0);
+                otPay = Math.round(hourlyRate * 1.34 * h1) + Math.round(hourlyRate * 1.67 * h2);
+            }
+
+            // 總收入
+            const gross = monthSalary + otPay + fullAttAmount + mealAmount + posAmount;
+
+            // 保險
+            const bracket = prLookupBracket(salaryType === 'monthly' ? baseSalary : monthSalary);
+            let laborIns = 0, healthIns = 0;
+            if (bracket) {
+                laborIns = Math.round(bracket.insured_amount * (bracket.labor_rate || 0.125) * (bracket.labor_employee_share || 0.2));
+                healthIns = Math.round(bracket.insured_amount * (bracket.health_rate || 0.0517) * (bracket.health_employee_share || 0.3));
+            } else {
+                laborIns = Math.round(monthSalary * 0.125 * 0.2);
+                healthIns = Math.round(monthSalary * 0.0517 * 0.3);
+            }
+
+            // 勞退自提
+            const pensionSelf = Math.round(monthSalary * pensionRate / 100);
+
+            // 所得稅
+            const incomeTax = Math.round(gross * taxRate / 100);
+
+            // 遲到扣款（每次 100 元，可調整）
+            const lateDed = lateCount * 100;
+
+            // 事假扣款（日薪 × 天數）
+            const personalLeaveDed = Math.round(dailyRate * personalLeaveDays);
+
+            // 手動調整
+            const adj = payrollAdjustments[emp.id]?.amount || 0;
+
+            // 總扣款
+            const totalDeduct = laborIns + healthIns + pensionSelf + incomeTax + lateDed + personalLeaveDed - adj;
+
+            // 實發
+            const net = gross - totalDeduct;
+
+            return {
+                employee_id: emp.id,
+                name: emp.name,
+                employee_number: emp.employee_number,
+                department: emp.department || '',
+                year, month,
+                salary_type: salaryType,
+                base_salary: monthSalary,
+                overtime_pay: otPay,
+                full_attendance_bonus: fullAttAmount,
+                meal_allowance: mealAmount,
+                position_allowance: posAmount,
+                night_allowance: 0,
+                late_deduction: lateDed,
+                absence_deduction: 0,
+                personal_leave_deduction: personalLeaveDed,
+                labor_insurance: laborIns,
+                health_insurance: healthIns,
+                pension_self: pensionSelf,
+                income_tax: incomeTax,
+                manual_adjustment: adj,
+                adjustment_note: payrollAdjustments[emp.id]?.note || '',
+                total_deduction: totalDeduct,
+                gross_salary: gross,
+                net_salary: net,
+                calculation_details: {
+                    salary_type: salaryType,
+                    original_base: baseSalary,
+                    actual_days: actualDays,
+                    late_count: lateCount,
+                    leave_days: leaveDays,
+                    personal_leave_days: personalLeaveDays,
+                    overtime_hours: otHours,
+                    total_work_hours: Math.round(totalWorkHours * 10) / 10,
+                    daily_rate: dailyRate,
+                    hourly_rate: hourlyRate,
+                    pension_self_rate: pensionRate,
+                    tax_rate: taxRate,
+                    full_attendance: hasFullAtt
+                }
+            };
+        }
+
+        function populatePayrollDropdown() {
+            const sel = document.getElementById('payrollEmpDropdown');
+            const prev = sel.value;
+            sel.innerHTML = '<option value="_all">📋 全部員工總覽</option>';
+            payrollEmployees.forEach(emp => {
+                sel.innerHTML += `<option value="${emp.employee_id}">${emp.employee_number} ${emp.name}（${emp.department}）— ${formatNT(emp.net_salary)}</option>`;
+            });
+            if (prev) sel.value = prev;
+        }
+
+        function renderPayrollSummary() {
+            const total = payrollEmployees.reduce((s, e) => s + e.net_salary, 0);
+            const avg = payrollEmployees.length > 0 ? Math.round(total / payrollEmployees.length) : 0;
+            document.getElementById('prEmpCount').textContent = payrollEmployees.length;
+            document.getElementById('prTotalNet').textContent = formatNT(total);
+            document.getElementById('prAvgNet').textContent = formatNT(avg);
+            document.getElementById('prStatus').textContent = payrollIsPublished ? '✅ 已發布' : '📝 草稿';
+        }
+
+        function renderPayrollView() {
+            const sel = document.getElementById('payrollEmpDropdown').value;
+            if (sel === '_all') {
+                renderAllPayrollTable();
+            } else {
+                renderPayrollCard(sel);
+            }
+        }
+
+        function renderAllPayrollTable() {
+            const el = document.getElementById('payrollContent');
+            if (payrollEmployees.length === 0) {
+                el.innerHTML = '<p style="text-align:center;color:#94A3B8;padding:20px;">無資料（請確認員工已設定薪資）</p>';
+                return;
+            }
+            let html = '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12px;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.08);">';
+            html += '<thead><tr style="background:#F1F5F9;">';
+            html += '<th style="padding:10px 8px;text-align:left;font-weight:800;color:#475569;">姓名</th>';
+            html += '<th style="padding:10px 4px;text-align:right;font-weight:800;color:#475569;">底薪</th>';
+            html += '<th style="padding:10px 4px;text-align:right;font-weight:800;color:#475569;">加班</th>';
+            html += '<th style="padding:10px 4px;text-align:right;font-weight:800;color:#475569;">扣款</th>';
+            html += '<th style="padding:10px 8px;text-align:right;font-weight:800;color:#059669;">實發</th>';
+            html += '</tr></thead><tbody>';
+
+            payrollEmployees.forEach(emp => {
+                html += `<tr onclick="document.getElementById('payrollEmpDropdown').value='${emp.employee_id}';renderPayrollView();" style="cursor:pointer;border-bottom:1px solid #F1F5F9;transition:background 0.15s;" onmouseover="this.style.background='#F8FAFC'" onmouseout="this.style.background=''">`;
+                html += `<td style="padding:10px 8px;"><div style="font-weight:700;color:#0F172A;">${emp.name}</div><div style="font-size:11px;color:#94A3B8;">${emp.employee_number} · ${emp.department}</div></td>`;
+                html += `<td style="padding:10px 4px;text-align:right;color:#334155;">${Math.round(emp.base_salary).toLocaleString()}</td>`;
+                html += `<td style="padding:10px 4px;text-align:right;color:#0369A1;">${emp.overtime_pay > 0 ? '+' + Math.round(emp.overtime_pay).toLocaleString() : '-'}</td>`;
+                html += `<td style="padding:10px 4px;text-align:right;color:#DC2626;">-${Math.round(emp.total_deduction).toLocaleString()}</td>`;
+                html += `<td style="padding:10px 8px;text-align:right;font-weight:900;color:#059669;">${Math.round(emp.net_salary).toLocaleString()}</td>`;
+                html += '</tr>';
+            });
+
+            html += '</tbody></table></div>';
+            el.innerHTML = html;
+        }
+
+        function renderPayrollCard(empId) {
+            const el = document.getElementById('payrollContent');
+            const emp = payrollEmployees.find(e => e.employee_id === empId);
+            if (!emp) { el.innerHTML = '<p style="text-align:center;color:#94A3B8;">找不到此員工</p>'; return; }
+
+            const cd = emp.calculation_details || {};
+            const typeLabel = { monthly: '月薪制', daily: '日薪制', hourly: '時薪制' };
+
+            // 收入明細
+            const incomeItems = [
+                { label: '基本薪資', value: emp.base_salary, desc: cd.salary_type === 'monthly' ? '固定月薪' : cd.salary_type === 'daily' ? `日薪 ${cd.original_base?.toLocaleString()} × ${cd.actual_days}天` : `時薪 ${cd.original_base?.toLocaleString()} × ${cd.total_work_hours}h` },
+                { label: '加班費', value: emp.overtime_pay, desc: cd.overtime_hours > 0 ? `${cd.overtime_hours}小時` : '' },
+                { label: '全勤獎金', value: emp.full_attendance_bonus, desc: cd.full_attendance ? '✅ 達成' : '❌ 未達成' },
+                { label: '伙食津貼', value: emp.meal_allowance, desc: '每月固定' },
+                { label: '職務加給', value: emp.position_allowance, desc: '每月固定' },
+            ].filter(i => i.value > 0);
+
+            // 扣款明細
+            const deductItems = [
+                { label: '勞保自付', value: emp.labor_insurance, desc: '投保級距×12.5%×20%' },
+                { label: '健保自付', value: emp.health_insurance, desc: '投保級距×5.17%×30%' },
+                { label: '勞退自提', value: emp.pension_self, desc: cd.pension_self_rate > 0 ? `月薪×${cd.pension_self_rate}%` : '' },
+                { label: '所得稅', value: emp.income_tax, desc: `總收入×${cd.tax_rate}%` },
+                { label: '遲到扣款', value: emp.late_deduction, desc: cd.late_count > 0 ? `${cd.late_count}次×$100` : '' },
+                { label: '事假扣款', value: emp.personal_leave_deduction, desc: cd.personal_leave_days > 0 ? `日薪×${cd.personal_leave_days}天` : '' },
+            ].filter(i => i.value > 0);
+
+            const totalIncome = incomeItems.reduce((s, i) => s + i.value, 0);
+            const totalDeduct = deductItems.reduce((s, i) => s + i.value, 0);
+
+            let html = `<div style="background:#fff;border-radius:16px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,0.08);">`;
+
+            // Header
+            html += `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">`;
+            html += `<div><div style="font-size:18px;font-weight:900;color:#0F172A;">${emp.name}</div><div style="font-size:12px;color:#94A3B8;">${emp.employee_number} · ${emp.department} · ${typeLabel[emp.salary_type] || emp.salary_type}</div></div>`;
+            html += `<div style="text-align:right;"><div style="font-size:11px;color:#94A3B8;">實發薪資</div><div style="font-size:22px;font-weight:900;color:#059669;">${formatNT(emp.net_salary)}</div></div>`;
+            html += `</div>`;
+
+            // 出勤摘要
+            html += `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px;">`;
+            html += `<div style="text-align:center;background:#F8FAFC;border-radius:10px;padding:10px;"><div style="font-size:11px;color:#94A3B8;">出勤</div><div style="font-size:16px;font-weight:800;color:#0F172A;">${cd.actual_days}天</div></div>`;
+            html += `<div style="text-align:center;background:#F8FAFC;border-radius:10px;padding:10px;"><div style="font-size:11px;color:#94A3B8;">遲到</div><div style="font-size:16px;font-weight:800;color:${cd.late_count > 0 ? '#DC2626' : '#059669'};">${cd.late_count}次</div></div>`;
+            html += `<div style="text-align:center;background:#F8FAFC;border-radius:10px;padding:10px;"><div style="font-size:11px;color:#94A3B8;">請假</div><div style="font-size:16px;font-weight:800;color:#0F172A;">${cd.leave_days}天</div></div>`;
+            html += `<div style="text-align:center;background:#F8FAFC;border-radius:10px;padding:10px;"><div style="font-size:11px;color:#94A3B8;">加班</div><div style="font-size:16px;font-weight:800;color:#0369A1;">${cd.overtime_hours}h</div></div>`;
+            html += `</div>`;
+
+            // 收入
+            html += `<div style="font-size:13px;font-weight:800;color:#059669;margin-bottom:8px;">📈 收入明細</div>`;
+            incomeItems.forEach(i => {
+                html += `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #F1F5F9;font-size:13px;">`;
+                html += `<div><span style="color:#334155;">${i.label}</span><span style="color:#94A3B8;font-size:11px;margin-left:6px;">${i.desc}</span></div>`;
+                html += `<div style="font-weight:700;color:#059669;">+${Math.round(i.value).toLocaleString()}</div>`;
+                html += `</div>`;
+            });
+            html += `<div style="display:flex;justify-content:space-between;padding:8px 0;font-size:14px;font-weight:800;color:#059669;border-top:2px solid #059669;margin-top:4px;">`;
+            html += `<div>收入小計</div><div>${formatNT(totalIncome)}</div></div>`;
+
+            // 扣款
+            html += `<div style="font-size:13px;font-weight:800;color:#DC2626;margin:16px 0 8px;">📉 扣款明細</div>`;
+            deductItems.forEach(i => {
+                html += `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #F1F5F9;font-size:13px;">`;
+                html += `<div><span style="color:#334155;">${i.label}</span><span style="color:#94A3B8;font-size:11px;margin-left:6px;">${i.desc}</span></div>`;
+                html += `<div style="font-weight:700;color:#DC2626;">-${Math.round(i.value).toLocaleString()}</div>`;
+                html += `</div>`;
+            });
+            html += `<div style="display:flex;justify-content:space-between;padding:8px 0;font-size:14px;font-weight:800;color:#DC2626;border-top:2px solid #DC2626;margin-top:4px;">`;
+            html += `<div>扣款小計</div><div>-${formatNT(totalDeduct)}</div></div>`;
+
+            // 手動調整
+            html += `<div style="font-size:13px;font-weight:800;color:#7C3AED;margin:16px 0 8px;">✏️ 手動調整</div>`;
+            html += `<div style="display:flex;gap:8px;align-items:center;">`;
+            html += `<input id="prAdj_${emp.employee_id}" type="text" inputmode="numeric" value="${(emp.manual_adjustment || 0) !== 0 ? emp.manual_adjustment.toLocaleString() : ''}" placeholder="正數=加給，負數=扣款" style="flex:1;padding:10px;border:1px solid #E5E7EB;border-radius:10px;font-size:13px;" onchange="updatePayrollAdjustment('${emp.employee_id}')">`;
+            html += `<input id="prAdjNote_${emp.employee_id}" type="text" value="${emp.adjustment_note || ''}" placeholder="備註" style="width:120px;padding:10px;border:1px solid #E5E7EB;border-radius:10px;font-size:13px;" onchange="updatePayrollAdjustment('${emp.employee_id}')">`;
+            html += `</div>`;
+
+            html += `</div>`;
+            el.innerHTML = html;
+
+            // 格式化金額輸入
+            const adjEl = document.getElementById(`prAdj_${emp.employee_id}`);
+            if (adjEl) {
+                adjEl.addEventListener('input', function() {
+                    const neg = this.value.startsWith('-');
+                    const raw = this.value.replace(/[^\d]/g, '');
+                    this.value = raw ? (neg ? '-' : '') + parseInt(raw, 10).toLocaleString() : '';
+                });
+            }
+        }
+
+        function updatePayrollAdjustment(empId) {
+            const amtEl = document.getElementById(`prAdj_${empId}`);
+            const noteEl = document.getElementById(`prAdjNote_${empId}`);
+            const neg = amtEl.value.startsWith('-');
+            const raw = parseInt(amtEl.value.replace(/[^\d]/g, ''), 10) || 0;
+            const amount = neg ? -raw : raw;
+            payrollAdjustments[empId] = { amount, note: noteEl.value || '' };
+
+            // 重新計算該員工
+            const idx = payrollEmployees.findIndex(e => e.employee_id === empId);
+            if (idx >= 0) {
+                const old = payrollEmployees[idx];
+                // manual_adjustment 影響 total_deduction 和 net_salary
+                const adjDiff = amount - (old.manual_adjustment || 0);
+                old.manual_adjustment = amount;
+                old.adjustment_note = noteEl.value || '';
+                old.total_deduction = old.total_deduction - adjDiff;
+                old.net_salary = old.gross_salary - old.total_deduction;
+                payrollEmployees[idx] = old;
+            }
+
+            // 更新摘要和下拉選單
+            renderPayrollSummary();
+            populatePayrollDropdown();
+            // 重設下拉到當前員工
+            document.getElementById('payrollEmpDropdown').value = empId;
+        }
+
+        async function saveAllPayroll() {
+            if (payrollEmployees.length === 0) { showToast('⚠️ 無資料可儲存'); return; }
+            const year = parseInt(document.getElementById('payrollYear').value);
+            const month = parseInt(document.getElementById('payrollMonth').value);
+
+            if (!confirm(`確定儲存 ${year}年${month}月 共 ${payrollEmployees.length} 人薪資（草稿）？`)) return;
+
+            const btn = document.getElementById('savePayrollBtn');
+            btn.disabled = true; btn.textContent = '⏳ 儲存中...';
+
+            try {
+                const records = payrollEmployees.map(emp => ({
+                    employee_id: emp.employee_id,
+                    year: emp.year,
+                    month: emp.month,
+                    salary_type: emp.salary_type,
+                    base_salary: emp.base_salary,
+                    overtime_pay: emp.overtime_pay,
+                    bonus: 0,
+                    full_attendance_bonus: emp.full_attendance_bonus,
+                    meal_allowance: emp.meal_allowance,
+                    position_allowance: emp.position_allowance,
+                    night_allowance: emp.night_allowance,
+                    late_deduction: emp.late_deduction,
+                    absence_deduction: emp.absence_deduction,
+                    personal_leave_deduction: emp.personal_leave_deduction,
+                    labor_insurance: emp.labor_insurance,
+                    health_insurance: emp.health_insurance,
+                    pension_self: emp.pension_self,
+                    income_tax: emp.income_tax,
+                    manual_adjustment: emp.manual_adjustment,
+                    adjustment_note: emp.adjustment_note,
+                    total_deduction: emp.total_deduction,
+                    gross_salary: emp.gross_salary,
+                    net_salary: emp.net_salary,
+                    calculation_details: emp.calculation_details,
+                    is_published: false,
+                    updated_at: new Date().toISOString()
+                }));
+
+                const { error } = await sb.from('payroll').upsert(records, { onConflict: 'employee_id,year,month' });
+                if (error) throw error;
+
+                if (typeof writeAuditLog === 'function') {
+                    writeAuditLog('save_payroll', 'payroll', null, `${year}年${month}月薪資草稿`, {
+                        count: records.length,
+                        total: records.reduce((s, r) => s + r.net_salary, 0)
+                    });
+                }
+
+                payrollIsPublished = false;
+                renderPayrollSummary();
+                showToast(`✅ 已儲存 ${records.length} 筆薪資（草稿）`);
+            } catch(e) {
+                showToast('❌ 儲存失敗：' + (typeof friendlyError === 'function' ? friendlyError(e) : e.message));
+            } finally {
+                btn.disabled = false; btn.textContent = '💾 儲存全部（草稿）';
+            }
+        }
+
+        async function publishPayroll() {
+            if (payrollEmployees.length === 0) { showToast('⚠️ 請先計算並儲存薪資'); return; }
+            const year = parseInt(document.getElementById('payrollYear').value);
+            const month = parseInt(document.getElementById('payrollMonth').value);
+
+            if (!confirm(`⚠️ 確定發布 ${year}年${month}月 薪資？\n\n發布後員工將在薪資頁面看到明細。`)) return;
+
+            const btn = document.getElementById('publishPayrollBtn');
+            btn.disabled = true; btn.textContent = '⏳ 發布中...';
+
+            try {
+                // 先確保已儲存
+                const records = payrollEmployees.map(emp => ({
+                    employee_id: emp.employee_id,
+                    year: emp.year,
+                    month: emp.month,
+                    salary_type: emp.salary_type,
+                    base_salary: emp.base_salary,
+                    overtime_pay: emp.overtime_pay,
+                    bonus: 0,
+                    full_attendance_bonus: emp.full_attendance_bonus,
+                    meal_allowance: emp.meal_allowance,
+                    position_allowance: emp.position_allowance,
+                    night_allowance: emp.night_allowance,
+                    late_deduction: emp.late_deduction,
+                    absence_deduction: emp.absence_deduction,
+                    personal_leave_deduction: emp.personal_leave_deduction,
+                    labor_insurance: emp.labor_insurance,
+                    health_insurance: emp.health_insurance,
+                    pension_self: emp.pension_self,
+                    income_tax: emp.income_tax,
+                    manual_adjustment: emp.manual_adjustment,
+                    adjustment_note: emp.adjustment_note,
+                    total_deduction: emp.total_deduction,
+                    gross_salary: emp.gross_salary,
+                    net_salary: emp.net_salary,
+                    calculation_details: emp.calculation_details,
+                    is_published: true,
+                    updated_at: new Date().toISOString()
+                }));
+
+                const { error } = await sb.from('payroll').upsert(records, { onConflict: 'employee_id,year,month' });
+                if (error) throw error;
+
+                if (typeof writeAuditLog === 'function') {
+                    writeAuditLog('publish_payroll', 'payroll', null, `${year}年${month}月薪資發布`, {
+                        count: records.length,
+                        total: records.reduce((s, r) => s + r.net_salary, 0)
+                    });
+                }
+
+                payrollIsPublished = true;
+                renderPayrollSummary();
+                document.getElementById('payrollPublishedWarn').style.display = 'block';
+                showToast(`✅ ${year}年${month}月 薪資已發布（${records.length} 人）`);
+            } catch(e) {
+                showToast('❌ 發布失敗：' + (typeof friendlyError === 'function' ? friendlyError(e) : e.message));
+            } finally {
+                btn.disabled = false; btn.textContent = '📢 發布薪資（員工可見）';
+            }
+        }
+
+        function exportPayrollCSV() {
+            if (payrollEmployees.length === 0) { showToast('⚠️ 請先計算薪資'); return; }
+            const year = parseInt(document.getElementById('payrollYear').value);
+            const month = parseInt(document.getElementById('payrollMonth').value);
+            const typeMap = { monthly: '月薪', daily: '日薪', hourly: '時薪' };
+
+            const rows = [['工號','姓名','部門','薪資類型','底薪','加班費','全勤獎金','伙食津貼','職務加給','勞保','健保','勞退','所得稅','遲到扣','請假扣','手動調整','調整備註','總收入','總扣款','實發']];
+
+            payrollEmployees.forEach(emp => {
+                rows.push([
+                    emp.employee_number, emp.name, emp.department,
+                    typeMap[emp.salary_type] || emp.salary_type,
+                    emp.base_salary, emp.overtime_pay, emp.full_attendance_bonus,
+                    emp.meal_allowance, emp.position_allowance,
+                    emp.labor_insurance, emp.health_insurance, emp.pension_self, emp.income_tax,
+                    emp.late_deduction, emp.personal_leave_deduction,
+                    emp.manual_adjustment, emp.adjustment_note,
+                    emp.gross_salary, emp.total_deduction, emp.net_salary
+                ]);
+            });
+
+            const csv = '\uFEFF' + rows.map(r => r.map(c => `"${String(c ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+            a.download = `薪資明細_${year}年${month}月.csv`;
+            a.click();
+
+            if (typeof writeAuditLog === 'function') {
+                writeAuditLog('export', 'payroll', null, `薪資明細_${year}年${month}月.csv`, { rows: rows.length - 1 });
+            }
+            showToast(`✅ 薪資明細_${year}年${month}月.csv（${rows.length - 1} 筆）`);
+        }
+
         // ===== 排班管理 =====
         let smWeekStart;
         (function() {
@@ -2776,6 +3443,15 @@
                         rows.push([r.employees?.employee_number,r.employees?.name,r.employees?.department,r.months_worked,r.base_amount,r.adjustment||0,r.final_bonus||0,detail]);
                     });
                     fn = `獎金報表_${y}.csv`;
+                } else if (type === 'payroll') {
+                    const { data } = await sb.from('payroll').select('*, employees(name, employee_number, department)').eq('year',y).eq('month',m).order('employees(employee_number)');
+                    rows.push(['工號','姓名','部門','薪資類型','底薪','加班費','全勤獎金','伙食津貼','職務加給','勞保','健保','勞退','所得稅','遲到扣','請假扣','手動調整','總收入','總扣款','實發','狀態']);
+                    (data||[]).forEach(r => {
+                        const cd = r.calculation_details || {};
+                        const typeMap = {monthly:'月薪',daily:'日薪',hourly:'時薪'};
+                        rows.push([r.employees?.employee_number,r.employees?.name,r.employees?.department,typeMap[r.salary_type]||r.salary_type,r.base_salary,r.overtime_pay,r.full_attendance_bonus,r.meal_allowance||0,r.position_allowance||0,r.labor_insurance,r.health_insurance,r.pension_self||0,r.income_tax||0,r.late_deduction,r.personal_leave_deduction||0,r.manual_adjustment||0,r.gross_salary,r.total_deduction,r.net_salary,r.is_published?'已發布':'草稿']);
+                    });
+                    fn = `薪資報表_${ms}.csv`;
                 }
                 
                 if (rows.length <= 1) { showToast('⚠️ 無資料'); return; }
