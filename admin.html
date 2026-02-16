@@ -83,11 +83,8 @@
                 <div class="menu-item" data-require="admin" data-feature="fieldwork,sales_target" onclick="showPage('fieldSalesAdminPage')">
                     <div class="icon">📍</div><div class="label">外勤/業務</div>
                 </div>
-                <div class="menu-item" data-require="admin" data-feature="store_ordering" onclick="showPage('storeManagePage')">
-                    <div class="icon">🍽️</div><div class="label">商店管理</div>
-                </div>
-                <div class="menu-item" data-require="admin" data-feature="store_ordering" onclick="showPage('orderManagePage')">
-                    <div class="icon">📦</div><div class="label">訂單管理</div>
+                <div class="menu-item" data-require="admin" data-feature="store_ordering" onclick="showPage('restaurantPage')">
+                    <div class="icon">🍽️</div><div class="label">餐飲業管理</div>
                 </div>
                 <div class="menu-item" data-require="admin" onclick="showPage('insurancePage')">
                     <div class="icon">🏥</div><div class="label">勞健保級距</div>
@@ -654,6 +651,9 @@
                     <div class="menu-item" onclick="showPage('fieldSalesAdminPage')">
                         <div class="icon">📍</div><div class="label">外勤報表</div>
                     </div>
+                    <div class="menu-item" data-feature="store_ordering" onclick="exportReport('orders')">
+                        <div class="icon">🍽️</div><div class="label">訂單報表</div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1053,15 +1053,185 @@
             </div>
         </div>
 
-        <!-- ====== 商店管理 ====== -->
-        <div id="storeManagePage" class="page">
+        <!-- ====== 餐飲業管理 ====== -->
+        <div id="restaurantPage" class="page">
             <button class="btn btn-secondary" onclick="showPage('adminHomePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
             <div class="checkin-page">
-                <h2>🍽️ 商店管理</h2>
-
+                <h2>🍽️ 餐飲業管理</h2>
                 <button class="btn btn-primary" onclick="showStoreModal()" style="margin-bottom:16px;font-size:13px;padding:12px;">+ 新增商店</button>
+                <div id="restaurantStoreList"><p style="text-align:center;color:#999;">載入中...</p></div>
+            </div>
+        </div>
 
-                <div id="storeList"><p style="text-align:center;color:#999;">載入中...</p></div>
+        <!-- 商店詳情頁 -->
+        <div id="restaurantDetailPage" class="page">
+            <button class="btn btn-secondary" onclick="showPage('restaurantPage')" style="width:auto;margin-bottom:10px;">← 返回商店列表</button>
+            <div class="checkin-page">
+                <!-- 店頭資訊 -->
+                <div id="rdStoreHeader" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                    <h2 id="rdStoreName" style="margin:0;font-size:18px;"></h2>
+                    <div style="display:flex;gap:6px;">
+                        <button onclick="showStoreQR(rdCurrentStoreId)" style="padding:6px 10px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;font-size:12px;cursor:pointer;">📱 QR</button>
+                        <button onclick="editStore(rdCurrentStoreId)" style="padding:6px 10px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;font-size:12px;cursor:pointer;">📝 編輯</button>
+                    </div>
+                </div>
+                <div id="rdAcceptOrderToggle" style="margin-bottom:12px;"></div>
+
+                <!-- Tab 切換 -->
+                <div style="display:flex;gap:0;margin-bottom:14px;border-bottom:2px solid #E2E8F0;">
+                    <div class="rdTab rdTabActive" onclick="switchRestaurantTab('orders',this)" style="flex:1;text-align:center;padding:10px 0;font-size:13px;font-weight:700;cursor:pointer;border-bottom:3px solid #4F46E5;margin-bottom:-2px;color:#4F46E5;">📋 訂單</div>
+                    <div class="rdTab" onclick="switchRestaurantTab('menu',this)" style="flex:1;text-align:center;padding:10px 0;font-size:13px;font-weight:600;cursor:pointer;color:#94A3B8;">🍽️ 菜單</div>
+                    <div class="rdTab" onclick="switchRestaurantTab('settings',this)" style="flex:1;text-align:center;padding:10px 0;font-size:13px;font-weight:600;cursor:pointer;color:#94A3B8;">⚙️ 設定</div>
+                </div>
+
+                <!-- 訂單 Tab -->
+                <div id="rdOrdersTab">
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+                        <select id="rdStatusFilter" style="flex:1;padding:8px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;">
+                            <option value="">全部狀態</option>
+                            <option value="pending" selected>待處理</option>
+                            <option value="confirmed">已確認</option>
+                            <option value="preparing">準備中</option>
+                            <option value="ready">可取餐</option>
+                            <option value="completed">已完成</option>
+                            <option value="cancelled">已取消</option>
+                        </select>
+                        <button class="btn btn-primary" onclick="loadStoreOrders()" style="font-size:12px;padding:8px 14px;">查詢</button>
+                    </div>
+                    <!-- 統計 -->
+                    <div style="display:flex;gap:8px;margin-bottom:12px;">
+                        <div style="flex:1;text-align:center;padding:8px;background:#FEF3C7;border-radius:8px;">
+                            <div style="font-size:18px;font-weight:900;color:#92400E;" id="rdPendingCount">0</div>
+                            <div style="font-size:10px;color:#92400E;">待處理</div>
+                        </div>
+                        <div style="flex:1;text-align:center;padding:8px;background:#DBEAFE;border-radius:8px;">
+                            <div style="font-size:18px;font-weight:900;color:#1E40AF;" id="rdTodayCount">0</div>
+                            <div style="font-size:10px;color:#1E40AF;">今日訂單</div>
+                        </div>
+                        <div style="flex:1;text-align:center;padding:8px;background:#D1FAE5;border-radius:8px;">
+                            <div style="font-size:18px;font-weight:900;color:#059669;" id="rdTodayRevenue">$0</div>
+                            <div style="font-size:10px;color:#059669;">今日營收</div>
+                        </div>
+                    </div>
+                    <!-- 熱銷 TOP 5 -->
+                    <div id="rdTopSelling" style="display:none;background:#FFFBEB;border-radius:10px;padding:10px 14px;margin-bottom:12px;font-size:12px;"></div>
+                    <div id="rdOrderList"><p style="text-align:center;color:#999;">載入中...</p></div>
+                </div>
+
+                <!-- 菜單 Tab -->
+                <div id="rdMenuTab" style="display:none;">
+                    <!-- 分類管理 -->
+                    <div style="background:#F8FAFC;border-radius:12px;padding:14px;margin-bottom:16px;">
+                        <div style="font-weight:700;font-size:14px;margin-bottom:8px;">📂 分類</div>
+                        <div id="menuCatList" style="margin-bottom:8px;"></div>
+                        <div style="display:flex;gap:8px;">
+                            <input type="text" id="newCatName" placeholder="新分類名稱" style="flex:1;padding:8px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;box-sizing:border-box;">
+                            <button onclick="addMenuCategory()" style="padding:8px 14px;border:none;border-radius:8px;background:#4F46E5;color:#fff;font-weight:600;font-size:13px;cursor:pointer;">+ 新增</button>
+                        </div>
+                    </div>
+                    <!-- 品項管理 -->
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                        <div style="font-weight:700;font-size:14px;">🍽️ 品項</div>
+                        <button onclick="showCopyMenuModal()" style="padding:6px 12px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;font-size:11px;cursor:pointer;">📋 複製菜單到其他商店</button>
+                    </div>
+                    <button onclick="showMenuItemForm()" style="width:100%;padding:10px;border:1px dashed #4F46E5;border-radius:10px;background:#EEF2FF;color:#4F46E5;font-weight:600;font-size:13px;cursor:pointer;margin-bottom:12px;">+ 新增品項</button>
+                    <div id="menuItemList"></div>
+                    <!-- 新增/編輯品項表單 -->
+                    <div id="menuItemForm" style="display:none;background:#F8FAFC;border-radius:12px;padding:14px;margin-top:12px;">
+                        <input type="hidden" id="miEditId">
+                        <div class="form-group">
+                            <label style="font-size:12px;">品名 *</label>
+                            <input type="text" id="miName" placeholder="例：招牌牛肉麵" style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;box-sizing:border-box;">
+                        </div>
+                        <div class="form-group">
+                            <label style="font-size:12px;">分類</label>
+                            <select id="miCategory" style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;"></select>
+                        </div>
+                        <div class="form-group">
+                            <label style="font-size:12px;">價格 *</label>
+                            <input type="number" id="miPrice" min="0" placeholder="0" style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;box-sizing:border-box;">
+                        </div>
+                        <div class="form-group">
+                            <label style="font-size:12px;">說明</label>
+                            <input type="text" id="miDesc" placeholder="選填" style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;box-sizing:border-box;">
+                        </div>
+                        <!-- 品項圖片 -->
+                        <div class="form-group">
+                            <label style="font-size:12px;">圖片</label>
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <img id="miImagePreview" style="width:60px;height:60px;border-radius:8px;object-fit:cover;display:none;border:1px solid #E2E8F0;">
+                                <button type="button" onclick="document.getElementById('miImageFile').click()" style="padding:8px 14px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;font-size:12px;cursor:pointer;">📷 上傳圖片</button>
+                                <input type="file" id="miImageFile" accept="image/*" onchange="handleMenuImageUpload(this)" style="display:none;">
+                            </div>
+                            <input type="hidden" id="miImageUrl">
+                        </div>
+                        <!-- 客製化選項 -->
+                        <div class="form-group">
+                            <label style="font-size:12px;">客製化選項</label>
+                            <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;">
+                                <button type="button" onclick="applyOptionTemplate('drink')" style="padding:4px 10px;border:1px solid #E2E8F0;border-radius:6px;background:#fff;font-size:11px;cursor:pointer;">☕ 飲料（甜度+冰量）</button>
+                                <button type="button" onclick="applyOptionTemplate('food')" style="padding:4px 10px;border:1px solid #E2E8F0;border-radius:6px;background:#fff;font-size:11px;cursor:pointer;">🍜 餐點（辣度+加料）</button>
+                            </div>
+                            <div id="miOptionsEditor"></div>
+                            <button type="button" onclick="addOptionGroup()" style="padding:6px 12px;border:1px dashed #94A3B8;border-radius:8px;background:#fff;font-size:11px;cursor:pointer;color:#64748B;margin-top:4px;">+ 新增選項群組</button>
+                        </div>
+                        <!-- 套餐組合 -->
+                        <div class="form-group">
+                            <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer;">
+                                <input type="checkbox" id="miIsCombo" onchange="toggleComboEditor()"> 🍱 此品項為套餐組合
+                            </label>
+                            <div id="miComboEditor" style="display:none;margin-top:8px;">
+                                <p style="font-size:11px;color:#94A3B8;margin-bottom:8px;">設定套餐包含的群組，每個群組可設定可選品項與選擇數量</p>
+                                <div id="miComboGroups"></div>
+                                <button type="button" onclick="addComboGroup()" style="padding:6px 12px;border:1px dashed #94A3B8;border-radius:8px;background:#fff;font-size:11px;cursor:pointer;color:#64748B;margin-top:4px;">+ 新增套餐群組</button>
+                            </div>
+                        </div>
+                        <div style="display:flex;gap:8px;margin-top:8px;">
+                            <button onclick="cancelMenuItemForm()" style="flex:1;padding:10px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;font-size:13px;cursor:pointer;">取消</button>
+                            <button onclick="saveMenuItem()" style="flex:1;padding:10px;border:none;border-radius:8px;background:#059669;color:#fff;font-weight:600;font-size:13px;cursor:pointer;">儲存</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 設定 Tab -->
+                <div id="rdSettingsTab" style="display:none;">
+                    <!-- 基本資料（用現有 storeModal 編輯） -->
+                    <div style="background:#F8FAFC;border-radius:12px;padding:14px;margin-bottom:14px;">
+                        <div style="font-weight:700;font-size:14px;margin-bottom:10px;">📋 基本資料</div>
+                        <div id="rdStoreInfo" style="font-size:13px;color:#64748B;"></div>
+                        <button onclick="editStore(rdCurrentStoreId)" style="margin-top:8px;padding:8px 16px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;font-size:12px;cursor:pointer;">📝 編輯基本資料</button>
+                    </div>
+                    <!-- 營業時間 -->
+                    <div style="background:#F8FAFC;border-radius:12px;padding:14px;margin-bottom:14px;">
+                        <div style="font-weight:700;font-size:14px;margin-bottom:10px;">🕐 營業時間</div>
+                        <div id="rdBusinessHours"></div>
+                        <button onclick="saveBusinessHours()" class="btn btn-success" style="margin-top:10px;font-size:13px;padding:10px 20px;">💾 儲存營業時間</button>
+                    </div>
+                    <!-- LINE 群組 -->
+                    <div style="background:#F8FAFC;border-radius:12px;padding:14px;margin-bottom:14px;">
+                        <div style="font-weight:700;font-size:14px;margin-bottom:10px;">💬 LINE 群組推播</div>
+                        <p style="font-size:11px;color:#94A3B8;margin-bottom:8px;">將 Bot 加入群組後，在群組中輸入 /groupid 取得群組 ID</p>
+                        <input type="text" id="rdLineGroupId" placeholder="LINE Group ID" style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;box-sizing:border-box;">
+                        <button onclick="saveLineGroupId()" class="btn btn-success" style="margin-top:8px;font-size:13px;padding:10px 20px;">💾 儲存</button>
+                    </div>
+                    <!-- 集點設定 -->
+                    <div style="background:#F8FAFC;border-radius:12px;padding:14px;margin-bottom:14px;">
+                        <div style="font-weight:700;font-size:14px;margin-bottom:10px;">🎯 會員集點</div>
+                        <div class="form-group" style="margin-bottom:8px;">
+                            <label style="font-size:12px;">每消費多少元得 1 點</label>
+                            <input type="number" id="rdLoyaltySpend" min="1" placeholder="50" style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;box-sizing:border-box;">
+                        </div>
+                        <div class="form-group" style="margin-bottom:8px;">
+                            <label style="font-size:12px;">多少點可兌換折扣</label>
+                            <input type="number" id="rdLoyaltyPoints" min="1" placeholder="10" style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;box-sizing:border-box;">
+                        </div>
+                        <div class="form-group" style="margin-bottom:8px;">
+                            <label style="font-size:12px;">折扣金額 (元)</label>
+                            <input type="number" id="rdLoyaltyDiscount" min="1" placeholder="50" style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;box-sizing:border-box;">
+                        </div>
+                        <button onclick="saveLoyaltyConfig()" class="btn btn-success" style="font-size:13px;padding:10px 20px;">💾 儲存集點設定</button>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -1109,106 +1279,16 @@
             </div>
         </div>
 
-        <!-- 菜單管理 Modal -->
-        <div id="menuManageModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9999;align-items:flex-start;justify-content:center;padding:10px;overflow-y:auto;">
-            <div style="background:#fff;border-radius:16px;width:100%;max-width:500px;max-height:95vh;overflow-y:auto;padding:24px;margin:auto;">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-                    <h3 id="menuManageTitle" style="margin:0;">菜單管理</h3>
-                    <button onclick="closeMenuManage()" style="background:none;border:none;font-size:24px;cursor:pointer;color:#94A3B8;">×</button>
+        <!-- 菜單複製 Modal -->
+        <div id="copyMenuModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9999;align-items:center;justify-content:center;padding:20px;">
+            <div style="background:#fff;border-radius:16px;width:100%;max-width:400px;padding:24px;">
+                <h3 style="margin-bottom:12px;">📋 複製菜單到其他商店</h3>
+                <p style="font-size:12px;color:#EF4444;margin-bottom:12px;">會覆蓋目標商店的現有菜單</p>
+                <div id="copyMenuTargets" style="margin-bottom:16px;"></div>
+                <div style="display:flex;gap:8px;">
+                    <button onclick="closeCopyMenuModal()" style="flex:1;padding:10px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;font-size:13px;cursor:pointer;">取消</button>
+                    <button onclick="executeCopyMenu()" style="flex:1;padding:10px;border:none;border-radius:8px;background:#4F46E5;color:#fff;font-weight:600;font-size:13px;cursor:pointer;">確定複製</button>
                 </div>
-
-                <!-- 分類管理 -->
-                <div style="background:#F8FAFC;border-radius:12px;padding:14px;margin-bottom:16px;">
-                    <div style="font-weight:700;font-size:14px;margin-bottom:8px;">📂 分類</div>
-                    <div id="menuCatList" style="margin-bottom:8px;"></div>
-                    <div style="display:flex;gap:8px;">
-                        <input type="text" id="newCatName" placeholder="新分類名稱" style="flex:1;padding:8px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;box-sizing:border-box;">
-                        <button onclick="addMenuCategory()" style="padding:8px 14px;border:none;border-radius:8px;background:#4F46E5;color:#fff;font-weight:600;font-size:13px;cursor:pointer;">+ 新增</button>
-                    </div>
-                </div>
-
-                <!-- 品項管理 -->
-                <div style="font-weight:700;font-size:14px;margin-bottom:8px;">🍽️ 品項</div>
-                <button onclick="showMenuItemForm()" style="width:100%;padding:10px;border:1px dashed #4F46E5;border-radius:10px;background:#EEF2FF;color:#4F46E5;font-weight:600;font-size:13px;cursor:pointer;margin-bottom:12px;">+ 新增品項</button>
-                <div id="menuItemList"></div>
-
-                <!-- 新增/編輯品項表單 -->
-                <div id="menuItemForm" style="display:none;background:#F8FAFC;border-radius:12px;padding:14px;margin-top:12px;">
-                    <input type="hidden" id="miEditId">
-                    <div class="form-group">
-                        <label style="font-size:12px;">品名 *</label>
-                        <input type="text" id="miName" placeholder="例：招牌牛肉麵" style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;box-sizing:border-box;">
-                    </div>
-                    <div class="form-group">
-                        <label style="font-size:12px;">分類</label>
-                        <select id="miCategory" style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;"></select>
-                    </div>
-                    <div class="form-group">
-                        <label style="font-size:12px;">價格 *</label>
-                        <input type="number" id="miPrice" min="0" placeholder="0" style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;box-sizing:border-box;">
-                    </div>
-                    <div class="form-group">
-                        <label style="font-size:12px;">說明</label>
-                        <input type="text" id="miDesc" placeholder="選填" style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;box-sizing:border-box;">
-                    </div>
-                    <div style="display:flex;gap:8px;">
-                        <button onclick="cancelMenuItemForm()" style="flex:1;padding:10px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;font-size:13px;cursor:pointer;">取消</button>
-                        <button onclick="saveMenuItem()" style="flex:1;padding:10px;border:none;border-radius:8px;background:#059669;color:#fff;font-weight:600;font-size:13px;cursor:pointer;">儲存</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- QR Code Modal -->
-        <div id="storeQRModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9999;display:none;align-items:center;justify-content:center;padding:20px;">
-            <div style="background:#fff;border-radius:16px;padding:24px;text-align:center;max-width:360px;width:100%;">
-                <h3 id="storeQRTitle" style="margin-bottom:12px;"></h3>
-                <div id="storeQRCode" style="display:inline-block;margin-bottom:12px;"></div>
-                <p id="storeQRUrl" style="font-size:12px;color:#64748B;word-break:break-all;margin-bottom:12px;"></p>
-                <button onclick="closeStoreQR()" style="padding:12px 24px;border:1px solid #E2E8F0;border-radius:10px;background:#fff;font-weight:600;cursor:pointer;">關閉</button>
-            </div>
-        </div>
-
-        <!-- ====== 訂單管理 ====== -->
-        <div id="orderManagePage" class="page">
-            <button class="btn btn-secondary" onclick="showPage('adminHomePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
-            <div class="checkin-page">
-                <h2>📦 訂單管理</h2>
-
-                <!-- 篩選 -->
-                <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
-                    <select id="omStoreFilter" style="flex:1;min-width:120px;padding:8px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;">
-                        <option value="">全部商店</option>
-                    </select>
-                    <select id="omStatusFilter" style="padding:8px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;">
-                        <option value="">全部狀態</option>
-                        <option value="pending" selected>待處理</option>
-                        <option value="confirmed">已確認</option>
-                        <option value="preparing">準備中</option>
-                        <option value="ready">可取餐</option>
-                        <option value="completed">已完成</option>
-                        <option value="cancelled">已取消</option>
-                    </select>
-                    <button class="btn btn-primary" onclick="loadOrderList()" style="font-size:12px;padding:8px 14px;">查詢</button>
-                </div>
-
-                <!-- 統計 -->
-                <div style="display:flex;gap:8px;margin-bottom:12px;">
-                    <div style="flex:1;text-align:center;padding:8px;background:#FEF3C7;border-radius:8px;">
-                        <div style="font-size:18px;font-weight:900;color:#92400E;" id="omPendingCount">0</div>
-                        <div style="font-size:10px;color:#92400E;">待處理</div>
-                    </div>
-                    <div style="flex:1;text-align:center;padding:8px;background:#DBEAFE;border-radius:8px;">
-                        <div style="font-size:18px;font-weight:900;color:#1E40AF;" id="omTodayCount">0</div>
-                        <div style="font-size:10px;color:#1E40AF;">今日訂單</div>
-                    </div>
-                    <div style="flex:1;text-align:center;padding:8px;background:#D1FAE5;border-radius:8px;">
-                        <div style="font-size:18px;font-weight:900;color:#059669;" id="omTodayRevenue">$0</div>
-                        <div style="font-size:10px;color:#059669;">今日營收</div>
-                    </div>
-                </div>
-
-                <div id="orderList"><p style="text-align:center;color:#999;">載入中...</p></div>
             </div>
         </div>
 
@@ -1289,8 +1369,8 @@
             if (id === 'clientPage') { loadClientList(); loadServiceItemList(); }
             if (id === 'fieldSalesAdminPage') { switchFieldSalesAdmin('approval', document.querySelector('.fsaTab')); }
             if (id === 'insurancePage') { loadInsuranceBrackets(); }
-            if (id === 'storeManagePage') { loadStoreList(); }
-            if (id === 'orderManagePage') { initOrderManage(); }
+            if (id === 'restaurantPage') { loadRestaurantList(); }
+            if (id === 'restaurantDetailPage') { /* loaded via openRestaurantDetail */ }
         }
 
         // ===== 功能管理 =====
@@ -4028,7 +4108,24 @@
                     });
                     fn = `薪資報表_${ms}.csv`;
                 }
-                
+
+                else if (type === 'orders') {
+                    // 最近 3 個月訂單
+                    const threeMonthsAgo = new Date();
+                    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+                    const since = fmtDate(threeMonthsAgo);
+                    let oq = sb.from('orders').select('*, store_profiles(store_name)').gte('created_at', since + 'T00:00:00').order('created_at', { ascending: false });
+                    const { data: od } = await oq;
+                    const typeLabel = { dine_in:'內用', takeout:'外帶', delivery:'外送' };
+                    const stLabel = { pending:'待處理', confirmed:'已確認', preparing:'準備中', ready:'可取餐', completed:'已完成', cancelled:'已取消' };
+                    rows.push(['訂單號','商店','取餐號','客人','電話','類型','品項明細','合計','狀態','下單時間']);
+                    (od || []).forEach(o => {
+                        const itemStr = (o.items || []).map(i => `${i.name}x${i.qty}`).join('、');
+                        rows.push([o.order_number, o.store_profiles?.store_name || '', o.pickup_number || '', o.customer_name || '', o.customer_phone || '', typeLabel[o.order_type] || o.order_type || '', itemStr, o.total, stLabel[o.status] || o.status, o.created_at?.substring(0, 16).replace('T', ' ') || '']);
+                    });
+                    fn = `訂單報表_${ms}.csv`;
+                }
+
                 if (rows.length <= 1) { showToast('⚠️ 無資料'); return; }
                 const csv = '\uFEFF' + rows.map(r => r.map(c => `"${String(c??'').replace(/"/g,'""')}"`).join(',')).join('\n');
                 const a = document.createElement('a');
@@ -4639,50 +4736,249 @@
             }
         }
 
-        // ===== 商店管理 =====
+        // ===== 餐飲業管理 =====
         let smStores = [];
         let smCurrentStoreId = null;
+        let rdCurrentStoreId = null;
         let smCategories = [];
         let smItems = [];
+        let rdOrders = [];
+        let miOptionGroups = []; // 客製化選項暫存
+        let miComboGroups = []; // 套餐組合暫存
 
-        async function loadStoreList() {
+        // --- 商店列表 ---
+        async function loadRestaurantList() {
             try {
-                let q = sb.from('store_profiles').select('*, clients(company_name)').order('created_at', { ascending: false });
+                let q = sb.from('store_profiles').select('*').order('created_at', { ascending: false });
                 if (currentCompanyId) q = q.eq('company_id', currentCompanyId);
                 const { data } = await q;
                 smStores = data || [];
-                renderStoreList();
+                // 載入每店今日訂單統計
+                const today = fmtDate(new Date());
+                const { data: todayOrders } = await sb.from('orders').select('store_id, status, total').gte('created_at', today + 'T00:00:00');
+                const stats = {};
+                (todayOrders || []).forEach(o => {
+                    if (!stats[o.store_id]) stats[o.store_id] = { total: 0, pending: 0, revenue: 0 };
+                    stats[o.store_id].total++;
+                    if (o.status === 'pending') stats[o.store_id].pending++;
+                    if (o.status !== 'cancelled') stats[o.store_id].revenue += parseFloat(o.total) || 0;
+                });
+                renderRestaurantList(stats);
             } catch(e) { console.error(e); }
         }
 
-        function renderStoreList() {
-            const el = document.getElementById('storeList');
+        function renderRestaurantList(stats) {
+            const el = document.getElementById('restaurantStoreList');
             if (smStores.length === 0) {
-                el.innerHTML = '<p style="text-align:center;color:#94A3B8;font-size:13px;padding:16px;">尚無商店</p>';
+                el.innerHTML = '<p style="text-align:center;color:#94A3B8;font-size:13px;padding:16px;">尚無商店，請點「+ 新增商店」建立</p>';
                 return;
             }
-            const typeLabel = { restaurant:'🍽️ 餐飲', service:'💈 服務', retail:'🛒 零售' };
-            el.innerHTML = smStores.map(s => `
-                <div style="background:#fff;border:1px solid #E2E8F0;border-radius:12px;padding:14px;margin-bottom:8px;">
+            el.innerHTML = smStores.map(s => {
+                const st = stats[s.id] || { total: 0, pending: 0, revenue: 0 };
+                return `<div onclick="openRestaurantDetail('${s.id}')" style="background:#fff;border:1px solid #E2E8F0;border-radius:12px;padding:14px;margin-bottom:8px;cursor:pointer;">
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-                        <span style="font-weight:700;font-size:14px;">${escapeHTML(s.store_name)}</span>
-                        <span style="font-size:11px;color:${s.is_active ? '#059669' : '#94A3B8'};">${s.is_active ? '營業中' : '暫停'}</span>
+                        <span style="font-weight:700;font-size:15px;">${escapeHTML(s.store_name)}</span>
+                        <span style="font-size:11px;padding:2px 10px;border-radius:10px;background:${s.is_active !== false ? '#D1FAE5' : '#F1F5F9'};color:${s.is_active !== false ? '#059669' : '#94A3B8'};font-weight:600;">${s.is_active !== false ? '營業中' : '暫停'}</span>
                     </div>
-                    <div style="font-size:12px;color:#64748B;margin-bottom:8px;">
-                        ${typeLabel[s.store_type] || s.store_type}
-                        ${s.clients?.company_name ? ' · ' + escapeHTML(s.clients.company_name) : ''}
-                        ${s.store_slug ? ' · <code>' + escapeHTML(s.store_slug) + '</code>' : ''}
+                    <div style="display:flex;gap:12px;font-size:12px;color:#64748B;">
+                        <span>今日 <b style="color:#1E40AF;">${st.total}</b> 單</span>
+                        ${st.pending > 0 ? '<span style="color:#DC2626;font-weight:700;">待處理 ' + st.pending + '</span>' : ''}
+                        <span>營收 <b style="color:#059669;">$${st.revenue}</b></span>
                     </div>
-                    <div style="display:flex;gap:6px;flex-wrap:wrap;">
-                        <button onclick="editStore('${s.id}')" style="padding:6px 12px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;font-size:12px;cursor:pointer;">📝 編輯</button>
-                        <button onclick="openMenuManage('${s.id}')" style="padding:6px 12px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;font-size:12px;cursor:pointer;">🍽️ 菜單</button>
-                        <button onclick="showStoreQR('${s.id}')" style="padding:6px 12px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;font-size:12px;cursor:pointer;">📱 QR</button>
-                        <button onclick="toggleStoreActive('${s.id}', ${!s.is_active})" style="padding:6px 12px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;font-size:12px;cursor:pointer;">${s.is_active ? '⏸️ 暫停' : '▶️ 啟用'}</button>
-                    </div>
-                </div>
-            `).join('');
+                </div>`;
+            }).join('');
         }
 
+        // --- 商店詳情 ---
+        async function openRestaurantDetail(storeId) {
+            rdCurrentStoreId = storeId;
+            smCurrentStoreId = storeId;
+            const s = smStores.find(x => x.id === storeId);
+            if (!s) return;
+            document.getElementById('rdStoreName').textContent = s.store_name;
+            // 接單狀態
+            renderAcceptOrderToggle(s);
+            // 預設顯示訂單 Tab
+            switchRestaurantTab('orders', document.querySelector('.rdTab'));
+            showPage('restaurantDetailPage');
+        }
+
+        function renderAcceptOrderToggle(s) {
+            const on = s.accept_orders !== false;
+            document.getElementById('rdAcceptOrderToggle').innerHTML = `
+                <button onclick="toggleAcceptOrders('${s.id}', ${!on})" style="width:100%;padding:10px;border:none;border-radius:10px;background:${on ? '#D1FAE5' : '#FEF2F2'};color:${on ? '#059669' : '#DC2626'};font-weight:700;font-size:13px;cursor:pointer;">
+                    ${on ? '🟢 開放接單中 — 點擊暫停' : '🔴 已暫停接單 — 點擊開放'}
+                </button>`;
+        }
+
+        async function toggleAcceptOrders(storeId, accept) {
+            try {
+                await sb.from('store_profiles').update({ accept_orders: accept, updated_at: new Date().toISOString() }).eq('id', storeId);
+                const s = smStores.find(x => x.id === storeId);
+                if (s) s.accept_orders = accept;
+                renderAcceptOrderToggle(s || { accept_orders: accept });
+                showToast(accept ? '🟢 已開放接單' : '🔴 已暫停接單');
+            } catch(e) { showToast('❌ 操作失敗'); }
+        }
+
+        function switchRestaurantTab(tab, el) {
+            // 切換 Tab 樣式
+            document.querySelectorAll('.rdTab').forEach(t => {
+                t.style.borderBottom = 'none'; t.style.color = '#94A3B8'; t.classList.remove('rdTabActive');
+            });
+            if (el) { el.style.borderBottom = '3px solid #4F46E5'; el.style.color = '#4F46E5'; el.classList.add('rdTabActive'); }
+            document.getElementById('rdOrdersTab').style.display = tab === 'orders' ? '' : 'none';
+            document.getElementById('rdMenuTab').style.display = tab === 'menu' ? '' : 'none';
+            document.getElementById('rdSettingsTab').style.display = tab === 'settings' ? '' : 'none';
+            if (tab === 'orders') loadStoreOrders();
+            if (tab === 'menu') { loadMenuCategories(); loadMenuItems(); }
+            if (tab === 'settings') loadStoreSettings();
+        }
+
+        // --- 訂單 Tab ---
+        async function loadStoreOrders() {
+            try {
+                let q = sb.from('orders').select('*').eq('store_id', rdCurrentStoreId).order('created_at', { ascending: false }).limit(100);
+                const statusFilter = document.getElementById('rdStatusFilter').value;
+                if (statusFilter) q = q.eq('status', statusFilter);
+                const { data } = await q;
+                rdOrders = data || [];
+                renderStoreOrderList();
+                updateStoreOrderStats();
+                renderTopSelling();
+            } catch(e) { console.error(e); }
+        }
+
+        function updateStoreOrderStats() {
+            const today = fmtDate(new Date());
+            const todayOrders = rdOrders.filter(o => o.created_at && o.created_at.startsWith(today));
+            const pending = rdOrders.filter(o => o.status === 'pending').length;
+            const revenue = todayOrders.filter(o => o.status !== 'cancelled').reduce((s, o) => s + (parseFloat(o.total) || 0), 0);
+            document.getElementById('rdPendingCount').textContent = pending;
+            document.getElementById('rdTodayCount').textContent = todayOrders.length;
+            document.getElementById('rdTodayRevenue').textContent = '$' + revenue;
+        }
+
+        function renderTopSelling() {
+            const today = fmtDate(new Date());
+            const todayOrders = rdOrders.filter(o => o.created_at && o.created_at.startsWith(today) && o.status !== 'cancelled');
+            const itemCount = {};
+            todayOrders.forEach(o => (o.items || []).forEach(i => {
+                itemCount[i.name] = (itemCount[i.name] || 0) + (i.qty || 1);
+            }));
+            const sorted = Object.entries(itemCount).sort((a, b) => b[1] - a[1]).slice(0, 5);
+            const el = document.getElementById('rdTopSelling');
+            if (sorted.length === 0) { el.style.display = 'none'; return; }
+            el.style.display = '';
+            el.innerHTML = '<div style="font-weight:700;margin-bottom:4px;">🔥 今日熱銷</div>' +
+                sorted.map((s, i) => `<span style="margin-right:10px;">${i+1}. ${escapeHTML(s[0])} ×${s[1]}</span>`).join('');
+        }
+
+        function renderStoreOrderList() {
+            const el = document.getElementById('rdOrderList');
+            if (rdOrders.length === 0) {
+                el.innerHTML = '<p style="text-align:center;color:#94A3B8;font-size:13px;padding:16px;">尚無訂單</p>';
+                return;
+            }
+            const statusMap = {
+                pending: { label:'待處理', color:'#92400E', bg:'#FEF3C7' },
+                confirmed: { label:'已確認', color:'#1E40AF', bg:'#DBEAFE' },
+                preparing: { label:'準備中', color:'#7C3AED', bg:'#F5F3FF' },
+                ready: { label:'可取餐', color:'#059669', bg:'#D1FAE5' },
+                completed: { label:'已完成', color:'#64748B', bg:'#F1F5F9' },
+                cancelled: { label:'已取消', color:'#DC2626', bg:'#FEF2F2' }
+            };
+            el.innerHTML = rdOrders.map(o => {
+                const st = statusMap[o.status] || { label:o.status, color:'#64748B', bg:'#F1F5F9' };
+                const time = o.created_at ? new Date(o.created_at).toLocaleString('zh-TW', { hour:'2-digit', minute:'2-digit' }) : '';
+                const itemCount = (o.items || []).reduce((s, i) => s + (i.qty || 1), 0);
+                const pickup = o.pickup_number ? '#' + String(o.pickup_number).padStart(3, '0') + ' ' : '';
+                const typeLabel = { dine_in:'內用', takeout:'外帶', delivery:'外送' };
+                return `<div onclick="showOrderDetail('${o.id}')" style="background:#fff;border:1px solid #E2E8F0;border-radius:12px;padding:14px;margin-bottom:8px;cursor:pointer;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                        <span style="font-weight:700;font-size:14px;">${pickup}#${escapeHTML(o.order_number)}</span>
+                        <span style="font-size:11px;font-weight:600;padding:2px 10px;border-radius:10px;background:${st.bg};color:${st.color};">${st.label}</span>
+                    </div>
+                    <div style="font-size:12px;color:#64748B;">
+                        ${escapeHTML(o.customer_name || '?')}
+                        ${o.order_type ? ' · ' + (typeLabel[o.order_type] || o.order_type) : ''}
+                        ${o.table_number ? ' · 桌' + escapeHTML(o.table_number) : ''}
+                        ${o.pickup_time ? ' · 取餐 ' + escapeHTML(o.pickup_time) : ''}
+                        · ${itemCount}品 · <b>$${o.total}</b> · ${time}
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        function showOrderDetail(orderId) {
+            const o = rdOrders.find(x => x.id === orderId);
+            if (!o) return;
+            const pickup = o.pickup_number ? ' 取餐號 #' + String(o.pickup_number).padStart(3, '0') : '';
+            document.getElementById('odTitle').textContent = '#' + o.order_number + pickup;
+            const typeLabel = { dine_in:'內用', takeout:'外帶', delivery:'外送' };
+            const items = o.items || [];
+            document.getElementById('odContent').innerHTML = `
+                <div style="margin-bottom:12px;">
+                    <div style="font-size:13px;color:#64748B;">顧客</div>
+                    <div style="font-weight:600;">${escapeHTML(o.customer_name || '?')} ${o.customer_phone ? '· ' + escapeHTML(o.customer_phone) : ''}</div>
+                    <div style="font-size:13px;color:#64748B;">${typeLabel[o.order_type] || ''} ${o.table_number ? '· 桌號 ' + escapeHTML(o.table_number) : ''} ${o.pickup_time ? '· 取餐 ' + escapeHTML(o.pickup_time) : ''}</div>
+                </div>
+                <div style="border-top:1px solid #F1F5F9;padding-top:8px;">
+                    ${items.map(i => {
+                        const optStr = i.options ? '<div style="font-size:11px;color:#94A3B8;margin-left:16px;">' + escapeHTML(i.options) + '</div>' : '';
+                        return `<div style="padding:4px 0;font-size:14px;">
+                            <div style="display:flex;justify-content:space-between;">
+                                <span>${escapeHTML(i.name)} x${i.qty}</span>
+                                <span style="font-weight:600;">$${i.subtotal || i.price * i.qty}</span>
+                            </div>${optStr}
+                        </div>`;
+                    }).join('')}
+                    <div style="display:flex;justify-content:space-between;padding:8px 0;border-top:1px solid #E2E8F0;margin-top:4px;font-weight:800;">
+                        <span>合計</span><span>$${o.total}</span>
+                    </div>
+                </div>
+                ${o.notes ? '<div style="margin-top:8px;font-size:13px;color:#64748B;">備註：' + escapeHTML(o.notes) + '</div>' : ''}
+            `;
+            const actions = [];
+            if (o.status === 'pending') {
+                actions.push(`<button onclick="updateOrderStatus('${o.id}','confirmed')" style="flex:1;padding:10px;border:none;border-radius:10px;background:#2563EB;color:#fff;font-weight:600;cursor:pointer;">✅ 確認</button>`);
+                actions.push(`<button onclick="updateOrderStatus('${o.id}','cancelled')" style="flex:1;padding:10px;border:none;border-radius:10px;background:#EF4444;color:#fff;font-weight:600;cursor:pointer;">❌ 取消</button>`);
+            }
+            if (o.status === 'confirmed') actions.push(`<button onclick="updateOrderStatus('${o.id}','preparing')" style="flex:1;padding:10px;border:none;border-radius:10px;background:#7C3AED;color:#fff;font-weight:600;cursor:pointer;">🍳 開始準備</button>`);
+            if (o.status === 'preparing') actions.push(`<button onclick="updateOrderStatus('${o.id}','ready')" style="flex:1;padding:10px;border:none;border-radius:10px;background:#059669;color:#fff;font-weight:600;cursor:pointer;">🔔 可取餐</button>`);
+            if (o.status === 'ready') actions.push(`<button onclick="updateOrderStatus('${o.id}','completed')" style="flex:1;padding:10px;border:none;border-radius:10px;background:#64748B;color:#fff;font-weight:600;cursor:pointer;">✅ 完成</button>`);
+            document.getElementById('odActions').innerHTML = actions.join('');
+            document.getElementById('orderDetailModal').style.display = 'flex';
+        }
+
+        function closeOrderDetail() { document.getElementById('orderDetailModal').style.display = 'none'; }
+
+        async function updateOrderStatus(orderId, newStatus) {
+            try {
+                await sb.from('orders').update({ status: newStatus, updated_at: new Date().toISOString() }).eq('id', orderId);
+                // LINE 推播給客人
+                const o = rdOrders.find(x => x.id === orderId);
+                if (o?.customer_line_id) {
+                    const pickup = o.pickup_number ? '#' + String(o.pickup_number).padStart(3, '0') : '#' + o.order_number;
+                    const msgs = {
+                        confirmed: `✅ 您的訂單 ${pickup} 已確認，正在準備中`,
+                        ready: `🔔 您的餐點 ${pickup} 已完成，請取餐！`,
+                        cancelled: `❌ 您的訂單 ${pickup} 已取消`
+                    };
+                    if (msgs[newStatus]) {
+                        try { await sb.functions.invoke('send-line-notify', { body: { userId: o.customer_line_id, message: msgs[newStatus] } }); } catch(e2) { console.warn('推播失敗', e2); }
+                    }
+                }
+                showToast('✅ 狀態已更新');
+                closeOrderDetail();
+                await loadStoreOrders();
+            } catch(e) {
+                console.error(e);
+                showToast('❌ 更新失敗');
+            }
+        }
+
+        // --- 商店基本 CRUD ---
         async function showStoreModal(storeId) {
             if (storeId) {
                 const s = smStores.find(x => x.id === storeId);
@@ -4709,7 +5005,6 @@
             }
             document.getElementById('storeModal').style.display = 'flex';
         }
-
         function editStore(id) { showStoreModal(id); }
         function closeStoreModal() { document.getElementById('storeModal').style.display = 'none'; }
 
@@ -4726,7 +5021,6 @@
                 theme_color: document.getElementById('storeColorInput').value
             };
             if (currentCompanyId) record.company_id = currentCompanyId;
-
             try {
                 const editId = document.getElementById('storeEditId').value;
                 if (editId) {
@@ -4737,19 +5031,8 @@
                 }
                 showToast('✅ 商店已儲存');
                 closeStoreModal();
-                await loadStoreList();
-            } catch(e) {
-                console.error(e);
-                showToast('❌ 儲存失敗：' + friendlyError(e));
-            }
-        }
-
-        async function toggleStoreActive(id, active) {
-            try {
-                await sb.from('store_profiles').update({ is_active: active, updated_at: new Date().toISOString() }).eq('id', id);
-                showToast(active ? '✅ 已啟用' : '⏸️ 已暫停');
-                await loadStoreList();
-            } catch(e) { showToast('❌ 操作失敗'); }
+                await loadRestaurantList();
+            } catch(e) { showToast('❌ 儲存失敗：' + friendlyError(e)); }
         }
 
         function showStoreQR(storeId) {
@@ -4763,108 +5046,68 @@
             qrEl.innerHTML = '';
             if (typeof QRCode !== 'undefined') {
                 new QRCode(qrEl, { text: url, width: 200, height: 200 });
-            } else {
-                qrEl.innerHTML = '<p style="color:#94A3B8;">QRCode 元件未載入</p>';
-            }
+            } else { qrEl.innerHTML = '<p style="color:#94A3B8;">QRCode 元件未載入</p>'; }
             document.getElementById('storeQRModal').style.display = 'flex';
         }
-
         function closeStoreQR() { document.getElementById('storeQRModal').style.display = 'none'; }
 
         // --- 菜單管理 ---
-        async function openMenuManage(storeId) {
-            smCurrentStoreId = storeId;
-            const s = smStores.find(x => x.id === storeId);
-            document.getElementById('menuManageTitle').textContent = (s?.store_name || '') + ' 菜單管理';
-
-            await Promise.all([loadMenuCategories(), loadMenuItems()]);
-            document.getElementById('menuManageModal').style.display = 'flex';
-        }
-
-        function closeMenuManage() {
-            document.getElementById('menuManageModal').style.display = 'none';
-            smCurrentStoreId = null;
-        }
-
         async function loadMenuCategories() {
-            const { data } = await sb.from('menu_categories')
-                .select('*')
-                .eq('store_id', smCurrentStoreId)
-                .order('sort_order');
+            const { data } = await sb.from('menu_categories').select('*').eq('store_id', smCurrentStoreId).order('sort_order');
             smCategories = data || [];
             renderMenuCatList();
             updateMiCategorySelect();
         }
-
         function renderMenuCatList() {
             const el = document.getElementById('menuCatList');
-            if (smCategories.length === 0) {
-                el.innerHTML = '<p style="font-size:12px;color:#94A3B8;">尚無分類</p>';
-                return;
-            }
+            if (smCategories.length === 0) { el.innerHTML = '<p style="font-size:12px;color:#94A3B8;">尚無分類</p>'; return; }
             el.innerHTML = smCategories.map(c => `
                 <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #F1F5F9;">
                     <span style="font-size:13px;font-weight:600;">${escapeHTML(c.name)}</span>
                     <button onclick="deleteMenuCategory('${c.id}')" style="background:none;border:none;color:#EF4444;cursor:pointer;font-size:12px;">刪除</button>
-                </div>
-            `).join('');
+                </div>`).join('');
         }
-
         function updateMiCategorySelect() {
-            const sel = document.getElementById('miCategory');
-            sel.innerHTML = '<option value="">-- 不分類 --</option>' +
+            document.getElementById('miCategory').innerHTML = '<option value="">-- 不分類 --</option>' +
                 smCategories.map(c => `<option value="${c.id}">${escapeHTML(c.name)}</option>`).join('');
         }
-
         async function addMenuCategory() {
             const name = document.getElementById('newCatName').value.trim();
             if (!name) return showToast('請輸入分類名稱');
             try {
-                await sb.from('menu_categories').insert({
-                    store_id: smCurrentStoreId,
-                    name: name,
-                    sort_order: smCategories.length
-                });
+                await sb.from('menu_categories').insert({ store_id: smCurrentStoreId, name, sort_order: smCategories.length });
                 document.getElementById('newCatName').value = '';
                 showToast('✅ 分類已新增');
                 await loadMenuCategories();
             } catch(e) { showToast('❌ 新增失敗'); }
         }
-
         async function deleteMenuCategory(id) {
             if (!confirm('確定刪除此分類？（品項不會被刪除）')) return;
-            try {
-                await sb.from('menu_categories').delete().eq('id', id);
-                showToast('✅ 已刪除');
-                await loadMenuCategories();
-            } catch(e) { showToast('❌ 刪除失敗'); }
+            try { await sb.from('menu_categories').delete().eq('id', id); showToast('✅ 已刪除'); await loadMenuCategories(); }
+            catch(e) { showToast('❌ 刪除失敗'); }
         }
 
         async function loadMenuItems() {
-            const { data } = await sb.from('menu_items')
-                .select('*, menu_categories(name)')
-                .eq('store_id', smCurrentStoreId)
-                .order('sort_order');
+            const { data } = await sb.from('menu_items').select('*, menu_categories(name)').eq('store_id', smCurrentStoreId).order('sort_order');
             smItems = data || [];
             renderMenuItemList();
         }
-
         function renderMenuItemList() {
             const el = document.getElementById('menuItemList');
-            if (smItems.length === 0) {
-                el.innerHTML = '<p style="font-size:12px;color:#94A3B8;text-align:center;">尚無品項</p>';
-                return;
-            }
-            el.innerHTML = smItems.map(i => `
-                <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #F1F5F9;">
+            if (smItems.length === 0) { el.innerHTML = '<p style="font-size:12px;color:#94A3B8;text-align:center;">尚無品項</p>'; return; }
+            el.innerHTML = smItems.map(i => {
+                const imgThumb = i.image_url ? `<img src="${i.image_url}" style="width:40px;height:40px;border-radius:6px;object-fit:cover;">` : '';
+                const optCount = (i.options && Array.isArray(i.options)) ? i.options.length : 0;
+                return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #F1F5F9;">
+                    ${imgThumb}
                     <div style="flex:1;min-width:0;">
-                        <div style="font-weight:600;font-size:13px;">${escapeHTML(i.name)} ${!i.is_available ? '<span style="color:#EF4444;font-size:11px;">售完</span>' : ''}</div>
+                        <div style="font-weight:600;font-size:13px;">${escapeHTML(i.name)} ${i.is_combo ? '<span style="color:#D97706;font-size:10px;background:#FEF3C7;padding:1px 6px;border-radius:4px;">🍱套餐</span>' : ''} ${!i.is_available ? '<span style="color:#EF4444;font-size:11px;">售完</span>' : ''} ${optCount ? '<span style="color:#94A3B8;font-size:10px;">' + optCount + '組選項</span>' : ''}</div>
                         <div style="font-size:11px;color:#64748B;">${i.menu_categories?.name || '未分類'} · $${i.price}</div>
                     </div>
                     <button onclick="editMenuItem('${i.id}')" style="padding:4px 10px;border:1px solid #E2E8F0;border-radius:6px;background:#fff;font-size:11px;cursor:pointer;">編輯</button>
-                    <button onclick="toggleItemAvail('${i.id}', ${!i.is_available})" style="padding:4px 10px;border:1px solid #E2E8F0;border-radius:6px;background:#fff;font-size:11px;cursor:pointer;">${i.is_available ? '下架' : '上架'}</button>
-                </div>
-            `).join('');
+                    <button onclick="toggleItemAvail('${i.id}', ${!i.is_available})" style="padding:4px 10px;border:1px solid ${i.is_available ? '#E2E8F0' : '#DC2626'};border-radius:6px;background:${i.is_available ? '#fff' : '#FEF2F2'};font-size:11px;cursor:pointer;color:${i.is_available ? '' : '#DC2626'};font-weight:${i.is_available ? 'normal' : '700'};">${i.is_available ? '標售完' : '恢復上架'}</button>
+                </div>`;
+            }).join('');
         }
 
         function showMenuItemForm(itemId) {
@@ -4877,15 +5120,28 @@
                 document.getElementById('miCategory').value = i.category_id || '';
                 document.getElementById('miPrice').value = i.price;
                 document.getElementById('miDesc').value = i.description || '';
+                document.getElementById('miImageUrl').value = i.image_url || '';
+                const preview = document.getElementById('miImagePreview');
+                if (i.image_url) { preview.src = i.image_url; preview.style.display = ''; } else { preview.style.display = 'none'; }
+                miOptionGroups = (i.options && Array.isArray(i.options)) ? JSON.parse(JSON.stringify(i.options)) : [];
+                document.getElementById('miIsCombo').checked = !!i.is_combo;
+                miComboGroups = (i.combo_config && i.combo_config.groups) ? JSON.parse(JSON.stringify(i.combo_config.groups)) : [];
             } else {
                 document.getElementById('miEditId').value = '';
                 document.getElementById('miName').value = '';
                 document.getElementById('miCategory').value = '';
                 document.getElementById('miPrice').value = '';
                 document.getElementById('miDesc').value = '';
+                document.getElementById('miImageUrl').value = '';
+                document.getElementById('miImagePreview').style.display = 'none';
+                miOptionGroups = [];
+                document.getElementById('miIsCombo').checked = false;
+                miComboGroups = [];
             }
+            renderOptionEditor();
+            toggleComboEditor();
+            renderComboEditor();
         }
-
         function editMenuItem(id) { showMenuItemForm(id); }
         function cancelMenuItemForm() { document.getElementById('menuItemForm').style.display = 'none'; }
 
@@ -4894,169 +5150,299 @@
             const price = parseFloat(document.getElementById('miPrice').value);
             if (!name) return showToast('請輸入品名');
             if (isNaN(price) || price < 0) return showToast('請輸入有效價格');
-
+            const isCombo = document.getElementById('miIsCombo').checked;
+            syncComboEditor();
             const record = {
-                store_id: smCurrentStoreId,
-                name: name,
+                store_id: smCurrentStoreId, name,
                 category_id: document.getElementById('miCategory').value || null,
-                price: price,
-                description: document.getElementById('miDesc').value.trim() || null
+                price,
+                description: document.getElementById('miDesc').value.trim() || null,
+                image_url: document.getElementById('miImageUrl').value || null,
+                options: miOptionGroups.length > 0 ? miOptionGroups : null,
+                is_combo: isCombo,
+                combo_config: isCombo && miComboGroups.length > 0 ? { groups: miComboGroups } : null
             };
-
             try {
                 const editId = document.getElementById('miEditId').value;
-                if (editId) {
-                    record.updated_at = new Date().toISOString();
-                    await sb.from('menu_items').update(record).eq('id', editId);
-                } else {
-                    record.sort_order = smItems.length;
-                    await sb.from('menu_items').insert(record);
-                }
+                if (editId) { record.updated_at = new Date().toISOString(); await sb.from('menu_items').update(record).eq('id', editId); }
+                else { record.sort_order = smItems.length; await sb.from('menu_items').insert(record); }
                 showToast('✅ 品項已儲存');
                 cancelMenuItemForm();
                 await loadMenuItems();
-            } catch(e) {
-                console.error(e);
-                showToast('❌ 儲存失敗');
-            }
+            } catch(e) { showToast('❌ 儲存失敗'); }
         }
 
         async function toggleItemAvail(id, avail) {
             try {
                 await sb.from('menu_items').update({ is_available: avail, updated_at: new Date().toISOString() }).eq('id', id);
-                showToast(avail ? '✅ 已上架' : '⏸️ 已下架');
+                showToast(avail ? '✅ 已恢復上架' : '🔴 已標記售完');
                 await loadMenuItems();
             } catch(e) { showToast('❌ 操作失敗'); }
         }
 
-        // ===== 訂單管理 =====
-        let omOrders = [];
-
-        async function initOrderManage() {
-            // 填充商店下拉
-            let sq = sb.from('store_profiles').select('id, store_name').eq('is_active', true);
-            if (currentCompanyId) sq = sq.eq('company_id', currentCompanyId);
-            const { data: stores } = await sq;
-            document.getElementById('omStoreFilter').innerHTML = '<option value="">全部商店</option>' +
-                (stores || []).map(s => `<option value="${s.id}">${escapeHTML(s.store_name)}</option>`).join('');
-            await loadOrderList();
-        }
-
-        async function loadOrderList() {
+        // --- 品項圖片上傳 ---
+        async function handleMenuImageUpload(input) {
+            const file = input.files[0];
+            if (!file) return;
             try {
-                let q = sb.from('orders').select('*, store_profiles(store_name)').order('created_at', { ascending: false }).limit(100);
-                const storeFilter = document.getElementById('omStoreFilter').value;
-                const statusFilter = document.getElementById('omStatusFilter').value;
-                if (storeFilter) q = q.eq('store_id', storeFilter);
-                if (statusFilter) q = q.eq('status', statusFilter);
-
-                const { data } = await q;
-                omOrders = data || [];
-                renderOrderList();
-                updateOrderStats();
-            } catch(e) { console.error(e); }
+                showToast('☁️ 上傳中...');
+                const bitmap = await createImageBitmap(file);
+                let cw = bitmap.width, ch = bitmap.height;
+                const MAX = 400;
+                if (cw > MAX) { ch = Math.round(ch * MAX / cw); cw = MAX; }
+                if (ch > MAX) { cw = Math.round(cw * MAX / ch); ch = MAX; }
+                const canvas = document.createElement('canvas');
+                canvas.width = cw; canvas.height = ch;
+                canvas.getContext('2d').drawImage(bitmap, 0, 0, cw, ch);
+                const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.7));
+                const s = smStores.find(x => x.id === smCurrentStoreId);
+                const slug = s?.store_slug || smCurrentStoreId;
+                const fileName = `menu/${slug}/${Date.now()}.jpg`;
+                const { error } = await sb.storage.from(CONFIG.BUCKET).upload(fileName, blob);
+                if (error) throw error;
+                const { data: urlData } = sb.storage.from(CONFIG.BUCKET).getPublicUrl(fileName);
+                const url = urlData?.publicUrl || urlData?.publicURL;
+                document.getElementById('miImageUrl').value = url;
+                const preview = document.getElementById('miImagePreview');
+                preview.src = url; preview.style.display = '';
+                showToast('✅ 圖片已上傳');
+            } catch(e) { showToast('❌ 圖片上傳失敗：' + (e.message || e)); }
+            input.value = '';
         }
 
-        function updateOrderStats() {
-            const today = fmtDate(new Date());
-            const todayOrders = omOrders.filter(o => o.created_at && o.created_at.startsWith(today));
-            const pending = omOrders.filter(o => o.status === 'pending').length;
-            const revenue = todayOrders.filter(o => o.status !== 'cancelled').reduce((s, o) => s + (parseFloat(o.total) || 0), 0);
-
-            document.getElementById('omPendingCount').textContent = pending;
-            document.getElementById('omTodayCount').textContent = todayOrders.length;
-            document.getElementById('omTodayRevenue').textContent = '$' + revenue;
+        // --- 客製化選項 ---
+        const OPTION_TEMPLATES = {
+            drink: [
+                { name: '甜度', required: true, type: 'single', choices: [{label:'正常糖',price:0},{label:'少糖',price:0},{label:'半糖',price:0},{label:'微糖',price:0},{label:'無糖',price:0}] },
+                { name: '冰量', required: true, type: 'single', choices: [{label:'正常冰',price:0},{label:'少冰',price:0},{label:'微冰',price:0},{label:'去冰',price:0},{label:'熱飲',price:0}] }
+            ],
+            food: [
+                { name: '辣度', required: false, type: 'single', choices: [{label:'不辣',price:0},{label:'小辣',price:0},{label:'中辣',price:0},{label:'大辣',price:0}] },
+                { name: '加料', required: false, type: 'multi', choices: [{label:'加蛋',price:10},{label:'加起司',price:15},{label:'加培根',price:20}] }
+            ]
+        };
+        function applyOptionTemplate(tpl) {
+            miOptionGroups = JSON.parse(JSON.stringify(OPTION_TEMPLATES[tpl] || []));
+            renderOptionEditor();
+        }
+        function addOptionGroup() {
+            miOptionGroups.push({ name: '', required: false, type: 'single', choices: [{ label: '', price: 0 }] });
+            renderOptionEditor();
+        }
+        function removeOptionGroup(idx) { miOptionGroups.splice(idx, 1); renderOptionEditor(); }
+        function addOptionChoice(gIdx) {
+            miOptionGroups[gIdx].choices.push({ label: '', price: 0 });
+            renderOptionEditor();
+        }
+        function removeOptionChoice(gIdx, cIdx) { miOptionGroups[gIdx].choices.splice(cIdx, 1); renderOptionEditor(); }
+        function syncOptionEditor() {
+            document.querySelectorAll('.optGrp').forEach((grpEl, gIdx) => {
+                if (!miOptionGroups[gIdx]) return;
+                miOptionGroups[gIdx].name = grpEl.querySelector('.optGrpName').value;
+                miOptionGroups[gIdx].required = grpEl.querySelector('.optGrpReq').checked;
+                miOptionGroups[gIdx].type = grpEl.querySelector('.optGrpType').value;
+                grpEl.querySelectorAll('.optChoice').forEach((cEl, cIdx) => {
+                    if (!miOptionGroups[gIdx].choices[cIdx]) return;
+                    miOptionGroups[gIdx].choices[cIdx].label = cEl.querySelector('.optCLabel').value;
+                    miOptionGroups[gIdx].choices[cIdx].price = parseFloat(cEl.querySelector('.optCPrice').value) || 0;
+                });
+            });
+        }
+        function renderOptionEditor() {
+            const el = document.getElementById('miOptionsEditor');
+            if (miOptionGroups.length === 0) { el.innerHTML = '<p style="font-size:11px;color:#94A3B8;">尚無客製選項</p>'; return; }
+            el.innerHTML = miOptionGroups.map((g, gIdx) => `
+                <div class="optGrp" style="border:1px solid #E2E8F0;border-radius:8px;padding:10px;margin-bottom:8px;background:#fff;">
+                    <div style="display:flex;gap:4px;align-items:center;margin-bottom:6px;">
+                        <input class="optGrpName" value="${escapeHTML(g.name)}" placeholder="群組名" onchange="syncOptionEditor()" style="flex:1;padding:6px;border:1px solid #E2E8F0;border-radius:6px;font-size:12px;">
+                        <select class="optGrpType" onchange="syncOptionEditor()" style="padding:6px;border:1px solid #E2E8F0;border-radius:6px;font-size:11px;">
+                            <option value="single" ${g.type==='single'?'selected':''}>單選</option>
+                            <option value="multi" ${g.type==='multi'?'selected':''}>多選</option>
+                        </select>
+                        <label style="font-size:11px;white-space:nowrap;"><input type="checkbox" class="optGrpReq" ${g.required?'checked':''} onchange="syncOptionEditor()"> 必選</label>
+                        <button onclick="removeOptionGroup(${gIdx})" style="background:none;border:none;color:#EF4444;cursor:pointer;font-size:14px;">×</button>
+                    </div>
+                    ${g.choices.map((c, cIdx) => `
+                        <div class="optChoice" style="display:flex;gap:4px;align-items:center;margin-bottom:4px;margin-left:8px;">
+                            <input class="optCLabel" value="${escapeHTML(c.label)}" placeholder="選項名" onchange="syncOptionEditor()" style="flex:1;padding:4px;border:1px solid #E2E8F0;border-radius:4px;font-size:11px;">
+                            <input class="optCPrice" type="number" value="${c.price}" placeholder="+$" onchange="syncOptionEditor()" style="width:55px;padding:4px;border:1px solid #E2E8F0;border-radius:4px;font-size:11px;">
+                            <button onclick="removeOptionChoice(${gIdx},${cIdx})" style="background:none;border:none;color:#EF4444;cursor:pointer;font-size:12px;">×</button>
+                        </div>
+                    `).join('')}
+                    <button onclick="addOptionChoice(${gIdx})" style="font-size:11px;color:#4F46E5;background:none;border:none;cursor:pointer;margin-left:8px;">+ 新增選項</button>
+                </div>
+            `).join('');
         }
 
-        function renderOrderList() {
-            const el = document.getElementById('orderList');
-            if (omOrders.length === 0) {
-                el.innerHTML = '<p style="text-align:center;color:#94A3B8;font-size:13px;padding:16px;">尚無訂單</p>';
-                return;
-            }
-            const statusMap = {
-                pending: { label:'待處理', color:'#92400E', bg:'#FEF3C7' },
-                confirmed: { label:'已確認', color:'#1E40AF', bg:'#DBEAFE' },
-                preparing: { label:'準備中', color:'#7C3AED', bg:'#F5F3FF' },
-                ready: { label:'可取餐', color:'#059669', bg:'#D1FAE5' },
-                completed: { label:'已完成', color:'#64748B', bg:'#F1F5F9' },
-                cancelled: { label:'已取消', color:'#DC2626', bg:'#FEF2F2' }
-            };
-            el.innerHTML = omOrders.map(o => {
-                const st = statusMap[o.status] || { label:o.status, color:'#64748B', bg:'#F1F5F9' };
-                const time = o.created_at ? new Date(o.created_at).toLocaleString('zh-TW', { month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' }) : '';
-                const itemCount = (o.items || []).reduce((s, i) => s + (i.qty || 1), 0);
-                return `<div onclick="showOrderDetail('${o.id}')" style="background:#fff;border:1px solid #E2E8F0;border-radius:12px;padding:14px;margin-bottom:8px;cursor:pointer;">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-                        <span style="font-weight:700;font-size:14px;">#${escapeHTML(o.order_number)}</span>
-                        <span style="font-size:11px;font-weight:600;padding:2px 10px;border-radius:10px;background:${st.bg};color:${st.color};">${st.label}</span>
+        // --- 套餐組合編輯器 ---
+        function toggleComboEditor() {
+            document.getElementById('miComboEditor').style.display = document.getElementById('miIsCombo').checked ? '' : 'none';
+        }
+        function addComboGroup() {
+            miComboGroups.push({ name: '', pick: 1, items: [] });
+            renderComboEditor();
+        }
+        function removeComboGroup(idx) { miComboGroups.splice(idx, 1); renderComboEditor(); }
+        function syncComboEditor() {
+            document.querySelectorAll('#miComboGroups .comboGrp').forEach((grpEl, gIdx) => {
+                if (!miComboGroups[gIdx]) return;
+                miComboGroups[gIdx].name = grpEl.querySelector('.comboGrpName').value;
+                miComboGroups[gIdx].pick = parseInt(grpEl.querySelector('.comboGrpPick').value) || 1;
+                // 收集勾選的品項 ID
+                const checked = grpEl.querySelectorAll('.comboItemCheck:checked');
+                miComboGroups[gIdx].items = Array.from(checked).map(c => c.value);
+            });
+        }
+        function renderComboEditor() {
+            const el = document.getElementById('miComboGroups');
+            if (!el) return;
+            if (miComboGroups.length === 0) { el.innerHTML = '<p style="font-size:11px;color:#94A3B8;">尚無套餐群組</p>'; return; }
+            // 取得目前商店的所有品項（排除自己）
+            const editId = document.getElementById('miEditId').value;
+            const availItems = smItems.filter(i => i.id !== editId);
+            el.innerHTML = miComboGroups.map((g, gIdx) => `
+                <div class="comboGrp" style="border:1px solid #E2E8F0;border-radius:8px;padding:10px;margin-bottom:8px;background:#fff;">
+                    <div style="display:flex;gap:4px;align-items:center;margin-bottom:6px;">
+                        <input class="comboGrpName" value="${escapeHTML(g.name)}" placeholder="群組名稱（如：主餐選1）" onchange="syncComboEditor()" style="flex:1;padding:6px;border:1px solid #E2E8F0;border-radius:6px;font-size:12px;">
+                        <span style="font-size:11px;white-space:nowrap;">選</span>
+                        <select class="comboGrpPick" onchange="syncComboEditor()" style="padding:4px;border:1px solid #E2E8F0;border-radius:6px;font-size:11px;">
+                            <option value="-1" ${g.pick===-1?'selected':''}>任選</option>
+                            <option value="1" ${g.pick===1?'selected':''}>1</option>
+                            <option value="2" ${g.pick===2?'selected':''}>2</option>
+                            <option value="3" ${g.pick===3?'selected':''}>3</option>
+                        </select>
+                        <button onclick="removeComboGroup(${gIdx})" style="background:none;border:none;color:#EF4444;cursor:pointer;font-size:14px;">×</button>
                     </div>
-                    <div style="font-size:12px;color:#64748B;">
-                        ${o.store_profiles?.store_name ? escapeHTML(o.store_profiles.store_name) + ' · ' : ''}
-                        ${escapeHTML(o.customer_name || '?')}
-                        ${o.table_number ? ' · 桌' + escapeHTML(o.table_number) : ''}
-                        · ${itemCount}品 · <b>$${o.total}</b>
-                        · ${time}
+                    <div style="max-height:150px;overflow-y:auto;margin-left:8px;">
+                        ${availItems.length === 0 ? '<p style="font-size:11px;color:#94A3B8;">請先新增其他品項</p>' :
+                        availItems.map(item => `
+                            <label style="display:flex;align-items:center;gap:6px;font-size:12px;padding:2px 0;cursor:pointer;">
+                                <input type="checkbox" class="comboItemCheck" value="${item.id}" ${g.items.includes(item.id)?'checked':''} onchange="syncComboEditor()">
+                                ${escapeHTML(item.name)} ($${item.price})
+                            </label>
+                        `).join('')}
                     </div>
+                </div>
+            `).join('');
+        }
+
+        // --- 設定 Tab ---
+        function loadStoreSettings() {
+            const s = smStores.find(x => x.id === rdCurrentStoreId);
+            if (!s) return;
+            // 基本資料
+            document.getElementById('rdStoreInfo').innerHTML = `
+                <div>名稱：${escapeHTML(s.store_name)}</div>
+                <div>類型：${{ restaurant:'餐飲', service:'服務業', retail:'零售' }[s.store_type] || s.store_type}</div>
+                ${s.phone ? '<div>電話：' + escapeHTML(s.phone) + '</div>' : ''}
+                ${s.address ? '<div>地址：' + escapeHTML(s.address) + '</div>' : ''}
+                ${s.store_slug ? '<div>Slug：' + escapeHTML(s.store_slug) + '</div>' : ''}
+            `;
+            // 營業時間
+            const bh = s.business_hours || {};
+            const days = [['mon','一'],['tue','二'],['wed','三'],['thu','四'],['fri','五'],['sat','六'],['sun','日']];
+            document.getElementById('rdBusinessHours').innerHTML = days.map(([key, label]) => {
+                const d = bh[key] || { open: true, start: '08:00', end: '20:00' };
+                return `<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;font-size:13px;" data-day="${key}">
+                    <span style="width:24px;font-weight:600;">${label}</span>
+                    <label style="font-size:12px;"><input type="checkbox" class="bhOpen" ${d.open ? 'checked' : ''}> 營業</label>
+                    <input type="time" class="bhStart" value="${d.start || '08:00'}" style="padding:4px;border:1px solid #E2E8F0;border-radius:6px;font-size:12px;">
+                    <span>~</span>
+                    <input type="time" class="bhEnd" value="${d.end || '20:00'}" style="padding:4px;border:1px solid #E2E8F0;border-radius:6px;font-size:12px;">
                 </div>`;
             }).join('');
+            // LINE 群組
+            document.getElementById('rdLineGroupId').value = s.line_group_id || '';
+            // 集點設定
+            const lc = s.loyalty_config || {};
+            document.getElementById('rdLoyaltySpend').value = lc.spend_per_point || '';
+            document.getElementById('rdLoyaltyPoints').value = lc.points_to_redeem || '';
+            document.getElementById('rdLoyaltyDiscount').value = lc.discount_amount || '';
         }
 
-        function showOrderDetail(orderId) {
-            const o = omOrders.find(x => x.id === orderId);
-            if (!o) return;
-            document.getElementById('odTitle').textContent = '#' + o.order_number;
-            const typeLabel = { dine_in:'內用', takeout:'外帶', delivery:'外送' };
-            const items = o.items || [];
-            document.getElementById('odContent').innerHTML = `
-                <div style="margin-bottom:12px;">
-                    <div style="font-size:13px;color:#64748B;">顧客</div>
-                    <div style="font-weight:600;">${escapeHTML(o.customer_name || '?')} ${o.customer_phone ? '· ' + escapeHTML(o.customer_phone) : ''}</div>
-                    <div style="font-size:13px;color:#64748B;">${typeLabel[o.order_type] || ''} ${o.table_number ? '· 桌號 ' + escapeHTML(o.table_number) : ''}</div>
-                </div>
-                <div style="border-top:1px solid #F1F5F9;padding-top:8px;">
-                    ${items.map(i => `<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:14px;">
-                        <span>${escapeHTML(i.name)} x${i.qty}</span>
-                        <span style="font-weight:600;">$${i.subtotal || i.price * i.qty}</span>
-                    </div>`).join('')}
-                    <div style="display:flex;justify-content:space-between;padding:8px 0;border-top:1px solid #E2E8F0;margin-top:4px;font-weight:800;">
-                        <span>合計</span><span>$${o.total}</span>
-                    </div>
-                </div>
-                ${o.notes ? '<div style="margin-top:8px;font-size:13px;color:#64748B;">備註：' + escapeHTML(o.notes) + '</div>' : ''}
-            `;
-
-            // 狀態操作按鈕
-            const actions = [];
-            if (o.status === 'pending') {
-                actions.push(`<button onclick="updateOrderStatus('${o.id}','confirmed')" style="flex:1;padding:10px;border:none;border-radius:10px;background:#2563EB;color:#fff;font-weight:600;cursor:pointer;">✅ 確認</button>`);
-                actions.push(`<button onclick="updateOrderStatus('${o.id}','cancelled')" style="flex:1;padding:10px;border:none;border-radius:10px;background:#EF4444;color:#fff;font-weight:600;cursor:pointer;">❌ 取消</button>`);
-            }
-            if (o.status === 'confirmed') {
-                actions.push(`<button onclick="updateOrderStatus('${o.id}','preparing')" style="flex:1;padding:10px;border:none;border-radius:10px;background:#7C3AED;color:#fff;font-weight:600;cursor:pointer;">🍳 開始準備</button>`);
-            }
-            if (o.status === 'preparing') {
-                actions.push(`<button onclick="updateOrderStatus('${o.id}','ready')" style="flex:1;padding:10px;border:none;border-radius:10px;background:#059669;color:#fff;font-weight:600;cursor:pointer;">🔔 可取餐</button>`);
-            }
-            if (o.status === 'ready') {
-                actions.push(`<button onclick="updateOrderStatus('${o.id}','completed')" style="flex:1;padding:10px;border:none;border-radius:10px;background:#64748B;color:#fff;font-weight:600;cursor:pointer;">✅ 完成</button>`);
-            }
-            document.getElementById('odActions').innerHTML = actions.join('');
-            document.getElementById('orderDetailModal').style.display = 'flex';
-        }
-
-        function closeOrderDetail() { document.getElementById('orderDetailModal').style.display = 'none'; }
-
-        async function updateOrderStatus(orderId, newStatus) {
+        async function saveBusinessHours() {
+            const bh = {};
+            document.querySelectorAll('#rdBusinessHours [data-day]').forEach(row => {
+                bh[row.dataset.day] = {
+                    open: row.querySelector('.bhOpen').checked,
+                    start: row.querySelector('.bhStart').value,
+                    end: row.querySelector('.bhEnd').value
+                };
+            });
             try {
-                await sb.from('orders').update({ status: newStatus, updated_at: new Date().toISOString() }).eq('id', orderId);
-                showToast('✅ 狀態已更新');
-                closeOrderDetail();
-                await loadOrderList();
-            } catch(e) {
-                console.error(e);
-                showToast('❌ 更新失敗');
-            }
+                await sb.from('store_profiles').update({ business_hours: bh, updated_at: new Date().toISOString() }).eq('id', rdCurrentStoreId);
+                const s = smStores.find(x => x.id === rdCurrentStoreId);
+                if (s) s.business_hours = bh;
+                showToast('✅ 營業時間已儲存');
+            } catch(e) { showToast('❌ 儲存失敗'); }
+        }
+
+        async function saveLineGroupId() {
+            const gid = document.getElementById('rdLineGroupId').value.trim();
+            try {
+                await sb.from('store_profiles').update({ line_group_id: gid || null, updated_at: new Date().toISOString() }).eq('id', rdCurrentStoreId);
+                const s = smStores.find(x => x.id === rdCurrentStoreId);
+                if (s) s.line_group_id = gid || null;
+                showToast('✅ LINE 群組已儲存');
+            } catch(e) { showToast('❌ 儲存失敗'); }
+        }
+
+        async function saveLoyaltyConfig() {
+            const config = {
+                spend_per_point: parseInt(document.getElementById('rdLoyaltySpend').value) || 50,
+                points_to_redeem: parseInt(document.getElementById('rdLoyaltyPoints').value) || 10,
+                discount_amount: parseInt(document.getElementById('rdLoyaltyDiscount').value) || 50
+            };
+            try {
+                await sb.from('store_profiles').update({ loyalty_config: config, updated_at: new Date().toISOString() }).eq('id', rdCurrentStoreId);
+                const s = smStores.find(x => x.id === rdCurrentStoreId);
+                if (s) s.loyalty_config = config;
+                showToast('✅ 集點設定已儲存');
+            } catch(e) { showToast('❌ 儲存失敗'); }
+        }
+
+        // --- 菜單複製 ---
+        function showCopyMenuModal() {
+            const targets = smStores.filter(s => s.id !== smCurrentStoreId);
+            if (targets.length === 0) return showToast('沒有其他商店可以複製');
+            document.getElementById('copyMenuTargets').innerHTML = targets.map(s => `
+                <label style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #F1F5F9;font-size:13px;">
+                    <input type="checkbox" class="copyTarget" value="${s.id}">
+                    ${escapeHTML(s.store_name)}
+                </label>
+            `).join('');
+            document.getElementById('copyMenuModal').style.display = 'flex';
+        }
+        function closeCopyMenuModal() { document.getElementById('copyMenuModal').style.display = 'none'; }
+        async function executeCopyMenu() {
+            const targets = [];
+            document.querySelectorAll('.copyTarget:checked').forEach(cb => targets.push(cb.value));
+            if (targets.length === 0) return showToast('請選擇目標商店');
+            if (!confirm(`確定將菜單複製到 ${targets.length} 間商店？會覆蓋目標的現有菜單。`)) return;
+            try {
+                for (const targetId of targets) {
+                    // 刪除目標的現有菜單
+                    await sb.from('menu_items').delete().eq('store_id', targetId);
+                    await sb.from('menu_categories').delete().eq('store_id', targetId);
+                    // 複製分類
+                    const catMap = {};
+                    for (const c of smCategories) {
+                        const { data } = await sb.from('menu_categories').insert({ store_id: targetId, name: c.name, sort_order: c.sort_order }).select().single();
+                        catMap[c.id] = data.id;
+                    }
+                    // 複製品項
+                    for (const i of smItems) {
+                        await sb.from('menu_items').insert({
+                            store_id: targetId,
+                            name: i.name, category_id: i.category_id ? catMap[i.category_id] : null,
+                            price: i.price, description: i.description, image_url: i.image_url,
+                            is_available: i.is_available, sort_order: i.sort_order, options: i.options, tags: i.tags
+                        });
+                    }
+                }
+                showToast(`✅ 已複製到 ${targets.length} 間商店`);
+                closeCopyMenuModal();
+            } catch(e) { showToast('❌ 複製失敗：' + (e.message || e)); }
         }
 
         // ===== 業務目標管理 =====
