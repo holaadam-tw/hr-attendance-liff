@@ -91,6 +91,12 @@
                 <div class="menu-item" onclick="showPage('fieldWorkApprovalPage')">
                     <div class="icon">📍</div><div class="label">外勤審核</div>
                 </div>
+                <div class="menu-item" onclick="showPage('insurancePage')">
+                    <div class="icon">🏥</div><div class="label">勞健保級距</div>
+                </div>
+                <div class="menu-item" onclick="showPage('companyPage')">
+                    <div class="icon">🏛️</div><div class="label">公司管理</div>
+                </div>
                 <div class="menu-item" onclick="showPage('featurePage')">
                     <div class="icon">🎛️</div><div class="label">功能管理</div>
                 </div>
@@ -912,6 +918,97 @@
             </div>
         </div>
 
+        <!-- 勞健保級距管理頁面 -->
+        <div id="insurancePage" class="page">
+            <button class="btn btn-secondary" onclick="showPage('adminHomePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
+            <div class="checkin-page">
+                <h2>🏥 勞健保級距管理</h2>
+
+                <div class="lunch-summary" id="insRateSummary">
+                    <h3 style="margin-bottom:10px;">⚙️ 費率設定</h3>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                        <div class="form-group" style="margin:0;"><label style="font-size:12px;">勞保費率 %</label><input type="number" id="insLaborRate" step="0.01" value="12.50" style="padding:8px;font-size:13px;"></div>
+                        <div class="form-group" style="margin:0;"><label style="font-size:12px;">勞保員工負擔比 %</label><input type="number" id="insLaborShare" step="0.01" value="20.00" style="padding:8px;font-size:13px;"></div>
+                        <div class="form-group" style="margin:0;"><label style="font-size:12px;">健保費率 %</label><input type="number" id="insHealthRate" step="0.01" value="5.17" style="padding:8px;font-size:13px;"></div>
+                        <div class="form-group" style="margin:0;"><label style="font-size:12px;">健保員工負擔比 %</label><input type="number" id="insHealthShare" step="0.01" value="30.00" style="padding:8px;font-size:13px;"></div>
+                    </div>
+                    <button class="btn btn-primary" onclick="updateAllInsRates()" style="margin-top:10px;font-size:13px;">📝 套用費率到所有級距</button>
+                </div>
+
+                <div style="display:flex;justify-content:space-between;align-items:center;margin:16px 0 8px;">
+                    <span style="font-size:14px;font-weight:700;">📋 級距表（共 <span id="insCount">0</span> 筆）</span>
+                    <button class="btn btn-success" onclick="showInsModal()" style="font-size:12px;padding:8px 14px;width:auto;">+ 新增</button>
+                </div>
+
+                <div style="overflow-x:auto;border-radius:12px;border:1px solid #E2E8F0;">
+                    <table style="width:100%;border-collapse:collapse;font-size:12px;" id="insTable">
+                        <thead>
+                            <tr style="background:#F8FAFC;">
+                                <th style="padding:8px 6px;text-align:right;white-space:nowrap;">薪資下限</th>
+                                <th style="padding:8px 6px;text-align:right;white-space:nowrap;">薪資上限</th>
+                                <th style="padding:8px 6px;text-align:right;white-space:nowrap;">投保金額</th>
+                                <th style="padding:8px 6px;text-align:center;">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="insTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 新增/編輯級距 Modal -->
+            <div id="insModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:999;overflow-y:auto;">
+                <div style="background:#fff;margin:60px auto;max-width:400px;border-radius:16px;padding:24px;">
+                    <h3 id="insModalTitle" style="margin-bottom:16px;">新增級距</h3>
+                    <input type="hidden" id="insEditId">
+                    <div class="form-group"><label>薪資下限 *</label><input type="number" id="insSalaryMin" placeholder="0"></div>
+                    <div class="form-group"><label>薪資上限 *</label><input type="number" id="insSalaryMax" placeholder="27470"></div>
+                    <div class="form-group"><label>投保金額 *</label><input type="number" id="insAmount" placeholder="27470"></div>
+                    <div style="display:flex;gap:8px;">
+                        <button class="btn btn-success" onclick="saveInsBracket()" style="flex:1;">💾 儲存</button>
+                        <button class="btn btn-secondary" onclick="closeInsModal()" style="flex:1;">取消</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 公司管理頁面 -->
+        <div id="companyPage" class="page">
+            <button class="btn btn-secondary" onclick="showPage('adminHomePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
+            <div class="checkin-page">
+                <h2>🏛️ 公司管理</h2>
+
+                <div style="display:flex;gap:8px;margin-bottom:12px;">
+                    <input type="text" id="companySearch" placeholder="搜尋公司..." oninput="filterCompanies()" style="flex:1;padding:10px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;">
+                    <button class="btn btn-primary" onclick="showCompanyModal()" style="white-space:nowrap;font-size:13px;padding:10px 16px;">+ 新增</button>
+                </div>
+
+                <div id="companyList">
+                    <p style="text-align:center;color:#94A3B8;font-size:13px;padding:16px;">載入中...</p>
+                </div>
+            </div>
+
+            <!-- 公司新增/編輯 Modal -->
+            <div id="companyModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:999;overflow-y:auto;">
+                <div style="background:#fff;margin:60px auto;max-width:450px;border-radius:16px;padding:24px;">
+                    <h3 id="companyModalTitle" style="margin-bottom:16px;">新增公司</h3>
+                    <input type="hidden" id="companyEditId">
+                    <div class="form-group"><label>公司代碼 *</label><input type="text" id="companyCode" placeholder="例：HR_SYSTEM_001" style="text-transform:uppercase;"></div>
+                    <div class="form-group"><label>公司名稱 *</label><input type="text" id="companyName" placeholder="公司全名"></div>
+                    <div class="form-group">
+                        <label>狀態</label>
+                        <select id="companyIsActive" style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;">
+                            <option value="true">啟用</option>
+                            <option value="false">停用</option>
+                        </select>
+                    </div>
+                    <div style="display:flex;gap:8px;">
+                        <button class="btn btn-success" onclick="saveCompany()" style="flex:1;">💾 儲存</button>
+                        <button class="btn btn-secondary" onclick="closeCompanyModal()" style="flex:1;">取消</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- 外勤審核頁面 -->
         <div id="fieldWorkApprovalPage" class="page">
             <button class="btn btn-secondary" onclick="showPage('adminHomePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
@@ -1031,6 +1128,8 @@
             if (id === 'payrollPage') { initPayrollPage(); }
             if (id === 'clientPage') { loadClientList(); loadServiceItemList(); }
             if (id === 'fieldWorkApprovalPage') { initFieldWorkApproval(); }
+            if (id === 'insurancePage') { loadInsuranceBrackets(); }
+            if (id === 'companyPage') { loadCompanyList(); }
         }
 
         // ===== 功能管理 =====
@@ -3960,6 +4059,231 @@
             a.download = fn; a.click();
             writeAuditLog('export','field_work_logs',null,fn,{rows:rows.length-1});
             showToast(`✅ 已匯出 ${fn}（${rows.length-1} 筆）`);
+        }
+
+        // ===== 勞健保級距管理 =====
+        let insBrackets = [];
+
+        async function loadInsuranceBrackets() {
+            try {
+                const { data, error } = await sb.from('insurance_brackets')
+                    .select('*').eq('is_active', true).order('salary_min');
+                if (error) throw error;
+                insBrackets = data || [];
+                renderInsTable();
+
+                // 顯示費率（取第一筆）
+                if (insBrackets.length > 0) {
+                    const b = insBrackets[0];
+                    document.getElementById('insLaborRate').value = ((b.labor_rate || 0.125) * 100).toFixed(2);
+                    document.getElementById('insLaborShare').value = ((b.labor_employee_share || 0.2) * 100).toFixed(2);
+                    document.getElementById('insHealthRate').value = ((b.health_rate || 0.0517) * 100).toFixed(2);
+                    document.getElementById('insHealthShare').value = ((b.health_employee_share || 0.3) * 100).toFixed(2);
+                }
+            } catch(e) { showToast('❌ 載入級距失敗'); console.error(e); }
+        }
+
+        function renderInsTable() {
+            document.getElementById('insCount').textContent = insBrackets.length;
+            const tbody = document.getElementById('insTableBody');
+            if (insBrackets.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" style="padding:20px;text-align:center;color:#94A3B8;">尚無級距資料</td></tr>';
+                return;
+            }
+            tbody.innerHTML = insBrackets.map(b => `
+                <tr style="border-bottom:1px solid #F1F5F9;">
+                    <td style="padding:6px;text-align:right;">${Number(b.salary_min).toLocaleString()}</td>
+                    <td style="padding:6px;text-align:right;">${Number(b.salary_max).toLocaleString()}</td>
+                    <td style="padding:6px;text-align:right;font-weight:600;">${Number(b.insured_amount).toLocaleString()}</td>
+                    <td style="padding:6px;text-align:center;">
+                        <span onclick="editInsBracket('${b.id}')" style="cursor:pointer;margin-right:6px;">✏️</span>
+                        <span onclick="deleteInsBracket('${b.id}')" style="cursor:pointer;">🗑️</span>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function showInsModal(editData) {
+            document.getElementById('insEditId').value = editData ? editData.id : '';
+            document.getElementById('insModalTitle').textContent = editData ? '編輯級距' : '新增級距';
+            document.getElementById('insSalaryMin').value = editData ? editData.salary_min : '';
+            document.getElementById('insSalaryMax').value = editData ? editData.salary_max : '';
+            document.getElementById('insAmount').value = editData ? editData.insured_amount : '';
+            document.getElementById('insModal').style.display = 'block';
+        }
+        function closeInsModal() { document.getElementById('insModal').style.display = 'none'; }
+
+        function editInsBracket(id) {
+            const b = insBrackets.find(x => x.id === id);
+            if (b) showInsModal(b);
+        }
+
+        async function saveInsBracket() {
+            const id = document.getElementById('insEditId').value;
+            const salaryMin = parseFloat(document.getElementById('insSalaryMin').value);
+            const salaryMax = parseFloat(document.getElementById('insSalaryMax').value);
+            const insuredAmount = parseFloat(document.getElementById('insAmount').value);
+
+            if (isNaN(salaryMin) || isNaN(salaryMax) || isNaN(insuredAmount)) {
+                showToast('⚠️ 請填寫完整'); return;
+            }
+
+            const laborRate = parseFloat(document.getElementById('insLaborRate').value) / 100;
+            const laborShare = parseFloat(document.getElementById('insLaborShare').value) / 100;
+            const healthRate = parseFloat(document.getElementById('insHealthRate').value) / 100;
+            const healthShare = parseFloat(document.getElementById('insHealthShare').value) / 100;
+
+            const row = {
+                salary_min: salaryMin, salary_max: salaryMax, insured_amount: insuredAmount,
+                labor_rate: laborRate, labor_employee_share: laborShare,
+                health_rate: healthRate, health_employee_share: healthShare, is_active: true
+            };
+
+            try {
+                if (id) {
+                    const { error } = await sb.from('insurance_brackets').update(row).eq('id', id);
+                    if (error) throw error;
+                    writeAuditLog('update', 'insurance_brackets', id, `投保 ${insuredAmount}`);
+                } else {
+                    const { error } = await sb.from('insurance_brackets').insert(row);
+                    if (error) throw error;
+                    writeAuditLog('create', 'insurance_brackets', null, `投保 ${insuredAmount}`);
+                }
+                closeInsModal();
+                showToast('✅ 已儲存');
+                loadInsuranceBrackets();
+            } catch(e) { showToast('❌ 儲存失敗'); console.error(e); }
+        }
+
+        async function deleteInsBracket(id) {
+            if (!confirm('確定刪除此級距？')) return;
+            try {
+                const { error } = await sb.from('insurance_brackets').update({ is_active: false }).eq('id', id);
+                if (error) throw error;
+                writeAuditLog('delete', 'insurance_brackets', id);
+                showToast('✅ 已刪除');
+                loadInsuranceBrackets();
+            } catch(e) { showToast('❌ 刪除失敗'); console.error(e); }
+        }
+
+        async function updateAllInsRates() {
+            if (!confirm('確定將費率套用到所有級距？')) return;
+            const laborRate = parseFloat(document.getElementById('insLaborRate').value) / 100;
+            const laborShare = parseFloat(document.getElementById('insLaborShare').value) / 100;
+            const healthRate = parseFloat(document.getElementById('insHealthRate').value) / 100;
+            const healthShare = parseFloat(document.getElementById('insHealthShare').value) / 100;
+
+            if (isNaN(laborRate) || isNaN(laborShare) || isNaN(healthRate) || isNaN(healthShare)) {
+                showToast('⚠️ 費率格式錯誤'); return;
+            }
+
+            try {
+                const { error } = await sb.from('insurance_brackets').update({
+                    labor_rate: laborRate, labor_employee_share: laborShare,
+                    health_rate: healthRate, health_employee_share: healthShare
+                }).eq('is_active', true);
+                if (error) throw error;
+                writeAuditLog('update', 'insurance_brackets', null, `費率更新：勞保${(laborRate*100).toFixed(2)}%/${(laborShare*100).toFixed(2)}% 健保${(healthRate*100).toFixed(2)}%/${(healthShare*100).toFixed(2)}%`);
+                showToast('✅ 費率已更新');
+                loadInsuranceBrackets();
+            } catch(e) { showToast('❌ 更新失敗'); console.error(e); }
+        }
+
+        // ===== 公司管理 =====
+        let allCompanies = [];
+
+        async function loadCompanyList() {
+            try {
+                const { data, error } = await sb.from('companies').select('*').order('created_at', { ascending: false });
+                if (error) throw error;
+                allCompanies = data || [];
+
+                // 取得每家公司的員工數
+                const { data: empCounts } = await sb.from('employees')
+                    .select('company_id').eq('is_active', true);
+                const countMap = {};
+                (empCounts || []).forEach(e => {
+                    countMap[e.company_id] = (countMap[e.company_id] || 0) + 1;
+                });
+                allCompanies.forEach(c => { c._empCount = countMap[c.id] || 0; });
+
+                renderCompanyList(allCompanies);
+            } catch(e) { showToast('❌ 載入公司列表失敗'); console.error(e); }
+        }
+
+        function filterCompanies() {
+            const q = (document.getElementById('companySearch').value || '').toLowerCase();
+            const filtered = allCompanies.filter(c =>
+                c.name.toLowerCase().includes(q) || (c.code || '').toLowerCase().includes(q)
+            );
+            renderCompanyList(filtered);
+        }
+
+        function renderCompanyList(list) {
+            const el = document.getElementById('companyList');
+            if (list.length === 0) {
+                el.innerHTML = '<p style="text-align:center;color:#94A3B8;font-size:13px;padding:16px;">無公司資料</p>';
+                return;
+            }
+            el.innerHTML = list.map(c => `
+                <div style="background:#fff;border-radius:12px;padding:14px;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,0.06);display:flex;justify-content:space-between;align-items:center;">
+                    <div>
+                        <div style="font-weight:700;font-size:15px;color:#0F172A;">${escapeHTML(c.name)}</div>
+                        <div style="font-size:12px;color:#64748B;margin-top:2px;">代碼：${escapeHTML(c.code)} ｜ 員工：${c._empCount} 人</div>
+                    </div>
+                    <div style="display:flex;gap:8px;align-items:center;">
+                        <span style="font-size:11px;padding:2px 8px;border-radius:20px;background:${c.is_active?'#D1FAE5':'#FEE2E2'};color:${c.is_active?'#065F46':'#991B1B'};">${c.is_active?'啟用':'停用'}</span>
+                        <span onclick="editCompany('${c.id}')" style="cursor:pointer;">✏️</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function showCompanyModal(editData) {
+            document.getElementById('companyEditId').value = editData ? editData.id : '';
+            document.getElementById('companyModalTitle').textContent = editData ? '編輯公司' : '新增公司';
+            document.getElementById('companyCode').value = editData ? editData.code : '';
+            document.getElementById('companyName').value = editData ? editData.name : '';
+            document.getElementById('companyIsActive').value = editData ? String(editData.is_active) : 'true';
+            document.getElementById('companyModal').style.display = 'block';
+        }
+        function closeCompanyModal() { document.getElementById('companyModal').style.display = 'none'; }
+
+        function editCompany(id) {
+            const c = allCompanies.find(x => x.id === id);
+            if (c) showCompanyModal(c);
+        }
+
+        async function saveCompany() {
+            const id = document.getElementById('companyEditId').value;
+            const code = document.getElementById('companyCode').value.trim().toUpperCase();
+            const name = document.getElementById('companyName').value.trim();
+            const isActive = document.getElementById('companyIsActive').value === 'true';
+
+            if (!code || !name) { showToast('⚠️ 請填寫代碼和名稱'); return; }
+
+            const row = { code, name, is_active: isActive };
+
+            try {
+                if (id) {
+                    const { error } = await sb.from('companies').update(row).eq('id', id);
+                    if (error) throw error;
+                    writeAuditLog('update', 'companies', id, name);
+                } else {
+                    const { error } = await sb.from('companies').insert(row);
+                    if (error) throw error;
+                    writeAuditLog('create', 'companies', null, `${name} (${code})`);
+                }
+                closeCompanyModal();
+                showToast('✅ 已儲存');
+                loadCompanyList();
+            } catch(e) {
+                if (String(e).includes('unique') || String(e?.message||'').includes('unique')) {
+                    showToast('⚠️ 公司代碼已存在');
+                } else {
+                    showToast('❌ 儲存失敗'); console.error(e);
+                }
+            }
         }
 
         // 頁面載入
