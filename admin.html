@@ -1071,12 +1071,6 @@
                 <h3 id="storeModalTitle" style="margin-bottom:16px;">新增商店</h3>
                 <input type="hidden" id="storeEditId">
                 <div class="form-group">
-                    <label>關聯客戶（選填）</label>
-                    <select id="storeClientSelect" style="width:100%;padding:12px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;">
-                        <option value="">-- 選擇客戶 --</option>
-                    </select>
-                </div>
-                <div class="form-group">
                     <label>商店名稱 *</label>
                     <input type="text" id="storeNameInput" placeholder="例：Mike's Cafe" style="width:100%;padding:12px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;box-sizing:border-box;">
                 </div>
@@ -4690,19 +4684,11 @@
         }
 
         async function showStoreModal(storeId) {
-            // 載入客戶下拉
-            let cq = sb.from('clients').select('id, company_name').eq('is_active', true).order('company_name');
-            if (currentCompanyId) cq = cq.eq('company_id', currentCompanyId);
-            const { data: clients } = await cq;
-            document.getElementById('storeClientSelect').innerHTML = '<option value="">-- 選擇客戶 --</option>' +
-                (clients || []).map(c => `<option value="${c.id}">${escapeHTML(c.company_name)}</option>`).join('');
-
             if (storeId) {
                 const s = smStores.find(x => x.id === storeId);
                 if (!s) return;
                 document.getElementById('storeModalTitle').textContent = '編輯商店';
                 document.getElementById('storeEditId').value = s.id;
-                document.getElementById('storeClientSelect').value = s.client_id || '';
                 document.getElementById('storeNameInput').value = s.store_name;
                 document.getElementById('storeSlugInput').value = s.store_slug || '';
                 document.getElementById('storeTypeSelect').value = s.store_type || 'restaurant';
@@ -4713,7 +4699,6 @@
             } else {
                 document.getElementById('storeModalTitle').textContent = '新增商店';
                 document.getElementById('storeEditId').value = '';
-                document.getElementById('storeClientSelect').value = '';
                 document.getElementById('storeNameInput').value = '';
                 document.getElementById('storeSlugInput').value = '';
                 document.getElementById('storeTypeSelect').value = 'restaurant';
@@ -4730,10 +4715,8 @@
 
         async function saveStore() {
             const name = document.getElementById('storeNameInput').value.trim();
-            const clientId = document.getElementById('storeClientSelect').value;
             if (!name) return showToast('請輸入商店名稱');
             const record = {
-                client_id: clientId || null,
                 store_name: name,
                 store_slug: document.getElementById('storeSlugInput').value.trim().toLowerCase().replace(/[^a-z0-9-]/g, '') || null,
                 store_type: document.getElementById('storeTypeSelect').value,
