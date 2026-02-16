@@ -1377,6 +1377,30 @@
                 const { error } = await sb.from('field_work_logs').update(updateData).eq('id', fwCurrentLogId);
                 if (error) throw error;
 
+                // 自動建立「實地拜訪」業務活動記錄
+                try {
+                    const clientId = document.getElementById('fwClientSelect').value;
+                    const selectedItems = getSelectedFwItems();
+                    const productNames = selectedItems.map(pid => {
+                        const item = fwServiceItems.find(s => s.id === pid);
+                        return item ? item.name : '';
+                    }).filter(Boolean);
+                    let desc = updateData.work_content || '';
+                    if (!desc && productNames.length) desc = '介紹產品：' + productNames.join('、');
+                    if (!desc) desc = '實地拜訪';
+                    const saRecord = {
+                        employee_id: currentEmployee.id,
+                        activity_type: 'visit',
+                        activity_date: getTaiwanDate(),
+                        description: desc,
+                        duration_minutes: Math.round((workHours || 0) * 60),
+                        notes: updateData.notes || null,
+                        client_id: clientId || null
+                    };
+                    if (currentCompanyId) saRecord.company_id = currentCompanyId;
+                    await sb.from('sales_activities').insert(saRecord);
+                } catch(e2) { console.warn('自動建立拜訪記錄失敗', e2); }
+
                 const infoEl = document.getElementById('fwLeaveInfo');
                 const t = new Date(now).toLocaleTimeString('zh-TW', { hour:'2-digit', minute:'2-digit' });
                 infoEl.style.display = 'block';
