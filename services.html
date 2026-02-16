@@ -282,16 +282,20 @@
                         <button type="button" onclick="showQuickAddClientModal()" style="padding:12px 16px;border:none;border-radius:10px;background:linear-gradient(135deg,#4F46E5,#7C3AED);color:#fff;font-weight:700;font-size:14px;cursor:pointer;white-space:nowrap;">+ 新增</button>
                     </div>
                 </div>
-                <div class="form-group">
-                    <label>說明 *</label>
-                    <textarea id="saDescription" rows="3" placeholder="例：介紹新產品方案" style="width:100%;padding:12px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;resize:vertical;box-sizing:border-box;"></textarea>
-                </div>
-                <!-- 介紹產品（勾選） -->
+                <!-- 介紹產品（勾選 + 新增） -->
                 <div class="form-group" id="saProductGroup">
                     <label>介紹產品</label>
                     <div id="saProductList" style="display:flex;flex-wrap:wrap;gap:8px;padding:8px;background:#F8FAFC;border-radius:10px;min-height:36px;">
                         <span style="color:#94A3B8;font-size:13px;">載入中...</span>
                     </div>
+                    <div style="display:flex;gap:8px;margin-top:8px;">
+                        <input type="text" id="saNewProductName" placeholder="新增產品項目..." style="flex:1;padding:10px;border:1px solid #E2E8F0;border-radius:10px;font-size:13px;box-sizing:border-box;">
+                        <button type="button" onclick="addProductFromModal()" style="padding:10px 16px;border:none;border-radius:10px;background:#059669;color:#fff;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap;">+ 新增</button>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>說明</label>
+                    <textarea id="saDescription" rows="2" placeholder="選填" style="width:100%;padding:12px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;resize:vertical;box-sizing:border-box;"></textarea>
                 </div>
                 <div class="form-group">
                     <label>時長（分鐘）</label>
@@ -1315,6 +1319,8 @@
             document.getElementById('saResult').value = '';
             document.getElementById('saNotes').value = '';
             document.getElementById('saClientSelect').value = '';
+            const newProdInput = document.getElementById('saNewProductName');
+            if (newProdInput) newProdInput.value = '';
             renderProductCheckboxes();
             // 也重新填充客戶下拉
             const sel = document.getElementById('saClientSelect');
@@ -1345,13 +1351,38 @@
             }).join('');
         }
 
+        // 從 Modal 快速新增產品項目
+        async function addProductFromModal() {
+            const input = document.getElementById('saNewProductName');
+            const name = input?.value.trim();
+            if (!name) return showToast('請輸入產品名稱');
+            try {
+                const record = { name, code: name.substring(0, 10).toUpperCase(), is_active: true };
+                if (currentCompanyId) record.company_id = currentCompanyId;
+                const { data, error } = await sb.from('service_items').insert(record).select().single();
+                if (error) throw error;
+                input.value = '';
+                // 更新本地列表並重新渲染（自動勾選新項目）
+                fwServiceItems.push(data);
+                let lastProducts = [];
+                try { lastProducts = JSON.parse(localStorage.getItem('sa_last_products') || '[]'); } catch(e) {}
+                lastProducts.push(data.id);
+                localStorage.setItem('sa_last_products', JSON.stringify(lastProducts));
+                renderProductCheckboxes();
+                showToast('✅ 已新增「' + name + '」');
+            } catch(e) {
+                console.error(e);
+                showToast('❌ 新增失敗：' + friendlyError(e));
+            }
+        }
+
         function closeSalesActivityModal() {
             document.getElementById('salesActivityModal').style.display = 'none';
         }
 
         async function saveSalesActivity() {
-            const desc = document.getElementById('saDescription').value.trim();
-            if (!desc) return showToast('請輸入說明');
+            const clientId = document.getElementById('saClientSelect').value;
+            if (!clientId) return showToast('請選擇客戶');
 
             // 收集勾選的產品
             const checkedProducts = [];
@@ -1359,17 +1390,25 @@
             // 儲存本次勾選，供下次預設
             localStorage.setItem('sa_last_products', JSON.stringify(checkedProducts));
 
-            // 產品名稱附加到備註
+            // 產品名稱
+            const productNames = checkedProducts.map(pid => {
+                const item = fwServiceItems.find(s => s.id === pid);
+                return item ? item.name : '';
+            }).filter(Boolean);
+
+            // description：若使用者有填就用，否則自動產生
+            let desc = document.getElementById('saDescription').value.trim();
+            if (!desc && productNames.length) {
+                desc = '介紹產品：' + productNames.join('、');
+            }
+            if (!desc) desc = document.getElementById('saType').value === 'call' ? '電話拜訪' : '實地拜訪';
+
+            // 備註：產品資訊附加
             let notes = document.getElementById('saNotes').value.trim() || '';
-            if (checkedProducts.length > 0) {
-                const productNames = checkedProducts.map(pid => {
-                    const item = fwServiceItems.find(s => s.id === pid);
-                    return item ? item.name : '';
-                }).filter(Boolean);
-                if (productNames.length) {
-                    const productStr = '介紹產品：' + productNames.join('、');
-                    notes = notes ? notes + ' | ' + productStr : productStr;
-                }
+            if (productNames.length) {
+                const productStr = '介紹產品：' + productNames.join('、');
+                if (!notes) notes = productStr;
+                else if (!notes.includes('介紹產品')) notes = notes + ' | ' + productStr;
             }
 
             const record = {
@@ -1380,7 +1419,7 @@
                 duration_minutes: parseInt(document.getElementById('saDuration').value) || 0,
                 result: document.getElementById('saResult').value || null,
                 notes: notes || null,
-                client_id: document.getElementById('saClientSelect').value || null
+                client_id: clientId || null
             };
             if (currentCompanyId) record.company_id = currentCompanyId;
 
