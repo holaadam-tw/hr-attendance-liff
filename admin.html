@@ -38,6 +38,7 @@
         <!-- 管理後台首頁 -->
         <div id="adminHomePage" class="page">
             <div class="user-card">
+                <div id="adminCompanyName" style="font-size:13px;font-weight:700;color:#4F46E5;margin-bottom:8px;display:none;"></div>
                 <div class="user-info">
                     <div class="avatar" id="adminAvatar">👑</div>
                     <div class="user-details">
@@ -79,11 +80,8 @@
                 <div class="menu-item" data-require="admin" onclick="showPage('clientPage')">
                     <div class="icon">🏢</div><div class="label">客戶管理</div>
                 </div>
-                <div class="menu-item" data-require="admin" onclick="showPage('fieldWorkApprovalPage')">
-                    <div class="icon">📍</div><div class="label">外勤審核</div>
-                </div>
-                <div class="menu-item" data-require="admin" data-feature="sales_target" onclick="showPage('salesTargetPage')">
-                    <div class="icon">🎯</div><div class="label">業務目標</div>
+                <div class="menu-item" data-require="admin" data-feature="fieldwork,sales_target" onclick="showPage('fieldSalesAdminPage')">
+                    <div class="icon">📍</div><div class="label">外勤/業務</div>
                 </div>
                 <div class="menu-item" data-require="admin" data-feature="store_ordering" onclick="showPage('storeManagePage')">
                     <div class="icon">🍽️</div><div class="label">商店管理</div>
@@ -636,7 +634,7 @@
                     <div class="menu-item" onclick="exportReport('payroll')">
                         <div class="icon">💰</div><div class="label">薪資報表</div>
                     </div>
-                    <div class="menu-item" onclick="showPage('fieldWorkApprovalPage')">
+                    <div class="menu-item" onclick="showPage('fieldSalesAdminPage')">
                         <div class="icon">📍</div><div class="label">外勤報表</div>
                     </div>
                 </div>
@@ -948,46 +946,84 @@
             </div>
         </div>
 
-        <!-- 外勤審核頁面 -->
-        <div id="fieldWorkApprovalPage" class="page">
+        <!-- ====== 外勤/業務 合併管理頁 ====== -->
+        <div id="fieldSalesAdminPage" class="page">
             <button class="btn btn-secondary" onclick="showPage('adminHomePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
             <div class="checkin-page">
-                <h2>📍 外勤審核</h2>
-
-                <!-- 篩選 -->
-                <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
-                    <input type="date" id="fwaDateFrom" style="flex:1;min-width:120px;padding:8px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;">
-                    <input type="date" id="fwaDateTo" style="flex:1;min-width:120px;padding:8px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;">
-                    <select id="fwaStatusFilter" style="padding:8px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;">
-                        <option value="submitted">待審核</option>
-                        <option value="approved">已核准</option>
-                        <option value="rejected">已退回</option>
-                        <option value="">全部</option>
-                    </select>
-                    <button class="btn btn-primary" onclick="loadFieldWorkApprovals()" style="font-size:12px;padding:8px 14px;">查詢</button>
+                <h2>📍 外勤/業務</h2>
+                <!-- Tab 切換 -->
+                <div style="display:flex;gap:4px;margin-bottom:16px;background:#F1F5F9;border-radius:10px;padding:3px;">
+                    <button class="fsaTab" onclick="switchFieldSalesAdmin('approval',this)" style="flex:1;padding:10px;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;background:#fff;color:#4F46E5;box-shadow:0 1px 4px rgba(0,0,0,0.08);">📋 外勤審核</button>
+                    <button class="fsaTab" onclick="switchFieldSalesAdmin('target',this)" style="flex:1;padding:10px;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;background:transparent;color:#94A3B8;">🎯 業務目標</button>
                 </div>
 
-                <!-- 統計 -->
-                <div style="display:flex;gap:8px;margin-bottom:12px;">
-                    <div style="flex:1;text-align:center;padding:8px;background:#DBEAFE;border-radius:8px;">
-                        <div style="font-size:18px;font-weight:900;color:#1E40AF;" id="fwaTotal">0</div>
-                        <div style="font-size:10px;color:#1E40AF;">總筆數</div>
+                <!-- 外勤審核 Tab -->
+                <div id="fsaApprovalTab">
+                    <!-- 篩選 -->
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+                        <input type="date" id="fwaDateFrom" style="flex:1;min-width:120px;padding:8px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;">
+                        <input type="date" id="fwaDateTo" style="flex:1;min-width:120px;padding:8px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;">
+                        <select id="fwaStatusFilter" style="padding:8px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;">
+                            <option value="submitted">待審核</option>
+                            <option value="approved">已核准</option>
+                            <option value="rejected">已退回</option>
+                            <option value="">全部</option>
+                        </select>
+                        <button class="btn btn-primary" onclick="loadFieldWorkApprovals()" style="font-size:12px;padding:8px 14px;">查詢</button>
                     </div>
-                    <div style="flex:1;text-align:center;padding:8px;background:#FEF3C7;border-radius:8px;">
-                        <div style="font-size:18px;font-weight:900;color:#92400E;" id="fwaPending">0</div>
-                        <div style="font-size:10px;color:#92400E;">待審核</div>
+
+                    <!-- 統計 -->
+                    <div style="display:flex;gap:8px;margin-bottom:12px;">
+                        <div style="flex:1;text-align:center;padding:8px;background:#DBEAFE;border-radius:8px;">
+                            <div style="font-size:18px;font-weight:900;color:#1E40AF;" id="fwaTotal">0</div>
+                            <div style="font-size:10px;color:#1E40AF;">總筆數</div>
+                        </div>
+                        <div style="flex:1;text-align:center;padding:8px;background:#FEF3C7;border-radius:8px;">
+                            <div style="font-size:18px;font-weight:900;color:#92400E;" id="fwaPending">0</div>
+                            <div style="font-size:10px;color:#92400E;">待審核</div>
+                        </div>
+                        <div style="flex:1;text-align:center;padding:8px;background:#D1FAE5;border-radius:8px;">
+                            <div style="font-size:18px;font-weight:900;color:#059669;" id="fwaTotalHours">0</div>
+                            <div style="font-size:10px;color:#059669;">總工時(h)</div>
+                        </div>
                     </div>
-                    <div style="flex:1;text-align:center;padding:8px;background:#D1FAE5;border-radius:8px;">
-                        <div style="font-size:18px;font-weight:900;color:#059669;" id="fwaTotalHours">0</div>
-                        <div style="font-size:10px;color:#059669;">總工時(h)</div>
+
+                    <div id="fwaList">
+                        <p style="text-align:center;color:#94A3B8;font-size:13px;padding:16px;">請選擇日期查詢</p>
                     </div>
+
+                    <button class="btn btn-secondary" onclick="exportFieldWorkCSV()" style="width:100%;margin-top:12px;font-size:13px;padding:12px;">📥 匯出外勤 CSV</button>
                 </div>
 
-                <div id="fwaList">
-                    <p style="text-align:center;color:#94A3B8;font-size:13px;padding:16px;">請選擇日期查詢</p>
-                </div>
+                <!-- 業務目標 Tab -->
+                <div id="fsaTargetTab" style="display:none;">
+                    <!-- 週切換 -->
+                    <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:16px;">
+                        <button onclick="stChangeWeek(-1)" style="padding:8px 14px;border:1px solid #E2E8F0;border-radius:10px;background:#fff;cursor:pointer;font-size:16px;">←</button>
+                        <span id="stWeekLabel" style="font-weight:700;font-size:14px;min-width:180px;text-align:center;"></span>
+                        <button onclick="stChangeWeek(1)" style="padding:8px 14px;border:1px solid #E2E8F0;border-radius:10px;background:#fff;cursor:pointer;font-size:16px;">→</button>
+                    </div>
 
-                <button class="btn btn-secondary" onclick="exportFieldWorkCSV()" style="width:100%;margin-top:12px;font-size:13px;padding:12px;">📥 匯出外勤 CSV</button>
+                    <!-- 設定目標區 -->
+                    <div style="background:#fff;border-radius:14px;padding:16px;box-shadow:0 2px 8px rgba(0,0,0,0.06);margin-bottom:16px;">
+                        <div style="font-size:14px;font-weight:800;color:#0F172A;margin-bottom:12px;">🎯 本週全員預設目標</div>
+                        <div style="display:flex;gap:12px;margin-bottom:12px;">
+                            <div style="flex:1;">
+                                <label style="font-size:12px;font-weight:600;color:#64748B;display:block;margin-bottom:4px;">📞 電話拜訪</label>
+                                <input type="number" id="stDefaultCall" min="0" value="0" style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;box-sizing:border-box;">
+                            </div>
+                            <div style="flex:1;">
+                                <label style="font-size:12px;font-weight:600;color:#64748B;display:block;margin-bottom:4px;">🏢 實地拜訪</label>
+                                <input type="number" id="stDefaultVisit" min="0" value="0" style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;box-sizing:border-box;">
+                            </div>
+                        </div>
+                        <button class="btn btn-primary" onclick="saveDefaultTarget()" style="font-size:13px;padding:10px;">💾 儲存預設目標</button>
+                    </div>
+
+                    <!-- 全員進度總覽 -->
+                    <div style="font-size:14px;font-weight:800;color:#0F172A;margin-bottom:12px;">📊 全員進度總覽</div>
+                    <div id="stProgressList"><p style="text-align:center;color:#999;">載入中...</p></div>
+                </div>
             </div>
 
             <!-- 明細 Modal -->
@@ -1177,41 +1213,6 @@
             </div>
         </div>
 
-        <!-- ====== 業務目標管理 ====== -->
-        <div id="salesTargetPage" class="page">
-            <button class="btn btn-secondary" onclick="showPage('adminHomePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
-            <div class="checkin-page">
-                <h2>🎯 業務目標管理</h2>
-
-                <!-- 週切換 -->
-                <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:16px;">
-                    <button onclick="stChangeWeek(-1)" style="padding:8px 14px;border:1px solid #E2E8F0;border-radius:10px;background:#fff;cursor:pointer;font-size:16px;">←</button>
-                    <span id="stWeekLabel" style="font-weight:700;font-size:14px;min-width:180px;text-align:center;"></span>
-                    <button onclick="stChangeWeek(1)" style="padding:8px 14px;border:1px solid #E2E8F0;border-radius:10px;background:#fff;cursor:pointer;font-size:16px;">→</button>
-                </div>
-
-                <!-- 設定目標區 -->
-                <div style="background:#fff;border-radius:14px;padding:16px;box-shadow:0 2px 8px rgba(0,0,0,0.06);margin-bottom:16px;">
-                    <div style="font-size:14px;font-weight:800;color:#0F172A;margin-bottom:12px;">🎯 本週全員預設目標</div>
-                    <div style="display:flex;gap:12px;margin-bottom:12px;">
-                        <div style="flex:1;">
-                            <label style="font-size:12px;font-weight:600;color:#64748B;display:block;margin-bottom:4px;">📞 電話拜訪</label>
-                            <input type="number" id="stDefaultCall" min="0" value="0" style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;box-sizing:border-box;">
-                        </div>
-                        <div style="flex:1;">
-                            <label style="font-size:12px;font-weight:600;color:#64748B;display:block;margin-bottom:4px;">🏢 實地拜訪</label>
-                            <input type="number" id="stDefaultVisit" min="0" value="0" style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;box-sizing:border-box;">
-                        </div>
-                    </div>
-                    <button class="btn btn-primary" onclick="saveDefaultTarget()" style="font-size:13px;padding:10px;">💾 儲存預設目標</button>
-                </div>
-
-                <!-- 全員進度總覽 -->
-                <div style="font-size:14px;font-weight:800;color:#0F172A;margin-bottom:12px;">📊 全員進度總覽</div>
-                <div id="stProgressList"><p style="text-align:center;color:#999;">載入中...</p></div>
-            </div>
-        </div>
-
     </div>
     <nav class="bottom-nav" id="bottomNav" style="display:none;">
         <a class="nav-item" onclick="window.location.href='index.html'">
@@ -1275,9 +1276,8 @@
             if (id === 'lunchMgrPage') { loadLunchManagers(); loadAdminLunchStats(); }
             if (id === 'payrollPage') { initPayrollPage(); }
             if (id === 'clientPage') { loadClientList(); loadServiceItemList(); }
-            if (id === 'fieldWorkApprovalPage') { initFieldWorkApproval(); }
+            if (id === 'fieldSalesAdminPage') { switchFieldSalesAdmin('approval', document.querySelector('.fsaTab')); }
             if (id === 'insurancePage') { loadInsuranceBrackets(); }
-            if (id === 'salesTargetPage') { initSalesTargetPage(); }
             if (id === 'storeManagePage') { loadStoreList(); }
             if (id === 'orderManagePage') { initOrderManage(); }
         }
@@ -1474,14 +1474,19 @@
                 // 載入系統設定（地點等）
                 await loadSettings();
 
-                // 載入公司功能設定（平台管理員設定的允許功能）
+                // 載入公司功能設定（平台管理員設定的允許功能）+ 公司名稱
                 if (data.company_id) {
                     try {
                         const { data: compData } = await sb.from('companies')
-                            .select('features')
+                            .select('name, features')
                             .eq('id', data.company_id)
                             .maybeSingle();
                         companyAllowedFeatures = compData?.features || null;
+                        // 顯示公司名稱
+                        if (compData?.name) {
+                            const el = document.getElementById('adminCompanyName');
+                            if (el) { el.textContent = compData.name; el.style.display = 'block'; }
+                        }
                     } catch(e) { console.log('載入公司功能設定失敗', e); }
                 }
 
@@ -1530,15 +1535,26 @@
             });
         }
 
-        // 依公司功能隱藏未開啟的選單項目
+        // 依公司功能隱藏未開啟的選單項目（支援 comma-separated OR 邏輯）
         function applyAdminFeatureVisibility() {
             if (!companyAllowedFeatures) return;
             document.querySelectorAll('.menu-grid .menu-item[data-feature]').forEach(el => {
-                const feature = el.getAttribute('data-feature');
-                if (feature && companyAllowedFeatures[feature] !== true) {
-                    el.style.display = 'none';
-                }
+                const keys = el.getAttribute('data-feature').split(',');
+                const visible = keys.some(k => companyAllowedFeatures[k.trim()] === true);
+                if (!visible) el.style.display = 'none';
             });
+        }
+
+        // ===== 外勤/業務 tab 切換 =====
+        function switchFieldSalesAdmin(tab, btn) {
+            document.querySelectorAll('.fsaTab').forEach(t => {
+                t.style.background = 'transparent'; t.style.color = '#94A3B8'; t.style.boxShadow = 'none';
+            });
+            if (btn) { btn.style.background = '#fff'; btn.style.color = '#4F46E5'; btn.style.boxShadow = '0 1px 4px rgba(0,0,0,0.08)'; }
+            document.getElementById('fsaApprovalTab').style.display = tab === 'approval' ? 'block' : 'none';
+            document.getElementById('fsaTargetTab').style.display = tab === 'target' ? 'block' : 'none';
+            if (tab === 'approval') initFieldWorkApproval();
+            if (tab === 'target') initSalesTargetPage();
         }
 
         // ===== 混合精算獎金系統 =====
