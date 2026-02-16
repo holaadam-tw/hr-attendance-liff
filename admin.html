@@ -1377,14 +1377,12 @@
                 const cardId = f.key.replace(',', '_');
                 return `
                 <div class="feature-toggle-card" id="ftCard_${cardId}" onclick="toggleFeature('${f.key}')"
-                     style="display:flex;align-items:center;gap:14px;padding:16px;background:${on ? '#F5F3FF' : '#fff'};border:2px solid ${on ? '#4F46E5' : '#E5E7EB'};border-radius:14px;cursor:pointer;transition:all 0.2s;">
+                     style="display:flex;align-items:center;gap:14px;padding:16px;background:${on ? '#F5F3FF' : '#F8FAFC'};border:2px solid ${on ? '#4F46E5' : '#E5E7EB'};border-radius:14px;cursor:pointer;transition:all 0.2s;">
+                    <div class="ft-indicator" style="width:26px;height:26px;border:2px solid ${on ? '#4F46E5' : '#CBD5E1'};border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:${on ? '#4F46E5' : '#fff'};color:#fff;font-size:16px;transition:all 0.2s;">${on ? '✓' : ''}</div>
                     <span style="font-size:28px;">${f.icon}</span>
                     <div style="flex:1;">
                         <div style="font-weight:800;font-size:14px;color:#0F172A;">${f.label}</div>
                         <div style="font-size:12px;color:#94A3B8;margin-top:2px;">${f.desc}</div>
-                    </div>
-                    <div class="ft-indicator" style="width:44px;height:26px;border-radius:13px;background:${on ? '#4F46E5' : '#CBD5E1'};position:relative;transition:background 0.3s;">
-                        <div style="width:20px;height:20px;border-radius:50%;background:#fff;position:absolute;top:3px;${on ? 'right:3px;' : 'left:3px;'}transition:all 0.3s;box-shadow:0 1px 3px rgba(0,0,0,0.2);"></div>
                     </div>
                 </div>`;
             }).join('');
@@ -1396,19 +1394,20 @@
             if (!card) return;
             const keys = key.split(',');
             const on = keys.some(k => featureState[k.trim()] !== false);
-            const indicator = card.querySelector('.ft-indicator');
-            const dot = indicator?.querySelector('div');
+            const box = card.querySelector('.ft-indicator');
 
             if (on) {
                 card.style.borderColor = '#4F46E5';
                 card.style.background = '#F5F3FF';
-                indicator.style.background = '#4F46E5';
-                if (dot) { dot.style.right = '3px'; dot.style.left = 'auto'; }
+                box.style.borderColor = '#4F46E5';
+                box.style.background = '#4F46E5';
+                box.textContent = '✓';
             } else {
                 card.style.borderColor = '#E5E7EB';
-                card.style.background = '#fff';
-                indicator.style.background = '#CBD5E1';
-                if (dot) { dot.style.left = '3px'; dot.style.right = 'auto'; }
+                card.style.background = '#F8FAFC';
+                box.style.borderColor = '#CBD5E1';
+                box.style.background = '#fff';
+                box.textContent = '';
             }
         }
 
