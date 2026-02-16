@@ -101,38 +101,48 @@
                         <span id="salaryMonthLabel">2026年 1月</span>
                         <button onclick="changeSalaryMonth(1)">▶</button>
                     </div>
-                    <div style="background:var(--primary-gradient);border-radius:16px;padding:20px;text-align:center;margin-bottom:20px;">
-                        <div style="font-size:12px;color:rgba(255,255,255,0.7);font-weight:600;">實發薪資</div>
-                        <div id="netSalary" style="font-size:36px;font-weight:900;color:#fff;margin-top:6px;letter-spacing:-1px;">NT$ 0</div>
-                        <div id="paidDate" style="font-size:12px;color:rgba(255,255,255,0.6);margin-top:4px;">尚未發放</div>
+                    <!-- 尚未發放提示 -->
+                    <div id="salaryNotPublished" style="display:none;text-align:center;padding:40px 20px;">
+                        <div style="font-size:48px;margin-bottom:12px;">📭</div>
+                        <div style="font-size:16px;font-weight:800;color:#0F172A;margin-bottom:6px;">本月薪資尚未發放</div>
+                        <div style="font-size:13px;color:#94A3B8;">薪資發放後將自動顯示明細，請耐心等候。</div>
                     </div>
 
-                    <!-- 出勤概況 -->
-                    <div class="att-overview">
-                        <div class="att-ov-item" style="background:#ECFDF5;">
-                            <div class="ao-num" style="color:#059669;" id="sdWorkDays">0</div>
-                            <div class="ao-label" style="color:#059669;">出勤天數</div>
+                    <!-- 薪資內容（有資料時顯示） -->
+                    <div id="salaryContent" style="display:none;">
+                        <div style="background:var(--primary-gradient);border-radius:16px;padding:20px;text-align:center;margin-bottom:20px;">
+                            <div style="font-size:12px;color:rgba(255,255,255,0.7);font-weight:600;">實發薪資</div>
+                            <div id="netSalary" style="font-size:36px;font-weight:900;color:#fff;margin-top:6px;letter-spacing:-1px;">NT$ 0</div>
+                            <div id="paidDate" style="font-size:12px;color:rgba(255,255,255,0.6);margin-top:4px;"></div>
                         </div>
-                        <div class="att-ov-item" style="background:#FFF7ED;">
-                            <div class="ao-num" style="color:#EA580C;" id="sdLate">0</div>
-                            <div class="ao-label" style="color:#EA580C;">遲到次數</div>
-                        </div>
-                        <div class="att-ov-item" style="background:#EFF6FF;">
-                            <div class="ao-num" style="color:#2563EB;" id="sdLeave">0</div>
-                            <div class="ao-label" style="color:#2563EB;">請假天數</div>
-                        </div>
-                    </div>
-                    <div id="sdExtraStats" style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;justify-content:center;"></div>
 
-                    <div class="chart-container">
-                        <canvas id="donutChart" width="200" height="200"></canvas>
-                        <div class="donut-center"><div class="label">總收入</div><div class="amount" id="chartTotal">NT$ 0</div></div>
+                        <!-- 出勤概況 -->
+                        <div class="att-overview">
+                            <div class="att-ov-item" style="background:#ECFDF5;">
+                                <div class="ao-num" style="color:#059669;" id="sdWorkDays">0</div>
+                                <div class="ao-label" style="color:#059669;">出勤天數</div>
+                            </div>
+                            <div class="att-ov-item" style="background:#FFF7ED;">
+                                <div class="ao-num" style="color:#EA580C;" id="sdLate">0</div>
+                                <div class="ao-label" style="color:#EA580C;">遲到次數</div>
+                            </div>
+                            <div class="att-ov-item" style="background:#EFF6FF;">
+                                <div class="ao-num" style="color:#2563EB;" id="sdLeave">0</div>
+                                <div class="ao-label" style="color:#2563EB;">請假天數</div>
+                            </div>
+                        </div>
+                        <div id="sdExtraStats" style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;justify-content:center;"></div>
+
+                        <div class="chart-container">
+                            <canvas id="donutChart" width="200" height="200"></canvas>
+                            <div class="donut-center"><div class="label">總收入</div><div class="amount" id="chartTotal">NT$ 0</div></div>
+                        </div>
+                        <div class="chart-legend" id="chartLegend"></div>
                     </div>
-                    <div class="chart-legend" id="chartLegend"></div>
                 </div>
 
                 <!-- 收入明細 -->
-                <div class="card">
+                <div class="card" id="salaryDetailCard" style="display:none;">
                     <div class="detail-section">
                         <div class="detail-section-title"><span class="dot" style="background:var(--success);"></span> 收入明細</div>
                         <div id="incomeRows"></div>
@@ -417,42 +427,43 @@
             ).join('');
         }
 
+        function showSalaryEmpty() {
+            document.getElementById('salaryNotPublished').style.display = 'block';
+            document.getElementById('salaryContent').style.display = 'none';
+            document.getElementById('salaryDetailCard').style.display = 'none';
+        }
+
+        function showSalaryContent() {
+            document.getElementById('salaryNotPublished').style.display = 'none';
+            document.getElementById('salaryContent').style.display = 'block';
+            document.getElementById('salaryDetailCard').style.display = 'block';
+        }
+
         async function loadSalary() {
             document.getElementById('salaryMonthLabel').textContent = `${salaryYear}年 ${salaryMonth+1}月`;
             try {
                 if (typeof sb !== 'undefined' && liffProfile) {
                     // 先嘗試 RPC
                     const { data, error } = await sb.rpc('get_employee_payroll', { p_line_user_id: liffProfile.userId, p_year: salaryYear, p_month: salaryMonth+1 });
-                    if (!error && data?.success && data.data) { renderSalary(data.data); return; }
-                    
+                    if (!error && data?.success && data.data) { showSalaryContent(); renderSalary(data.data); return; }
+
                     // 再嘗試直接查表
                     if (currentEmployee) {
                         const { data: p } = await sb.from('payroll').select('*').eq('employee_id', currentEmployee.id).eq('year', salaryYear).eq('month', salaryMonth+1).eq('is_published', true).maybeSingle();
                         if (p) {
-                            // 嘗試解析 calculation_details
                             if (p.calculation_details && typeof p.calculation_details === 'string') {
                                 try { p.calculation_details = JSON.parse(p.calculation_details); } catch(e) {}
                             }
+                            showSalaryContent();
                             renderSalary(p);
                             return;
                         }
                     }
                 }
-            } catch(e) { console.log('Fallback:', e.message); }
+            } catch(e) { console.log('載入薪資失敗:', e.message); }
 
-            // Demo data
-            renderSalary({
-                base_salary: 45000, overtime_pay: 3200, meal_allowance: 2400, position_allowance: 5000,
-                full_attendance_bonus: 2000, night_allowance: 800,
-                labor_insurance: 1042, health_insurance: 826, pension_self: 2700, income_tax: 894,
-                personal_leave_deduction: 0, late_deduction: 0, status: 'demo',
-                calculation_details: {
-                    work_days: 22, actual_days: 21, late_count: 0, leave_days: 1,
-                    overtime_hours: { regular: 4, rest_day: 0, holiday: 0 },
-                    night_shift_days: 2, position_mode: 'fixed', meal_mode: 'fixed',
-                    pension_self_rate: 6
-                }
-            });
+            // 無已發布薪資 → 顯示尚未發放
+            showSalaryEmpty();
         }
 
         function changeSalaryMonth(d) {
