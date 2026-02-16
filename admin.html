@@ -472,14 +472,18 @@
                         <input type="date" id="annExpire">
                     </div>
                     <div class="form-group" style="display:flex;flex-direction:column;gap:10px;">
-                        <label style="display:flex;align-items:center;gap:10px;padding:12px;background:#F8FAFC;border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;">
-                            <input type="checkbox" id="annPinned" style="width:20px;height:20px;accent-color:#4F46E5;flex-shrink:0;">
-                            📌 置頂
-                        </label>
-                        <label style="display:flex;align-items:center;gap:10px;padding:12px;background:#F8FAFC;border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;">
-                            <input type="checkbox" id="annRequireAck" style="width:20px;height:20px;accent-color:#4F46E5;flex-shrink:0;">
-                            ✍️ 強制閱讀簽署（員工必須確認才能使用系統）
-                        </label>
+                        <input type="checkbox" id="annPinned" style="display:none;">
+                        <div id="annPinnedCard" onclick="toggleAnnCheck('annPinned')"
+                             style="display:flex;align-items:center;gap:12px;padding:14px;background:#F8FAFC;border:2px solid #E5E7EB;border-radius:12px;cursor:pointer;transition:all 0.2s;">
+                            <div id="annPinnedBox" style="width:26px;height:26px;border:2px solid #CBD5E1;border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all 0.2s;background:#fff;font-size:16px;color:#fff;"></div>
+                            <span style="font-size:14px;font-weight:600;">📌 置頂</span>
+                        </div>
+                        <input type="checkbox" id="annRequireAck" style="display:none;">
+                        <div id="annRequireAckCard" onclick="toggleAnnCheck('annRequireAck')"
+                             style="display:flex;align-items:center;gap:12px;padding:14px;background:#F8FAFC;border:2px solid #E5E7EB;border-radius:12px;cursor:pointer;transition:all 0.2s;">
+                            <div id="annRequireAckBox" style="width:26px;height:26px;border:2px solid #CBD5E1;border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all 0.2s;background:#fff;font-size:16px;color:#fff;"></div>
+                            <span style="font-size:14px;font-weight:600;">✍️ 強制閱讀簽署（員工必須確認才能使用系統）</span>
+                        </div>
                     </div>
                     <button class="btn btn-primary" onclick="publishAnnouncement()">📤 發布公告</button>
                 </div>
@@ -3686,6 +3690,27 @@
         }
 
         // ===== 公告管理 =====
+        function toggleAnnCheck(id) {
+            const cb = document.getElementById(id);
+            if (!cb) return;
+            cb.checked = !cb.checked;
+            const card = document.getElementById(id + 'Card');
+            const box = document.getElementById(id + 'Box');
+            if (cb.checked) {
+                card.style.borderColor = '#4F46E5';
+                card.style.background = '#F5F3FF';
+                box.style.background = '#4F46E5';
+                box.style.borderColor = '#4F46E5';
+                box.innerHTML = '✓';
+            } else {
+                card.style.borderColor = '#E5E7EB';
+                card.style.background = '#F8FAFC';
+                box.style.background = '#fff';
+                box.style.borderColor = '#CBD5E1';
+                box.innerHTML = '';
+            }
+        }
+
         async function publishAnnouncement() {
             const title = document.getElementById('annTitle')?.value;
             const content = document.getElementById('annContent')?.value;
