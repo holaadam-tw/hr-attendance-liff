@@ -280,21 +280,10 @@
                         <button type="button" onclick="showQuickAddClientModal()" style="padding:12px 16px;border:none;border-radius:10px;background:linear-gradient(135deg,#4F46E5,#7C3AED);color:#fff;font-weight:700;font-size:14px;cursor:pointer;white-space:nowrap;">+ 新增</button>
                     </div>
                 </div>
-                <!-- 介紹產品（勾選 + 新增） -->
+                <!-- 服務項目（母子階層，同外勤打卡） -->
                 <div class="form-group" id="saProductGroup">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-                        <label style="margin:0;">介紹產品</label>
-                        <button type="button" onclick="toggleProductAddRow()" style="padding:4px 12px;border:1px solid #059669;border-radius:8px;background:#ECFDF5;color:#059669;font-weight:700;font-size:12px;cursor:pointer;">+ 新增</button>
-                    </div>
-                    <div id="saProductAddRow" style="display:none;margin-bottom:8px;">
-                        <div style="display:flex;gap:8px;">
-                            <input type="text" id="saNewProductName" placeholder="輸入產品名稱" style="flex:1;padding:10px;border:1px solid #E2E8F0;border-radius:10px;font-size:13px;box-sizing:border-box;">
-                            <button type="button" onclick="addProductFromModal()" style="padding:10px 16px;border:none;border-radius:10px;background:#059669;color:#fff;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap;">確認</button>
-                        </div>
-                    </div>
-                    <div id="saProductList" style="display:flex;flex-wrap:wrap;gap:8px;padding:8px;background:#F8FAFC;border-radius:10px;min-height:36px;">
-                        <span style="color:#94A3B8;font-size:13px;">載入中...</span>
-                    </div>
+                    <label>服務項目</label>
+                    <div id="saServiceHierarchy"></div>
                 </div>
                 <div class="form-group">
                     <label>說明</label>
@@ -970,7 +959,7 @@
                 document.getElementById('fwCatAddRow').style.display = 'none';
                 fwServiceItems.push(data);
                 renderFwServiceHierarchy();
-                renderProductCheckboxes();
+                renderSaServiceHierarchy();
                 showToast('✅ 已新增服務類型「' + name + '」');
             } catch(e) { showToast('❌ 新增失敗：' + friendlyError(e)); }
         }
@@ -986,7 +975,7 @@
                 document.getElementById('fwProdAdd_' + catId).style.display = 'none';
                 fwServiceItems.push(data);
                 renderFwServiceHierarchy();
-                renderProductCheckboxes();
+                renderSaServiceHierarchy();
                 showToast('✅ 已新增「' + name + '」');
             } catch(e) { showToast('❌ 新增失敗：' + friendlyError(e)); }
         }
@@ -1047,7 +1036,7 @@
                 if (item) item.name = name;
                 document.getElementById('fwItemEditOverlay')?.remove();
                 renderFwServiceHierarchy();
-                renderProductCheckboxes();
+                renderSaServiceHierarchy();
                 showToast('✅ 已更新');
             } catch(e) { showToast('❌ 更新失敗：' + friendlyError(e)); }
         }
@@ -1070,7 +1059,7 @@
                 }
                 document.getElementById('fwItemEditOverlay')?.remove();
                 renderFwServiceHierarchy();
-                renderProductCheckboxes();
+                renderSaServiceHierarchy();
                 showToast('✅ 已刪除');
             } catch(e) { showToast('❌ 刪除失敗：' + friendlyError(e)); }
         }
@@ -1542,9 +1531,7 @@
             document.getElementById('saResult').value = '';
             document.getElementById('saNotes').value = '';
             document.getElementById('saClientSelect').value = '';
-            const newProdInput = document.getElementById('saNewProductName');
-            if (newProdInput) newProdInput.value = '';
-            renderProductCheckboxes();
+            renderSaServiceHierarchy();
             // 也重新填充客戶下拉
             const sel = document.getElementById('saClientSelect');
             if (sel) {
@@ -1554,26 +1541,72 @@
             document.getElementById('salesActivityModal').style.display = 'flex';
         }
 
-        // 渲染產品勾選列表（銷售活動用，只顯示子項目和未分類）
-        function renderProductCheckboxes() {
-            const el = document.getElementById('saProductList');
+        // 銷售活動用：母子階層（同外勤打卡結構）
+        function renderSaServiceHierarchy() {
+            const el = document.getElementById('saServiceHierarchy');
             if (!el) return;
-            const products = fwServiceItems.filter(s => s.code !== 'CAT');
-            if (products.length === 0) {
-                el.innerHTML = '<span style="color:#94A3B8;font-size:13px;">無產品項目，請點 +新增</span>';
-                return;
-            }
-            // 讀取上次勾選的產品（localStorage 持久化）
             let lastProducts = [];
             try { lastProducts = JSON.parse(localStorage.getItem('sa_last_products') || '[]'); } catch(e) {}
-            el.innerHTML = products.map(s => {
-                const on = lastProducts.includes(s.id);
-                return `<div class="saProductCard" data-id="${s.id}" onclick="toggleProductCard(this)"
-                    style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:${on ? '#F5F3FF' : '#fff'};border:2px solid ${on ? '#4F46E5' : '#E5E7EB'};border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;transition:all 0.2s;">
-                    <div style="width:22px;height:22px;border:2px solid ${on ? '#4F46E5' : '#CBD5E1'};border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:${on ? '#4F46E5' : '#fff'};color:#fff;font-size:14px;transition:all 0.2s;">${on ? '✓' : ''}</div>
-                    ${escapeHTML(s.name)}
+
+            const categories = fwServiceItems.filter(s => s.code === 'CAT');
+            const childrenMap = {};
+            const uncategorized = [];
+            fwServiceItems.forEach(s => {
+                if (s.code === 'CAT') return;
+                if (isUUIDCode(s.code)) {
+                    if (!childrenMap[s.code]) childrenMap[s.code] = [];
+                    childrenMap[s.code].push(s);
+                } else {
+                    uncategorized.push(s);
+                }
+            });
+
+            let html = '';
+            categories.forEach(cat => {
+                const children = childrenMap[cat.id] || [];
+                html += `<div style="margin-bottom:14px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                        <div style="display:flex;align-items:center;gap:6px;">
+                            <span style="font-size:14px;font-weight:700;color:#0F172A;">${escapeHTML(cat.name)}</span>
+                            <span onclick="editFwCategory('${cat.id}')" style="font-size:14px;cursor:pointer;opacity:0.4;">✏️</span>
+                        </div>
+                        <button type="button" onclick="toggleFwAddRow('saProdAdd_${cat.id}','saNewProd_${cat.id}')" style="padding:4px 12px;border:1px solid #059669;border-radius:8px;background:#ECFDF5;color:#059669;font-weight:700;font-size:12px;cursor:pointer;">+ 新增</button>
+                    </div>
+                    <div id="saProdAdd_${cat.id}" style="display:none;margin-bottom:8px;">
+                        <div style="display:flex;gap:6px;">
+                            <input id="saNewProd_${cat.id}" placeholder="新項目名稱" style="flex:1;padding:8px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;">
+                            <button onclick="saveSaProduct('${cat.id}')" style="padding:8px 14px;border:none;border-radius:8px;background:#059669;color:#fff;font-weight:700;font-size:13px;cursor:pointer;">新增</button>
+                        </div>
+                    </div>
+                    <div style="display:flex;flex-wrap:wrap;gap:8px;">
+                        ${children.length > 0 ? children.map(s => renderSaItemCard(s, lastProducts.includes(s.id))).join('') : '<span style="color:#94A3B8;font-size:12px;">尚無項目，請點 +新增</span>'}
+                    </div>
                 </div>`;
-            }).join('');
+            });
+            if (uncategorized.length > 0) {
+                html += `<div style="margin-bottom:14px;">
+                    <div style="font-size:14px;font-weight:700;color:#0F172A;margin-bottom:6px;">其他</div>
+                    <div style="display:flex;flex-wrap:wrap;gap:8px;">
+                        ${uncategorized.map(s => renderSaItemCard(s, lastProducts.includes(s.id))).join('')}
+                    </div>
+                </div>`;
+            }
+            html += `<div id="saCatAddRow" style="display:none;margin-bottom:8px;">
+                <div style="display:flex;gap:6px;">
+                    <input id="saNewCatName" placeholder="新服務類型名稱" style="flex:1;padding:8px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;">
+                    <button onclick="saveSaCategory()" style="padding:8px 14px;border:none;border-radius:8px;background:#4F46E5;color:#fff;font-weight:700;font-size:13px;cursor:pointer;">新增</button>
+                </div>
+            </div>
+            <button type="button" onclick="toggleFwAddRow('saCatAddRow','saNewCatName')" style="padding:8px 14px;border:2px dashed #CBD5E1;border-radius:10px;background:#fff;color:#64748B;font-weight:700;font-size:13px;cursor:pointer;width:100%;">+ 新增服務類型</button>`;
+            el.innerHTML = html;
+        }
+
+        function renderSaItemCard(s, on) {
+            return `<div class="saProductCard" data-id="${s.id}" onclick="toggleProductCard(this)" style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:${on ? '#F5F3FF' : '#fff'};border:2px solid ${on ? '#4F46E5' : '#E5E7EB'};border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;transition:all 0.2s;">
+                <div style="width:22px;height:22px;border:2px solid ${on ? '#4F46E5' : '#CBD5E1'};border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:${on ? '#4F46E5' : '#fff'};color:#fff;font-size:14px;transition:all 0.2s;">${on ? '✓' : ''}</div>
+                <span style="flex:1;">${escapeHTML(s.name)}</span>
+                <span onclick="event.stopPropagation();editFwItem('${s.id}')" style="font-size:14px;opacity:0.4;padding:2px;">✏️</span>
+            </div>`;
         }
 
         function toggleProductCard(card) {
@@ -1588,38 +1621,39 @@
             }
         }
 
-        function toggleProductAddRow() {
-            const row = document.getElementById('saProductAddRow');
-            if (row) {
-                const show = row.style.display === 'none';
-                row.style.display = show ? 'block' : 'none';
-                if (show) document.getElementById('saNewProductName')?.focus();
-            }
-        }
-
-        // 從 Modal 快速新增產品項目
-        async function addProductFromModal() {
-            const input = document.getElementById('saNewProductName');
+        async function saveSaCategory() {
+            const input = document.getElementById('saNewCatName');
             const name = input?.value.trim();
-            if (!name) return showToast('請輸入產品名稱');
+            if (!name) return showToast('請輸入服務類型名稱');
             try {
-                const record = { name, code: name.substring(0, 10).toUpperCase(), is_active: true };
-                const { data, error } = await sb.from('service_items').insert(record).select().single();
+                const { data, error } = await sb.from('service_items').insert({ name, code: 'CAT', is_active: true }).select().single();
                 if (error) throw error;
                 input.value = '';
-                document.getElementById('saProductAddRow').style.display = 'none';
-                // 更新本地列表並重新渲染（自動勾選新項目）
+                document.getElementById('saCatAddRow').style.display = 'none';
                 fwServiceItems.push(data);
+                renderSaServiceHierarchy();
+                showToast('✅ 已新增服務類型「' + name + '」');
+            } catch(e) { showToast('❌ 新增失敗：' + friendlyError(e)); }
+        }
+
+        async function saveSaProduct(catId) {
+            const input = document.getElementById('saNewProd_' + catId);
+            const name = input?.value.trim();
+            if (!name) return showToast('請輸入項目名稱');
+            try {
+                const { data, error } = await sb.from('service_items').insert({ name, code: catId, is_active: true }).select().single();
+                if (error) throw error;
+                input.value = '';
+                document.getElementById('saProdAdd_' + catId).style.display = 'none';
+                fwServiceItems.push(data);
+                // 自動勾選新項目
                 let lastProducts = [];
                 try { lastProducts = JSON.parse(localStorage.getItem('sa_last_products') || '[]'); } catch(e) {}
                 lastProducts.push(data.id);
                 localStorage.setItem('sa_last_products', JSON.stringify(lastProducts));
-                renderProductCheckboxes();
+                renderSaServiceHierarchy();
                 showToast('✅ 已新增「' + name + '」');
-            } catch(e) {
-                console.error(e);
-                showToast('❌ 新增失敗：' + friendlyError(e));
-            }
+            } catch(e) { showToast('❌ 新增失敗：' + friendlyError(e)); }
         }
 
         function closeSalesActivityModal() {
