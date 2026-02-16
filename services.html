@@ -154,9 +154,7 @@
                         <!-- 服務項目 -->
                         <div class="form-group">
                             <label>服務項目</label>
-                            <select id="fwServiceSelect" style="width:100%;padding:12px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;">
-                                <option value="">-- 選擇服務項目 --</option>
-                            </select>
+                            <div id="fwServiceCards" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
                         </div>
 
                         <!-- 到達打卡 -->
@@ -864,11 +862,41 @@
             try {
                 const { data } = await sb.from('service_items').select('*').eq('is_active', true).order('name');
                 fwServiceItems = data || [];
-                const sel = document.getElementById('fwServiceSelect');
-                if (!sel) return;
-                sel.innerHTML = '<option value="">-- 選擇服務項目 --</option>' +
-                    fwServiceItems.map(s => `<option value="${s.id}">${escapeHTML(s.name)}</option>`).join('');
+                renderFwServiceCards();
             } catch(e) { console.error('載入服務項目失敗', e); }
+        }
+
+        function renderFwServiceCards(selectedId) {
+            const el = document.getElementById('fwServiceCards');
+            if (!el) return;
+            if (!fwServiceItems || fwServiceItems.length === 0) {
+                el.innerHTML = '<span style="color:#94A3B8;font-size:13px;">無服務項目</span>';
+                return;
+            }
+            el.innerHTML = fwServiceItems.map(s => {
+                const on = s.id === selectedId;
+                return `<div class="fwServiceCard" data-id="${s.id}" onclick="selectFwServiceCard(this)"
+                    style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:${on ? '#F5F3FF' : '#fff'};border:2px solid ${on ? '#4F46E5' : '#E5E7EB'};border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;transition:all 0.2s;">
+                    <div style="width:22px;height:22px;border:2px solid ${on ? '#4F46E5' : '#CBD5E1'};border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:${on ? '#4F46E5' : '#fff'};color:#fff;font-size:14px;transition:all 0.2s;">${on ? '✓' : ''}</div>
+                    ${escapeHTML(s.name)}
+                </div>`;
+            }).join('');
+        }
+
+        function selectFwServiceCard(card) {
+            // 單選：先取消所有
+            document.querySelectorAll('.fwServiceCard').forEach(c => {
+                c.style.borderColor = '#E5E7EB'; c.style.background = '#fff';
+                const box = c.querySelector('div');
+                box.style.borderColor = '#CBD5E1'; box.style.background = '#fff'; box.textContent = '';
+            });
+            // 再選中點擊的（如果已選中則取消）
+            const wasOn = card.style.borderColor === 'rgb(79, 70, 229)';
+            if (!wasOn) {
+                card.style.borderColor = '#4F46E5'; card.style.background = '#F5F3FF';
+                const box = card.querySelector('div');
+                box.style.borderColor = '#4F46E5'; box.style.background = '#4F46E5'; box.textContent = '✓';
+            }
         }
 
         async function loadFieldWorkLogs() {
@@ -934,7 +962,7 @@
             document.getElementById('fwFormTitle').textContent = '新增外勤打卡';
             // Reset form
             document.getElementById('fwClientSelect').value = '';
-            document.getElementById('fwServiceSelect').value = '';
+            renderFwServiceCards();
             document.getElementById('fwArriveBtn').style.display = 'block';
             document.getElementById('fwArriveInfo').style.display = 'none';
             document.getElementById('fwContentSection').style.display = 'none';
@@ -962,7 +990,7 @@
             showFieldWorkForm();
             document.getElementById('fwFormTitle').textContent = '繼續外勤打卡';
             document.getElementById('fwClientSelect').value = log.client_id || '';
-            document.getElementById('fwServiceSelect').value = log.service_item_id || '';
+            renderFwServiceCards(log.service_item_id || null);
             // 已到達
             if (log.arrive_time) {
                 document.getElementById('fwArriveBtn').style.display = 'none';
@@ -989,7 +1017,8 @@
             try {
                 const loc = await getGPS();
                 const now = new Date().toISOString();
-                const serviceId = document.getElementById('fwServiceSelect').value || null;
+                const selectedCard = document.querySelector('.fwServiceCard[style*="rgb(79, 70, 229)"]');
+                const serviceId = selectedCard ? selectedCard.dataset.id : null;
 
                 const record = {
                     employee_id: currentEmployee.id,
