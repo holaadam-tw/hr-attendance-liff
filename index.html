@@ -253,12 +253,14 @@
         };
         async function loadWeather() {
             try {
-                let lat, lon;
+                let lat = 25.033, lon = 121.565; // 預設台北
                 if (cachedLocation) {
                     lat = cachedLocation.latitude; lon = cachedLocation.longitude;
                 } else {
-                    const loc = await getGPS();
-                    lat = loc.latitude; lon = loc.longitude;
+                    try {
+                        const loc = await getGPS();
+                        lat = loc.latitude; lon = loc.longitude;
+                    } catch(e) { /* GPS 失敗，使用預設座標 */ }
                 }
                 const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weather_code&timezone=Asia%2FTaipei`);
                 const json = await res.json();
