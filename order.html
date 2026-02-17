@@ -38,7 +38,7 @@
         .search-bar .icon { position:absolute; left:28px; top:50%; transform:translateY(-50%); color:#9CA3AF; font-size:18px; }
 
         /* ===== Category Nav ===== */
-        .category-nav { position:sticky; top:0; z-index:40; background:#fff; box-shadow:0 1px 4px rgba(0,0,0,0.06); overflow-x:auto; white-space:nowrap; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
+        .category-nav { position:sticky; top:0; z-index:40; background:#fff; box-shadow:0 1px 4px rgba(0,0,0,0.06); overflow-x:auto; white-space:nowrap; scrollbar-width:none; -webkit-overflow-scrolling:touch; transition:top 0.2s; }
         .category-nav::-webkit-scrollbar { display:none; }
         .category-nav .tabs { display:flex; padding:0 12px; }
         .cat-tab { padding:14px 16px; font-size:14px; font-weight:600; color:#9CA3AF; cursor:pointer; position:relative; transition:color 0.2s; flex-shrink:0; }
@@ -68,13 +68,13 @@
         .floating-cart { position:fixed; bottom:20px; left:16px; right:16px; max-width:500px; margin:0 auto; background:#1a1a2e; color:#fff; border-radius:50px; padding:12px 12px 12px 20px; display:none; align-items:center; justify-content:space-between; box-shadow:0 8px 30px rgba(0,0,0,0.25); z-index:100; animation:slideUp 0.3s ease; }
         @keyframes slideUp { from { transform:translateY(100px); opacity:0; } to { transform:translateY(0); opacity:1; } }
         .floating-cart .cart-info { display:flex; align-items:center; gap:10px; }
-        .floating-cart .cart-badge { background:#EF4444; width:24px; height:24px; border-radius:50%; font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center; }
         .floating-cart .cart-total-price { font-size:16px; font-weight:700; }
         .floating-cart .checkout-btn { background:var(--theme); color:#fff; border:none; border-radius:50px; padding:12px 24px; font-size:14px; font-weight:700; cursor:pointer; }
 
         /* ===== Modal (Bottom Sheet) ===== */
         .modal-overlay { display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:200; }
         .modal-overlay.open { display:flex; align-items:flex-end; justify-content:center; }
+        body.modal-open { overflow:hidden; position:fixed; width:100%; }
         .modal-sheet { background:#fff; border-radius:20px 20px 0 0; width:100%; max-width:500px; max-height:90vh; overflow-y:auto; padding:0; transform:translateY(0); animation:sheetUp 0.3s ease; }
         @keyframes sheetUp { from { transform:translateY(100%); } to { transform:translateY(0); } }
         .sheet-header { display:flex; justify-content:space-between; align-items:center; padding:20px 20px 12px; position:sticky; top:0; background:#fff; z-index:1; border-bottom:1px solid #f5f5f5; }
@@ -99,7 +99,11 @@
         .ci-opts { font-size:12px; color:#9CA3AF; margin-top:2px; }
         .ci-price { font-weight:800; color:var(--theme); font-size:15px; min-width:60px; text-align:right; }
         .qty-ctrl { display:flex; align-items:center; gap:6px; }
-        .qty-btn { width:30px; height:30px; border-radius:50%; border:1.5px solid #e0e0e0; background:#fff; font-size:18px; cursor:pointer; display:flex; align-items:center; justify-content:center; color:#1a1a2e; font-weight:600; }
+        .qty-btn { width:30px; height:30px; border-radius:50%; border:1.5px solid #e0e0e0; background:#fff; font-size:18px; cursor:pointer; display:flex; align-items:center; justify-content:center; color:#1a1a2e; font-weight:600; transition:all 0.15s; }
+        .qty-btn:active { transform:scale(0.9); }
+        .cart-badge { background:#EF4444; width:24px; height:24px; border-radius:50%; font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center; transition:transform 0.2s; }
+        .cart-badge.bounce { animation:badgeBounce 0.3s ease; }
+        @keyframes badgeBounce { 0% { transform:scale(1); } 50% { transform:scale(1.4); } 100% { transform:scale(1); } }
         .qty-num { font-weight:800; font-size:15px; min-width:24px; text-align:center; }
         .cart-total-row { display:flex; justify-content:space-between; padding:16px 0 8px; font-size:18px; font-weight:800; border-top:2px solid #1a1a2e; margin-top:8px; }
 
@@ -183,11 +187,11 @@
             <div class="cart-badge" id="cartBadge">0</div>
             <div class="cart-total-price" id="cartTotalPrice">$0</div>
         </div>
-        <button class="checkout-btn">去結帳 →</button>
+        <button class="checkout-btn" id="checkoutBtn">去結帳 →</button>
     </div>
 
     <!-- Options Modal -->
-    <div class="modal-overlay" id="optionsModal">
+    <div class="modal-overlay" id="optionsModal" onclick="if(event.target===this)closeOptionsModal()">
         <div class="modal-sheet">
             <div class="sheet-header">
                 <h2 id="optItemName"></h2>
@@ -196,13 +200,18 @@
             <div class="sheet-body" id="optGroupsContainer"></div>
             <div class="sheet-footer">
                 <div class="subtotal-bar">小計 <span id="optSubtotal">$0</span></div>
+                <div class="qty-selector" style="display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:12px;">
+                    <button class="qty-btn" onclick="adjustModalQty(-1)" style="width:36px;height:36px;">−</button>
+                    <span id="optQty" style="font-size:18px;font-weight:800;min-width:32px;text-align:center;">1</span>
+                    <button class="qty-btn" onclick="adjustModalQty(1)" style="width:36px;height:36px;">+</button>
+                </div>
                 <button class="submit-btn" onclick="confirmAddToCart()">加入購物車</button>
             </div>
         </div>
     </div>
 
     <!-- Combo Modal -->
-    <div class="modal-overlay" id="comboModal">
+    <div class="modal-overlay" id="comboModal" onclick="if(event.target===this)closeComboModal()">
         <div class="modal-sheet">
             <div class="sheet-header">
                 <h2 id="comboItemName"></h2>
@@ -217,11 +226,14 @@
     </div>
 
     <!-- Cart Modal -->
-    <div class="modal-overlay" id="cartModal">
+    <div class="modal-overlay" id="cartModal" onclick="if(event.target===this)closeCart()">
         <div class="modal-sheet">
             <div class="sheet-header">
                 <h2>購物車</h2>
-                <button class="sheet-close" onclick="closeCart()">✕</button>
+                <div style="display:flex;gap:8px;align-items:center;">
+                    <button onclick="clearCart()" style="border:none;background:none;color:#EF4444;font-size:13px;font-weight:600;cursor:pointer;padding:4px 8px;">清空</button>
+                    <button class="sheet-close" onclick="closeCart()">✕</button>
+                </div>
             </div>
             <div class="sheet-body">
                 <div id="cartItems"></div>
@@ -239,12 +251,12 @@
                     <div style="display:flex;gap:10px;">
                         <div class="form-group" style="flex:1;">
                             <label>用餐方式</label>
-                            <select id="orderType">
+                            <select id="orderType" onchange="toggleTableNumber()">
                                 <option value="dine_in">內用</option>
                                 <option value="takeout">外帶</option>
                             </select>
                         </div>
-                        <div class="form-group" style="flex:1;">
+                        <div class="form-group" id="tableNumberGroup" style="flex:1;">
                             <label>桌號</label>
                             <input type="text" id="tableNumber" placeholder="內用填寫">
                         </div>
@@ -295,8 +307,9 @@
         let store = null;
         let categories = [];
         let menuItems = [];
-        let cart = JSON.parse(localStorage.getItem('_cart') || '[]');
+        let cart = [];
         let lineUserId = null;
+        let lineDisplayName = '';
         let customerLoyalty = null;
         let pendingItem = null;
         let pendingComboItem = null;
@@ -309,9 +322,17 @@
             setTimeout(() => t.classList.remove('show'), 2200);
         }
         function escapeHTML(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
-        function saveCart() { localStorage.setItem('_cart', JSON.stringify(cart.map(c => ({ itemId: c.item.id, qty: c.qty, optionsLabel: c.optionsLabel, optionsPrice: c.optionsPrice, selectedOptions: c.selectedOptions })))); }
+
+        // Fix #11: Modal 背景滾動鎖定
+        let scrollY = 0;
+        function lockScroll() { scrollY = window.scrollY; document.body.classList.add('modal-open'); document.body.style.top = '-' + scrollY + 'px'; }
+        function unlockScroll() { document.body.classList.remove('modal-open'); document.body.style.top = ''; window.scrollTo(0, scrollY); }
+
+        // Fix #3: 購物車依商店分開
+        function getCartKey() { return store ? '_cart_' + store.id : '_cart'; }
+        function saveCart() { localStorage.setItem(getCartKey(), JSON.stringify(cart.map(c => ({ itemId: c.item.id, qty: c.qty, optionsLabel: c.optionsLabel, optionsPrice: c.optionsPrice, selectedOptions: c.selectedOptions })))); }
         function restoreCart() {
-            const saved = JSON.parse(localStorage.getItem('_cart') || '[]');
+            const saved = JSON.parse(localStorage.getItem(getCartKey()) || '[]');
             cart = [];
             saved.forEach(s => {
                 const item = menuItems.find(i => i.id === s.itemId);
@@ -324,7 +345,12 @@
         async function init() {
             try {
                 await liff.init({ liffId: LIFF_ID });
-                if (liff.isLoggedIn()) { const p = await liff.getProfile(); lineUserId = p.userId; }
+                if (liff.isLoggedIn()) {
+                    const p = await liff.getProfile();
+                    lineUserId = p.userId;
+                    // Fix #10: 自動帶入 LINE 顯示名稱
+                    lineDisplayName = p.displayName || '';
+                }
             } catch(e) { console.log('LIFF init skipped', e); }
 
             const params = new URLSearchParams(location.search);
@@ -346,6 +372,11 @@
                 await loadMenu();
                 restoreCart();
                 populatePickupTimes();
+                // Fix #10: 自動帶入名稱
+                if (lineDisplayName) {
+                    const nameEl = document.getElementById('custName');
+                    if (nameEl && !nameEl.value) nameEl.value = lineDisplayName;
+                }
                 if (lineUserId) loadLoyalty();
                 document.getElementById('loadingView').style.display = 'none';
                 document.getElementById('mainView').style.display = 'block';
@@ -441,6 +472,8 @@
             if (menuItems.length > 3) document.getElementById('searchBar').style.display = '';
             renderCategoryNav();
             renderMenuSections();
+            // Fix #4: 動態計算黏性偏移
+            fixStickyOffsets();
             initScrollSpy();
         }
 
@@ -456,7 +489,14 @@
         function renderMenuSections() {
             const container = document.getElementById('menuContainer');
             let items = menuItems;
-            if (searchQuery) items = items.filter(i => i.name.toLowerCase().includes(searchQuery.toLowerCase()));
+            // Fix #12: 搜尋也搜描述
+            if (searchQuery) items = items.filter(i => i.name.toLowerCase().includes(searchQuery.toLowerCase()) || (i.description||'').toLowerCase().includes(searchQuery.toLowerCase()));
+
+            // Fix #12: 搜尋無結果提示
+            if (items.length === 0 && searchQuery) {
+                container.innerHTML = '<div class="menu-section" style="text-align:center;padding:60px 20px;"><div style="font-size:48px;margin-bottom:12px;">🔍</div><p style="color:#9CA3AF;font-size:15px;font-weight:600;">找不到「' + escapeHTML(searchQuery) + '」</p><p style="color:#CBD5E1;font-size:13px;margin-top:4px;">試試其他關鍵字</p></div>';
+                return;
+            }
 
             if (categories.length === 0) {
                 container.innerHTML = `<div class="menu-section" id="section-all"><div class="section-title">菜單</div>${items.map(i => renderItem(i)).join('')}</div>`;
@@ -505,28 +545,41 @@
         }
 
         // ===== Scroll Spy =====
+        // Fix #4 + #14: 動態計算 sticky offset
+        let stickyOffset = 0;
+        function fixStickyOffsets() {
+            const sb = document.getElementById('searchBar');
+            const cn = document.getElementById('categoryNav');
+            if (sb && sb.style.display !== 'none') {
+                const h = sb.offsetHeight;
+                cn.style.top = h + 'px';
+                stickyOffset = h + (cn.offsetHeight || 50);
+            } else {
+                stickyOffset = cn ? cn.offsetHeight || 50 : 50;
+            }
+        }
         function scrollToSection(catId, el) {
             document.querySelectorAll('.cat-tab').forEach(t => t.classList.remove('active'));
             if (el) el.classList.add('active');
             if (catId === 'all') { window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
             const section = document.getElementById('section-' + catId);
-            if (section) { const navH = document.querySelector('.category-nav')?.offsetHeight || 50; window.scrollTo({ top: section.offsetTop - navH - 10, behavior: 'smooth' }); }
+            if (section) { window.scrollTo({ top: section.offsetTop - stickyOffset - 10, behavior: 'smooth' }); }
         }
         function initScrollSpy() {
             if (categories.length === 0) return;
             const sections = document.querySelectorAll('.menu-section[data-cat]');
             if (sections.length === 0) return;
+            // Fix #14: rootMargin 用實際 stickyOffset
             const observer = new IntersectionObserver(entries => {
                 entries.forEach(entry => {
                     if (entry.isIntersecting) {
                         const catId = entry.target.dataset.cat;
                         document.querySelectorAll('.cat-tab').forEach(t => t.classList.toggle('active', t.dataset.cat === catId));
-                        // 自動捲動 tab 到可見範圍
                         const activeTab = document.querySelector(`.cat-tab[data-cat="${catId}"]`);
                         if (activeTab) activeTab.scrollIntoView({ behavior:'smooth', block:'nearest', inline:'center' });
                     }
                 });
-            }, { rootMargin: '-100px 0px -60% 0px', threshold: 0 });
+            }, { rootMargin: `-${stickyOffset + 20}px 0px -60% 0px`, threshold: 0 });
             sections.forEach(s => observer.observe(s));
         }
 
@@ -555,7 +608,16 @@
         }
 
         // ===== Options Modal =====
+        // Fix #8: 數量選擇
+        let modalQty = 1;
+        function adjustModalQty(d) {
+            modalQty = Math.max(1, Math.min(99, modalQty + d));
+            document.getElementById('optQty').textContent = modalQty;
+            calcOptionSubtotal();
+        }
         function openOptionsModal(item) {
+            modalQty = 1;
+            document.getElementById('optQty').textContent = 1;
             document.getElementById('optItemName').textContent = item.name;
             document.getElementById('optGroupsContainer').innerHTML = item.options.map((g, gIdx) => {
                 const inputType = g.type === 'multi' ? 'checkbox' : 'radio';
@@ -563,26 +625,30 @@
                     <div class="opt-group-title">${escapeHTML(g.name)} ${g.required ? '<span class="opt-group-req">必選</span>' : ''}</div>
                     ${g.choices.map((c, cIdx) => `<label class="opt-choice">
                         <input type="${inputType}" name="optGrp${gIdx}" value="${cIdx}" onchange="calcOptionSubtotal()" ${g.type !== 'multi' && cIdx === 0 && g.required ? 'checked' : ''}>
-                        <span class="opt-choice-label">${escapeHTML(c.label)}</span>
+                        <span class="opt-choice-label">${escapeHTML(c.name || c.label)}</span>
                         ${c.price > 0 ? `<span class="opt-choice-price">+$${c.price}</span>` : ''}
                     </label>`).join('')}
                 </div>`;
             }).join('');
             calcOptionSubtotal();
             document.getElementById('optionsModal').classList.add('open');
+            lockScroll();
         }
-        function closeOptionsModal() { document.getElementById('optionsModal').classList.remove('open'); pendingItem = null; }
+        function closeOptionsModal() { document.getElementById('optionsModal').classList.remove('open'); pendingItem = null; unlockScroll(); }
         function calcOptionSubtotal() {
             if (!pendingItem) return; let extra = 0;
             pendingItem.options.forEach((g, gIdx) => { document.querySelectorAll(`[name="optGrp${gIdx}"]:checked`).forEach(inp => { const c = g.choices[parseInt(inp.value)]; if (c) extra += c.price || 0; }); });
-            document.getElementById('optSubtotal').textContent = '$' + (pendingItem.price + extra);
+            const unitPrice = pendingItem.price + extra;
+            // Fix #8: 顯示數量 × 小計
+            document.getElementById('optSubtotal').textContent = modalQty > 1 ? `$${unitPrice} × ${modalQty} = $${unitPrice * modalQty}` : '$' + unitPrice;
         }
         function confirmAddToCart() {
             if (!pendingItem) return; const item = pendingItem;
             for (let gIdx = 0; gIdx < item.options.length; gIdx++) { if (item.options[gIdx].required && document.querySelectorAll(`[name="optGrp${gIdx}"]:checked`).length === 0) return showToast(`請選擇${item.options[gIdx].name}`); }
             const labels = []; let extra = 0; const selected = [];
-            item.options.forEach((g, gIdx) => { document.querySelectorAll(`[name="optGrp${gIdx}"]:checked`).forEach(inp => { const c = g.choices[parseInt(inp.value)]; if (c) { labels.push(c.label); extra += c.price||0; selected.push({ group:g.name, label:c.label, price:c.price||0 }); } }); });
-            cart.push({ item, qty:1, selectedOptions:selected, optionsLabel:labels.join(' '), optionsPrice:extra });
+            // Fix #1: c.name || c.label 雙向相容
+            item.options.forEach((g, gIdx) => { document.querySelectorAll(`[name="optGrp${gIdx}"]:checked`).forEach(inp => { const c = g.choices[parseInt(inp.value)]; if (c) { const lbl = c.name || c.label; labels.push(lbl); extra += c.price||0; selected.push({ group:g.name, label:lbl, price:c.price||0 }); } }); });
+            cart.push({ item, qty:modalQty, selectedOptions:selected, optionsLabel:labels.join(' '), optionsPrice:extra });
             updateCartUI(); saveCart(); closeOptionsModal(); showToast(`✓ ${item.name}`);
         }
 
@@ -602,8 +668,9 @@
             }).join('');
             document.getElementById('comboSubtotal').textContent = '$' + item.price;
             document.getElementById('comboModal').classList.add('open');
+            lockScroll();
         }
-        function closeComboModal() { document.getElementById('comboModal').classList.remove('open'); pendingComboItem = null; }
+        function closeComboModal() { document.getElementById('comboModal').classList.remove('open'); pendingComboItem = null; unlockScroll(); }
         function calcComboSubtotal() { if (pendingComboItem) document.getElementById('comboSubtotal').textContent = '$' + pendingComboItem.price; }
         function confirmAddCombo() {
             if (!pendingComboItem) return; const item = pendingComboItem; const groups = item.combo_config.groups; const labels = [];
@@ -613,6 +680,18 @@
         }
 
         // ===== Cart =====
+        // Fix #6: 外帶時隱藏桌號
+        function toggleTableNumber() {
+            const grp = document.getElementById('tableNumberGroup');
+            const isIn = document.getElementById('orderType').value === 'dine_in';
+            grp.style.display = isIn ? '' : 'none';
+            if (!isIn) document.getElementById('tableNumber').value = '';
+        }
+        // Fix #9: 清空購物車
+        function clearCart() {
+            if (!confirm('確定要清空購物車嗎？')) return;
+            cart = []; saveCart(); updateCartUI(); renderCartItems();
+        }
         function updateCartQty(idx, delta) {
             cart[idx].qty += delta;
             if (cart[idx].qty <= 0) cart.splice(idx, 1);
@@ -624,43 +703,126 @@
             const el = document.getElementById('floatingCart');
             el.style.display = qty > 0 ? 'flex' : 'none';
             document.getElementById('cartBadge').textContent = qty;
+            // Fix #15: Badge 彈跳動畫
+            const badge = document.getElementById('cartBadge');
+            badge.classList.remove('bounce');
+            void badge.offsetWidth;
+            badge.classList.add('bounce');
             document.getElementById('cartTotalPrice').textContent = '$' + price;
+            // Fix #13: 店休時浮動按鈕顯示警告
+            const ckBtn = document.getElementById('checkoutBtn');
+            if (isStoreClosed) {
+                ckBtn.textContent = '⏸ 暫停接單';
+                ckBtn.style.background = '#6B7280';
+            } else {
+                ckBtn.textContent = '去結帳 →';
+                ckBtn.style.background = '';
+            }
+            const subBtn = document.getElementById('submitOrderBtn');
+            if (subBtn) {
+                subBtn.disabled = isStoreClosed;
+                subBtn.textContent = isStoreClosed ? '⏸ 目前暫停接單' : '送出訂單';
+            }
         }
-        function openCart() { if (cart.length === 0) return showToast('購物車是空的'); renderCartItems(); document.getElementById('cartModal').classList.add('open'); }
-        function closeCart() { document.getElementById('cartModal').classList.remove('open'); }
+        function openCart() {
+            if (cart.length === 0) return showToast('購物車是空的');
+            renderCartItems();
+            toggleTableNumber();
+            document.getElementById('cartModal').classList.add('open');
+            lockScroll();
+        }
+        function closeCart() { document.getElementById('cartModal').classList.remove('open'); unlockScroll(); }
         function renderCartItems() {
-            document.getElementById('cartItems').innerHTML = cart.map((c,idx) => {
+            const el = document.getElementById('cartItems');
+            // Fix #9: 空狀態
+            if (cart.length === 0) {
+                el.innerHTML = '<div style="text-align:center;padding:40px 20px;"><div style="font-size:48px;margin-bottom:8px;">🛒</div><div style="font-size:15px;font-weight:700;color:#9CA3AF;">購物車是空的</div><div style="font-size:13px;color:#CBD5E1;margin-top:4px;">快去選幾道好料吧！</div></div>';
+                document.getElementById('cartTotal').textContent = '$0';
+                return;
+            }
+            el.innerHTML = cart.map((c,idx) => {
                 const up = c.item.price + (c.optionsPrice||0);
-                return `<div class="cart-item"><div class="ci-info"><div class="ci-name">${escapeHTML(c.item.name)}</div>${c.optionsLabel ? `<div class="ci-opts">${escapeHTML(c.optionsLabel)}</div>`:''}</div><div class="qty-ctrl"><button class="qty-btn" onclick="updateCartQty(${idx},-1)">−</button><span class="qty-num">${c.qty}</span><button class="qty-btn" onclick="updateCartQty(${idx},1)">+</button></div><div class="ci-price">$${up*c.qty}</div></div>`;
+                // Fix #15: qty=1 時顯示垃圾桶
+                return `<div class="cart-item">
+                    <div class="ci-info">
+                        <div class="ci-name">${escapeHTML(c.item.name)}</div>
+                        ${c.optionsLabel ? `<div class="ci-opts">${escapeHTML(c.optionsLabel)}</div>`:''}
+                    </div>
+                    <div class="qty-ctrl">
+                        <button class="qty-btn" onclick="updateCartQty(${idx},-1)">${c.qty === 1 ? '🗑' : '−'}</button>
+                        <span class="qty-num">${c.qty}</span>
+                        <button class="qty-btn" onclick="updateCartQty(${idx},1)">+</button>
+                    </div>
+                    <div class="ci-price">$${up*c.qty}</div>
+                </div>`;
             }).join('');
             document.getElementById('cartTotal').textContent = '$' + cart.reduce((s,c) => s + (c.item.price+(c.optionsPrice||0))*c.qty, 0);
         }
 
         // ===== Submit Order =====
+        let isSubmitting = false;
         async function submitOrder() {
+            if (isSubmitting) return;
+            // Fix #7: 店休阻擋送出
+            if (isStoreClosed) return showToast('本店目前暫停接單');
             const name = document.getElementById('custName').value.trim();
             if (!name) return showToast('請輸入姓名');
             if (cart.length === 0) return showToast('購物車是空的');
+            isSubmitting = true;
             const btn = document.getElementById('submitOrderBtn');
             btn.disabled = true; btn.textContent = '送出中...';
             try {
                 const items = cart.map(c => ({ name:c.item.name, qty:c.qty, price:c.item.price+(c.optionsPrice||0), subtotal:(c.item.price+(c.optionsPrice||0))*c.qty, options:c.optionsLabel||null }));
                 const total = items.reduce((s,i) => s+i.subtotal, 0);
                 const orderNumber = 'O' + Date.now().toString(36).toUpperCase();
-                const today = new Date().toISOString().split('T')[0];
+                // Fix #2: 用本地日期避免 UTC 時區偏移
+                const now0 = new Date();
+                const today = `${now0.getFullYear()}-${String(now0.getMonth()+1).padStart(2,'0')}-${String(now0.getDate()).padStart(2,'0')}`;
                 const { data: maxOrder } = await sb.from('orders').select('pickup_number').eq('store_id', store.id).gte('created_at', today+'T00:00:00').order('pickup_number',{ascending:false}).limit(1).maybeSingle();
                 const pickupNumber = (maxOrder?.pickup_number || 0) + 1;
                 const pickupTime = document.getElementById('pickupTime').value || null;
-                const record = { store_id:store.id, order_number:orderNumber, pickup_number:pickupNumber, customer_name:name, customer_phone:document.getElementById('custPhone').value.trim()||null, customer_line_id:lineUserId||null, order_type:document.getElementById('orderType').value, table_number:document.getElementById('tableNumber').value.trim()||null, pickup_time:pickupTime, items, total, notes:document.getElementById('orderNotes').value.trim()||null, status:'pending' };
+                const record = {
+                    store_id: store.id,
+                    order_number: orderNumber,
+                    pickup_number: pickupNumber,
+                    customer_name: name,
+                    customer_phone: document.getElementById('custPhone').value.trim() || null,
+                    customer_line_id: lineUserId || null,
+                    order_type: document.getElementById('orderType').value,
+                    table_number: document.getElementById('tableNumber').value.trim() || null,
+                    pickup_time: pickupTime,
+                    items, total,
+                    notes: document.getElementById('orderNotes').value.trim() || null,
+                    status: 'pending'
+                };
                 const { data, error } = await sb.from('orders').insert(record).select().single();
                 if (error) throw error;
                 // LINE group push
-                if (store.line_group_id) { try { const itemStr = items.map(i=>`${i.name}${i.options?'('+i.options+')':''} ×${i.qty}`).join('\n'); const tl={dine_in:'內用',takeout:'外帶'}; await sb.functions.invoke('send-line-notify',{body:{groupId:store.line_group_id,message:`🔔 新訂單 #${String(pickupNumber).padStart(3,'0')}\n客人：${name}\n${tl[record.order_type]||''}\n${itemStr}\n合計 $${total}`}}); } catch(e2){} }
+                if (store.line_group_id) {
+                    try {
+                        const itemStr = items.map(i => `${i.name}${i.options ? '(' + i.options + ')' : ''} ×${i.qty}`).join('\n');
+                        const tl = { dine_in:'內用', takeout:'外帶' };
+                        await sb.functions.invoke('send-line-notify', { body: { groupId: store.line_group_id, message: `🔔 新訂單 #${String(pickupNumber).padStart(3,'0')}\n客人：${name}\n${tl[record.order_type]||''}\n${itemStr}\n合計 $${total}` } });
+                    } catch(e2) {}
+                }
                 // Loyalty
-                if (lineUserId && store.loyalty_config) { try { const lc=store.loyalty_config; const earnPts=Math.floor(total/(lc.spend_per_point||50)); if(earnPts>0){ if(customerLoyalty){await sb.from('loyalty_points').update({points:(customerLoyalty.points||0)+earnPts,total_earned:(customerLoyalty.total_earned||0)+earnPts,updated_at:new Date().toISOString()}).eq('id',customerLoyalty.id);}else{await sb.from('loyalty_points').insert({store_id:store.id,customer_line_id:lineUserId,points:earnPts,total_earned:earnPts});} } } catch(e2){} }
+                if (lineUserId && store.loyalty_config) {
+                    try {
+                        const lc = store.loyalty_config;
+                        const earnPts = Math.floor(total / (lc.spend_per_point || 50));
+                        if (earnPts > 0) {
+                            if (customerLoyalty) {
+                                await sb.from('loyalty_points').update({ points: (customerLoyalty.points||0)+earnPts, total_earned: (customerLoyalty.total_earned||0)+earnPts, updated_at: new Date().toISOString() }).eq('id', customerLoyalty.id);
+                            } else {
+                                await sb.from('loyalty_points').insert({ store_id: store.id, customer_line_id: lineUserId, points: earnPts, total_earned: earnPts });
+                            }
+                        }
+                    } catch(e2) {}
+                }
                 showOrderConfirmation(data, items, pickupNumber);
                 cart = []; saveCart(); updateCartUI(); closeCart();
             } catch(e) { console.error(e); showToast('訂單送出失敗，請重試'); }
+            isSubmitting = false;
             btn.disabled = false; btn.textContent = '送出訂單';
         }
 
@@ -685,11 +847,16 @@
                 ${order.notes?'<div class="confirm-card"><h4>備註</h4><p style="font-size:14px;">'+escapeHTML(order.notes)+'</p></div>':''}`;
         }
 
+        // Fix #14 + #15: resetOrder 保留 LINE 名稱
         function resetOrder() {
             document.getElementById('orderConfirmView').style.display = 'none';
             document.getElementById('mainView').style.display = 'block';
-            ['custName','custPhone','tableNumber','orderNotes'].forEach(id => document.getElementById(id).value = '');
+            // 保留 LINE 自動帶入的名稱
+            document.getElementById('custPhone').value = '';
+            document.getElementById('tableNumber').value = '';
+            document.getElementById('orderNotes').value = '';
             document.getElementById('pickupTime').value = '';
+            if (!lineDisplayName) document.getElementById('custName').value = '';
         }
 
         init();
