@@ -1071,10 +1071,12 @@
                 <div id="rdStoreHeader" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
                     <h2 id="rdStoreName" style="margin:0;font-size:18px;"></h2>
                     <div style="display:flex;gap:6px;">
+                        <button onclick="previewStoreOrder()" style="padding:6px 10px;border:none;border-radius:8px;background:#4F46E5;color:#fff;font-size:12px;cursor:pointer;">👁️ 預覽</button>
                         <button onclick="showStoreQR(rdCurrentStoreId)" style="padding:6px 10px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;font-size:12px;cursor:pointer;">📱 QR</button>
                         <button onclick="editStore(rdCurrentStoreId)" style="padding:6px 10px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;font-size:12px;cursor:pointer;">📝 編輯</button>
                     </div>
                 </div>
+                <div id="rdStorePreviewLink" style="margin-bottom:8px;"></div>
                 <div id="rdAcceptOrderToggle" style="margin-bottom:12px;"></div>
 
                 <!-- Tab 切換 -->
@@ -1289,6 +1291,20 @@
                     <button onclick="closeCopyMenuModal()" style="flex:1;padding:10px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;font-size:13px;cursor:pointer;">取消</button>
                     <button onclick="executeCopyMenu()" style="flex:1;padding:10px;border:none;border-radius:8px;background:#4F46E5;color:#fff;font-weight:600;font-size:13px;cursor:pointer;">確定複製</button>
                 </div>
+            </div>
+        </div>
+
+        <!-- 商店 QR Code Modal -->
+        <div id="storeQRModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9999;align-items:center;justify-content:center;padding:20px;">
+            <div style="background:#fff;border-radius:16px;width:100%;max-width:380px;padding:24px;text-align:center;">
+                <h3 id="storeQRTitle" style="margin-bottom:12px;"></h3>
+                <div id="storeQRCode" style="display:inline-block;margin:12px 0;"></div>
+                <div style="margin-top:8px;">
+                    <p id="storeQRUrl" style="font-size:11px;color:#64748B;word-break:break-all;margin-bottom:12px;"></p>
+                    <button onclick="copyStoreUrl()" style="padding:8px 16px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;font-size:12px;cursor:pointer;margin-right:6px;">📋 複製連結</button>
+                    <button onclick="openStorePreview()" style="padding:8px 16px;border:none;border-radius:8px;background:#4F46E5;color:#fff;font-size:12px;cursor:pointer;">👁️ 預覽點餐頁</button>
+                </div>
+                <button onclick="closeStoreQR()" style="margin-top:16px;padding:10px 24px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;font-size:13px;cursor:pointer;">關閉</button>
             </div>
         </div>
 
@@ -4796,11 +4812,23 @@
             const s = smStores.find(x => x.id === storeId);
             if (!s) return;
             document.getElementById('rdStoreName').textContent = s.store_name;
+            // 預覽連結
+            const previewUrl = getStoreOrderUrl(s);
+            document.getElementById('rdStorePreviewLink').innerHTML = `
+                <div style="background:#EEF2FF;border-radius:8px;padding:8px 12px;display:flex;align-items:center;gap:8px;">
+                    <span style="font-size:11px;color:#4F46E5;flex:1;word-break:break-all;">${escapeHTML(previewUrl)}</span>
+                    <button onclick="navigator.clipboard.writeText('${previewUrl}').then(()=>showToast('✅ 已複製'))" style="padding:4px 8px;border:1px solid #C7D2FE;border-radius:6px;background:#fff;font-size:11px;cursor:pointer;white-space:nowrap;">📋 複製</button>
+                </div>`;
             // 接單狀態
             renderAcceptOrderToggle(s);
             // 預設顯示訂單 Tab
             switchRestaurantTab('orders', document.querySelector('.rdTab'));
             showPage('restaurantDetailPage');
+        }
+        function previewStoreOrder() {
+            const s = smStores.find(x => x.id === rdCurrentStoreId);
+            if (!s) return showToast('找不到商店資料');
+            window.open(getStoreOrderUrl(s), '_blank');
         }
 
         function renderAcceptOrderToggle(s) {
@@ -4981,8 +5009,14 @@
         // --- 商店基本 CRUD ---
         async function showStoreModal(storeId) {
             if (storeId) {
-                const s = smStores.find(x => x.id === storeId);
-                if (!s) return;
+                let s = smStores.find(x => x.id === storeId);
+                if (!s) {
+                    // 嘗試從 DB 重新載入
+                    const { data } = await sb.from('store_profiles').select('*').eq('id', storeId).maybeSingle();
+                    if (!data) return showToast('找不到商店資料');
+                    s = data;
+                    smStores.push(s);
+                }
                 document.getElementById('storeModalTitle').textContent = '編輯商店';
                 document.getElementById('storeEditId').value = s.id;
                 document.getElementById('storeNameInput').value = s.store_name;
@@ -5039,9 +5073,8 @@
 
         function showStoreQR(storeId) {
             const s = smStores.find(x => x.id === storeId);
-            if (!s) return;
-            const slug = s.store_slug || s.id;
-            const url = `${location.origin}/order.html?store=${slug}`;
+            if (!s) return showToast('找不到商店資料');
+            const url = getStoreOrderUrl(s);
             document.getElementById('storeQRTitle').textContent = s.store_name;
             document.getElementById('storeQRUrl').textContent = url;
             const qrEl = document.getElementById('storeQRCode');
@@ -5052,6 +5085,19 @@
             document.getElementById('storeQRModal').style.display = 'flex';
         }
         function closeStoreQR() { document.getElementById('storeQRModal').style.display = 'none'; }
+        function getStoreOrderUrl(s) {
+            const slug = s.store_slug || s.id;
+            const base = location.hostname === 'localhost' ? location.origin : 'https://' + location.hostname;
+            return base + location.pathname.replace('admin.html', 'order.html') + '?store=' + slug;
+        }
+        function copyStoreUrl() {
+            const url = document.getElementById('storeQRUrl').textContent;
+            navigator.clipboard.writeText(url).then(() => showToast('✅ 已複製連結')).catch(() => showToast('複製失敗'));
+        }
+        function openStorePreview() {
+            const url = document.getElementById('storeQRUrl').textContent;
+            window.open(url, '_blank');
+        }
 
         // --- 菜單管理 ---
         async function loadMenuCategories() {
