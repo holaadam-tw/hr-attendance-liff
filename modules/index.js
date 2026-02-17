@@ -57,7 +57,7 @@ import {
     showStoreModal, editStore, closeStoreModal, saveStore,
     showStoreQR, closeStoreQR, getStoreOrderUrl, copyStoreUrl,
     openStorePreview, loadMenuCategories, addMenuCategory,
-    deleteMenuCategory, loadMenuItems, showMenuItemForm,
+    renameMenuCategory, deleteMenuCategory, loadMenuItems, showMenuItemForm,
     editMenuItem, cancelMenuItemForm, toggleMiSection, toggleMiPreview,
     updateOptBadge, toggleComboSwitch, saveMenuItem, deleteMenuItem,
     toggleItemAvail, handleMenuImageUpload,
@@ -206,6 +206,7 @@ window.copyStoreUrl = copyStoreUrl;
 window.openStorePreview = openStorePreview;
 window.loadMenuCategories = loadMenuCategories;
 window.addMenuCategory = addMenuCategory;
+window.renameMenuCategory = renameMenuCategory;
 window.deleteMenuCategory = deleteMenuCategory;
 window.loadMenuItems = loadMenuItems;
 window.showMenuItemForm = showMenuItemForm;

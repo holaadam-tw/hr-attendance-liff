@@ -376,16 +376,19 @@ export async function loadMenuCategories() {
 
 function renderMenuCatList() {
     const el = document.getElementById('menuCatList');
-    if (smCategories.length === 0) { el.innerHTML = '<p style="font-size:12px;color:#94A3B8;">尚無分類</p>'; return; }
+    if (smCategories.length === 0) { el.innerHTML = '<p style="font-size:12px;color:#94A3B8;">尚無分大類</p>'; return; }
     el.innerHTML = smCategories.map(c => `
         <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #F1F5F9;">
             <span style="font-size:13px;font-weight:600;">${escapeHTML(c.name)}</span>
-            <button onclick="deleteMenuCategory('${c.id}')" style="background:none;border:none;color:#EF4444;cursor:pointer;font-size:12px;">刪除</button>
+            <div style="display:flex;gap:8px;">
+                <button onclick="renameMenuCategory('${c.id}','${escapeHTML(c.name)}')" style="background:none;border:none;color:#4F46E5;cursor:pointer;font-size:12px;font-weight:600;">編輯</button>
+                <button onclick="deleteMenuCategory('${c.id}')" style="background:none;border:none;color:#EF4444;cursor:pointer;font-size:12px;">刪除</button>
+            </div>
         </div>`).join('');
 }
 
 function updateMiCategorySelect() {
-    document.getElementById('miCategory').innerHTML = '<option value="">-- 不分類 --</option>' +
+    document.getElementById('miCategory').innerHTML = '<option value="">-- 未分類 --</option>' +
         smCategories.map(c => `<option value="${c.id}">${escapeHTML(c.name)}</option>`).join('');
 }
 
@@ -400,8 +403,18 @@ export async function addMenuCategory() {
     } catch(e) { showToast('❌ 新增失敗'); }
 }
 
+export async function renameMenuCategory(id, currentName) {
+    const newName = prompt('修改分大類名稱：', currentName);
+    if (!newName || newName.trim() === '' || newName.trim() === currentName) return;
+    try {
+        await sb.from('menu_categories').update({ name: newName.trim() }).eq('id', id);
+        showToast('✅ 已修改');
+        await loadMenuCategories();
+    } catch(e) { showToast('❌ 修改失敗'); }
+}
+
 export async function deleteMenuCategory(id) {
-    if (!confirm('確定刪除此分類？（品項不會被刪除）')) return;
+    if (!confirm('確定刪除此分大類？（品項不會被刪除）')) return;
     try { await sb.from('menu_categories').delete().eq('id', id); showToast('✅ 已刪除'); await loadMenuCategories(); }
     catch(e) { showToast('❌ 刪除失敗'); }
 }
