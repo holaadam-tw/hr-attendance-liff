@@ -113,6 +113,16 @@
                 </div>
             </div>
 
+            <!-- 目前訂單 -->
+            <div id="activeOrdersCard" class="card" style="padding:16px;display:none;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                    <span style="font-size:14px;font-weight:700;color:#0F172A;">🛒 目前訂單</span>
+                    <span id="activeOrdersBadge" style="font-size:11px;padding:2px 10px;border-radius:10px;background:#FEF3C7;color:#92400E;font-weight:600;">0 筆待處理</span>
+                </div>
+                <div id="activeOrdersList" style="display:flex;flex-direction:column;gap:8px;"></div>
+                <button onclick="window.location.href='admin.html#restaurant'" style="width:100%;margin-top:12px;padding:10px;border:1.5px solid #E2E8F0;border-radius:10px;background:#fff;font-size:13px;font-weight:600;color:#4F46E5;cursor:pointer;font-family:inherit;">查看全部訂單 →</button>
+            </div>
+
             <!-- 精簡選單（移除與底部導航重複的項目）-->
             <div class="menu-grid">
                 <div class="menu-item" data-feature="leave" onclick="window.location.href='records.html'">
@@ -288,6 +298,71 @@
             } catch(e) { console.log('天氣載入失敗', e); }
         }
 
+        // 載入目前訂單
+        async function loadActiveOrders() {
+            try {
+                // 先查該公司的商店
+                let storeQ = sb.from('store_profiles').select('id, store_name');
+                if (currentCompanyId) storeQ = storeQ.or('company_id.eq.' + currentCompanyId + ',company_id.is.null');
+                const { data: stores } = await storeQ;
+                if (!stores || stores.length === 0) return;
+
+                const storeIds = stores.map(s => s.id);
+                const storeMap = {};
+                stores.forEach(s => storeMap[s.id] = s.store_name);
+
+                // 查進行中的訂單（待處理 + 已確認 + 準備中 + 可取餐）
+                const { data: orders } = await sb.from('orders')
+                    .select('id, order_number, pickup_number, store_id, status, total, items, table_number, created_at')
+                    .in('store_id', storeIds)
+                    .in('status', ['pending', 'confirmed', 'preparing', 'ready'])
+                    .order('created_at', { ascending: false })
+                    .limit(5);
+
+                if (!orders || orders.length === 0) return;
+
+                const card = document.getElementById('activeOrdersCard');
+                card.style.display = '';
+
+                // 統計
+                const pendingCount = orders.filter(o => o.status === 'pending').length;
+                const badge = document.getElementById('activeOrdersBadge');
+                if (pendingCount > 0) {
+                    badge.textContent = pendingCount + ' 筆待處理';
+                    badge.style.background = '#FEE2E2';
+                    badge.style.color = '#DC2626';
+                } else {
+                    badge.textContent = orders.length + ' 筆進行中';
+                    badge.style.background = '#DBEAFE';
+                    badge.style.color = '#1E40AF';
+                }
+
+                // 渲染訂單列表
+                const statusMap = {
+                    pending:   { label: '待處理', color: '#92400E', bg: '#FEF3C7' },
+                    confirmed: { label: '已確認', color: '#1E40AF', bg: '#DBEAFE' },
+                    preparing: { label: '準備中', color: '#7C3AED', bg: '#F5F3FF' },
+                    ready:     { label: '可取餐', color: '#059669', bg: '#D1FAE5' }
+                };
+                const list = document.getElementById('activeOrdersList');
+                list.innerHTML = orders.map(o => {
+                    const st = statusMap[o.status] || { label: o.status, color: '#64748B', bg: '#F1F5F9' };
+                    const time = o.created_at ? new Date(o.created_at).toLocaleString('zh-TW', { hour: '2-digit', minute: '2-digit' }) : '';
+                    const itemCount = (o.items || []).reduce((s, i) => s + (i.qty || 1), 0);
+                    const pickup = o.pickup_number ? '#' + String(o.pickup_number).padStart(3, '0') : '';
+                    const storeName = stores.length > 1 ? '<span style="font-size:11px;color:#94A3B8;">' + (storeMap[o.store_id] || '') + '</span>' : '';
+                    return '<div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;padding:10px 12px;cursor:pointer;" onclick="window.location.href=\'admin.html#restaurant\'">' +
+                        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">' +
+                        '<span style="font-weight:700;font-size:13px;">' + pickup + ' #' + (o.order_number || '').slice(-4) + '</span>' +
+                        '<span style="font-size:11px;font-weight:600;padding:2px 8px;border-radius:8px;background:' + st.bg + ';color:' + st.color + ';">' + st.label + '</span></div>' +
+                        '<div style="font-size:12px;color:#64748B;">' +
+                        (o.table_number ? '桌' + o.table_number + ' · ' : '') +
+                        itemCount + '品 · $' + o.total + ' · ' + time +
+                        '</div>' + storeName + '</div>';
+                }).join('');
+            } catch(e) { console.log('載入訂單失敗', e); }
+        }
+
         function checkLiffParams() {
             try {
                 if (liff && liff.isInClient()) {
@@ -336,12 +411,17 @@
                     loadTodayStatus();
 
                     // [優化] 平行發送所有獨立的 API 請求
-                    Promise.all([
+                    const tasks = [
                         loadEmployeeType(),
                         loadAnnouncements(),
                         checkForcedAnnouncements(),
                         loadWeather()
-                    ].map(p => Promise.resolve(p).catch(e => console.error(e))));
+                    ];
+                    // 管理員載入目前訂單
+                    if (currentEmployee.role === 'admin' || currentEmployee.role === 'manager') {
+                        tasks.push(loadActiveOrders());
+                    }
+                    Promise.all(tasks.map(p => Promise.resolve(p).catch(e => console.error(e))));
                     applyFeatureVisibility();
                     preloadGPS();
                 } else {
