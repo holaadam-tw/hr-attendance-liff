@@ -11,7 +11,7 @@ export const ADMIN_FEATURE_LIST = [
     { key: 'lunch',          label: '便當訂購',      desc: '每日午餐訂購管理',     icon: '🍱' },
     { key: 'attendance',     label: '考勤查詢',      desc: '出勤月曆與記錄查詢',   icon: '📊' },
     { key: 'fieldwork,sales_target', label: '外勤/業務', desc: '外勤打卡、業務目標與週報', icon: '📍' },
-    { key: 'store_ordering', label: '線上點餐/預約',  desc: '線上預約與點餐服務',   icon: '🛍️' }
+    { key: 'store_ordering', label: '查看訂單',        desc: '線上預約與點餐服務',   icon: '🛍️' }
 ];
 
 export let featureState = { leave: true, lunch: true, attendance: true, fieldwork: true, sales_target: true, store_ordering: false };

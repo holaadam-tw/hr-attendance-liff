@@ -31,6 +31,14 @@ export async function loadRestaurantList() {
             if (o.status === 'pending') stats[o.store_id].pending++;
             if (o.status !== 'cancelled') stats[o.store_id].revenue += parseFloat(o.total) || 0;
         });
+
+        // 平台管理員 + 有商店 → 跳過列表，直接進第一間商店
+        if (window.isPlatformAdmin && smStores.length > 0) {
+            openRestaurantDetail(smStores[0].id);
+            renderStoreSwitcher();
+            return;
+        }
+
         renderRestaurantList(stats);
     } catch(e) { console.error(e); }
 }
@@ -74,6 +82,44 @@ export async function openRestaurantDetail(storeId) {
     renderAcceptOrderToggle(s);
     switchRestaurantTab('orders', document.querySelector('.rdTab'));
     window.showPage?.('restaurantDetailPage');
+}
+
+// ===== 商店切換器（平台管理員多店切換）=====
+function renderStoreSwitcher() {
+    if (!window.isPlatformAdmin || smStores.length <= 1) return;
+    if (document.getElementById('storeSwitcherWrap')) return;
+
+    const target = document.getElementById('rdStoreName');
+    if (!target) return;
+
+    const wrap = document.createElement('div');
+    wrap.id = 'storeSwitcherWrap';
+    wrap.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:8px;';
+
+    const select = document.createElement('select');
+    select.id = 'storeSwitcher';
+    select.style.cssText = 'flex:1;padding:6px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;background:#fff;color:#333;cursor:pointer;';
+    smStores.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s.id;
+        opt.textContent = s.store_name;
+        if (s.id === rdCurrentStoreId) opt.selected = true;
+        select.appendChild(opt);
+    });
+    select.addEventListener('change', () => {
+        openRestaurantDetail(select.value);
+    });
+
+    wrap.appendChild(select);
+    target.parentNode.insertBefore(wrap, target);
+    target.style.display = 'none';
+
+    // 修改返回按鈕：平台管理員回首頁而非商店列表
+    const backBtn = document.querySelector('#restaurantDetailPage > button');
+    if (backBtn) {
+        backBtn.textContent = '← 返回';
+        backBtn.onclick = () => window.showPage?.('adminHomePage');
+    }
 }
 
 export function previewStoreOrder() {

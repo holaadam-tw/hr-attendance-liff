@@ -14,6 +14,9 @@ let currentEmployee = null;
 let currentCompanyId = null;    // 多租戶：當前公司 ID
 let currentCompanyFeatures = null; // 多租戶：當前公司功能設定
 let currentCompanyName = null;     // 多租戶：當前公司名稱
+let isPlatformAdmin = false;       // 是否為平台管理員
+let currentPlatformAdmin = null;   // 平台管理員資料
+let managedCompanies = [];         // 可管理的公司列表
 let videoStream = null;
 let cachedLocation = null;
 let currentBindMode = 'id_card';
@@ -173,13 +176,77 @@ function friendlyError(err) {
 async function checkUserStatus() {
     const loadingEl = document.getElementById('loadingPage');
     if (loadingEl) loadingEl.style.display = 'flex';
-    
+
     try {
+        // === 先檢查是否為平台管理員 ===
+        const { data: padmin } = await sb.from('platform_admins')
+            .select('*')
+            .eq('line_user_id', liffProfile.userId)
+            .eq('is_active', true)
+            .maybeSingle();
+
+        if (padmin) {
+            isPlatformAdmin = true;
+            currentPlatformAdmin = padmin;
+            // 載入可管理公司列表（含 role）
+            const { data: pac } = await sb.from('platform_admin_companies')
+                .select('company_id, role, companies(id, name, features, status)')
+                .eq('platform_admin_id', padmin.id);
+            managedCompanies = (pac || []).map(r => ({
+                id: r.company_id,
+                name: r.companies?.name || '未命名',
+                features: r.companies?.features || null,
+                status: r.companies?.status || 'active',
+                role: r.role
+            }));
+
+            // 恢復上次選擇的公司（sessionStorage）
+            const savedCompanyId = sessionStorage.getItem('selectedCompanyId');
+            const savedCompany = savedCompanyId && managedCompanies.find(c => c.id === savedCompanyId);
+            const selected = savedCompany || managedCompanies[0];
+
+            if (selected) {
+                currentCompanyId = selected.id;
+                currentCompanyFeatures = selected.features;
+                currentCompanyName = selected.name;
+                sessionStorage.setItem('selectedCompanyId', selected.id);
+            }
+
+            // 建立虛擬 employee 物件（平台管理員可能不在該公司有 employee 記錄）
+            const { data: empData } = await sb.from('employees')
+                .select('*')
+                .eq('line_user_id', liffProfile.userId)
+                .eq('company_id', currentCompanyId)
+                .maybeSingle();
+
+            currentEmployee = empData || {
+                id: null,
+                name: padmin.name,
+                role: 'admin',
+                department: '平台管理',
+                position: '平台管理員',
+                employee_number: 'PA-001',
+                line_user_id: padmin.line_user_id,
+                company_id: currentCompanyId
+            };
+
+            await loadSettings();
+            if (loadingEl) loadingEl.style.display = 'none';
+            updateUserInfo(currentEmployee);
+            // 顯示公司名稱
+            const hcn = document.getElementById('homeCompanyName');
+            if (hcn && currentCompanyName) { hcn.textContent = currentCompanyName; hcn.style.display = 'block'; }
+            renderCompanySwitcher();
+            if (currentEmployee.id) await checkTodayAttendance();
+            return true;
+        }
+
+        // === 一般員工流程（原邏輯）===
         const { data, error } = await sb.from('employees')
             .select('*')
             .eq('line_user_id', liffProfile.userId)
             .maybeSingle();
-        
+
         await loadSettings();
 
         if (loadingEl) loadingEl.style.display = 'none';
@@ -209,6 +276,102 @@ async function checkUserStatus() {
         if (loadingEl) loadingEl.style.display = 'none';
         return false;
     }
+}
+
+// ===== 公司切換 =====
+async function switchCompany(companyId) {
+    const company = managedCompanies.find(c => c.id === companyId);
+    if (!company) return;
+
+    currentCompanyId = company.id;
+    currentCompanyFeatures = company.features;
+    currentCompanyName = company.name;
+    sessionStorage.setItem('selectedCompanyId', company.id);
+
+    // 嘗試取得該公司的 employee 記錄
+    const { data: empData } = await sb.from('employees')
+        .select('*')
+        .eq('line_user_id', liffProfile.userId)
+        .eq('company_id', companyId)
+        .maybeSingle();
+
+    currentEmployee = empData || {
+        id: null,
+        name: currentPlatformAdmin.name,
+        role: 'admin',
+        department: '平台管理',
+        position: '平台管理員',
+        employee_number: 'PA-001',
+        line_user_id: currentPlatformAdmin.line_user_id,
+        company_id: companyId
+    };
+
+    // 清除 settings 快取，重新載入該公司設定
+    sessionStorage.removeItem('system_settings_cache');
+    _settingsCache = null;
+    await loadSettings();
+
+    // 更新 UI
+    updateUserInfo(currentEmployee);
+    applyFeatureVisibility();
+
+    // 更新公司名稱顯示
+    const companyNameEl = document.getElementById('homeCompanyName');
+    if (companyNameEl) { companyNameEl.textContent = currentCompanyName; companyNameEl.style.display = 'block'; }
+
+    if (currentEmployee.id) {
+        await checkTodayAttendance();
+    } else {
+        todayAttendance = null;
+    }
+
+    showToast('已切換至 ' + currentCompanyName);
+}
+
+// ===== 公司切換器 UI =====
+function renderCompanySwitcher() {
+    if (!isPlatformAdmin || managedCompanies.length < 1) return;
+
+    // index.html 的 user-card 區域
+    const companyNameEl = document.getElementById('homeCompanyName');
+    if (!companyNameEl) return;
+
+    // 更新公司名稱
+    companyNameEl.textContent = currentCompanyName || '';
+    companyNameEl.style.display = 'block';
+
+    // 如果只有一間公司，不需要下拉選單
+    if (managedCompanies.length <= 1) return;
+
+    // 避免重複渲染
+    if (document.getElementById('companySwitcher')) return;
+
+    const wrapper = document.createElement('div');
+    wrapper.style.cssText = 'margin-top:6px;display:flex;align-items:center;gap:6px;';
+
+    const select = document.createElement('select');
+    select.id = 'companySwitcher';
+    select.style.cssText = 'flex:1;padding:6px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;background:#fff;color:#333;cursor:pointer;';
+    managedCompanies.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.id;
+        opt.textContent = c.name + (c.role === 'manager' ? ' (代管)' : '');
+        if (c.id === currentCompanyId) opt.selected = true;
+        select.appendChild(opt);
+    });
+    select.addEventListener('change', () => switchCompany(select.value));
+
+    const badge = document.createElement('span');
+    badge.textContent = managedCompanies.length + ' 間公司';
+    badge.style.cssText = 'font-size:11px;color:#888;white-space:nowrap;';
+
+    wrapper.appendChild(select);
+    wrapper.appendChild(badge);
+
+    // 插入到 companyName 之後
+    companyNameEl.parentNode.insertBefore(wrapper, companyNameEl.nextSibling);
+    // 隱藏原本的 companyName（下拉已含公司名）
+    companyNameEl.style.display = 'none';
 }
 
 // 更新用戶資訊
@@ -327,7 +490,7 @@ function getGPS() {
 
 // ===== 考勤功能 =====
 async function checkTodayAttendance() {
-    if (!currentEmployee) return;
+    if (!currentEmployee || !currentEmployee.id) return;
     try {
         const today = getTaiwanDate(0);
         const { data, error } = await sb.from('attendance')

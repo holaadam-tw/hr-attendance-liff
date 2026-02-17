@@ -6,7 +6,8 @@
 import {
     showPage, checkAdminPermission, updateAdminInfo,
     applyRoleVisibility, applyAdminFeatureVisibility,
-    switchFieldSalesAdmin
+    switchFieldSalesAdmin,
+    renderAdminCompanySwitcher, switchCompanyAdmin
 } from './auth.js';
 
 import {
@@ -93,6 +94,8 @@ window.updateAdminInfo = updateAdminInfo;
 window.applyRoleVisibility = applyRoleVisibility;
 window.applyAdminFeatureVisibility = applyAdminFeatureVisibility;
 window.switchFieldSalesAdmin = switchFieldSalesAdmin;
+window.renderAdminCompanySwitcher = renderAdminCompanySwitcher;
+window.switchCompanyAdmin = switchCompanyAdmin;
 
 // audit
 window.loadAuditLogs = loadAuditLogs;
