@@ -801,8 +801,8 @@ body {
 
 <script>
 // ===== CONFIG =====
-const SUPABASE_URL = 'YOUR_SUPABASE_URL';
-const SUPABASE_KEY = 'YOUR_SUPABASE_ANON_KEY';
+const SUPABASE_URL = 'https://nssuisyvlrqnqfxupklb.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5zc3Vpc3l2bHJxbnFmeHVwa2xiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkyOTAwMzUsImV4cCI6MjA4NDg2NjAzNX0.q_B6v3gf1TOCuAq7z0xIw10wDueCSJn0p37VzdMfmbc';
 
 // ===== THEME SYSTEM =====
 const THEMES = {
@@ -855,6 +855,33 @@ function renderThemePanel() {
     ).join('');
 }
 
+// Apply store's custom theme color
+function applyStoreThemeColor(hex) {
+  // 找最接近的內建主題
+  var bestKey = null, bestDist = Infinity;
+  Object.entries(THEMES).forEach(function(entry) {
+    var d = colorDistance(hex, entry[1].primary);
+    if (d < bestDist) { bestDist = d; bestKey = entry[0]; }
+  });
+  if (bestDist < 80) { applyTheme(bestKey); return; }
+  // 自訂色：直接套用 CSS 變數
+  var r = document.documentElement.style;
+  r.setProperty('--primary', hex);
+  r.setProperty('--primary-light', adjustBrightness(hex, 30));
+  r.setProperty('--primary-dark', adjustBrightness(hex, -30));
+}
+function colorDistance(a, b) {
+  var ra = parseInt(a.slice(1,3),16), ga = parseInt(a.slice(3,5),16), ba = parseInt(a.slice(5,7),16);
+  var rb = parseInt(b.slice(1,3),16), gb = parseInt(b.slice(3,5),16), bb = parseInt(b.slice(5,7),16);
+  return Math.sqrt((ra-rb)*(ra-rb)+(ga-gb)*(ga-gb)+(ba-bb)*(ba-bb));
+}
+function adjustBrightness(hex, amount) {
+  var r = Math.max(0,Math.min(255,parseInt(hex.slice(1,3),16)+amount));
+  var g = Math.max(0,Math.min(255,parseInt(hex.slice(3,5),16)+amount));
+  var b = Math.max(0,Math.min(255,parseInt(hex.slice(5,7),16)+amount));
+  return '#' + [r,g,b].map(function(c){return c.toString(16).padStart(2,'0');}).join('');
+}
+
 // Close theme panel on outside click
 document.addEventListener('click', function(e) {
   const fab = document.getElementById('themeFab');
@@ -865,6 +892,7 @@ document.addEventListener('click', function(e) {
 });
 
 // ===== STATE =====
+let currentStoreId = null;
 let shopInfo = {};
 let categories = [];
 let menuItems = [];
@@ -971,16 +999,18 @@ const DEMO_ITEMS = [
 document.addEventListener('DOMContentLoaded', () => { initApp(); });
 
 async function initApp() {
-  // Apply saved theme or URL param
   const params = new URLSearchParams(window.location.search);
+  const storeSlug = params.get('store');
+
+  // Apply saved theme or URL param
   const urlTheme = params.get('theme');
   const savedTheme = localStorage.getItem('_order_theme');
   applyTheme(urlTheme || savedTheme || 'fire');
   renderThemePanel();
 
   try {
-    if (SUPABASE_URL !== 'YOUR_SUPABASE_URL') {
-      await loadFromSupabase();
+    if (storeSlug) {
+      await loadStoreFromSupabase(storeSlug);
     } else {
       loadDemoData();
     }
@@ -1001,24 +1031,96 @@ async function initApp() {
   setTimeout(() => { document.getElementById('loadingScreen').classList.add('hide'); }, 600);
 }
 
-async function loadFromSupabase() {
+async function loadStoreFromSupabase(slug) {
   const headers = { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' };
-  const [catRes, itemRes, shopRes] = await Promise.all([
-    fetch(SUPABASE_URL + '/rest/v1/menu_categories?select=*&order=sort_order', { headers }),
-    fetch(SUPABASE_URL + '/rest/v1/menu_items?select=*&is_available=eq.true&order=sort_order', { headers }),
-    fetch(SUPABASE_URL + '/rest/v1/shops?select=*&limit=1', { headers }),
-  ]);
+
+  // 1. 查找商店
+  const storeRes = await fetch(SUPABASE_URL + '/rest/v1/store_profiles?store_slug=eq.' + encodeURIComponent(slug) + '&limit=1', { headers });
+  const storeData = await storeRes.json();
+  if (!storeData || storeData.length === 0) throw new Error('Store not found: ' + slug);
+
+  const store = storeData[0];
+  currentStoreId = store.id;
+
+  // 更新商店 header
+  shopInfo = {
+    name: store.store_name || '',
+    subtitle: store.description || '',
+    address: store.address || '',
+    phone: store.phone || '',
+    hours: ''
+  };
+  // 解析營業時間
+  if (store.business_hours && typeof store.business_hours === 'object') {
+    const bh = store.business_hours;
+    const dayNames = { mon:'週一', tue:'週二', wed:'週三', thu:'週四', fri:'週五', sat:'週六', sun:'週日' };
+    const parts = [];
+    Object.keys(dayNames).forEach(function(d) {
+      if (bh[d] && bh[d].open && bh[d].close) parts.push(dayNames[d] + ' ' + bh[d].open + '-' + bh[d].close);
+    });
+    if (parts.length > 0) shopInfo.hours = parts.join(' / ');
+  }
+  updateShopHeader(shopInfo);
+
+  // 套用商店主題色（找最接近的內建主題，或自訂）
+  if (store.theme_color) {
+    applyStoreThemeColor(store.theme_color);
+  }
+
+  // 不接受訂單時顯示提示
+  if (store.accept_orders === false) {
+    document.getElementById('shopSubtitle').textContent = '\u{1F534} 目前暫停接單';
+  }
+
+  // 2. 載入分類
+  const catRes = await fetch(SUPABASE_URL + '/rest/v1/menu_categories?store_id=eq.' + currentStoreId + '&is_active=eq.true&order=sort_order', { headers });
   const catData = await catRes.json();
+
+  // 從分類名稱提取 emoji 作為 icon
+  categories = (catData || []).map(function(c) {
+    var icon = ICONS.star;
+    var name = c.name;
+    // 如果名稱開頭是 emoji，分離出來
+    var emojiMatch = name.match(/^([\u{1F000}-\u{1FFFF}][\u{FE00}-\u{FE0F}]?|[\u{2600}-\u{27BF}]|[\u{2B00}-\u{2BFF}]|[\u{E000}-\u{F8FF}]|[\u2702-\u27B0]|➕)\s*/u);
+    if (emojiMatch) {
+      icon = emojiMatch[1];
+      name = name.substring(emojiMatch[0].length);
+    }
+    return { id: c.id, name: name, icon: icon, sort: c.sort_order };
+  });
+
+  // 3. 載入品項
+  const itemRes = await fetch(SUPABASE_URL + '/rest/v1/menu_items?store_id=eq.' + currentStoreId + '&is_available=eq.true&order=sort_order', { headers });
   const itemData = await itemRes.json();
-  const shopData = await shopRes.json();
-  if (shopData.length > 0) { shopInfo = shopData[0]; updateShopHeader(shopInfo); }
-  categories = catData.map(c => ({ id: c.id, name: c.name, icon: c.icon || ICONS.star, sort: c.sort_order }));
-  menuItems = itemData.map(i => ({ id: i.id, name: i.name, desc: i.description || '', price: i.price, category: i.category_id, image: i.image_url || '', tags: i.tags || [], spicy: i.spicy_level || 0, featured: i.is_featured || false, sizes: i.sizes || null }));
+
+  menuItems = (itemData || []).map(function(i) {
+    // 將 options 中的「尺寸」group 轉為 sizes 格式
+    var sizes = null;
+    var opts = i.options || [];
+    if (Array.isArray(opts)) {
+      for (var g = 0; g < opts.length; g++) {
+        if (opts[g].group === '尺寸' && Array.isArray(opts[g].items)) {
+          sizes = opts[g].items.map(function(s) { return { name: s.name, price: s.price }; });
+        }
+      }
+    }
+    // 判斷是否為推薦
+    var tags = i.tags || [];
+    var featured = tags.indexOf('推薦') >= 0;
+
+    return {
+      id: i.id, name: i.name, desc: i.description || '',
+      price: i.price, category: i.category_id,
+      image: i.image_url || '', tags: tags,
+      spicy: 0, featured: featured, sizes: sizes,
+      options: opts  // 保留完整 options 供 modal 使用
+    };
+  });
 }
 
 function loadDemoData() {
-  categories = DEMO_CATEGORIES;
-  menuItems = DEMO_ITEMS;
+  categories = DEMO_CATEGORIES.map(function(c) { return Object.assign({}, c, { id: String(c.id) }); });
+  menuItems = DEMO_ITEMS.map(function(i) { return Object.assign({}, i, { id: String(i.id), category: String(i.category) }); });
 }
 
 function updateShopHeader(shop) {
@@ -1072,31 +1174,34 @@ function renderMenuContent(filter) {
   content.querySelectorAll('.menu-item').forEach((el, i) => { el.style.animationDelay = Math.min(i * 0.04, 0.4) + 's'; });
 }
 
+// 安全引用 ID（支援 UUID 字串和數字）
+function qid(id) { return "'" + id + "'"; }
+
 function renderFeaturedCard(item) {
   const imgSrc = item.image || generatePlaceholder(item.name);
-  return '<div class="featured-card" onclick="openItemModal(' + item.id + ')">' +
+  return '<div class="featured-card" onclick="openItemModal(' + qid(item.id) + ')">' +
     '<img class="featured-img" src="' + imgSrc + '" alt="' + item.name + '" onerror="this.src=\'' + generatePlaceholder(item.name) + '\'">' +
     '<span class="featured-badge">必點</span>' +
     '<div class="featured-info"><div class="featured-name">' + item.name + '</div>' +
     '<div class="featured-price"><span class="currency">$</span>' + item.price + '</div></div>' +
-    '<button class="featured-add" onclick="event.stopPropagation(); addToCart(' + item.id + ', event)">+</button></div>';
+    '<button class="featured-add" onclick="event.stopPropagation(); addToCart(' + qid(item.id) + ', event)">+</button></div>';
 }
 
 function renderMenuItem(item) {
   const imgSrc = item.image || generatePlaceholder(item.name);
   const cartQty = getCartQty(item.id);
   const tagHtml = (item.tags || []).map(t => {
-    const labels = { hot: '熱銷', new: '新品', chef: '主廚推薦' };
+    const labels = { hot: '熱銷', new: '新品', chef: '主廚推薦', '推薦': '推薦', '套餐': '套餐' };
     return '<span class="item-tag ' + t + '">' + (labels[t] || t) + '</span>';
   }).join('');
   const spicyIcons = item.spicy > 0 ? ICONS.chili.repeat(Math.min(item.spicy, 3)) : '';
   let sizeHtml = '';
   if (item.sizes && item.sizes.length > 0) {
     sizeHtml = '<div class="item-sizes">' + item.sizes.map((s, i) =>
-      '<span class="size-option ' + (i === item.sizes.length - 1 ? 'active' : '') + '" onclick="event.stopPropagation(); selectSize(' + item.id + ', ' + i + ')">' + s.name + ' $' + s.price + '</span>'
+      '<span class="size-option ' + (i === item.sizes.length - 1 ? 'active' : '') + '" onclick="event.stopPropagation(); selectSize(' + qid(item.id) + ', ' + i + ')">' + s.name + ' $' + s.price + '</span>'
     ).join('') + '</div>';
   }
-  return '<div class="menu-item" data-id="' + item.id + '" onclick="openItemModal(' + item.id + ')">' +
+  return '<div class="menu-item" data-id="' + item.id + '" onclick="openItemModal(' + qid(item.id) + ')">' +
     '<div class="item-img-wrap"><img class="item-img" src="' + imgSrc + '" alt="' + item.name + '" loading="lazy" onerror="this.src=\'' + generatePlaceholder(item.name) + '\'">' +
     (spicyIcons ? '<span class="item-spicy">' + spicyIcons + '</span>' : '') + '</div>' +
     '<div class="item-info"><div class="item-name">' + item.name + '</div>' +
@@ -1106,8 +1211,8 @@ function renderMenuItem(item) {
     '<div class="item-price"><span class="currency">$</span>' + getItemDisplayPrice(item) + '</div>' + sizeHtml + '</div>' +
     '<div class="item-actions" onclick="event.stopPropagation()">' +
     (cartQty > 0
-      ? '<div class="qty-control"><button class="qty-btn minus" onclick="changeQty(' + item.id + ', -1, event)">&#8722;</button><span class="qty-num">' + cartQty + '</span><button class="qty-btn" onclick="changeQty(' + item.id + ', 1, event)">+</button></div>'
-      : '<button class="add-btn" onclick="addToCart(' + item.id + ', event)">+</button>') +
+      ? '<div class="qty-control"><button class="qty-btn minus" onclick="changeQty(' + qid(item.id) + ', -1, event)">&#8722;</button><span class="qty-num">' + cartQty + '</span><button class="qty-btn" onclick="changeQty(' + qid(item.id) + ', 1, event)">+</button></div>'
+      : '<button class="add-btn" onclick="addToCart(' + qid(item.id) + ', event)">+</button>') +
     '</div></div></div></div>';
 }
 
@@ -1234,8 +1339,8 @@ function refreshItemDisplay(itemId) {
   const actionsEl = itemEl.querySelector('.item-actions');
   const cartQty = getCartQty(itemId);
   actionsEl.innerHTML = cartQty > 0
-    ? '<div class="qty-control"><button class="qty-btn minus" onclick="changeQty(' + itemId + ', -1, event)">&#8722;</button><span class="qty-num">' + cartQty + '</span><button class="qty-btn" onclick="changeQty(' + itemId + ', 1, event)">+</button></div>'
-    : '<button class="add-btn" onclick="addToCart(' + itemId + ', event)">+</button>';
+    ? '<div class="qty-control"><button class="qty-btn minus" onclick="changeQty(' + qid(itemId) + ', -1, event)">&#8722;</button><span class="qty-num">' + cartQty + '</span><button class="qty-btn" onclick="changeQty(' + qid(itemId) + ', 1, event)">+</button></div>'
+    : '<button class="add-btn" onclick="addToCart(' + qid(itemId) + ', event)">+</button>';
 }
 
 function updateCartUI() {
@@ -1271,11 +1376,11 @@ function renderDrawerItems() {
     return '<div class="drawer-item">' +
       '<img class="drawer-item-img" src="' + imgSrc + '" alt="' + item.name + '" onerror="this.src=\'' + generatePlaceholder(item.name) + '\'">' +
       '<div class="drawer-item-info"><div class="drawer-item-name">' + item.name + '</div>' +
-      (c.sizeName ? '<div class="drawer-item-size">' + c.sizeName + '</div>' : '') +
+      (c.optKey ? '<div class="drawer-item-size">' + c.optKey + '</div>' : '') +
       '<div class="drawer-item-price"><span class="currency">$</span>' + (c.price * c.qty) + '</div></div>' +
-      '<div class="drawer-item-qty"><button class="drawer-qty-btn" onclick="changeQty(' + c.id + ', -1)">&#8722;</button>' +
+      '<div class="drawer-item-qty"><button class="drawer-qty-btn" onclick="changeQty(' + qid(c.id) + ', -1)">&#8722;</button>' +
       '<span class="drawer-qty-num">' + c.qty + '</span>' +
-      '<button class="drawer-qty-btn" onclick="changeQty(' + c.id + ', 1)">+</button></div></div>';
+      '<button class="drawer-qty-btn" onclick="changeQty(' + qid(c.id) + ', 1)">+</button></div></div>';
   }).join('');
 }
 
@@ -1316,6 +1421,18 @@ function openItemModal(itemId) {
       item.sizes.map((s, i) => '<button class="modal-opt-btn ' + (i === modalSelectedSize ? 'active' : '') + '" onclick="selectModalSize(' + i + ')">' + s.name + ' - $' + s.price + '</button>').join('') +
     '</div></div>';
   }
+  // 顯示非尺寸的 options（如飲料選擇、可樂/雪碧）
+  if (item.options && Array.isArray(item.options)) {
+    item.options.forEach(function(grp, gi) {
+      if (grp.group === '尺寸') return; // 已處理為 sizes
+      var reqHtml = grp.required ? ' <span class="required">必選</span>' : '';
+      optHtml += '<div class="modal-option-group" data-optgrp="' + gi + '"><div class="modal-option-title">' + grp.group + reqHtml + '</div><div class="modal-options">' +
+        (grp.items || []).map(function(opt, oi) {
+          return '<button class="modal-opt-btn' + (oi === 0 ? ' active' : '') + '" onclick="selectOption(this, ' + gi + ', ' + oi + ')">' + opt.name + (opt.price ? ' +$' + opt.price : '') + '</button>';
+        }).join('') +
+      '</div></div>';
+    });
+  }
   if (item.spicy > 0) {
     optHtml += '<div class="modal-option-group"><div class="modal-option-title">辣度</div><div class="modal-options">' +
       '<button class="modal-opt-btn" onclick="selectSpicy(this, 0)">不辣</button>' +
@@ -1345,6 +1462,11 @@ function selectSpicy(btn, level) {
   btn.classList.add('active');
 }
 
+function selectOption(btn, grpIdx, optIdx) {
+  btn.closest('.modal-options').querySelectorAll('.modal-opt-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
 function updateModalPrice() {
   if (!modalItem) return;
   let price = modalItem.price;
@@ -1366,9 +1488,18 @@ function modalAddToCart() {
     price = modalItem.sizes[modalSelectedSize].price;
     sizeName = modalItem.sizes[modalSelectedSize].name;
   }
-  const existing = cart.find(c => c.id === modalItem.id && c.sizeName === sizeName);
+  // 收集選擇的 options
+  var selectedOpts = [];
+  document.querySelectorAll('#modalOptions [data-optgrp]').forEach(function(grpEl) {
+    var activeBtn = grpEl.querySelector('.modal-opt-btn.active');
+    if (activeBtn) selectedOpts.push(activeBtn.textContent.trim());
+  });
+  var optKey = sizeName ? sizeName : '';
+  if (selectedOpts.length > 0) optKey += (optKey ? '/' : '') + selectedOpts.join('/');
+
+  const existing = cart.find(c => c.id === modalItem.id && c.sizeName === sizeName && c.optKey === optKey);
   if (existing) { existing.qty += modalQtyVal; }
-  else { cart.push({ id: modalItem.id, qty: modalQtyVal, price: price, sizeName: sizeName }); }
+  else { cart.push({ id: modalItem.id, qty: modalQtyVal, price: price, sizeName: sizeName, optKey: optKey, selectedOpts: selectedOpts }); }
   updateCartUI();
   refreshItemDisplay(modalItem.id);
   closeItemModal({ target: document.getElementById('itemModalOverlay') });
@@ -1411,11 +1542,19 @@ async function submitOrder() {
   const totalPrice = cart.reduce((s, c) => s + c.price * c.qty, 0);
   const orderItems = cart.map(c => {
     const item = menuItems.find(i => i.id === c.id);
-    return { item_id: c.id, name: item?.name || 'Unknown', size: c.sizeName, qty: c.qty, unit_price: c.price, subtotal: c.price * c.qty };
+    return { item_id: c.id, name: item ? item.name : 'Unknown', size: c.sizeName || null, options: c.selectedOpts || [], qty: c.qty, unit_price: c.price, subtotal: c.price * c.qty };
   });
-  const order = { table_number: tableNum, guest_count: guestCount, items: orderItems, total_qty: totalQty, total_price: totalPrice, status: 'pending', created_at: new Date().toISOString() };
+  const order = {
+    store_id: currentStoreId,
+    table_number: tableNum,
+    guest_count: guestCount,
+    items: orderItems,
+    total: totalPrice,
+    status: 'pending',
+    order_type: 'dine_in'
+  };
   try {
-    if (SUPABASE_URL !== 'YOUR_SUPABASE_URL') {
+    if (currentStoreId) {
       const res = await fetch(SUPABASE_URL + '/rest/v1/orders', {
         method: 'POST', headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
         body: JSON.stringify(order)

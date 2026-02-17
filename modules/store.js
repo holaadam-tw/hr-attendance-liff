@@ -61,6 +61,7 @@ function renderRestaurantList(stats) {
 export async function openRestaurantDetail(storeId) {
     rdCurrentStoreId = storeId;
     smCurrentStoreId = storeId;
+    window.rdCurrentStoreId = storeId;
     const s = smStores.find(x => x.id === storeId);
     if (!s) return;
     document.getElementById('rdStoreName').textContent = s.store_name;
