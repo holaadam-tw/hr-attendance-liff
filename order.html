@@ -623,37 +623,53 @@ body {
 /* ===== THEME PICKER ===== */
 .theme-fab {
   position: fixed; top: 12px; right: 12px; z-index: 150;
-  width: 36px; height: 36px; border-radius: 50%;
-  background: rgba(255,255,255,0.85); backdrop-filter: blur(8px);
-  border: 1px solid rgba(0,0,0,0.1);
-  display: flex; align-items: center; justify-content: center;
-  cursor: pointer; font-size: 16px; transition: all 0.2s;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  height: 34px; border-radius: 17px;
+  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+  border: none; padding: 0 14px 0 10px;
+  display: flex; align-items: center; gap: 6px;
+  cursor: pointer; font-size: 14px; transition: all 0.25s;
+  box-shadow: 0 3px 12px rgba(0,0,0,0.2);
+  color: #fff; font-weight: 600;
 }
-.theme-fab:hover { transform: scale(1.1); }
+.theme-fab:hover { transform: scale(1.05); box-shadow: 0 4px 16px rgba(0,0,0,0.25); }
+.theme-fab:active { transform: scale(0.97); }
+.theme-fab-icon { font-size: 16px; display: flex; }
+.theme-fab-label { font-size: 11px; letter-spacing: 0.3px; }
+.theme-overlay {
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(0,0,0,0.4); backdrop-filter: blur(3px);
+  display: none; align-items: flex-end; justify-content: center;
+}
+.theme-overlay.show { display: flex; }
 .theme-panel {
-  position: fixed; top: 56px; right: 12px; z-index: 150;
-  background: white; border-radius: var(--radius-md);
-  padding: 14px; box-shadow: var(--shadow-lg);
-  border: 1px solid var(--border-light);
-  display: none; min-width: 200px;
+  background: white; border-radius: 20px 20px 0 0;
+  padding: 20px 16px calc(20px + env(safe-area-inset-bottom, 0px));
+  width: 100%; max-width: 480px; max-height: 70vh; overflow-y: auto;
+  box-shadow: 0 -4px 24px rgba(0,0,0,0.15);
+  animation: slideUpPanel 0.3s ease-out;
 }
-.theme-panel.show { display: block; }
-.theme-panel h4 { font-size: 13px; font-weight: 700; margin-bottom: 10px; color: var(--text-secondary); }
-.theme-option {
-  display: flex; align-items: center; gap: 10px;
-  padding: 8px 10px; border-radius: var(--radius-sm);
-  cursor: pointer; transition: background 0.15s;
-  margin-bottom: 2px;
+@keyframes slideUpPanel { from { transform: translateY(100%); } to { transform: translateY(0); } }
+.theme-panel-handle { width: 36px; height: 4px; border-radius: 2px; background: #D1D5DB; margin: 0 auto 16px; }
+.theme-panel h4 { font-size: 15px; font-weight: 800; margin-bottom: 4px; color: var(--text-primary); text-align: center; }
+.theme-panel-sub { font-size: 11px; color: var(--text-muted); text-align: center; margin-bottom: 16px; }
+.theme-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.theme-card {
+  position: relative; border-radius: 14px; padding: 14px 10px 10px;
+  cursor: pointer; transition: all 0.2s; text-align: center;
+  border: 2px solid transparent;
 }
-.theme-option:hover { background: #f5f5f5; }
-.theme-option.active { background: var(--bg); font-weight: 600; }
-.theme-dot {
-  width: 24px; height: 24px; border-radius: 50%;
-  border: 2px solid rgba(0,0,0,0.1); flex-shrink: 0;
+.theme-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+.theme-card.active { border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary); }
+.theme-card.active::after {
+  content: '\2713'; position: absolute; top: 6px; right: 6px;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: var(--primary); color: #fff;
+  font-size: 11px; font-weight: 700; line-height: 18px; text-align: center;
 }
-.theme-option.active .theme-dot { border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary); }
-.theme-label { font-size: 13px; }
+.theme-card-dots { display: flex; gap: 4px; justify-content: center; margin-bottom: 8px; }
+.theme-card-dot { width: 18px; height: 18px; border-radius: 50%; }
+.theme-card-name { font-size: 12px; font-weight: 600; color: #333; }
+.theme-card-dark .theme-card-name { color: #eee; }
 
 /* ===== RESPONSIVE ===== */
 @media (min-width: 480px) {
@@ -681,8 +697,13 @@ body {
 <div class="toast" id="toast"></div>
 
 <!-- THEME PICKER -->
-<div class="theme-fab" id="themeFab" onclick="toggleThemePanel()">&#9681;</div>
-<div class="theme-panel" id="themePanel"></div>
+<div class="theme-fab" id="themeFab" onclick="toggleThemePanel()">
+  <span class="theme-fab-icon">&#x1F3A8;</span>
+  <span class="theme-fab-label">風格</span>
+</div>
+<div class="theme-overlay" id="themeOverlay" onclick="if(event.target===this)closeThemePanel()">
+  <div class="theme-panel" id="themePanel"></div>
+</div>
 
 <!-- ===== SHOP HEADER ===== -->
 <header class="shop-header" id="shopHeader">
@@ -806,12 +827,26 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 
 // ===== THEME SYSTEM =====
 const THEMES = {
-  fire:    { name: '熱情橘紅', primary: '#E8430A', primaryLight: '#FF6B35', primaryDark: '#C23508', accent: '#FFB800', accentLight: '#FFD466', bg: '#F5F0EB', bgCard: '#FFFFFF', bgSidebar: '#FAFAFA', textPrimary: '#1A1A1A', textSecondary: '#666666', textMuted: '#999999', border: '#E8E8E8', borderLight: '#F0F0F0' },
-  indigo:  { name: '靛藍經典', primary: '#4F46E5', primaryLight: '#6366F1', primaryDark: '#3730A3', accent: '#F59E0B', accentLight: '#FCD34D', bg: '#F0F0FF', bgCard: '#FFFFFF', bgSidebar: '#F8F8FF', textPrimary: '#1A1A2E', textSecondary: '#5B5B7A', textMuted: '#9090A8', border: '#E0E0F0', borderLight: '#F0F0F8' },
-  forest:  { name: '森綠自然', primary: '#059669', primaryLight: '#10B981', primaryDark: '#047857', accent: '#F59E0B', accentLight: '#FCD34D', bg: '#F0FAF4', bgCard: '#FFFFFF', bgSidebar: '#F5FBF8', textPrimary: '#1A2E1A', textSecondary: '#4A6A4A', textMuted: '#8AAA8A', border: '#D0E8D0', borderLight: '#E8F5E8' },
-  rose:    { name: '玫瑰典雅', primary: '#E11D48', primaryLight: '#FB7185', primaryDark: '#BE123C', accent: '#F59E0B', accentLight: '#FCD34D', bg: '#FFF5F7', bgCard: '#FFFFFF', bgSidebar: '#FFF8FA', textPrimary: '#2E1A1E', textSecondary: '#7A5060', textMuted: '#B08090', border: '#F0D8DF', borderLight: '#F8E8EE' },
-  ocean:   { name: '海洋清新', primary: '#0891B2', primaryLight: '#22D3EE', primaryDark: '#0E7490', accent: '#F59E0B', accentLight: '#FCD34D', bg: '#F0F9FF', bgCard: '#FFFFFF', bgSidebar: '#F5FBFF', textPrimary: '#1A2530', textSecondary: '#506A7A', textMuted: '#90B0C0', border: '#D0E8F0', borderLight: '#E8F4F8' },
-  night:   { name: '暗夜質感', primary: '#F97316', primaryLight: '#FB923C', primaryDark: '#EA580C', accent: '#FBBF24', accentLight: '#FDE68A', bg: '#1A1A2E', bgCard: '#2A2A40', bgSidebar: '#222238', textPrimary: '#F0F0F0', textSecondary: '#A0A0B8', textMuted: '#707088', border: '#3A3A50', borderLight: '#2E2E44' },
+  // --- 暖色系 ---
+  fire:    { name: '熱情橘紅', group: 'warm', primary: '#E8430A', primaryLight: '#FF6B35', primaryDark: '#C23508', accent: '#FFB800', accentLight: '#FFD466', bg: '#F5F0EB', bgCard: '#FFFFFF', bgSidebar: '#FAFAFA', textPrimary: '#1A1A1A', textSecondary: '#666666', textMuted: '#999999', border: '#E8E8E8', borderLight: '#F0F0F0' },
+  rose:    { name: '玫瑰典雅', group: 'warm', primary: '#E11D48', primaryLight: '#FB7185', primaryDark: '#BE123C', accent: '#F59E0B', accentLight: '#FCD34D', bg: '#FFF5F7', bgCard: '#FFFFFF', bgSidebar: '#FFF8FA', textPrimary: '#2E1A1E', textSecondary: '#7A5060', textMuted: '#B08090', border: '#F0D8DF', borderLight: '#F8E8EE' },
+  coral:   { name: '珊瑚甜橙', group: 'warm', primary: '#F97066', primaryLight: '#FCA5A5', primaryDark: '#DC2626', accent: '#FBBF24', accentLight: '#FDE68A', bg: '#FFF7F5', bgCard: '#FFFFFF', bgSidebar: '#FFFAF9', textPrimary: '#1F1717', textSecondary: '#7A5A5A', textMuted: '#B09090', border: '#F0E0DD', borderLight: '#F8EEEC' },
+  amber:   { name: '琥珀金黃', group: 'warm', primary: '#D97706', primaryLight: '#F59E0B', primaryDark: '#B45309', accent: '#EF4444', accentLight: '#FCA5A5', bg: '#FFFBEB', bgCard: '#FFFFFF', bgSidebar: '#FFFDF5', textPrimary: '#1C1408', textSecondary: '#78600A', textMuted: '#A09060', border: '#F0E6C8', borderLight: '#F8F0DD' },
+  // --- 冷色系 ---
+  indigo:  { name: '靛藍經典', group: 'cool', primary: '#4F46E5', primaryLight: '#6366F1', primaryDark: '#3730A3', accent: '#F59E0B', accentLight: '#FCD34D', bg: '#F0F0FF', bgCard: '#FFFFFF', bgSidebar: '#F8F8FF', textPrimary: '#1A1A2E', textSecondary: '#5B5B7A', textMuted: '#9090A8', border: '#E0E0F0', borderLight: '#F0F0F8' },
+  ocean:   { name: '海洋清新', group: 'cool', primary: '#0891B2', primaryLight: '#22D3EE', primaryDark: '#0E7490', accent: '#F59E0B', accentLight: '#FCD34D', bg: '#F0F9FF', bgCard: '#FFFFFF', bgSidebar: '#F5FBFF', textPrimary: '#1A2530', textSecondary: '#506A7A', textMuted: '#90B0C0', border: '#D0E8F0', borderLight: '#E8F4F8' },
+  sky:     { name: '天空蔚藍', group: 'cool', primary: '#2563EB', primaryLight: '#3B82F6', primaryDark: '#1D4ED8', accent: '#F59E0B', accentLight: '#FCD34D', bg: '#F0F5FF', bgCard: '#FFFFFF', bgSidebar: '#F5F8FF', textPrimary: '#1A2040', textSecondary: '#506080', textMuted: '#90A0B8', border: '#D0DCF0', borderLight: '#E8EEF8' },
+  violet:  { name: '夢幻紫羅', group: 'cool', primary: '#7C3AED', primaryLight: '#A78BFA', primaryDark: '#6D28D9', accent: '#F472B6', accentLight: '#FBCFE8', bg: '#F5F0FF', bgCard: '#FFFFFF', bgSidebar: '#FAF5FF', textPrimary: '#1A1030', textSecondary: '#6A5080', textMuted: '#A090B8', border: '#E0D0F0', borderLight: '#F0E8F8' },
+  // --- 自然系 ---
+  forest:  { name: '森綠自然', group: 'nature', primary: '#059669', primaryLight: '#10B981', primaryDark: '#047857', accent: '#F59E0B', accentLight: '#FCD34D', bg: '#F0FAF4', bgCard: '#FFFFFF', bgSidebar: '#F5FBF8', textPrimary: '#1A2E1A', textSecondary: '#4A6A4A', textMuted: '#8AAA8A', border: '#D0E8D0', borderLight: '#E8F5E8' },
+  mint:    { name: '薄荷沁涼', group: 'nature', primary: '#14B8A6', primaryLight: '#2DD4BF', primaryDark: '#0D9488', accent: '#F59E0B', accentLight: '#FCD34D', bg: '#F0FDFA', bgCard: '#FFFFFF', bgSidebar: '#F5FEFC', textPrimary: '#1A2E2A', textSecondary: '#4A706A', textMuted: '#80AAA0', border: '#C8E8E4', borderLight: '#E0F5F0' },
+  earth:   { name: '大地棕調', group: 'nature', primary: '#92400E', primaryLight: '#B45309', primaryDark: '#78350F', accent: '#059669', accentLight: '#34D399', bg: '#FAF5F0', bgCard: '#FFFFFF', bgSidebar: '#FBF8F5', textPrimary: '#1C1510', textSecondary: '#6A5A48', textMuted: '#A09080', border: '#E8DDD0', borderLight: '#F0EAE0' },
+  olive:   { name: '橄欖田園', group: 'nature', primary: '#65A30D', primaryLight: '#84CC16', primaryDark: '#4D7C0F', accent: '#EAB308', accentLight: '#FDE047', bg: '#F7FEE7', bgCard: '#FFFFFF', bgSidebar: '#FBFFF0', textPrimary: '#1A2E10', textSecondary: '#4A6A30', textMuted: '#88AA68', border: '#D4E8B8', borderLight: '#E8F5D8' },
+  // --- 暗色系 ---
+  night:   { name: '暗夜質感', group: 'dark', dark: true, primary: '#F97316', primaryLight: '#FB923C', primaryDark: '#EA580C', accent: '#FBBF24', accentLight: '#FDE68A', bg: '#1A1A2E', bgCard: '#2A2A40', bgSidebar: '#222238', textPrimary: '#F0F0F0', textSecondary: '#A0A0B8', textMuted: '#707088', border: '#3A3A50', borderLight: '#2E2E44' },
+  midnight:{ name: '午夜深藍', group: 'dark', dark: true, primary: '#60A5FA', primaryLight: '#93C5FD', primaryDark: '#3B82F6', accent: '#FBBF24', accentLight: '#FDE68A', bg: '#0F172A', bgCard: '#1E293B', bgSidebar: '#162032', textPrimary: '#E8EEF8', textSecondary: '#94A3B8', textMuted: '#64748B', border: '#334155', borderLight: '#1E293B' },
+  carbon:  { name: '極簡碳黑', group: 'dark', dark: true, primary: '#10B981', primaryLight: '#34D399', primaryDark: '#059669', accent: '#F59E0B', accentLight: '#FCD34D', bg: '#111111', bgCard: '#1C1C1C', bgSidebar: '#161616', textPrimary: '#EBEBEB', textSecondary: '#999999', textMuted: '#666666', border: '#2E2E2E', borderLight: '#222222' },
+  wine:    { name: '紅酒之夜', group: 'dark', dark: true, primary: '#FB7185', primaryLight: '#FDA4AF', primaryDark: '#F43F5E', accent: '#FBBF24', accentLight: '#FDE68A', bg: '#1A1018', bgCard: '#2A1E28', bgSidebar: '#221620', textPrimary: '#F0E8EE', textSecondary: '#B8A0B0', textMuted: '#887080', border: '#3E2E3A', borderLight: '#2E2028' },
 };
 
 function applyTheme(name) {
@@ -840,19 +875,41 @@ function applyTheme(name) {
 let currentTheme = 'fire';
 
 function toggleThemePanel() {
-  const panel = document.getElementById('themePanel');
-  panel.classList.toggle('show');
+  document.getElementById('themeOverlay').classList.toggle('show');
+}
+function closeThemePanel() {
+  document.getElementById('themeOverlay').classList.remove('show');
 }
 
 function renderThemePanel() {
-  const panel = document.getElementById('themePanel');
-  panel.innerHTML = '<h4>&#9681; 選擇風格</h4>' +
-    Object.entries(THEMES).map(([key, t]) =>
-      '<div class="theme-option ' + (key === currentTheme ? 'active' : '') + '" onclick="applyTheme(\'' + key + '\')">' +
-        '<div class="theme-dot" style="background:' + t.primary + ';"></div>' +
-        '<span class="theme-label">' + t.name + '</span>' +
-      '</div>'
-    ).join('');
+  var groups = [
+    { key: 'warm',   label: '\u{2600}\u{FE0F} \u6EAB\u6696\u7CFB' },
+    { key: 'cool',   label: '\u{2744}\u{FE0F} \u6E05\u6DBC\u7CFB' },
+    { key: 'nature', label: '\u{1F33F} \u81EA\u7136\u7CFB' },
+    { key: 'dark',   label: '\u{1F319} \u6697\u8272\u7CFB' }
+  ];
+  var html = '<div class="theme-panel-handle"></div>' +
+    '<h4>\u{1F3A8} \u9078\u64C7\u98A8\u683C</h4>' +
+    '<div class="theme-panel-sub">\u9078\u64C7\u559C\u6B61\u7684\u914D\u8272\uFF0C\u81EA\u52D5\u5132\u5B58</div>';
+  groups.forEach(function(g) {
+    html += '<div style="font-size:12px;font-weight:700;color:var(--text-secondary);margin:12px 0 6px;padding-left:4px;">' + g.label + '</div><div class="theme-grid">';
+    Object.entries(THEMES).forEach(function(entry) {
+      var key = entry[0], t = entry[1];
+      if (t.group !== g.key) return;
+      var cardBg = t.dark ? t.bgCard : t.bg;
+      var isDark = t.dark ? ' theme-card-dark' : '';
+      html += '<div class="theme-card' + (key === currentTheme ? ' active' : '') + isDark + '" ' +
+        'style="background:' + cardBg + ';" onclick="applyTheme(\'' + key + '\')">' +
+        '<div class="theme-card-dots">' +
+          '<div class="theme-card-dot" style="background:' + t.primary + ';"></div>' +
+          '<div class="theme-card-dot" style="background:' + t.primaryLight + ';"></div>' +
+          '<div class="theme-card-dot" style="background:' + t.accent + ';"></div>' +
+        '</div>' +
+        '<div class="theme-card-name">' + t.name + '</div></div>';
+    });
+    html += '</div>';
+  });
+  document.getElementById('themePanel').innerHTML = html;
 }
 
 // Apply store's custom theme color
@@ -882,13 +939,9 @@ function adjustBrightness(hex, amount) {
   return '#' + [r,g,b].map(function(c){return c.toString(16).padStart(2,'0');}).join('');
 }
 
-// Close theme panel on outside click
-document.addEventListener('click', function(e) {
-  const fab = document.getElementById('themeFab');
-  const panel = document.getElementById('themePanel');
-  if (!fab.contains(e.target) && !panel.contains(e.target)) {
-    panel.classList.remove('show');
-  }
+// Close theme panel on ESC
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') closeThemePanel();
 });
 
 // ===== STATE =====
