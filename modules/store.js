@@ -19,7 +19,7 @@ let miPreviewMode = false;
 export async function loadRestaurantList() {
     try {
         let q = sb.from('store_profiles').select('*').order('created_at', { ascending: false });
-        if (window.currentCompanyId) q = q.eq('company_id', window.currentCompanyId);
+        if (window.currentCompanyId) q = q.or('company_id.eq.' + window.currentCompanyId + ',company_id.is.null');
         const { data } = await q;
         smStores = data || [];
         const today = fmtDate(new Date());
@@ -293,19 +293,20 @@ export function closeStoreModal() { document.getElementById('storeModal').style.
 export async function saveStore() {
     const name = document.getElementById('storeNameInput').value.trim();
     if (!name) return showToast('請輸入商店名稱');
-    const slug = document.getElementById('storeSlugInput').value.trim().toLowerCase().replace(/[^a-z0-9-]/g, '') || null;
+    let slug = document.getElementById('storeSlugInput').value.trim().toLowerCase().replace(/[^a-z0-9-]/g, '') || null;
     const editId = document.getElementById('storeEditId').value;
 
-    // 檢查 slug 是否重複
-    if (slug) {
-        let dupQ = sb.from('store_profiles').select('id').eq('store_slug', slug);
-        if (editId) dupQ = dupQ.neq('id', editId);
-        const { data: dupData } = await dupQ;
-        if (dupData && dupData.length > 0) {
-            showToast('❌ URL 代碼「' + slug + '」已被使用，請換一個');
-            document.getElementById('storeSlugInput').focus();
-            return;
-        }
+    // 若未填 slug，自動產生（s + 時間戳末6碼）
+    if (!slug) {
+        slug = 's' + Date.now().toString(36).slice(-6);
+    }
+
+    // 檢查 slug 是否重複，若重複自動加後綴
+    let dupQ = sb.from('store_profiles').select('id').eq('store_slug', slug);
+    if (editId) dupQ = dupQ.neq('id', editId);
+    const { data: dupData } = await dupQ;
+    if (dupData && dupData.length > 0) {
+        slug = slug + '-' + Date.now().toString(36).slice(-4);
     }
 
     const record = {
@@ -883,7 +884,7 @@ function loadStoreSettings() {
         <div>類型：${{ restaurant:'餐飲', service:'服務業', retail:'零售' }[s.store_type] || s.store_type}</div>
         ${s.phone ? '<div>電話：' + escapeHTML(s.phone) + '</div>' : ''}
         ${s.address ? '<div>地址：' + escapeHTML(s.address) + '</div>' : ''}
-        ${s.store_slug ? '<div>Slug：' + escapeHTML(s.store_slug) + '</div>' : ''}
+        ${s.store_slug ? '<div>網址代碼：' + escapeHTML(s.store_slug) + '</div>' : ''}
     `;
     const bh = s.business_hours || {};
     const days = [['mon','一'],['tue','二'],['wed','三'],['thu','四'],['fri','五'],['sat','六'],['sun','日']];
