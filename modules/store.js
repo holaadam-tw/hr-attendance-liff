@@ -293,9 +293,24 @@ export function closeStoreModal() { document.getElementById('storeModal').style.
 export async function saveStore() {
     const name = document.getElementById('storeNameInput').value.trim();
     if (!name) return showToast('請輸入商店名稱');
+    const slug = document.getElementById('storeSlugInput').value.trim().toLowerCase().replace(/[^a-z0-9-]/g, '') || null;
+    const editId = document.getElementById('storeEditId').value;
+
+    // 檢查 slug 是否重複
+    if (slug) {
+        let dupQ = sb.from('store_profiles').select('id').eq('store_slug', slug);
+        if (editId) dupQ = dupQ.neq('id', editId);
+        const { data: dupData } = await dupQ;
+        if (dupData && dupData.length > 0) {
+            showToast('❌ URL 代碼「' + slug + '」已被使用，請換一個');
+            document.getElementById('storeSlugInput').focus();
+            return;
+        }
+    }
+
     const record = {
         store_name: name,
-        store_slug: document.getElementById('storeSlugInput').value.trim().toLowerCase().replace(/[^a-z0-9-]/g, '') || null,
+        store_slug: slug,
         store_type: document.getElementById('storeTypeSelect').value,
         description: document.getElementById('storeDescInput').value.trim() || null,
         phone: document.getElementById('storePhoneInput').value.trim() || null,
@@ -304,7 +319,6 @@ export async function saveStore() {
     };
     if (window.currentCompanyId) record.company_id = window.currentCompanyId;
     try {
-        const editId = document.getElementById('storeEditId').value;
         let res;
         if (editId) {
             record.updated_at = new Date().toISOString();
