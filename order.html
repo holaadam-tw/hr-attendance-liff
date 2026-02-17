@@ -673,7 +673,7 @@ body {
 
 <!-- LOADING SCREEN -->
 <div class="loading-screen" id="loadingScreen">
-  <div class="loading-logo">✦</div>
+  <div class="loading-logo">&#x1F37D;&#xFE0F;</div>
   <div class="loading-text">載入菜單中<span class="loading-dots"></span></div>
 </div>
 
@@ -692,16 +692,16 @@ body {
   </div>
   <div class="shop-info">
     <div class="shop-name-row">
-      <div class="shop-logo" id="shopLogo">✦</div>
+      <div class="shop-logo" id="shopLogo">&#x1F37D;&#xFE0F;</div>
       <div>
         <div class="shop-name" id="shopName">松辣椒</div>
         <div class="shop-subtitle" id="shopSubtitle">傳統經典台式熱炒美食</div>
       </div>
     </div>
     <div class="shop-details">
-      <div class="detail-row"><span class="icon">◉</span><span id="shopAddress">台中市西區精誠路 88 號</span></div>
-      <div class="detail-row"><span class="icon">☎</span><span id="shopPhone">04-2310-8888</span></div>
-      <div class="detail-row"><span class="icon">◴</span><span id="shopHours">11:00 - 22:00</span></div>
+      <div class="detail-row"><span class="icon">&#x1F4CD;</span><span id="shopAddress">台中市西區精誠路 88 號</span></div>
+      <div class="detail-row"><span class="icon">&#x1F4DE;</span><span id="shopPhone">04-2310-8888</span></div>
+      <div class="detail-row"><span class="icon">&#x1F550;</span><span id="shopHours">11:00 - 22:00</span></div>
     </div>
   </div>
 </header>
@@ -876,20 +876,48 @@ let modalSelectedSize = null;
 let guestCount = 3;
 let isScrollingByClick = false;
 
+// ===== EMOJI ICONS (ES6 \u{} safe encoding) =====
+const ICONS = {
+  restaurant: '\u{1F37D}\u{FE0F}',  // 🍽️
+  search:     '\u{1F50D}',           // 🔍
+  phone:      '\u{1F4DE}',           // 📞
+  pin:        '\u{1F4CD}',           // 📍
+  clock:      '\u{1F550}',           // 🕐
+  fire:       '\u{1F525}',           // 🔥
+  cart:       '\u{1F6D2}',           // 🛒
+  trash:      '\u{1F5D1}',           // 🗑
+  bell:       '\u{1F514}',           // 🔔
+  chili:      '\u{1F336}\u{FE0F}',  // 🌶️
+  star:       '\u{2B50}',            // ⭐
+  noodle:     '\u{1F35C}',           // 🍜
+  salad:      '\u{1F957}',           // 🥗
+  curry:      '\u{1F35B}',           // 🍛
+  chicken:    '\u{1F357}',           // 🍗
+  pig:        '\u{1F969}',           // 🥩
+  beef:       '\u{1F404}',           // 🐄
+  fish:       '\u{1F41F}',           // 🐟
+  soup:       '\u{1F372}',           // 🍲
+  leaf:       '\u{1F96C}',           // 🥬
+  rice:       '\u{1F35A}',           // 🍚
+  drink:      '\u{1F964}',           // 🥤
+  empty:      '\u{1F371}',           // 🍱
+  check:      '\u{2705}',            // ✅
+};
+
 // ===== DEMO DATA =====
 const DEMO_CATEGORIES = [
-  { id: 'rec',   name: '推薦', icon: '★',  sort: 0 },
-  { id: 'stir',  name: '熱炒', icon: '✦',  sort: 1 },
-  { id: 'cold',  name: '涼拌', icon: '▣',  sort: 2 },
-  { id: 'curry', name: '咖哩', icon: '♧',  sort: 3 },
-  { id: 'chick', name: '雞鴨', icon: '♢',  sort: 4 },
-  { id: 'pork',  name: '豬肉', icon: '♠',  sort: 5 },
-  { id: 'beef',  name: '牛肉', icon: '◆',  sort: 6 },
-  { id: 'sea',   name: '海鮮', icon: '∿',  sort: 7 },
-  { id: 'soup',  name: '湯品', icon: '♨',  sort: 8 },
-  { id: 'veg',   name: '蔬菜', icon: '❀',  sort: 9 },
-  { id: 'rice',  name: '飯麵', icon: '◎',  sort: 10 },
-  { id: 'drink', name: '飲料', icon: '☗',  sort: 11 },
+  { id: 'rec',   name: '推薦', icon: ICONS.star,    sort: 0 },
+  { id: 'stir',  name: '熱炒', icon: ICONS.fire,    sort: 1 },
+  { id: 'cold',  name: '涼拌', icon: ICONS.salad,   sort: 2 },
+  { id: 'curry', name: '咖哩', icon: ICONS.curry,   sort: 3 },
+  { id: 'chick', name: '雞鴨', icon: ICONS.chicken, sort: 4 },
+  { id: 'pork',  name: '豬肉', icon: ICONS.pig,     sort: 5 },
+  { id: 'beef',  name: '牛肉', icon: ICONS.beef,    sort: 6 },
+  { id: 'sea',   name: '海鮮', icon: ICONS.fish,    sort: 7 },
+  { id: 'soup',  name: '湯品', icon: ICONS.soup,    sort: 8 },
+  { id: 'veg',   name: '蔬菜', icon: ICONS.leaf,    sort: 9 },
+  { id: 'rice',  name: '飯麵', icon: ICONS.rice,    sort: 10 },
+  { id: 'drink', name: '飲料', icon: ICONS.drink,   sort: 11 },
 ];
 
 const DEMO_ITEMS = [
@@ -984,7 +1012,7 @@ async function loadFromSupabase() {
   const itemData = await itemRes.json();
   const shopData = await shopRes.json();
   if (shopData.length > 0) { shopInfo = shopData[0]; updateShopHeader(shopInfo); }
-  categories = catData.map(c => ({ id: c.id, name: c.name, icon: c.icon || '★', sort: c.sort_order }));
+  categories = catData.map(c => ({ id: c.id, name: c.name, icon: c.icon || ICONS.star, sort: c.sort_order }));
   menuItems = itemData.map(i => ({ id: i.id, name: i.name, desc: i.description || '', price: i.price, category: i.category_id, image: i.image_url || '', tags: i.tags || [], spicy: i.spicy_level || 0, featured: i.is_featured || false, sizes: i.sizes || null }));
 }
 
@@ -1023,7 +1051,7 @@ function renderMenuContent(filter) {
   const featured = menuItems.filter(i => i.featured);
   if (featured.length > 0 && !filter) {
     html += '<div class="featured-section">' +
-      '<div class="section-title"><span class="fire">★</span><h2>本店必點推薦</h2><span class="subtitle">人氣精選 &#8594;</span></div>' +
+      '<div class="section-title"><span class="fire">' + ICONS.fire + '</span><h2>本店必點推薦</h2><span class="subtitle">人氣精選 &#8594;</span></div>' +
       '<div class="featured-scroll">' + featured.map(item => renderFeaturedCard(item)).join('') + '</div></div>';
   }
 
@@ -1035,7 +1063,7 @@ function renderMenuContent(filter) {
     html += '<div class="category-section" id="catSection_' + cat.id + '" data-cat="' + cat.id + '">' +
       '<div class="category-header"><span class="cat-emoji">' + cat.icon + '</span><h3>' + cat.name + '</h3><span class="count">' + items.length + ' 道</span></div>' +
       (items.length === 0
-        ? '<div class="empty-state"><div class="empty-icon">◇</div><div class="empty-title">即將推出</div><div class="empty-desc">此類別暫無菜品</div></div>'
+        ? '<div class="empty-state"><div class="empty-icon">' + ICONS.empty + '</div><div class="empty-title">即將推出</div><div class="empty-desc">此類別暫無菜品</div></div>'
         : items.map((item, idx) => renderMenuItem(item, idx)).join('')) +
     '</div>';
   });
@@ -1061,7 +1089,7 @@ function renderMenuItem(item) {
     const labels = { hot: '熱銷', new: '新品', chef: '主廚推薦' };
     return '<span class="item-tag ' + t + '">' + (labels[t] || t) + '</span>';
   }).join('');
-  const spicyIcons = item.spicy > 0 ? '✦'.repeat(Math.min(item.spicy, 3)) : '';
+  const spicyIcons = item.spicy > 0 ? ICONS.chili.repeat(Math.min(item.spicy, 3)) : '';
   let sizeHtml = '';
   if (item.sizes && item.sizes.length > 0) {
     sizeHtml = '<div class="item-sizes">' + item.sizes.map((s, i) =>
@@ -1233,7 +1261,7 @@ function updateCartUI() {
 function renderDrawerItems() {
   const container = document.getElementById('drawerItems');
   if (cart.length === 0) {
-    container.innerHTML = '<div class="empty-state"><div class="empty-icon">&#9635;</div><div class="empty-title">購物車是空的</div><div class="empty-desc">快去選幾道好菜吧！</div></div>';
+    container.innerHTML = '<div class="empty-state"><div class="empty-icon">' + ICONS.cart + '</div><div class="empty-title">購物車是空的</div><div class="empty-desc">快去選幾道好菜吧！</div></div>';
     return;
   }
   container.innerHTML = cart.map(c => {
