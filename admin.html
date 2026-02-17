@@ -1462,6 +1462,7 @@
     <script src="common.js"></script>
     <script>
         let currentAdminEmployee = null;
+        let currentCompanyId = null;
 
         // ===== 混合精算獎金系統 =====
         const BONUS_MATRIX = {
@@ -1701,6 +1702,7 @@
                 }
 
                 currentAdminEmployee = data;
+                currentCompanyId = data.company_id || null;
                 updateAdminInfo(data);
 
                 // 載入系統設定（地點等）
@@ -2065,7 +2067,7 @@
                 hire_date: document.getElementById('newEmployeeHireDate').value,
                 role: document.getElementById('newEmployeeRole').value,
                 is_active: true,
-                company_id: '8a669e2c-7521-43e9-9300-5c004c57e9db',
+                company_id: currentAdminEmployee?.company_id || currentCompanyId,
                 created_at: new Date().toISOString()
             };
 
@@ -2274,7 +2276,7 @@
                 showToast('✅ 薪資設定已儲存');
                 closeSalarySettingModal();
                 if (typeof loadSalarySettingList === 'function') loadSalarySettingList();
-                if (typeof writeAuditLog === 'function') writeAuditLog('update_salary_setting', { employee_id: currentSalaryEmpId, base_salary: base });
+                if (typeof writeAuditLog === 'function') writeAuditLog('update', 'salary_settings', currentSalaryEmpId, '薪資設定', { employee_id: currentSalaryEmpId, base_salary: base, salary_type: record.salary_type });
             } catch(e) {
                 showToast('❌ 儲存失敗: ' + friendlyError(e));
             }
@@ -2616,7 +2618,7 @@
                 statusEl.textContent = '✅ 已儲存 — ' + modeLabel;
                 setTimeout(() => { statusEl.style.display = 'none'; }, 2000);
                 applyShiftTabMode();
-                if (typeof writeAuditLog === 'function') writeAuditLog('update_scheduling_mode', val);
+                if (typeof writeAuditLog === 'function') writeAuditLog('update', 'system_settings', null, '排班模式', { scheduling_mode: val });
             } catch(e) {
                 statusEl.style.display = 'block'; statusEl.style.color = '#DC2626'; statusEl.textContent = '❌ 儲存失敗';
             }
@@ -3759,7 +3761,7 @@
                 const lwStart = new Date(dates[0]); lwStart.setDate(lwStart.getDate()-7);
                 const lwEnd = new Date(dates[6]); lwEnd.setDate(lwEnd.getDate()-7);
                 const { data: lastScheds } = await sb.from('schedules').select('employee_id, date, shift_type_id, shift_types(code, name)')
-                    .gte('date', fmtDate(lwStart)).lte('date', lwEnfmtDate(d));
+                    .gte('date', fmtDate(lwStart)).lte('date', fmtDate(lwEnd));
                 let copied = 0;
                 (lastScheds || []).forEach(s => {
                     const oldD = new Date(s.date + 'T00:00:00');
@@ -6011,5 +6013,6 @@
             checkAdminPermission();
         });
     </script>
+    <script src="admin_fixes.js"></script>
 </body>
 </html>
