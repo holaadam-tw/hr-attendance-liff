@@ -3,243 +3,284 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#4F46E5">
     <title>線上點餐</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/versions/2.22.3/sdk.js"></script>
     <style>
-        * { margin:0; padding:0; box-sizing:border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background:#F8FAFC; color:#0F172A; min-height:100vh; }
+        :root { --theme: #4F46E5; --theme-dark: #3730A3; --theme-light: #EEF2FF; }
+        * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif; background:#f5f5f5; color:#1a1a2e; min-height:100vh; padding-bottom:90px; }
 
-        .store-header {
-            background:linear-gradient(135deg, var(--theme, #4F46E5), var(--theme-dark, #3730A3));
-            color:#fff; padding:24px 16px; text-align:center;
-        }
-        .store-header .store-logo { width:60px; height:60px; border-radius:50%; border:3px solid rgba(255,255,255,0.3); object-fit:cover; margin-bottom:8px; }
-        .store-header h1 { font-size:20px; margin-bottom:4px; }
-        .store-header .store-desc { font-size:13px; opacity:0.85; }
-        .store-header .store-info { font-size:12px; opacity:0.7; margin-top:8px; }
+        /* ===== Loading & Error ===== */
+        .loading-view { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:100vh; gap:16px; }
+        .loading-spinner { width:40px; height:40px; border:3px solid #e0e0e0; border-top-color:var(--theme); border-radius:50%; animation:spin 0.8s linear infinite; }
+        @keyframes spin { to { transform:rotate(360deg); } }
+        .error-view { display:none; text-align:center; padding:80px 24px; }
 
-        .closed-banner { background:#FEF2F2; color:#DC2626; text-align:center; padding:14px; font-weight:700; font-size:14px; }
-        .hours-info { background:#FFFBEB; color:#92400E; text-align:center; padding:8px; font-size:11px; }
+        /* ===== Store Banner ===== */
+        .store-banner { position:relative; height:200px; background:linear-gradient(135deg, var(--theme), var(--theme-dark)); overflow:hidden; }
+        .store-banner img { width:100%; height:100%; object-fit:cover; }
+        .store-banner .overlay { position:absolute; bottom:0; left:0; right:0; padding:20px 16px 16px; background:linear-gradient(transparent, rgba(0,0,0,0.7)); color:#fff; }
+        .store-banner .store-logo { width:52px; height:52px; border-radius:12px; border:2px solid #fff; object-fit:cover; margin-bottom:8px; background:#fff; }
+        .store-banner h1 { font-size:22px; font-weight:800; margin-bottom:2px; text-shadow:0 1px 3px rgba(0,0,0,0.3); }
+        .store-banner .store-meta { font-size:13px; opacity:0.9; }
 
-        .category-tabs {
-            display:flex; overflow-x:auto; gap:8px; padding:12px 16px; background:#fff;
-            border-bottom:1px solid #E2E8F0; position:sticky; top:0; z-index:10;
-            -webkit-overflow-scrolling:touch; scrollbar-width:none;
-        }
-        .category-tabs::-webkit-scrollbar { display:none; }
-        .cat-tab {
-            padding:8px 18px; border-radius:20px; border:1px solid #E2E8F0; background:#fff;
-            font-size:13px; font-weight:600; white-space:nowrap; cursor:pointer; transition:all 0.2s;
-        }
-        .cat-tab.active { background:var(--theme, #4F46E5); color:#fff; border-color:var(--theme, #4F46E5); }
+        /* ===== Status Bars ===== */
+        .closed-banner { background:#FEE2E2; color:#DC2626; text-align:center; padding:12px 16px; font-weight:700; font-size:14px; }
+        .hours-bar { background:#fff; color:#6B7280; padding:10px 16px; font-size:12px; border-bottom:1px solid #f0f0f0; display:flex; align-items:center; gap:6px; overflow-x:auto; white-space:nowrap; }
+        .loyalty-bar { background:var(--theme-light); padding:10px 16px; display:flex; justify-content:space-between; align-items:center; font-size:13px; font-weight:500; }
 
-        .menu-list { padding:12px 16px; }
-        .menu-card {
-            display:flex; gap:12px; background:#fff; border-radius:14px; padding:12px;
-            margin-bottom:10px; box-shadow:0 1px 4px rgba(0,0,0,0.06); align-items:center;
-        }
-        .menu-card img { width:80px; height:80px; border-radius:10px; object-fit:cover; flex-shrink:0; }
-        .menu-card .no-img { width:80px; height:80px; border-radius:10px; background:#E2E8F0; display:flex; align-items:center; justify-content:center; font-size:28px; flex-shrink:0; }
-        .menu-card .info { flex:1; min-width:0; }
-        .menu-card .name { font-weight:700; font-size:14px; margin-bottom:2px; }
-        .menu-card .desc { font-size:12px; color:#64748B; margin-bottom:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-        .menu-card .price { font-size:16px; font-weight:800; color:var(--theme, #4F46E5); }
-        .menu-card .tags { display:flex; gap:4px; margin-bottom:4px; }
-        .menu-card .tag { font-size:10px; padding:2px 6px; border-radius:4px; background:#EEF2FF; color:#4F46E5; font-weight:600; }
-        .add-btn {
-            width:36px; height:36px; border-radius:50%; border:none; background:var(--theme, #4F46E5);
-            color:#fff; font-size:20px; font-weight:700; cursor:pointer; flex-shrink:0; line-height:36px; text-align:center;
-        }
-        .unavailable { opacity:0.5; pointer-events:none; }
+        /* ===== Search ===== */
+        .search-bar { padding:12px 16px; background:#fff; border-bottom:1px solid #f0f0f0; position:sticky; top:0; z-index:50; }
+        .search-input { width:100%; padding:10px 16px 10px 40px; border:none; border-radius:24px; background:#f5f5f5; font-size:14px; outline:none; }
+        .search-bar .icon { position:absolute; left:28px; top:50%; transform:translateY(-50%); color:#9CA3AF; font-size:18px; }
 
-        .cart-fab {
-            position:fixed; bottom:20px; right:20px; width:60px; height:60px; border-radius:50%;
-            background:var(--theme, #4F46E5); color:#fff; border:none; font-size:28px;
-            box-shadow:0 4px 16px rgba(0,0,0,0.2); cursor:pointer; z-index:100; display:none;
-        }
-        .cart-fab .badge {
-            position:absolute; top:-4px; right:-4px; background:#EF4444; color:#fff;
-            width:22px; height:22px; border-radius:50%; font-size:12px; font-weight:700;
-            display:flex; align-items:center; justify-content:center;
-        }
+        /* ===== Category Nav ===== */
+        .category-nav { position:sticky; top:0; z-index:40; background:#fff; box-shadow:0 1px 4px rgba(0,0,0,0.06); overflow-x:auto; white-space:nowrap; scrollbar-width:none; -webkit-overflow-scrolling:touch; }
+        .category-nav::-webkit-scrollbar { display:none; }
+        .category-nav .tabs { display:flex; padding:0 12px; }
+        .cat-tab { padding:14px 16px; font-size:14px; font-weight:600; color:#9CA3AF; cursor:pointer; position:relative; transition:color 0.2s; flex-shrink:0; }
+        .cat-tab.active { color:var(--theme); }
+        .cat-tab.active::after { content:''; position:absolute; bottom:0; left:12px; right:12px; height:3px; background:var(--theme); border-radius:3px 3px 0 0; }
 
-        .modal-overlay {
-            display:none; position:fixed; top:0; left:0; right:0; bottom:0;
-            background:rgba(0,0,0,0.5); z-index:200; align-items:flex-end; justify-content:center;
-        }
-        .modal-overlay.open { display:flex; }
-        .modal-sheet {
-            background:#fff; border-radius:20px 20px 0 0; width:100%; max-width:500px;
-            max-height:85vh; overflow-y:auto; padding:24px 16px 32px;
-        }
-        .modal-sheet h2 { font-size:18px; margin-bottom:16px; }
+        /* ===== Menu Sections ===== */
+        .menu-container { padding:8px 0; }
+        .menu-section { background:#fff; margin-bottom:8px; padding:16px; }
+        .section-title { font-size:18px; font-weight:800; margin-bottom:16px; color:#1a1a2e; }
+        .menu-item { display:flex; justify-content:space-between; gap:12px; padding:12px 0; border-bottom:1px solid #f5f5f5; cursor:pointer; }
+        .menu-item:last-child { border-bottom:none; }
+        .item-info { flex:1; min-width:0; display:flex; flex-direction:column; justify-content:center; }
+        .item-name { font-size:15px; font-weight:700; margin-bottom:3px; display:flex; align-items:center; gap:6px; }
+        .item-desc { font-size:13px; color:#6B7280; margin-bottom:6px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+        .item-price { font-size:16px; font-weight:800; color:var(--theme); }
+        .item-photo { width:100px; height:100px; border-radius:12px; overflow:hidden; position:relative; flex-shrink:0; }
+        .item-photo img { width:100%; height:100%; object-fit:cover; }
+        .item-photo .no-img { width:100%; height:100%; background:#f0f0f0; display:flex; align-items:center; justify-content:center; font-size:32px; }
+        .item-photo .add-btn { position:absolute; bottom:-1px; right:-1px; width:32px; height:32px; border-radius:50%; border:none; background:var(--theme); color:#fff; font-size:22px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; box-shadow:0 2px 8px rgba(0,0,0,0.15); line-height:1; }
+        .tag { font-size:10px; padding:2px 8px; border-radius:4px; font-weight:600; display:inline-block; }
+        .tag-combo { background:#FEF3C7; color:#D97706; }
+        .tag-sold { background:#FEE2E2; color:#DC2626; }
+        .item-unavailable { opacity:0.45; pointer-events:none; }
 
-        .cart-item { display:flex; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid #F1F5F9; }
-        .cart-item .ci-name { flex:1; font-weight:600; font-size:14px; }
-        .cart-item .ci-opts { font-size:11px; color:#94A3B8; }
-        .cart-item .ci-price { font-weight:700; color:var(--theme, #4F46E5); min-width:60px; text-align:right; }
-        .qty-ctrl { display:flex; align-items:center; gap:8px; }
-        .qty-btn { width:28px; height:28px; border-radius:50%; border:1px solid #E2E8F0; background:#fff; font-size:16px; cursor:pointer; text-align:center; line-height:26px; }
-        .qty-num { font-weight:700; font-size:14px; min-width:20px; text-align:center; }
+        /* ===== Floating Cart Bar ===== */
+        .floating-cart { position:fixed; bottom:20px; left:16px; right:16px; max-width:500px; margin:0 auto; background:#1a1a2e; color:#fff; border-radius:50px; padding:12px 12px 12px 20px; display:none; align-items:center; justify-content:space-between; box-shadow:0 8px 30px rgba(0,0,0,0.25); z-index:100; animation:slideUp 0.3s ease; }
+        @keyframes slideUp { from { transform:translateY(100px); opacity:0; } to { transform:translateY(0); opacity:1; } }
+        .floating-cart .cart-info { display:flex; align-items:center; gap:10px; }
+        .floating-cart .cart-badge { background:#EF4444; width:24px; height:24px; border-radius:50%; font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center; }
+        .floating-cart .cart-total-price { font-size:16px; font-weight:700; }
+        .floating-cart .checkout-btn { background:var(--theme); color:#fff; border:none; border-radius:50px; padding:12px 24px; font-size:14px; font-weight:700; cursor:pointer; }
 
-        .cart-total { display:flex; justify-content:space-between; padding:14px 0; font-size:16px; font-weight:800; border-top:2px solid #0F172A; margin-top:8px; }
+        /* ===== Modal (Bottom Sheet) ===== */
+        .modal-overlay { display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); z-index:200; }
+        .modal-overlay.open { display:flex; align-items:flex-end; justify-content:center; }
+        .modal-sheet { background:#fff; border-radius:20px 20px 0 0; width:100%; max-width:500px; max-height:90vh; overflow-y:auto; padding:0; transform:translateY(0); animation:sheetUp 0.3s ease; }
+        @keyframes sheetUp { from { transform:translateY(100%); } to { transform:translateY(0); } }
+        .sheet-header { display:flex; justify-content:space-between; align-items:center; padding:20px 20px 12px; position:sticky; top:0; background:#fff; z-index:1; border-bottom:1px solid #f5f5f5; }
+        .sheet-header h2 { font-size:18px; font-weight:800; margin:0; }
+        .sheet-close { background:none; border:none; width:32px; height:32px; border-radius:50%; background:#f5f5f5; font-size:18px; cursor:pointer; display:flex; align-items:center; justify-content:center; color:#6B7280; }
+        .sheet-body { padding:16px 20px; }
+        .sheet-footer { padding:16px 20px 24px; border-top:1px solid #f0f0f0; background:#fff; position:sticky; bottom:0; }
 
-        .form-group { margin-bottom:12px; }
-        .form-group label { display:block; font-size:13px; font-weight:600; color:#374151; margin-bottom:4px; }
-        .form-group input, .form-group select, .form-group textarea {
-            width:100%; padding:12px; border:1px solid #E2E8F0; border-radius:10px; font-size:14px; box-sizing:border-box;
-        }
+        /* ===== Option Groups ===== */
+        .opt-group { margin-bottom:20px; }
+        .opt-group-title { font-size:15px; font-weight:700; margin-bottom:8px; display:flex; align-items:center; gap:6px; }
+        .opt-group-req { font-size:11px; color:#fff; background:#EF4444; padding:1px 8px; border-radius:10px; }
+        .opt-choice { display:flex; align-items:center; gap:10px; padding:12px 0; border-bottom:1px solid #f8f8f8; cursor:pointer; }
+        .opt-choice input[type="radio"], .opt-choice input[type="checkbox"] { width:20px; height:20px; accent-color:var(--theme); flex-shrink:0; }
+        .opt-choice-label { flex:1; font-size:15px; }
+        .opt-choice-price { font-size:14px; color:#6B7280; font-weight:500; }
 
-        .submit-btn {
-            width:100%; padding:16px; border:none; border-radius:14px; font-size:16px; font-weight:700;
-            color:#fff; background:var(--theme, #4F46E5); cursor:pointer; margin-top:12px;
-        }
-        .submit-btn:disabled { opacity:0.5; cursor:not-allowed; }
+        /* ===== Cart Items ===== */
+        .cart-item { display:flex; align-items:center; gap:12px; padding:14px 0; border-bottom:1px solid #f5f5f5; }
+        .ci-info { flex:1; }
+        .ci-name { font-weight:700; font-size:15px; }
+        .ci-opts { font-size:12px; color:#9CA3AF; margin-top:2px; }
+        .ci-price { font-weight:800; color:var(--theme); font-size:15px; min-width:60px; text-align:right; }
+        .qty-ctrl { display:flex; align-items:center; gap:6px; }
+        .qty-btn { width:30px; height:30px; border-radius:50%; border:1.5px solid #e0e0e0; background:#fff; font-size:18px; cursor:pointer; display:flex; align-items:center; justify-content:center; color:#1a1a2e; font-weight:600; }
+        .qty-num { font-weight:800; font-size:15px; min-width:24px; text-align:center; }
+        .cart-total-row { display:flex; justify-content:space-between; padding:16px 0 8px; font-size:18px; font-weight:800; border-top:2px solid #1a1a2e; margin-top:8px; }
 
-        .order-confirm { padding:24px 16px; text-align:center; }
-        .order-confirm .check-icon { font-size:60px; margin-bottom:12px; }
-        .order-confirm .order-no { font-size:24px; font-weight:900; color:var(--theme, #4F46E5); }
-        .order-confirm .pickup-no { font-size:40px; font-weight:900; color:var(--theme, #4F46E5); margin-top:8px; }
-        .order-confirm .status-badge { display:inline-block; padding:6px 16px; border-radius:20px; font-size:13px; font-weight:700; margin-top:12px; }
+        /* ===== Form ===== */
+        .form-section { padding:16px 0; }
+        .form-section-title { font-size:15px; font-weight:700; margin-bottom:12px; color:#1a1a2e; }
+        .form-group { margin-bottom:14px; }
+        .form-group label { display:block; font-size:13px; font-weight:600; color:#374151; margin-bottom:5px; }
+        .form-group input, .form-group select, .form-group textarea { width:100%; padding:12px 14px; border:1.5px solid #e0e0e0; border-radius:12px; font-size:15px; box-sizing:border-box; outline:none; transition:border-color 0.2s; background:#fff; }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color:var(--theme); }
 
-        .loading { text-align:center; padding:60px 20px; color:#94A3B8; }
-        .error-page { text-align:center; padding:60px 20px; color:#EF4444; }
+        .submit-btn { width:100%; padding:16px; border:none; border-radius:14px; font-size:16px; font-weight:800; color:#fff; background:var(--theme); cursor:pointer; transition:opacity 0.2s; }
+        .submit-btn:active { opacity:0.85; }
+        .submit-btn:disabled { opacity:0.4; cursor:not-allowed; }
 
-        /* 客製化選項 bottom sheet */
-        .opt-group { margin-bottom:14px; }
-        .opt-group-title { font-weight:700; font-size:14px; margin-bottom:6px; }
-        .opt-group-req { font-size:11px; color:#EF4444; margin-left:4px; }
-        .opt-choice { display:flex; align-items:center; gap:8px; padding:8px 0; border-bottom:1px solid #F8FAFC; cursor:pointer; }
-        .opt-choice input { accent-color:var(--theme, #4F46E5); }
-        .opt-choice-label { flex:1; font-size:14px; }
-        .opt-choice-price { font-size:13px; color:#64748B; }
-        .opt-total { font-size:16px; font-weight:800; text-align:right; margin-top:8px; color:var(--theme, #4F46E5); }
+        .subtotal-bar { display:flex; justify-content:space-between; align-items:center; padding:12px 0; font-size:17px; font-weight:800; color:var(--theme); }
 
-        .loyalty-bar { background:#F5F3FF; padding:8px 16px; display:flex; justify-content:space-between; align-items:center; font-size:12px; }
+        /* ===== Order Confirmation ===== */
+        .confirm-view { display:none; min-height:100vh; background:#fff; }
+        .confirm-hero { background:linear-gradient(135deg, var(--theme), var(--theme-dark)); color:#fff; padding:40px 24px; text-align:center; }
+        .confirm-hero .check { font-size:56px; margin-bottom:8px; }
+        .confirm-hero .pickup-num { font-size:48px; font-weight:900; margin:8px 0; letter-spacing:2px; }
+        .confirm-hero .order-num { font-size:14px; opacity:0.8; }
+        .confirm-body { padding:20px 16px; }
+        .confirm-card { background:#f9fafb; border-radius:16px; padding:16px; margin-bottom:12px; }
+        .confirm-card h4 { font-size:14px; color:#6B7280; margin-bottom:8px; }
 
-        .toast {
-            position:fixed; bottom:80px; left:50%; transform:translateX(-50%); background:#0F172A;
-            color:#fff; padding:10px 24px; border-radius:20px; font-size:13px; font-weight:600;
-            z-index:9999; opacity:0; transition:opacity 0.3s; pointer-events:none;
-        }
+        /* ===== Toast ===== */
+        .toast { position:fixed; bottom:100px; left:50%; transform:translateX(-50%); background:#1a1a2e; color:#fff; padding:12px 28px; border-radius:50px; font-size:14px; font-weight:600; z-index:9999; opacity:0; transition:opacity 0.3s; pointer-events:none; white-space:nowrap; }
         .toast.show { opacity:1; }
     </style>
 </head>
 <body>
-    <div id="loadingView" class="loading">
-        <p style="font-size:24px;">🍽️</p>
-        <p>載入中...</p>
+    <!-- Loading -->
+    <div id="loadingView" class="loading-view">
+        <div class="loading-spinner"></div>
+        <p style="color:#9CA3AF;font-size:14px;">載入菜單中...</p>
     </div>
 
-    <div id="errorView" class="error-page" style="display:none;">
-        <p style="font-size:48px;">😥</p>
-        <p style="font-size:16px;font-weight:700;margin-top:12px;">找不到商店</p>
-        <p style="font-size:13px;color:#94A3B8;margin-top:8px;">請確認 QR Code 或網址是否正確</p>
+    <!-- Error -->
+    <div id="errorView" class="error-view">
+        <div style="font-size:64px;margin-bottom:16px;">🍽️</div>
+        <h2 style="font-size:20px;font-weight:800;margin-bottom:8px;">找不到商店</h2>
+        <p style="color:#9CA3AF;font-size:14px;">請確認 QR Code 或網址是否正確</p>
     </div>
 
+    <!-- Main View -->
     <div id="mainView" style="display:none;">
-        <div class="store-header" id="storeHeader">
-            <img id="storeLogo" class="store-logo" src="" style="display:none;">
-            <h1 id="storeName"></h1>
-            <div id="storeDesc" class="store-desc"></div>
-            <div id="storeInfo" class="store-info"></div>
+        <!-- Store Banner -->
+        <div class="store-banner" id="storeBanner">
+            <div class="overlay">
+                <img id="storeLogo" class="store-logo" src="" style="display:none;">
+                <h1 id="storeName"></h1>
+                <div class="store-meta" id="storeMeta"></div>
+            </div>
         </div>
-        <!-- 集點 -->
+
+        <!-- Status Bars -->
         <div id="loyaltyBar" class="loyalty-bar" style="display:none;"></div>
-        <!-- 非營業時間 / 暫停接單 -->
         <div id="closedBanner" class="closed-banner" style="display:none;"></div>
-        <div id="hoursInfo" class="hours-info" style="display:none;"></div>
-        <!-- 分類 Tab -->
-        <div class="category-tabs" id="categoryTabs"></div>
-        <!-- 菜單列表 -->
-        <div class="menu-list" id="menuList"></div>
-        <!-- 購物車浮動按鈕 -->
-        <button class="cart-fab" id="cartFab" onclick="openCart()">🛒<span class="badge" id="cartBadge">0</span></button>
+        <div id="hoursBar" class="hours-bar" style="display:none;"></div>
+
+        <!-- Search -->
+        <div class="search-bar" id="searchBar" style="display:none;">
+            <span class="icon">🔍</span>
+            <input class="search-input" id="searchInput" type="text" placeholder="搜尋餐點..." oninput="handleSearch(this.value)">
+        </div>
+
+        <!-- Category Nav -->
+        <div class="category-nav" id="categoryNav" style="display:none;">
+            <div class="tabs" id="categoryTabs"></div>
+        </div>
+
+        <!-- Menu Sections -->
+        <div class="menu-container" id="menuContainer"></div>
     </div>
 
-    <!-- 客製化選項 Modal -->
+    <!-- Floating Cart Bar -->
+    <div class="floating-cart" id="floatingCart" onclick="openCart()">
+        <div class="cart-info">
+            <div class="cart-badge" id="cartBadge">0</div>
+            <div class="cart-total-price" id="cartTotalPrice">$0</div>
+        </div>
+        <button class="checkout-btn">去結帳 →</button>
+    </div>
+
+    <!-- Options Modal -->
     <div class="modal-overlay" id="optionsModal">
         <div class="modal-sheet">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-                <h2 id="optItemName" style="margin:0;"></h2>
-                <button onclick="closeOptionsModal()" style="background:none;border:none;font-size:24px;cursor:pointer;color:#94A3B8;">×</button>
+            <div class="sheet-header">
+                <h2 id="optItemName"></h2>
+                <button class="sheet-close" onclick="closeOptionsModal()">✕</button>
             </div>
-            <div id="optGroupsContainer"></div>
-            <div class="opt-total">小計：<span id="optSubtotal">$0</span></div>
-            <button class="submit-btn" onclick="confirmAddToCart()" style="margin-top:10px;">加入購物車</button>
+            <div class="sheet-body" id="optGroupsContainer"></div>
+            <div class="sheet-footer">
+                <div class="subtotal-bar">小計 <span id="optSubtotal">$0</span></div>
+                <button class="submit-btn" onclick="confirmAddToCart()">加入購物車</button>
+            </div>
         </div>
     </div>
 
-    <!-- 購物車 Modal -->
-    <div class="modal-overlay" id="cartModal">
-        <div class="modal-sheet">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-                <h2 style="margin:0;">🛒 購物車</h2>
-                <button onclick="closeCart()" style="background:none;border:none;font-size:24px;cursor:pointer;color:#94A3B8;">×</button>
-            </div>
-            <div id="cartItems"></div>
-            <div class="cart-total"><span>合計</span><span id="cartTotal">$0</span></div>
-            <hr style="border:none;border-top:1px solid #E2E8F0;margin:16px 0;">
-            <div class="form-group">
-                <label>姓名 *</label>
-                <input type="text" id="custName" placeholder="請輸入姓名">
-            </div>
-            <div class="form-group">
-                <label>電話</label>
-                <input type="tel" id="custPhone" placeholder="選填">
-            </div>
-            <div class="form-group">
-                <label>用餐方式</label>
-                <select id="orderType">
-                    <option value="dine_in">內用</option>
-                    <option value="takeout">外帶</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label>桌號</label>
-                <input type="text" id="tableNumber" placeholder="選填，內用請填寫">
-            </div>
-            <div class="form-group">
-                <label>取餐時間</label>
-                <select id="pickupTime">
-                    <option value="">盡快</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label>備註</label>
-                <textarea id="orderNotes" rows="2" placeholder="選填"></textarea>
-            </div>
-            <button class="submit-btn" id="submitOrderBtn" onclick="submitOrder()">送出訂單</button>
-        </div>
-    </div>
-
-    <!-- 套餐選擇 Modal -->
+    <!-- Combo Modal -->
     <div class="modal-overlay" id="comboModal">
         <div class="modal-sheet">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-                <h2 id="comboItemName" style="margin:0;"></h2>
-                <button onclick="closeComboModal()" style="background:none;border:none;font-size:24px;cursor:pointer;color:#94A3B8;">×</button>
+            <div class="sheet-header">
+                <h2 id="comboItemName"></h2>
+                <button class="sheet-close" onclick="closeComboModal()">✕</button>
             </div>
-            <div id="comboGroupsContainer"></div>
-            <div class="opt-total">套餐價：<span id="comboSubtotal">$0</span></div>
-            <button class="submit-btn" onclick="confirmAddCombo()" style="margin-top:10px;">加入購物車</button>
+            <div class="sheet-body" id="comboGroupsContainer"></div>
+            <div class="sheet-footer">
+                <div class="subtotal-bar">套餐價 <span id="comboSubtotal">$0</span></div>
+                <button class="submit-btn" onclick="confirmAddCombo()">加入購物車</button>
+            </div>
         </div>
     </div>
 
-    <!-- 訂單確認頁 -->
-    <div id="orderConfirmView" style="display:none;">
-        <div class="store-header" id="confirmHeader">
-            <h1 id="confirmStoreName"></h1>
+    <!-- Cart Modal -->
+    <div class="modal-overlay" id="cartModal">
+        <div class="modal-sheet">
+            <div class="sheet-header">
+                <h2>購物車</h2>
+                <button class="sheet-close" onclick="closeCart()">✕</button>
+            </div>
+            <div class="sheet-body">
+                <div id="cartItems"></div>
+                <div class="cart-total-row"><span>合計</span><span id="cartTotal">$0</span></div>
+                <div class="form-section">
+                    <div class="form-section-title">取餐資訊</div>
+                    <div class="form-group">
+                        <label>姓名 *</label>
+                        <input type="text" id="custName" placeholder="請輸入姓名">
+                    </div>
+                    <div class="form-group">
+                        <label>電話</label>
+                        <input type="tel" id="custPhone" placeholder="選填，方便店家聯繫">
+                    </div>
+                    <div style="display:flex;gap:10px;">
+                        <div class="form-group" style="flex:1;">
+                            <label>用餐方式</label>
+                            <select id="orderType">
+                                <option value="dine_in">內用</option>
+                                <option value="takeout">外帶</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="flex:1;">
+                            <label>桌號</label>
+                            <input type="text" id="tableNumber" placeholder="內用填寫">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>取餐時間</label>
+                        <select id="pickupTime">
+                            <option value="">盡快</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>備註</label>
+                        <textarea id="orderNotes" rows="2" placeholder="如有特殊需求請填寫"></textarea>
+                    </div>
+                </div>
+            </div>
+            <div class="sheet-footer">
+                <button class="submit-btn" id="submitOrderBtn" onclick="submitOrder()">送出訂單</button>
+            </div>
         </div>
-        <div class="order-confirm">
-            <div class="check-icon">✅</div>
-            <p style="font-size:14px;color:#64748B;">訂單已送出</p>
-            <div class="pickup-no" id="confirmPickup"></div>
-            <div class="order-no" id="confirmOrderNo" style="font-size:14px;"></div>
-            <div class="status-badge" id="confirmStatus" style="background:#ECFDF5;color:#059669;">等待確認</div>
-            <div id="confirmDetail" style="text-align:left;margin-top:20px;background:#fff;border-radius:14px;padding:16px;box-shadow:0 1px 4px rgba(0,0,0,0.06);"></div>
-            <button onclick="resetOrder()" style="margin-top:20px;padding:14px 32px;border:1px solid #E2E8F0;border-radius:12px;background:#fff;font-size:14px;font-weight:600;cursor:pointer;">繼續點餐</button>
+    </div>
+
+    <!-- Order Confirmation -->
+    <div id="orderConfirmView" class="confirm-view">
+        <div class="confirm-hero">
+            <div class="check">✅</div>
+            <p style="font-size:15px;opacity:0.9;">訂單已送出！</p>
+            <div class="pickup-num" id="confirmPickup"></div>
+            <div class="order-num" id="confirmOrderNo"></div>
+        </div>
+        <div class="confirm-body">
+            <div style="text-align:center;margin-bottom:16px;">
+                <span style="display:inline-block;padding:6px 20px;border-radius:20px;background:#ECFDF5;color:#059669;font-weight:700;font-size:13px;">等待確認</span>
+            </div>
+            <div id="confirmDetail"></div>
+            <button onclick="resetOrder()" style="width:100%;margin-top:16px;padding:16px;border:1.5px solid #e0e0e0;border-radius:14px;background:#fff;font-size:15px;font-weight:700;cursor:pointer;">繼續點餐</button>
         </div>
     </div>
 
@@ -254,50 +295,56 @@
         let store = null;
         let categories = [];
         let menuItems = [];
-        let cart = []; // [{item, qty, selectedOptions, optionsLabel, optionsPrice}]
-        let activeCategoryId = null;
+        let cart = JSON.parse(localStorage.getItem('_cart') || '[]');
         let lineUserId = null;
         let customerLoyalty = null;
-        let pendingItem = null; // 等待客製化選擇的品項
-        let pendingComboItem = null; // 等待套餐選擇的品項
+        let pendingItem = null;
+        let pendingComboItem = null;
         let isStoreClosed = false;
+        let searchQuery = '';
 
         function showToast(msg) {
             const t = document.getElementById('toast');
-            t.textContent = msg;
-            t.classList.add('show');
-            setTimeout(() => t.classList.remove('show'), 2000);
+            t.textContent = msg; t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), 2200);
         }
         function escapeHTML(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+        function saveCart() { localStorage.setItem('_cart', JSON.stringify(cart.map(c => ({ itemId: c.item.id, qty: c.qty, optionsLabel: c.optionsLabel, optionsPrice: c.optionsPrice, selectedOptions: c.selectedOptions })))); }
+        function restoreCart() {
+            const saved = JSON.parse(localStorage.getItem('_cart') || '[]');
+            cart = [];
+            saved.forEach(s => {
+                const item = menuItems.find(i => i.id === s.itemId);
+                if (item) cart.push({ item, qty: s.qty, optionsLabel: s.optionsLabel || '', optionsPrice: s.optionsPrice || 0, selectedOptions: s.selectedOptions || null });
+            });
+            updateCartUI();
+        }
 
-        // ===== 初始化 =====
+        // ===== Init =====
         async function init() {
-            // 嘗試 LIFF 登入取得 userId
             try {
                 await liff.init({ liffId: LIFF_ID });
-                if (liff.isLoggedIn()) {
-                    const profile = await liff.getProfile();
-                    lineUserId = profile.userId;
-                }
+                if (liff.isLoggedIn()) { const p = await liff.getProfile(); lineUserId = p.userId; }
             } catch(e) { console.log('LIFF init skipped', e); }
 
             const params = new URLSearchParams(location.search);
             const slug = params.get('store');
             const sid = params.get('sid');
             try {
-                let query = sb.from('store_profiles').select('*').eq('is_active', true);
-                if (slug) query = query.eq('store_slug', slug);
-                else if (sid) query = query.eq('id', sid);
+                let q = sb.from('store_profiles').select('*').eq('is_active', true);
+                if (slug) q = q.eq('store_slug', slug);
+                else if (sid) q = q.eq('id', sid);
                 else throw new Error('no store param');
-                const { data, error } = await query.maybeSingle();
+                const { data, error } = await q.maybeSingle();
                 if (error) throw error;
                 if (!data) throw new Error('store not found');
 
                 store = data;
                 applyTheme(store.theme_color);
-                renderStoreHeader();
+                renderStoreBanner();
                 checkStoreAvailability();
                 await loadMenu();
+                restoreCart();
                 populatePickupTimes();
                 if (lineUserId) loadLoyalty();
                 document.getElementById('loadingView').style.display = 'none';
@@ -312,37 +359,37 @@
         function applyTheme(color) {
             if (!color) return;
             document.documentElement.style.setProperty('--theme', color);
+            document.querySelector('meta[name="theme-color"]').content = color;
             const r = parseInt(color.slice(1,3),16), g = parseInt(color.slice(3,5),16), b = parseInt(color.slice(5,7),16);
-            const darker = '#' + [r,g,b].map(c => Math.max(0, c - 40).toString(16).padStart(2,'0')).join('');
-            document.documentElement.style.setProperty('--theme-dark', darker);
+            document.documentElement.style.setProperty('--theme-dark', '#' + [r,g,b].map(c => Math.max(0,c-40).toString(16).padStart(2,'0')).join(''));
+            document.documentElement.style.setProperty('--theme-light', '#' + [r,g,b].map(c => Math.min(255,c+60).toString(16).padStart(2,'0')).join('') + '22');
         }
 
-        function renderStoreHeader() {
-            document.getElementById('storeName').textContent = store.store_name;
-            document.getElementById('storeDesc').textContent = store.description || '';
-            const info = [];
-            if (store.phone) info.push('📞 ' + store.phone);
-            if (store.address) info.push('📍 ' + store.address);
-            document.getElementById('storeInfo').textContent = info.join('  |  ');
-            if (store.logo_url) {
-                const logo = document.getElementById('storeLogo');
-                logo.src = store.logo_url; logo.style.display = 'block';
+        function renderStoreBanner() {
+            const banner = document.getElementById('storeBanner');
+            if (store.banner_url) {
+                banner.innerHTML = `<img src="${store.banner_url}" alt=""><div class="overlay">${bannerContent()}</div>`;
+            } else {
+                banner.innerHTML = `<div class="overlay" style="background:linear-gradient(135deg, var(--theme), var(--theme-dark));height:100%;display:flex;flex-direction:column;justify-content:flex-end;">${bannerContent()}</div>`;
             }
             document.title = store.store_name + ' - 線上點餐';
         }
+        function bannerContent() {
+            const logo = store.logo_url ? `<img class="store-logo" src="${store.logo_url}">` : '';
+            const meta = [];
+            if (store.description) meta.push(escapeHTML(store.description));
+            if (store.phone) meta.push('📞 ' + escapeHTML(store.phone));
+            if (store.address) meta.push('📍 ' + escapeHTML(store.address));
+            return `${logo}<h1 id="storeName">${escapeHTML(store.store_name)}</h1><div class="store-meta">${meta.join(' · ')}</div>`;
+        }
 
-        // ===== 營業時間 & 接單檢查 =====
+        // ===== Availability =====
         function checkStoreAvailability() {
             const banner = document.getElementById('closedBanner');
-            const hoursEl = document.getElementById('hoursInfo');
-            // 暫停接單
+            const hoursEl = document.getElementById('hoursBar');
             if (store.accept_orders === false) {
-                banner.textContent = '⏸️ 本店暫停接單';
-                banner.style.display = '';
-                isStoreClosed = true;
-                return;
+                banner.textContent = '⏸️ 本店暫停接單'; banner.style.display = ''; isStoreClosed = true; return;
             }
-            // 營業時間
             const bh = store.business_hours;
             if (bh && typeof bh === 'object') {
                 const dayKeys = ['sun','mon','tue','wed','thu','fri','sat'];
@@ -350,453 +397,298 @@
                 const todayKey = dayKeys[now.getDay()];
                 const todayHours = bh[todayKey];
                 if (todayHours && !todayHours.open) {
-                    banner.textContent = '🕐 今日休息，無法點餐';
-                    banner.style.display = '';
-                    isStoreClosed = true;
+                    banner.textContent = '🕐 今日休息，無法點餐'; banner.style.display = ''; isStoreClosed = true;
                 } else if (todayHours && todayHours.start && todayHours.end) {
-                    const nowMin = now.getHours() * 60 + now.getMinutes();
-                    const [sh, sm] = todayHours.start.split(':').map(Number);
-                    const [eh, em] = todayHours.end.split(':').map(Number);
-                    const startMin = sh * 60 + sm;
-                    const endMin = eh * 60 + em;
-                    if (nowMin < startMin || nowMin > endMin) {
+                    const nowMin = now.getHours()*60+now.getMinutes();
+                    const [sh,sm] = todayHours.start.split(':').map(Number);
+                    const [eh,em] = todayHours.end.split(':').map(Number);
+                    if (nowMin < sh*60+sm || nowMin > eh*60+em) {
                         banner.textContent = `🕐 目前非營業時間（${todayHours.start} ~ ${todayHours.end}）`;
-                        banner.style.display = '';
-                        isStoreClosed = true;
+                        banner.style.display = ''; isStoreClosed = true;
                     }
                 }
-                // 顯示營業時間
                 const dayLabels = ['日','一','二','三','四','五','六'];
-                const hoursStr = dayKeys.map((k, idx) => {
-                    const h = bh[k];
-                    if (!h || !h.open) return dayLabels[idx] + ' 休';
-                    return dayLabels[idx] + ' ' + (h.start || '') + '-' + (h.end || '');
-                }).join('　');
-                hoursEl.textContent = '營業時間：' + hoursStr;
+                const parts = dayKeys.map((k,idx) => { const h = bh[k]; return !h || !h.open ? `<span style="opacity:0.5;">${dayLabels[idx]}休</span>` : `<span>${dayLabels[idx]} ${h.start}-${h.end}</span>`; });
+                hoursEl.innerHTML = '🕐 ' + parts.join('&nbsp;&nbsp;');
                 hoursEl.style.display = '';
             }
         }
 
-        // ===== 集點 =====
+        // ===== Loyalty =====
         async function loadLoyalty() {
             if (!lineUserId || !store.loyalty_config) return;
             try {
-                const { data } = await sb.from('loyalty_points').select('*')
-                    .eq('store_id', store.id).eq('customer_line_id', lineUserId).maybeSingle();
+                const { data } = await sb.from('loyalty_points').select('*').eq('store_id', store.id).eq('customer_line_id', lineUserId).maybeSingle();
                 customerLoyalty = data;
                 renderLoyaltyBar();
             } catch(e) { console.log('loyalty load failed', e); }
         }
-
         function renderLoyaltyBar() {
             const el = document.getElementById('loyaltyBar');
-            const lc = store.loyalty_config;
-            if (!lc) return;
+            const lc = store.loyalty_config; if (!lc) return;
             const pts = customerLoyalty?.points || 0;
             const canRedeem = pts >= (lc.points_to_redeem || 999999);
             el.style.display = '';
-            el.innerHTML = `<span>🎯 我的點數：<b>${pts}</b> 點</span>` +
-                (canRedeem ? `<span style="color:#059669;font-weight:700;">可折抵 $${lc.discount_amount}</span>` : `<span>再 ${(lc.points_to_redeem || 10) - pts} 點可折 $${lc.discount_amount || 50}</span>`);
+            el.innerHTML = `<span>🎯 我的點數：<b>${pts}</b> 點</span>` + (canRedeem ? `<span style="color:#059669;font-weight:700;">可折抵 $${lc.discount_amount}</span>` : `<span style="color:#6B7280;">再 ${(lc.points_to_redeem||10)-pts} 點可折 $${lc.discount_amount||50}</span>`);
         }
 
-        // ===== 菜單 =====
+        // ===== Menu =====
         async function loadMenu() {
             const { data: cats } = await sb.from('menu_categories').select('*').eq('store_id', store.id).eq('is_active', true).order('sort_order');
             categories = cats || [];
             const { data: items } = await sb.from('menu_items').select('*').eq('store_id', store.id).order('sort_order');
             menuItems = items || [];
-            renderCategoryTabs();
-            renderMenuItems();
+            if (menuItems.length > 3) document.getElementById('searchBar').style.display = '';
+            renderCategoryNav();
+            renderMenuSections();
+            initScrollSpy();
         }
 
-        function renderCategoryTabs() {
-            const el = document.getElementById('categoryTabs');
-            if (categories.length === 0) { el.style.display = 'none'; return; }
-            activeCategoryId = null;
-            el.innerHTML = `<div class="cat-tab active" onclick="filterCategory(null, this)">全部</div>` +
-                categories.map(c => `<div class="cat-tab" onclick="filterCategory('${c.id}', this)">${escapeHTML(c.name)}</div>`).join('');
+        function renderCategoryNav() {
+            if (categories.length === 0) return;
+            const nav = document.getElementById('categoryNav');
+            nav.style.display = '';
+            const tabs = document.getElementById('categoryTabs');
+            tabs.innerHTML = `<div class="cat-tab active" data-cat="all" onclick="scrollToSection('all', this)">全部</div>` +
+                categories.map(c => `<div class="cat-tab" data-cat="${c.id}" onclick="scrollToSection('${c.id}', this)">${escapeHTML(c.name)}</div>`).join('');
         }
 
-        function filterCategory(catId, el) {
-            activeCategoryId = catId;
-            document.querySelectorAll('.cat-tab').forEach(t => t.classList.remove('active'));
-            if (el) el.classList.add('active');
-            renderMenuItems();
-        }
-
-        function renderMenuItems() {
-            const el = document.getElementById('menuList');
+        function renderMenuSections() {
+            const container = document.getElementById('menuContainer');
             let items = menuItems;
-            if (activeCategoryId) items = items.filter(i => i.category_id === activeCategoryId);
-            if (items.length === 0) {
-                el.innerHTML = '<p style="text-align:center;color:#94A3B8;padding:40px;">尚無餐點</p>';
+            if (searchQuery) items = items.filter(i => i.name.toLowerCase().includes(searchQuery.toLowerCase()));
+
+            if (categories.length === 0) {
+                container.innerHTML = `<div class="menu-section" id="section-all"><div class="section-title">菜單</div>${items.map(i => renderItem(i)).join('')}</div>`;
+                if (items.length === 0) container.innerHTML = '<div class="menu-section"><p style="text-align:center;color:#9CA3AF;padding:40px;">尚無餐點</p></div>';
                 return;
             }
-            el.innerHTML = items.map(item => {
-                const avail = item.is_available !== false;
-                const closed = isStoreClosed;
-                const disabled = !avail || closed;
-                const tags = (item.tags || []).map(t => `<span class="tag">${escapeHTML(t)}</span>`).join('');
-                return `<div class="menu-card ${disabled ? 'unavailable' : ''}">
-                    ${item.image_url ? `<img src="${item.image_url}" alt="${escapeHTML(item.name)}">` : `<div class="no-img">🍽️</div>`}
-                    <div class="info">
-                        ${tags ? '<div class="tags">' + tags + '</div>' : ''}
-                        <div class="name">${escapeHTML(item.name)} ${item.is_combo ? '<span class="tag" style="background:#FEF3C7;color:#D97706;">套餐</span>' : ''}</div>
-                        <div class="desc">${escapeHTML(item.description || '')}</div>
-                        <div class="price">$${item.price}</div>
-                    </div>
-                    ${disabled ? (avail ? '' : '<span style="font-size:12px;color:#EF4444;font-weight:700;">售完</span>') : `<button class="add-btn" onclick="addToCart('${item.id}')">+</button>`}
+            const uncategorized = items.filter(i => !i.category_id);
+            container.innerHTML = categories.map(c => {
+                const catItems = items.filter(i => i.category_id === c.id);
+                if (catItems.length === 0 && searchQuery) return '';
+                return `<div class="menu-section" id="section-${c.id}" data-cat="${c.id}">
+                    <div class="section-title">${escapeHTML(c.name)}</div>
+                    ${catItems.length > 0 ? catItems.map(i => renderItem(i)).join('') : '<p style="color:#9CA3AF;font-size:13px;">此分類暫無餐點</p>'}
                 </div>`;
-            }).join('');
+            }).join('') + (uncategorized.length > 0 ? `<div class="menu-section" id="section-other"><div class="section-title">其他</div>${uncategorized.map(i => renderItem(i)).join('')}</div>` : '');
         }
 
-        // ===== 取餐時間 =====
+        function renderItem(item) {
+            const avail = item.is_available !== false;
+            const disabled = !avail || isStoreClosed;
+            const photo = item.image_url
+                ? `<img src="${item.image_url}" alt="${escapeHTML(item.name)}" loading="lazy">`
+                : `<div class="no-img">🍽️</div>`;
+            return `<div class="menu-item ${disabled ? 'item-unavailable' : ''}" onclick="${disabled ? '' : `addToCart('${item.id}')`}">
+                <div class="item-info">
+                    <div class="item-name">
+                        ${escapeHTML(item.name)}
+                        ${item.is_combo ? '<span class="tag tag-combo">套餐</span>' : ''}
+                        ${!avail ? '<span class="tag tag-sold">售完</span>' : ''}
+                    </div>
+                    ${item.description ? `<div class="item-desc">${escapeHTML(item.description)}</div>` : ''}
+                    <div class="item-price">$${item.price}</div>
+                </div>
+                <div class="item-photo">
+                    ${photo}
+                    ${disabled ? '' : `<button class="add-btn" onclick="event.stopPropagation();addToCart('${item.id}')">+</button>`}
+                </div>
+            </div>`;
+        }
+
+        // ===== Search =====
+        let searchTimer = null;
+        function handleSearch(val) {
+            clearTimeout(searchTimer);
+            searchTimer = setTimeout(() => { searchQuery = val.trim(); renderMenuSections(); }, 200);
+        }
+
+        // ===== Scroll Spy =====
+        function scrollToSection(catId, el) {
+            document.querySelectorAll('.cat-tab').forEach(t => t.classList.remove('active'));
+            if (el) el.classList.add('active');
+            if (catId === 'all') { window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
+            const section = document.getElementById('section-' + catId);
+            if (section) { const navH = document.querySelector('.category-nav')?.offsetHeight || 50; window.scrollTo({ top: section.offsetTop - navH - 10, behavior: 'smooth' }); }
+        }
+        function initScrollSpy() {
+            if (categories.length === 0) return;
+            const sections = document.querySelectorAll('.menu-section[data-cat]');
+            if (sections.length === 0) return;
+            const observer = new IntersectionObserver(entries => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const catId = entry.target.dataset.cat;
+                        document.querySelectorAll('.cat-tab').forEach(t => t.classList.toggle('active', t.dataset.cat === catId));
+                        // 自動捲動 tab 到可見範圍
+                        const activeTab = document.querySelector(`.cat-tab[data-cat="${catId}"]`);
+                        if (activeTab) activeTab.scrollIntoView({ behavior:'smooth', block:'nearest', inline:'center' });
+                    }
+                });
+            }, { rootMargin: '-100px 0px -60% 0px', threshold: 0 });
+            sections.forEach(s => observer.observe(s));
+        }
+
+        // ===== Pickup Times =====
         function populatePickupTimes() {
             const sel = document.getElementById('pickupTime');
             const now = new Date();
-            const start = new Date(now);
-            start.setMinutes(Math.ceil(start.getMinutes() / 15) * 15 + 15, 0, 0);
+            const start = new Date(now); start.setMinutes(Math.ceil(start.getMinutes()/15)*15+15, 0, 0);
             for (let i = 0; i < 12; i++) {
-                const t = new Date(start.getTime() + i * 15 * 60000);
-                const label = t.getHours().toString().padStart(2, '0') + ':' + t.getMinutes().toString().padStart(2, '0');
-                const opt = document.createElement('option');
-                opt.value = label; opt.textContent = label;
-                sel.appendChild(opt);
+                const t = new Date(start.getTime() + i*15*60000);
+                const label = t.getHours().toString().padStart(2,'0') + ':' + t.getMinutes().toString().padStart(2,'0');
+                const opt = document.createElement('option'); opt.value = label; opt.textContent = label; sel.appendChild(opt);
             }
         }
 
-        // ===== 客製化選項 =====
+        // ===== Add to Cart =====
         function addToCart(itemId) {
             const item = menuItems.find(i => i.id === itemId);
             if (!item) return;
-            // 套餐組合
-            if (item.is_combo && item.combo_config && item.combo_config.groups) {
-                pendingComboItem = item;
-                openComboModal(item);
-                return;
-            }
-            // 客製化選項
+            if (item.is_combo && item.combo_config && item.combo_config.groups) { pendingComboItem = item; openComboModal(item); return; }
             const opts = item.options;
-            if (opts && Array.isArray(opts) && opts.length > 0) {
-                pendingItem = item;
-                openOptionsModal(item);
-                return;
-            }
-            // 無客製 → 直接加入
+            if (opts && Array.isArray(opts) && opts.length > 0) { pendingItem = item; openOptionsModal(item); return; }
             const existing = cart.find(c => c.item.id === itemId && !c.optionsLabel);
-            if (existing) { existing.qty++; }
-            else { cart.push({ item, qty: 1, selectedOptions: null, optionsLabel: '', optionsPrice: 0 }); }
-            updateCartUI();
-            showToast(`已加入 ${item.name}`);
+            if (existing) { existing.qty++; } else { cart.push({ item, qty:1, selectedOptions:null, optionsLabel:'', optionsPrice:0 }); }
+            updateCartUI(); saveCart(); showToast(`✓ ${item.name}`);
         }
 
+        // ===== Options Modal =====
         function openOptionsModal(item) {
             document.getElementById('optItemName').textContent = item.name;
-            const container = document.getElementById('optGroupsContainer');
-            container.innerHTML = item.options.map((g, gIdx) => {
+            document.getElementById('optGroupsContainer').innerHTML = item.options.map((g, gIdx) => {
                 const inputType = g.type === 'multi' ? 'checkbox' : 'radio';
                 return `<div class="opt-group">
-                    <div class="opt-group-title">${escapeHTML(g.name)} ${g.required ? '<span class="opt-group-req">*必選</span>' : ''}</div>
-                    ${g.choices.map((c, cIdx) => `
-                        <label class="opt-choice">
-                            <input type="${inputType}" name="optGrp${gIdx}" value="${cIdx}" onchange="calcOptionSubtotal()" ${g.type !== 'multi' && cIdx === 0 && g.required ? 'checked' : ''}>
-                            <span class="opt-choice-label">${escapeHTML(c.label)}</span>
-                            ${c.price > 0 ? `<span class="opt-choice-price">+$${c.price}</span>` : ''}
-                        </label>
-                    `).join('')}
+                    <div class="opt-group-title">${escapeHTML(g.name)} ${g.required ? '<span class="opt-group-req">必選</span>' : ''}</div>
+                    ${g.choices.map((c, cIdx) => `<label class="opt-choice">
+                        <input type="${inputType}" name="optGrp${gIdx}" value="${cIdx}" onchange="calcOptionSubtotal()" ${g.type !== 'multi' && cIdx === 0 && g.required ? 'checked' : ''}>
+                        <span class="opt-choice-label">${escapeHTML(c.label)}</span>
+                        ${c.price > 0 ? `<span class="opt-choice-price">+$${c.price}</span>` : ''}
+                    </label>`).join('')}
                 </div>`;
             }).join('');
             calcOptionSubtotal();
             document.getElementById('optionsModal').classList.add('open');
         }
-
-        function closeOptionsModal() {
-            document.getElementById('optionsModal').classList.remove('open');
-            pendingItem = null;
-        }
-
+        function closeOptionsModal() { document.getElementById('optionsModal').classList.remove('open'); pendingItem = null; }
         function calcOptionSubtotal() {
-            if (!pendingItem) return;
-            let extra = 0;
-            pendingItem.options.forEach((g, gIdx) => {
-                document.querySelectorAll(`[name="optGrp${gIdx}"]:checked`).forEach(inp => {
-                    const c = g.choices[parseInt(inp.value)];
-                    if (c) extra += c.price || 0;
-                });
-            });
+            if (!pendingItem) return; let extra = 0;
+            pendingItem.options.forEach((g, gIdx) => { document.querySelectorAll(`[name="optGrp${gIdx}"]:checked`).forEach(inp => { const c = g.choices[parseInt(inp.value)]; if (c) extra += c.price || 0; }); });
             document.getElementById('optSubtotal').textContent = '$' + (pendingItem.price + extra);
         }
-
         function confirmAddToCart() {
-            if (!pendingItem) return;
-            const item = pendingItem;
-            // 驗證必選
-            for (let gIdx = 0; gIdx < item.options.length; gIdx++) {
-                const g = item.options[gIdx];
-                if (g.required) {
-                    const checked = document.querySelectorAll(`[name="optGrp${gIdx}"]:checked`);
-                    if (checked.length === 0) return showToast(`請選擇${g.name}`);
-                }
-            }
-            // 收集選項
-            const labels = [];
-            let extra = 0;
-            const selected = [];
-            item.options.forEach((g, gIdx) => {
-                const checked = document.querySelectorAll(`[name="optGrp${gIdx}"]:checked`);
-                checked.forEach(inp => {
-                    const c = g.choices[parseInt(inp.value)];
-                    if (c) {
-                        labels.push(c.label);
-                        extra += c.price || 0;
-                        selected.push({ group: g.name, label: c.label, price: c.price || 0 });
-                    }
-                });
-            });
-            const optionsLabel = labels.join(' ');
-            cart.push({ item, qty: 1, selectedOptions: selected, optionsLabel, optionsPrice: extra });
-            updateCartUI();
-            closeOptionsModal();
-            showToast(`已加入 ${item.name} ${optionsLabel}`);
+            if (!pendingItem) return; const item = pendingItem;
+            for (let gIdx = 0; gIdx < item.options.length; gIdx++) { if (item.options[gIdx].required && document.querySelectorAll(`[name="optGrp${gIdx}"]:checked`).length === 0) return showToast(`請選擇${item.options[gIdx].name}`); }
+            const labels = []; let extra = 0; const selected = [];
+            item.options.forEach((g, gIdx) => { document.querySelectorAll(`[name="optGrp${gIdx}"]:checked`).forEach(inp => { const c = g.choices[parseInt(inp.value)]; if (c) { labels.push(c.label); extra += c.price||0; selected.push({ group:g.name, label:c.label, price:c.price||0 }); } }); });
+            cart.push({ item, qty:1, selectedOptions:selected, optionsLabel:labels.join(' '), optionsPrice:extra });
+            updateCartUI(); saveCart(); closeOptionsModal(); showToast(`✓ ${item.name}`);
         }
 
-        // ===== 套餐組合 =====
+        // ===== Combo Modal =====
         function openComboModal(item) {
             document.getElementById('comboItemName').textContent = item.name;
             const groups = item.combo_config.groups;
-            const container = document.getElementById('comboGroupsContainer');
-            container.innerHTML = groups.map((g, gIdx) => {
+            document.getElementById('comboGroupsContainer').innerHTML = groups.map((g, gIdx) => {
                 const pickLabel = g.pick === -1 ? '任選' : `選 ${g.pick} 項`;
                 const inputType = g.pick === 1 ? 'radio' : 'checkbox';
-                // 找到群組中可選的品項
-                const groupItems = (g.items || []).map(id => menuItems.find(i => i.id === id)).filter(Boolean);
+                const groupItems = (g.items||[]).map(id => menuItems.find(i => i.id === id)).filter(Boolean);
                 return `<div class="opt-group">
-                    <div class="opt-group-title">${escapeHTML(g.name)} <span style="font-size:11px;color:#64748B;font-weight:400;">(${pickLabel})</span></div>
-                    ${groupItems.map((gi, iIdx) => `
-                        <label class="opt-choice">
-                            <input type="${inputType}" name="comboGrp${gIdx}" value="${gi.id}" onchange="calcComboSubtotal()">
-                            <span class="opt-choice-label">${escapeHTML(gi.name)}</span>
-                            <span class="opt-choice-price">$${gi.price}</span>
-                        </label>
-                    `).join('')}
-                    ${groupItems.length === 0 ? '<p style="font-size:12px;color:#94A3B8;">此群組暫無品項</p>' : ''}
+                    <div class="opt-group-title">${escapeHTML(g.name)} <span style="font-size:12px;color:#6B7280;font-weight:400;">(${pickLabel})</span></div>
+                    ${groupItems.map(gi => `<label class="opt-choice"><input type="${inputType}" name="comboGrp${gIdx}" value="${gi.id}" onchange="calcComboSubtotal()"><span class="opt-choice-label">${escapeHTML(gi.name)}</span><span class="opt-choice-price">$${gi.price}</span></label>`).join('')}
+                    ${groupItems.length === 0 ? '<p style="font-size:13px;color:#9CA3AF;">此群組暫無品項</p>' : ''}
                 </div>`;
             }).join('');
             document.getElementById('comboSubtotal').textContent = '$' + item.price;
             document.getElementById('comboModal').classList.add('open');
         }
-        function closeComboModal() {
-            document.getElementById('comboModal').classList.remove('open');
-            pendingComboItem = null;
-        }
-        function calcComboSubtotal() {
-            if (!pendingComboItem) return;
-            document.getElementById('comboSubtotal').textContent = '$' + pendingComboItem.price;
-        }
+        function closeComboModal() { document.getElementById('comboModal').classList.remove('open'); pendingComboItem = null; }
+        function calcComboSubtotal() { if (pendingComboItem) document.getElementById('comboSubtotal').textContent = '$' + pendingComboItem.price; }
         function confirmAddCombo() {
-            if (!pendingComboItem) return;
-            const item = pendingComboItem;
-            const groups = item.combo_config.groups;
-            const labels = [];
-            // 驗證每個群組的選擇數量
-            for (let gIdx = 0; gIdx < groups.length; gIdx++) {
-                const g = groups[gIdx];
-                const checked = document.querySelectorAll(`[name="comboGrp${gIdx}"]:checked`);
-                if (g.pick > 0 && checked.length !== g.pick) {
-                    return showToast(`${g.name}：請選擇 ${g.pick} 項`);
-                }
-                checked.forEach(inp => {
-                    const gi = menuItems.find(i => i.id === inp.value);
-                    if (gi) labels.push(gi.name);
-                });
-            }
-            const optionsLabel = labels.join('+');
-            cart.push({ item, qty: 1, selectedOptions: null, optionsLabel, optionsPrice: 0 });
-            updateCartUI();
-            closeComboModal();
-            showToast(`已加入 ${item.name}`);
+            if (!pendingComboItem) return; const item = pendingComboItem; const groups = item.combo_config.groups; const labels = [];
+            for (let gIdx = 0; gIdx < groups.length; gIdx++) { const g = groups[gIdx]; const checked = document.querySelectorAll(`[name="comboGrp${gIdx}"]:checked`); if (g.pick > 0 && checked.length !== g.pick) return showToast(`${g.name}：請選擇 ${g.pick} 項`); checked.forEach(inp => { const gi = menuItems.find(i => i.id === inp.value); if (gi) labels.push(gi.name); }); }
+            cart.push({ item, qty:1, selectedOptions:null, optionsLabel:labels.join('+'), optionsPrice:0 });
+            updateCartUI(); saveCart(); closeComboModal(); showToast(`✓ ${item.name}`);
         }
 
-        // ===== 購物車 =====
-        function updateCartQty(cartIdx, delta) {
-            cart[cartIdx].qty += delta;
-            if (cart[cartIdx].qty <= 0) cart.splice(cartIdx, 1);
-            updateCartUI();
-            renderCartItems();
+        // ===== Cart =====
+        function updateCartQty(idx, delta) {
+            cart[idx].qty += delta;
+            if (cart[idx].qty <= 0) cart.splice(idx, 1);
+            updateCartUI(); saveCart(); renderCartItems();
         }
-
         function updateCartUI() {
-            const total = cart.reduce((s, c) => s + c.qty, 0);
-            const fab = document.getElementById('cartFab');
-            fab.style.display = total > 0 ? 'block' : 'none';
-            document.getElementById('cartBadge').textContent = total;
+            const qty = cart.reduce((s,c) => s + c.qty, 0);
+            const price = cart.reduce((s,c) => s + (c.item.price + (c.optionsPrice||0)) * c.qty, 0);
+            const el = document.getElementById('floatingCart');
+            el.style.display = qty > 0 ? 'flex' : 'none';
+            document.getElementById('cartBadge').textContent = qty;
+            document.getElementById('cartTotalPrice').textContent = '$' + price;
         }
-
-        function openCart() {
-            if (cart.length === 0) return showToast('購物車是空的');
-            renderCartItems();
-            document.getElementById('cartModal').classList.add('open');
-        }
+        function openCart() { if (cart.length === 0) return showToast('購物車是空的'); renderCartItems(); document.getElementById('cartModal').classList.add('open'); }
         function closeCart() { document.getElementById('cartModal').classList.remove('open'); }
-
         function renderCartItems() {
-            const el = document.getElementById('cartItems');
-            el.innerHTML = cart.map((c, idx) => {
-                const unitPrice = c.item.price + (c.optionsPrice || 0);
-                return `<div class="cart-item">
-                    <div style="flex:1;">
-                        <div class="ci-name">${escapeHTML(c.item.name)}</div>
-                        ${c.optionsLabel ? `<div class="ci-opts">${escapeHTML(c.optionsLabel)}</div>` : ''}
-                    </div>
-                    <div class="qty-ctrl">
-                        <button class="qty-btn" onclick="updateCartQty(${idx}, -1)">−</button>
-                        <span class="qty-num">${c.qty}</span>
-                        <button class="qty-btn" onclick="updateCartQty(${idx}, 1)">+</button>
-                    </div>
-                    <div class="ci-price">$${unitPrice * c.qty}</div>
-                </div>`;
+            document.getElementById('cartItems').innerHTML = cart.map((c,idx) => {
+                const up = c.item.price + (c.optionsPrice||0);
+                return `<div class="cart-item"><div class="ci-info"><div class="ci-name">${escapeHTML(c.item.name)}</div>${c.optionsLabel ? `<div class="ci-opts">${escapeHTML(c.optionsLabel)}</div>`:''}</div><div class="qty-ctrl"><button class="qty-btn" onclick="updateCartQty(${idx},-1)">−</button><span class="qty-num">${c.qty}</span><button class="qty-btn" onclick="updateCartQty(${idx},1)">+</button></div><div class="ci-price">$${up*c.qty}</div></div>`;
             }).join('');
-            const total = cart.reduce((s, c) => s + (c.item.price + (c.optionsPrice || 0)) * c.qty, 0);
-            document.getElementById('cartTotal').textContent = '$' + total;
+            document.getElementById('cartTotal').textContent = '$' + cart.reduce((s,c) => s + (c.item.price+(c.optionsPrice||0))*c.qty, 0);
         }
 
-        // ===== 送出訂單 =====
+        // ===== Submit Order =====
         async function submitOrder() {
             const name = document.getElementById('custName').value.trim();
             if (!name) return showToast('請輸入姓名');
             if (cart.length === 0) return showToast('購物車是空的');
-
             const btn = document.getElementById('submitOrderBtn');
             btn.disabled = true; btn.textContent = '送出中...';
-
             try {
-                const items = cart.map(c => ({
-                    name: c.item.name,
-                    qty: c.qty,
-                    price: c.item.price + (c.optionsPrice || 0),
-                    subtotal: (c.item.price + (c.optionsPrice || 0)) * c.qty,
-                    options: c.optionsLabel || null
-                }));
-                const total = items.reduce((s, i) => s + i.subtotal, 0);
+                const items = cart.map(c => ({ name:c.item.name, qty:c.qty, price:c.item.price+(c.optionsPrice||0), subtotal:(c.item.price+(c.optionsPrice||0))*c.qty, options:c.optionsLabel||null }));
+                const total = items.reduce((s,i) => s+i.subtotal, 0);
                 const orderNumber = 'O' + Date.now().toString(36).toUpperCase();
-
-                // 取餐號碼：今日該店最大 + 1
                 const today = new Date().toISOString().split('T')[0];
-                const { data: maxOrder } = await sb.from('orders')
-                    .select('pickup_number')
-                    .eq('store_id', store.id)
-                    .gte('created_at', today + 'T00:00:00')
-                    .order('pickup_number', { ascending: false })
-                    .limit(1)
-                    .maybeSingle();
+                const { data: maxOrder } = await sb.from('orders').select('pickup_number').eq('store_id', store.id).gte('created_at', today+'T00:00:00').order('pickup_number',{ascending:false}).limit(1).maybeSingle();
                 const pickupNumber = (maxOrder?.pickup_number || 0) + 1;
-
                 const pickupTime = document.getElementById('pickupTime').value || null;
-
-                const record = {
-                    store_id: store.id,
-                    order_number: orderNumber,
-                    pickup_number: pickupNumber,
-                    customer_name: name,
-                    customer_phone: document.getElementById('custPhone').value.trim() || null,
-                    customer_line_id: lineUserId || null,
-                    order_type: document.getElementById('orderType').value,
-                    table_number: document.getElementById('tableNumber').value.trim() || null,
-                    pickup_time: pickupTime,
-                    items: items,
-                    total: total,
-                    notes: document.getElementById('orderNotes').value.trim() || null,
-                    status: 'pending'
-                };
-
+                const record = { store_id:store.id, order_number:orderNumber, pickup_number:pickupNumber, customer_name:name, customer_phone:document.getElementById('custPhone').value.trim()||null, customer_line_id:lineUserId||null, order_type:document.getElementById('orderType').value, table_number:document.getElementById('tableNumber').value.trim()||null, pickup_time:pickupTime, items, total, notes:document.getElementById('orderNotes').value.trim()||null, status:'pending' };
                 const { data, error } = await sb.from('orders').insert(record).select().single();
                 if (error) throw error;
-
-                // LINE 群組推播新訂單
-                if (store.line_group_id) {
-                    try {
-                        const itemStr = items.map(i => `${i.name}${i.options ? '('+i.options+')' : ''} ×${i.qty}`).join('\n');
-                        const typeLabel = { dine_in: '內用', takeout: '外帶' };
-                        const msg = `🔔 新訂單 #${String(pickupNumber).padStart(3, '0')}\n客人：${name}\n${typeLabel[record.order_type] || ''}\n${itemStr}\n合計 $${total}`;
-                        await sb.functions.invoke('send-line-notify', { body: { groupId: store.line_group_id, message: msg } });
-                    } catch(e2) { console.warn('群組推播失敗', e2); }
-                }
-
-                // 集點
-                if (lineUserId && store.loyalty_config) {
-                    try {
-                        const lc = store.loyalty_config;
-                        const earnPts = Math.floor(total / (lc.spend_per_point || 50));
-                        if (earnPts > 0) {
-                            if (customerLoyalty) {
-                                await sb.from('loyalty_points').update({
-                                    points: (customerLoyalty.points || 0) + earnPts,
-                                    total_earned: (customerLoyalty.total_earned || 0) + earnPts,
-                                    updated_at: new Date().toISOString()
-                                }).eq('id', customerLoyalty.id);
-                            } else {
-                                await sb.from('loyalty_points').insert({
-                                    store_id: store.id,
-                                    customer_line_id: lineUserId,
-                                    points: earnPts,
-                                    total_earned: earnPts
-                                });
-                            }
-                        }
-                    } catch(e2) { console.warn('集點失敗', e2); }
-                }
-
+                // LINE group push
+                if (store.line_group_id) { try { const itemStr = items.map(i=>`${i.name}${i.options?'('+i.options+')':''} ×${i.qty}`).join('\n'); const tl={dine_in:'內用',takeout:'外帶'}; await sb.functions.invoke('send-line-notify',{body:{groupId:store.line_group_id,message:`🔔 新訂單 #${String(pickupNumber).padStart(3,'0')}\n客人：${name}\n${tl[record.order_type]||''}\n${itemStr}\n合計 $${total}`}}); } catch(e2){} }
+                // Loyalty
+                if (lineUserId && store.loyalty_config) { try { const lc=store.loyalty_config; const earnPts=Math.floor(total/(lc.spend_per_point||50)); if(earnPts>0){ if(customerLoyalty){await sb.from('loyalty_points').update({points:(customerLoyalty.points||0)+earnPts,total_earned:(customerLoyalty.total_earned||0)+earnPts,updated_at:new Date().toISOString()}).eq('id',customerLoyalty.id);}else{await sb.from('loyalty_points').insert({store_id:store.id,customer_line_id:lineUserId,points:earnPts,total_earned:earnPts});} } } catch(e2){} }
                 showOrderConfirmation(data, items, pickupNumber);
-                cart = [];
-                updateCartUI();
-                closeCart();
-            } catch(e) {
-                console.error(e);
-                showToast('訂單送出失敗，請重試');
-            }
+                cart = []; saveCart(); updateCartUI(); closeCart();
+            } catch(e) { console.error(e); showToast('訂單送出失敗，請重試'); }
             btn.disabled = false; btn.textContent = '送出訂單';
         }
 
         function showOrderConfirmation(order, items, pickupNumber) {
             document.getElementById('mainView').style.display = 'none';
+            document.getElementById('floatingCart').style.display = 'none';
             document.getElementById('orderConfirmView').style.display = 'block';
-            document.getElementById('confirmStoreName').textContent = store.store_name;
-            document.getElementById('confirmPickup').textContent = '取餐號碼 #' + String(pickupNumber).padStart(3, '0');
+            document.getElementById('confirmPickup').textContent = '#' + String(pickupNumber).padStart(3,'0');
             document.getElementById('confirmOrderNo').textContent = '訂單編號 ' + order.order_number;
-
-            const typeLabel = { dine_in:'內用', takeout:'外帶', delivery:'外送' };
+            const tl = {dine_in:'內用',takeout:'外帶',delivery:'外送'};
             document.getElementById('confirmDetail').innerHTML = `
-                <div style="margin-bottom:12px;">
-                    <div style="font-size:13px;color:#64748B;margin-bottom:4px;">顧客</div>
-                    <div style="font-weight:600;">${escapeHTML(order.customer_name)} ${order.table_number ? '· 桌號 ' + escapeHTML(order.table_number) : ''}</div>
-                    <div style="font-size:13px;color:#64748B;">${typeLabel[order.order_type] || order.order_type} ${order.pickup_time ? '· 取餐 ' + escapeHTML(order.pickup_time) : ''}</div>
+                <div class="confirm-card">
+                    <h4>顧客資訊</h4>
+                    <div style="font-weight:600;">${escapeHTML(order.customer_name)}</div>
+                    <div style="font-size:13px;color:#6B7280;">${tl[order.order_type]||order.order_type}${order.table_number?' · 桌號 '+escapeHTML(order.table_number):''}${order.pickup_time?' · 取餐 '+escapeHTML(order.pickup_time):''}</div>
                 </div>
-                <div style="border-top:1px solid #F1F5F9;padding-top:8px;">
-                    ${items.map(i => `
-                        <div style="padding:4px 0;font-size:14px;">
-                            <div style="display:flex;justify-content:space-between;">
-                                <span>${escapeHTML(i.name)} x${i.qty}</span>
-                                <span style="font-weight:600;">$${i.subtotal}</span>
-                            </div>
-                            ${i.options ? '<div style="font-size:11px;color:#94A3B8;margin-left:12px;">' + escapeHTML(i.options) + '</div>' : ''}
-                        </div>
-                    `).join('')}
-                    <div style="display:flex;justify-content:space-between;padding:8px 0;border-top:1px solid #E2E8F0;margin-top:8px;font-weight:800;font-size:16px;">
-                        <span>合計</span>
-                        <span style="color:var(--theme, #4F46E5);">$${order.total}</span>
-                    </div>
+                <div class="confirm-card">
+                    <h4>訂單明細</h4>
+                    ${items.map(i=>`<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:14px;"><div>${escapeHTML(i.name)} ×${i.qty}${i.options?'<div style="font-size:11px;color:#9CA3AF;">'+escapeHTML(i.options)+'</div>':''}</div><div style="font-weight:700;">$${i.subtotal}</div></div>`).join('')}
+                    <div style="display:flex;justify-content:space-between;padding:12px 0 4px;border-top:2px solid #1a1a2e;margin-top:8px;font-weight:800;font-size:18px;"><span>合計</span><span style="color:var(--theme);">$${order.total}</span></div>
                 </div>
-                ${order.notes ? '<div style="margin-top:8px;font-size:13px;color:#64748B;">備註：' + escapeHTML(order.notes) + '</div>' : ''}
-            `;
+                ${order.notes?'<div class="confirm-card"><h4>備註</h4><p style="font-size:14px;">'+escapeHTML(order.notes)+'</p></div>':''}`;
         }
 
         function resetOrder() {
             document.getElementById('orderConfirmView').style.display = 'none';
             document.getElementById('mainView').style.display = 'block';
-            document.getElementById('custName').value = '';
-            document.getElementById('custPhone').value = '';
-            document.getElementById('tableNumber').value = '';
-            document.getElementById('orderNotes').value = '';
+            ['custName','custPhone','tableNumber','orderNotes'].forEach(id => document.getElementById(id).value = '');
             document.getElementById('pickupTime').value = '';
         }
 
