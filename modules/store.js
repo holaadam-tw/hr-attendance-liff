@@ -884,7 +884,7 @@ function loadStoreSettings() {
         <div>類型：${{ restaurant:'餐飲', service:'服務業', retail:'零售' }[s.store_type] || s.store_type}</div>
         ${s.phone ? '<div>電話：' + escapeHTML(s.phone) + '</div>' : ''}
         ${s.address ? '<div>地址：' + escapeHTML(s.address) + '</div>' : ''}
-        ${s.store_slug ? '<div>網址代碼：' + escapeHTML(s.store_slug) + '</div>' : ''}
+        ${s.store_slug ? '<div>商店代號：' + escapeHTML(s.store_slug) + '</div>' : ''}
     `;
     const bh = s.business_hours || {};
     const days = [['mon','一'],['tue','二'],['wed','三'],['thu','四'],['fri','五'],['sat','六'],['sun','日']];
