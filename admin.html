@@ -12,6 +12,66 @@
         #lcTable th, #lcTable td, #smTable th, #smTable td { border: 1px solid #F1F5F9; }
         #smTable td:hover { filter: brightness(0.92); }
         #lcTable th, #smTable th { position: sticky; top: 0; background: #fff; z-index: 1; }
+
+        /* ===== 菜單編輯器抽屜 ===== */
+        .mi-drawer-mask { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.45); z-index:9000; }
+        .mi-drawer { position:fixed; top:0; left:0; right:0; bottom:0; z-index:9001; max-width:520px; margin:0 auto; background:#F8FAFC; display:flex; flex-direction:column; animation:miSlideUp 0.28s ease-out; }
+        @keyframes miSlideUp { from { transform:translateY(100%); } to { transform:translateY(0); } }
+        .mi-drawer-header { display:flex; align-items:center; justify-content:space-between; padding:12px 16px; background:#fff; border-bottom:1px solid #E2E8F0; flex-shrink:0; }
+        .mi-drawer-body { flex:1; overflow-y:auto; padding:16px; -webkit-overflow-scrolling:touch; }
+        .mi-drawer-footer { display:flex; gap:10px; padding:12px 16px; background:#fff; border-top:1px solid #E2E8F0; flex-shrink:0; }
+        /* 分段卡片 */
+        .mi-section { background:#fff; border-radius:14px; border:1.5px solid #E2E8F0; margin-bottom:12px; overflow:hidden; }
+        .mi-section-hd { display:flex; align-items:center; justify-content:space-between; padding:13px 16px; cursor:pointer; user-select:none; }
+        .mi-section-hd .title { display:flex; align-items:center; gap:8px; font-size:14px; font-weight:800; color:#0F172A; }
+        .mi-section-hd .arrow { font-size:11px; color:#94A3B8; transition:transform 0.2s; }
+        .mi-section-hd .arrow.open { transform:rotate(180deg); }
+        .mi-section-bd { padding:16px; border-top:1px solid #F1F5F9; }
+        /* 表單欄位 */
+        .mi-field { margin-bottom:14px; }
+        .mi-field label { display:block; font-size:12px; font-weight:700; color:#334155; margin-bottom:5px; }
+        .mi-field label .req { color:#DC2626; }
+        .mi-field .hint { font-size:11px; color:#94A3B8; margin-top:3px; }
+        .mi-input { width:100%; padding:10px 12px; border:1.5px solid #E2E8F0; border-radius:10px; font-size:14px; color:#0F172A; outline:none; box-sizing:border-box; transition:border-color 0.2s; background:#fff; }
+        .mi-input:focus { border-color:#4F46E5; }
+        .mi-select { width:100%; padding:10px 12px; border:1.5px solid #E2E8F0; border-radius:10px; font-size:14px; color:#0F172A; background:#fff; }
+        /* 品項卡片 */
+        .mi-card { display:flex; align-items:center; gap:12px; padding:12px; background:#fff; border-radius:14px; border:1px solid #E2E8F0; margin-bottom:8px; transition:opacity 0.2s; }
+        .mi-card.sold-out { opacity:0.55; }
+        .mi-card-img { width:56px; height:56px; border-radius:12px; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-size:24px; background:linear-gradient(135deg,#EEF2FF,#F1F5F9); border:1px solid #F1F5F9; overflow:hidden; }
+        .mi-card-img img { width:100%; height:100%; object-fit:cover; }
+        .mi-card-info { flex:1; min-width:0; }
+        .mi-card-info .name { font-size:14px; font-weight:800; color:#0F172A; display:flex; align-items:center; gap:5px; flex-wrap:wrap; }
+        .mi-card-info .meta { font-size:12px; color:#64748B; display:flex; align-items:center; gap:6px; margin-top:3px; }
+        .mi-card-info .meta .price { font-weight:800; color:#4F46E5; }
+        .mi-badge { padding:2px 7px; border-radius:5px; font-size:10px; font-weight:700; white-space:nowrap; }
+        .mi-badge-combo { background:#FEF3C7; color:#92400E; }
+        .mi-badge-sold { background:#FEE2E2; color:#DC2626; }
+        .mi-badge-opt { background:#EEF2FF; color:#4F46E5; }
+        /* 選項群組編輯器 */
+        .og-card { border:1.5px solid #E2E8F0; border-radius:12px; padding:12px; margin-bottom:10px; background:#F8FAFC; }
+        .og-header { display:flex; gap:6px; margin-bottom:10px; align-items:center; flex-wrap:wrap; }
+        .og-toggle-group { display:flex; background:#F1F5F9; border-radius:8px; overflow:hidden; }
+        .og-toggle { padding:5px 10px; border:none; font-size:11px; font-weight:700; cursor:pointer; }
+        .og-toggle.active { background:#4F46E5; color:#fff; }
+        .og-toggle:not(.active) { background:transparent; color:#64748B; }
+        .og-req-btn { padding:5px 10px; border:1.5px solid #E2E8F0; border-radius:8px; font-size:11px; font-weight:700; cursor:pointer; white-space:nowrap; }
+        .og-req-btn.on { border-color:#4F46E5; background:#EEF2FF; color:#4F46E5; }
+        .og-req-btn.off { border-color:#E2E8F0; background:#fff; color:#94A3B8; }
+        .og-del-btn { width:28px; height:28px; border:none; border-radius:8px; background:#FEE2E2; color:#DC2626; font-size:13px; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+        .og-choice { display:flex; gap:6px; margin-bottom:6px; align-items:center; padding-left:24px; }
+        .og-choice-name { flex:1; padding:7px 10px; border:1px solid #E2E8F0; border-radius:8px; font-size:12px; outline:none; background:#fff; }
+        .og-price-wrap { position:relative; width:72px; }
+        .og-price-wrap .prefix { position:absolute; left:8px; top:50%; transform:translateY(-50%); font-size:11px; color:#94A3B8; }
+        .og-price-wrap input { width:100%; padding:7px 10px 7px 28px; border:1px solid #E2E8F0; border-radius:8px; font-size:12px; outline:none; box-sizing:border-box; background:#fff; }
+        /* 客人預覽 */
+        .mi-preview { background:#F8FAFC; border-radius:16px; padding:16px; border:1.5px solid #E2E8F0; }
+        .mi-preview-phone { background:#fff; border-radius:14px; overflow:hidden; box-shadow:0 2px 12px rgba(0,0,0,0.06); border:1px solid #F1F5F9; }
+        .mi-preview-img { height:120px; background:linear-gradient(135deg,#EEF2FF,#F1F5F9); display:flex; align-items:center; justify-content:center; font-size:36px; overflow:hidden; }
+        .mi-preview-img img { width:100%; height:100%; object-fit:cover; }
+        .mi-preview-bd { padding:14px; }
+        .mi-tpl-btn { padding:4px 12px; border:1.5px solid #E2E8F0; border-radius:8px; background:#fff; font-size:12px; font-weight:600; color:#475569; cursor:pointer; transition:all 0.15s; }
+        .mi-tpl-btn:hover { border-color:#4F46E5; color:#4F46E5; }
     </style>
 </head>
 <body>
@@ -1133,64 +1193,119 @@
                     </div>
                     <!-- 品項管理 -->
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                        <div style="font-weight:700;font-size:14px;">🍽️ 品項</div>
+                        <div>
+                            <span style="font-weight:700;font-size:14px;">🍽️ 品項</span>
+                            <span id="menuItemCount" style="font-size:12px;color:#94A3B8;margin-left:6px;"></span>
+                        </div>
                         <button onclick="showCopyMenuModal()" style="padding:6px 12px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;font-size:11px;cursor:pointer;">📋 複製菜單到其他商店</button>
                     </div>
-                    <button onclick="showMenuItemForm()" style="width:100%;padding:10px;border:1px dashed #4F46E5;border-radius:10px;background:#EEF2FF;color:#4F46E5;font-weight:600;font-size:13px;cursor:pointer;margin-bottom:12px;">+ 新增品項</button>
+                    <button onclick="showMenuItemForm()" style="width:100%;padding:12px;border:2px dashed #4F46E5;border-radius:14px;background:#EEF2FF;color:#4F46E5;font-weight:800;font-size:14px;cursor:pointer;margin-bottom:12px;">+ 新增品項</button>
                     <div id="menuItemList"></div>
-                    <!-- 新增/編輯品項表單 -->
-                    <div id="menuItemForm" style="display:none;background:#F8FAFC;border-radius:12px;padding:14px;margin-top:12px;">
+
+                    <!-- 全螢幕抽屜：新增/編輯品項 -->
+                    <div id="miDrawerMask" class="mi-drawer-mask" style="display:none;" onclick="cancelMenuItemForm()"></div>
+                    <div id="miDrawer" class="mi-drawer" style="display:none;">
                         <input type="hidden" id="miEditId">
-                        <div class="form-group">
-                            <label style="font-size:12px;">品名 *</label>
-                            <input type="text" id="miName" placeholder="例：招牌牛肉麵" style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;box-sizing:border-box;">
+                        <input type="hidden" id="miImageUrl">
+                        <input type="file" id="miImageFile" accept="image/*" onchange="handleMenuImageUpload(this)" style="display:none;">
+                        <!-- 頂部欄 -->
+                        <div class="mi-drawer-header">
+                            <button onclick="cancelMenuItemForm()" style="border:none;background:none;font-size:14px;font-weight:700;color:#64748B;cursor:pointer;padding:6px 0;">✕ 取消</button>
+                            <span id="miDrawerTitle" style="font-size:15px;font-weight:900;color:#0F172A;">新增品項</span>
+                            <button onclick="toggleMiPreview()" id="miPreviewBtn" style="border:1.5px solid #E2E8F0;background:#fff;color:#64748B;border-radius:8px;font-size:11px;font-weight:700;padding:6px 10px;cursor:pointer;">👁 預覽</button>
                         </div>
-                        <div class="form-group">
-                            <label style="font-size:12px;">分類</label>
-                            <select id="miCategory" style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;"></select>
-                        </div>
-                        <div class="form-group">
-                            <label style="font-size:12px;">價格 *</label>
-                            <input type="number" id="miPrice" min="0" placeholder="0" style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;box-sizing:border-box;">
-                        </div>
-                        <div class="form-group">
-                            <label style="font-size:12px;">說明</label>
-                            <input type="text" id="miDesc" placeholder="選填" style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;box-sizing:border-box;">
-                        </div>
-                        <!-- 品項圖片 -->
-                        <div class="form-group">
-                            <label style="font-size:12px;">圖片</label>
-                            <div style="display:flex;align-items:center;gap:8px;">
-                                <img id="miImagePreview" style="width:60px;height:60px;border-radius:8px;object-fit:cover;display:none;border:1px solid #E2E8F0;">
-                                <button type="button" onclick="document.getElementById('miImageFile').click()" style="padding:8px 14px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;font-size:12px;cursor:pointer;">📷 上傳圖片</button>
-                                <input type="file" id="miImageFile" accept="image/*" onchange="handleMenuImageUpload(this)" style="display:none;">
+                        <!-- 可捲動內容 -->
+                        <div class="mi-drawer-body">
+                            <!-- 預覽面板 -->
+                            <div id="miPreviewPanel" style="display:none;"></div>
+                            <!-- 表單面板 -->
+                            <div id="miFormPanel">
+                                <!-- Section 1: 基本資訊 -->
+                                <div class="mi-section">
+                                    <div class="mi-section-hd" onclick="toggleMiSection(this)">
+                                        <div class="title"><span>📝</span> 基本資訊</div>
+                                        <span class="arrow open">▼</span>
+                                    </div>
+                                    <div class="mi-section-bd">
+                                        <div class="mi-field">
+                                            <label>品名 <span class="req">*</span></label>
+                                            <input type="text" id="miName" class="mi-input" placeholder="例：招牌牛肉麵">
+                                        </div>
+                                        <div style="display:flex;gap:10px;">
+                                            <div class="mi-field" style="flex:1;">
+                                                <label>分類</label>
+                                                <select id="miCategory" class="mi-select"></select>
+                                            </div>
+                                            <div class="mi-field" style="flex:1;">
+                                                <label>價格 <span class="req">*</span></label>
+                                                <div style="position:relative;">
+                                                    <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:14px;font-weight:800;color:#94A3B8;">$</span>
+                                                    <input type="number" id="miPrice" class="mi-input" min="0" placeholder="0" style="padding-left:28px;">
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="mi-field">
+                                            <label>說明</label>
+                                            <input type="text" id="miDesc" class="mi-input" placeholder="簡短描述品項特色">
+                                            <div class="hint">選填，會顯示在客人點餐頁面</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- Section 2: 品項圖片 -->
+                                <div class="mi-section">
+                                    <div class="mi-section-hd" onclick="toggleMiSection(this)">
+                                        <div class="title"><span>📷</span> 品項圖片</div>
+                                        <span class="arrow">▼</span>
+                                    </div>
+                                    <div class="mi-section-bd" style="display:none;">
+                                        <div id="miImageArea" onclick="document.getElementById('miImageFile').click()" style="border:2px dashed #CBD5E1;border-radius:14px;padding:20px;text-align:center;cursor:pointer;background:#F8FAFC;">
+                                            <img id="miImagePreview" style="width:100px;height:100px;border-radius:12px;object-fit:cover;display:none;border:1px solid #E2E8F0;margin:0 auto 8px;">
+                                            <div id="miImagePlaceholder">
+                                                <div style="font-size:32px;margin-bottom:4px;">📷</div>
+                                                <div style="font-size:12px;font-weight:700;color:#64748B;">點擊上傳品項圖片</div>
+                                                <div style="font-size:11px;color:#94A3B8;margin-top:2px;">建議 400×400，JPG/PNG</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- Section 3: 客製化選項 -->
+                                <div class="mi-section">
+                                    <div class="mi-section-hd" onclick="toggleMiSection(this)">
+                                        <div class="title"><span>🎛</span> 客製化選項 <span id="miOptBadge" class="mi-badge mi-badge-opt" style="display:none;"></span></div>
+                                        <span class="arrow">▼</span>
+                                    </div>
+                                    <div class="mi-section-bd" id="miOptionsSection" style="display:none;">
+                                        <div id="miOptionsEditor"></div>
+                                    </div>
+                                </div>
+                                <!-- Section 4: 套餐組合 -->
+                                <div class="mi-section">
+                                    <div class="mi-section-hd" onclick="toggleMiSection(this)">
+                                        <div class="title"><span>🍱</span> 套餐組合</div>
+                                        <span class="arrow">▼</span>
+                                    </div>
+                                    <div class="mi-section-bd" id="miComboSection" style="display:none;">
+                                        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:8px 0;">
+                                            <div id="miComboToggle" onclick="toggleComboSwitch()" style="width:44px;height:24px;border-radius:12px;background:#CBD5E1;position:relative;cursor:pointer;transition:background 0.2s;">
+                                                <div id="miComboKnob" style="width:20px;height:20px;border-radius:10px;background:#fff;position:absolute;top:2px;left:2px;transition:left 0.2s;box-shadow:0 1px 3px rgba(0,0,0,0.2);"></div>
+                                            </div>
+                                            <span id="miComboLabel" style="font-size:13px;font-weight:700;color:#64748B;">此品項為套餐組合</span>
+                                        </label>
+                                        <div id="miComboEditor" style="display:none;margin-top:8px;">
+                                            <div style="margin-bottom:10px;padding:12px;background:#EEF2FF;border-radius:10px;font-size:12px;color:#4F46E5;line-height:1.6;">
+                                                💡 套餐模式下，客人可從多個群組中各選一項組合。
+                                            </div>
+                                            <div id="miComboGroups"></div>
+                                            <button type="button" onclick="addComboGroup()" style="width:100%;padding:10px;border:1.5px dashed #CBD5E1;border-radius:10px;background:transparent;font-size:12px;font-weight:700;color:#64748B;cursor:pointer;">+ 新增套餐群組</button>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
-                            <input type="hidden" id="miImageUrl">
                         </div>
-                        <!-- 客製化選項 -->
-                        <div class="form-group">
-                            <label style="font-size:12px;">客製化選項</label>
-                            <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;">
-                                <button type="button" onclick="applyOptionTemplate('drink')" style="padding:4px 10px;border:1px solid #E2E8F0;border-radius:6px;background:#fff;font-size:11px;cursor:pointer;">☕ 飲料（甜度+冰量）</button>
-                                <button type="button" onclick="applyOptionTemplate('food')" style="padding:4px 10px;border:1px solid #E2E8F0;border-radius:6px;background:#fff;font-size:11px;cursor:pointer;">🍜 餐點（辣度+加料）</button>
-                            </div>
-                            <div id="miOptionsEditor"></div>
-                            <button type="button" onclick="addOptionGroup()" style="padding:6px 12px;border:1px dashed #94A3B8;border-radius:8px;background:#fff;font-size:11px;cursor:pointer;color:#64748B;margin-top:4px;">+ 新增選項群組</button>
-                        </div>
-                        <!-- 套餐組合 -->
-                        <div class="form-group">
-                            <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer;">
-                                <input type="checkbox" id="miIsCombo" onchange="toggleComboEditor()"> 🍱 此品項為套餐組合
-                            </label>
-                            <div id="miComboEditor" style="display:none;margin-top:8px;">
-                                <p style="font-size:11px;color:#94A3B8;margin-bottom:8px;">設定套餐包含的群組，每個群組可設定可選品項與選擇數量</p>
-                                <div id="miComboGroups"></div>
-                                <button type="button" onclick="addComboGroup()" style="padding:6px 12px;border:1px dashed #94A3B8;border-radius:8px;background:#fff;font-size:11px;cursor:pointer;color:#64748B;margin-top:4px;">+ 新增套餐群組</button>
-                            </div>
-                        </div>
-                        <div style="display:flex;gap:8px;margin-top:8px;">
-                            <button onclick="cancelMenuItemForm()" style="flex:1;padding:10px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;font-size:13px;cursor:pointer;">取消</button>
-                            <button onclick="saveMenuItem()" style="flex:1;padding:10px;border:none;border-radius:8px;background:#059669;color:#fff;font-weight:600;font-size:13px;cursor:pointer;">儲存</button>
+                        <!-- 底部操作列 -->
+                        <div class="mi-drawer-footer">
+                            <button id="miDeleteBtn" onclick="deleteMenuItem()" style="display:none;padding:14px 16px;border:1.5px solid #DC2626;border-radius:12px;background:#fff;color:#DC2626;font-size:13px;font-weight:700;cursor:pointer;">🗑</button>
+                            <button onclick="saveMenuItem()" id="miSaveBtn" style="flex:1;padding:14px;border:none;border-radius:12px;background:linear-gradient(135deg,#059669,#047857);color:#fff;font-size:15px;font-weight:800;cursor:pointer;transition:all 0.2s;">✅ 新增品項</button>
                         </div>
                     </div>
                 </div>
@@ -5142,63 +5257,235 @@
         }
         function renderMenuItemList() {
             const el = document.getElementById('menuItemList');
-            if (smItems.length === 0) { el.innerHTML = '<p style="font-size:12px;color:#94A3B8;text-align:center;">尚無品項</p>'; return; }
-            el.innerHTML = smItems.map(i => {
-                const imgThumb = i.image_url ? `<img src="${i.image_url}" style="width:40px;height:40px;border-radius:6px;object-fit:cover;">` : '';
-                const optCount = (i.options && Array.isArray(i.options)) ? i.options.length : 0;
-                return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #F1F5F9;">
-                    ${imgThumb}
-                    <div style="flex:1;min-width:0;">
-                        <div style="font-weight:600;font-size:13px;">${escapeHTML(i.name)} ${i.is_combo ? '<span style="color:#D97706;font-size:10px;background:#FEF3C7;padding:1px 6px;border-radius:4px;">🍱套餐</span>' : ''} ${!i.is_available ? '<span style="color:#EF4444;font-size:11px;">售完</span>' : ''} ${optCount ? '<span style="color:#94A3B8;font-size:10px;">' + optCount + '組選項</span>' : ''}</div>
-                        <div style="font-size:11px;color:#64748B;">${i.menu_categories?.name || '未分類'} · $${i.price}</div>
-                    </div>
-                    <button onclick="editMenuItem('${i.id}')" style="padding:4px 10px;border:1px solid #E2E8F0;border-radius:6px;background:#fff;font-size:11px;cursor:pointer;">編輯</button>
-                    <button onclick="toggleItemAvail('${i.id}', ${!i.is_available})" style="padding:4px 10px;border:1px solid ${i.is_available ? '#E2E8F0' : '#DC2626'};border-radius:6px;background:${i.is_available ? '#fff' : '#FEF2F2'};font-size:11px;cursor:pointer;color:${i.is_available ? '' : '#DC2626'};font-weight:${i.is_available ? 'normal' : '700'};">${i.is_available ? '標售完' : '恢復上架'}</button>
-                </div>`;
-            }).join('');
+            const countEl = document.getElementById('menuItemCount');
+            if (countEl) {
+                const avail = smItems.filter(i => i.is_available !== false).length;
+                countEl.textContent = smItems.length + ' 個品項 · ' + avail + ' 個上架中';
+            }
+            if (smItems.length === 0) { el.innerHTML = '<p style="font-size:12px;color:#94A3B8;text-align:center;padding:20px;">尚無品項，點擊上方按鈕新增</p>'; return; }
+            // 按分類分組
+            const grouped = {};
+            smItems.forEach(i => {
+                const catName = i.menu_categories?.name || '未分類';
+                const catId = i.category_id || '__none__';
+                if (!grouped[catId]) grouped[catId] = { name: catName, items: [] };
+                grouped[catId].items.push(i);
+            });
+            let html = '';
+            for (const catId of Object.keys(grouped)) {
+                const g = grouped[catId];
+                const cat = smCategories.find(c => c.id === catId);
+                html += `<div style="margin-bottom:16px;">
+                    <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;padding:0 4px;">
+                        <span style="font-size:13px;font-weight:800;color:#334155;">${escapeHTML(g.name)}</span>
+                        <span style="font-size:11px;color:#94A3B8;">${g.items.length}</span>
+                    </div>`;
+                html += g.items.map(i => {
+                    const optCount = (i.options && Array.isArray(i.options)) ? i.options.length : 0;
+                    const imgHtml = i.image_url
+                        ? `<div class="mi-card-img"><img src="${i.image_url}" loading="lazy"></div>`
+                        : `<div class="mi-card-img">🍽</div>`;
+                    let badges = '';
+                    if (i.is_combo) badges += '<span class="mi-badge mi-badge-combo">套餐</span>';
+                    if (!i.is_available) badges += '<span class="mi-badge mi-badge-sold">售完</span>';
+                    return `<div class="mi-card${i.is_available === false ? ' sold-out' : ''}">
+                        ${imgHtml}
+                        <div class="mi-card-info">
+                            <div class="name">${escapeHTML(i.name)} ${badges}</div>
+                            <div class="meta">
+                                <span class="price">$${i.price}</span>
+                                ${optCount ? '<span>' + optCount + '組選項</span>' : ''}
+                            </div>
+                        </div>
+                        <div style="display:flex;gap:4px;flex-shrink:0;">
+                            <button onclick="toggleItemAvail('${i.id}',${!i.is_available})" style="padding:6px 10px;border:1px solid ${i.is_available ? '#E2E8F0' : '#059669'};border-radius:8px;background:${i.is_available ? '#fff' : '#ECFDF5'};color:${i.is_available ? '#64748B' : '#059669'};font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">${i.is_available !== false ? '標售完' : '上架'}</button>
+                            <button onclick="editMenuItem('${i.id}')" style="padding:6px 10px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;color:#4F46E5;font-size:11px;font-weight:700;cursor:pointer;">編輯</button>
+                        </div>
+                    </div>`;
+                }).join('');
+                html += '</div>';
+            }
+            el.innerHTML = html;
         }
 
+        // --- 全螢幕抽屜 ---
+        let miIsComboOn = false;
+        let miPreviewMode = false;
+
         function showMenuItemForm(itemId) {
-            document.getElementById('menuItemForm').style.display = 'block';
+            const drawer = document.getElementById('miDrawer');
+            const mask = document.getElementById('miDrawerMask');
+            drawer.style.display = 'flex';
+            mask.style.display = 'block';
+            miPreviewMode = false;
+            document.getElementById('miPreviewPanel').style.display = 'none';
+            document.getElementById('miFormPanel').style.display = '';
+            document.getElementById('miPreviewBtn').style.borderColor = '#E2E8F0';
+            document.getElementById('miPreviewBtn').style.background = '#fff';
+            document.getElementById('miPreviewBtn').style.color = '#64748B';
+
             if (itemId) {
                 const i = smItems.find(x => x.id === itemId);
                 if (!i) return;
                 document.getElementById('miEditId').value = i.id;
+                document.getElementById('miDrawerTitle').textContent = '編輯品項';
+                document.getElementById('miSaveBtn').textContent = '✅ 更新品項';
+                document.getElementById('miDeleteBtn').style.display = '';
                 document.getElementById('miName').value = i.name;
                 document.getElementById('miCategory').value = i.category_id || '';
                 document.getElementById('miPrice').value = i.price;
                 document.getElementById('miDesc').value = i.description || '';
                 document.getElementById('miImageUrl').value = i.image_url || '';
                 const preview = document.getElementById('miImagePreview');
-                if (i.image_url) { preview.src = i.image_url; preview.style.display = ''; } else { preview.style.display = 'none'; }
+                const placeholder = document.getElementById('miImagePlaceholder');
+                if (i.image_url) { preview.src = i.image_url; preview.style.display = 'block'; placeholder.style.display = 'none'; }
+                else { preview.style.display = 'none'; placeholder.style.display = ''; }
                 miOptionGroups = (i.options && Array.isArray(i.options)) ? JSON.parse(JSON.stringify(i.options)) : [];
-                document.getElementById('miIsCombo').checked = !!i.is_combo;
+                miIsComboOn = !!i.is_combo;
                 miComboGroups = (i.combo_config && i.combo_config.groups) ? JSON.parse(JSON.stringify(i.combo_config.groups)) : [];
             } else {
                 document.getElementById('miEditId').value = '';
+                document.getElementById('miDrawerTitle').textContent = '新增品項';
+                document.getElementById('miSaveBtn').textContent = '✅ 新增品項';
+                document.getElementById('miDeleteBtn').style.display = 'none';
                 document.getElementById('miName').value = '';
                 document.getElementById('miCategory').value = '';
                 document.getElementById('miPrice').value = '';
                 document.getElementById('miDesc').value = '';
                 document.getElementById('miImageUrl').value = '';
                 document.getElementById('miImagePreview').style.display = 'none';
+                document.getElementById('miImagePlaceholder').style.display = '';
                 miOptionGroups = [];
-                document.getElementById('miIsCombo').checked = false;
+                miIsComboOn = false;
                 miComboGroups = [];
             }
+            updateComboSwitchUI();
             renderOptionEditor();
-            toggleComboEditor();
             renderComboEditor();
+            // 如果有選項，展開選項區
+            if (miOptionGroups.length > 0) {
+                const sec = document.getElementById('miOptionsSection');
+                if (sec) { sec.style.display = ''; sec.previousElementSibling.querySelector('.arrow').classList.add('open'); }
+            }
+            // 如果是套餐，展開套餐區
+            if (miIsComboOn) {
+                const sec = document.getElementById('miComboSection');
+                if (sec) { sec.style.display = ''; sec.previousElementSibling.querySelector('.arrow').classList.add('open'); }
+                document.getElementById('miComboEditor').style.display = '';
+            }
+            // 更新選項 badge
+            updateOptBadge();
         }
         function editMenuItem(id) { showMenuItemForm(id); }
-        function cancelMenuItemForm() { document.getElementById('menuItemForm').style.display = 'none'; }
+        function cancelMenuItemForm() {
+            document.getElementById('miDrawer').style.display = 'none';
+            document.getElementById('miDrawerMask').style.display = 'none';
+        }
+
+        function toggleMiSection(hd) {
+            const bd = hd.nextElementSibling;
+            const arrow = hd.querySelector('.arrow');
+            if (bd.style.display === 'none') {
+                bd.style.display = '';
+                arrow.classList.add('open');
+            } else {
+                bd.style.display = 'none';
+                arrow.classList.remove('open');
+            }
+        }
+
+        function toggleMiPreview() {
+            miPreviewMode = !miPreviewMode;
+            const btn = document.getElementById('miPreviewBtn');
+            if (miPreviewMode) {
+                syncOptionEditor();
+                document.getElementById('miFormPanel').style.display = 'none';
+                document.getElementById('miPreviewPanel').style.display = '';
+                btn.style.borderColor = '#4F46E5'; btn.style.background = '#EEF2FF'; btn.style.color = '#4F46E5';
+                renderMiPreview();
+            } else {
+                document.getElementById('miFormPanel').style.display = '';
+                document.getElementById('miPreviewPanel').style.display = 'none';
+                btn.style.borderColor = '#E2E8F0'; btn.style.background = '#fff'; btn.style.color = '#64748B';
+            }
+        }
+
+        function renderMiPreview() {
+            const name = document.getElementById('miName').value.trim() || '品名';
+            const price = parseFloat(document.getElementById('miPrice').value) || 0;
+            const desc = document.getElementById('miDesc').value.trim();
+            const imgUrl = document.getElementById('miImageUrl').value;
+            const imgHtml = imgUrl ? `<img src="${imgUrl}" style="width:100%;height:100%;object-fit:cover;">` : '📷';
+            let optHtml = '';
+            miOptionGroups.forEach(g => {
+                if (!g.name) return;
+                optHtml += `<div style="margin-bottom:10px;">
+                    <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+                        <span style="font-size:12px;font-weight:800;color:#1E293B;">${escapeHTML(g.name)}</span>
+                        ${g.required ? '<span style="font-size:9px;padding:1px 5px;background:#FEE2E2;color:#DC2626;border-radius:4px;font-weight:700;">必選</span>' : ''}
+                        <span style="font-size:10px;color:#94A3B8;">${g.type === 'single' ? '單選' : '可多選'}</span>
+                    </div>
+                    <div style="display:flex;flex-wrap:wrap;gap:4px;">
+                        ${(g.choices || []).filter(c => c.label).map((c, j) => {
+                            const sel = j === 0 && g.type === 'single';
+                            return `<span style="padding:5px 10px;border:1.5px solid ${sel ? '#4F46E5' : '#E2E8F0'};border-radius:8px;background:${sel ? '#EEF2FF' : '#fff'};font-size:12px;font-weight:600;color:${sel ? '#4F46E5' : '#334155'};">${escapeHTML(c.label)}${c.price > 0 ? '<span style="color:#94A3B8;margin-left:4px;">+$' + c.price + '</span>' : ''}</span>`;
+                        }).join('')}
+                    </div>
+                </div>`;
+            });
+            document.getElementById('miPreviewPanel').innerHTML = `
+                <div class="mi-preview">
+                    <div style="font-size:10px;font-weight:700;color:#94A3B8;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">📱 客人看到的樣子</div>
+                    <div class="mi-preview-phone">
+                        <div class="mi-preview-img">${imgHtml}</div>
+                        <div class="mi-preview-bd">
+                            <div style="font-size:16px;font-weight:800;color:#0F172A;margin-bottom:4px;">${escapeHTML(name)}</div>
+                            ${desc ? '<div style="font-size:12px;color:#64748B;margin-bottom:8px;">' + escapeHTML(desc) + '</div>' : ''}
+                            <div style="font-size:18px;font-weight:900;color:#4F46E5;margin-bottom:12px;">$ ${price}</div>
+                            ${optHtml}
+                            <button style="width:100%;padding:12px;border:none;border-radius:12px;background:linear-gradient(135deg,#4F46E5,#3730A3);color:#fff;font-size:14px;font-weight:800;margin-top:8px;cursor:default;">🛒 加入購物車 · $${price}</button>
+                        </div>
+                    </div>
+                </div>`;
+        }
+
+        function updateOptBadge() {
+            const badge = document.getElementById('miOptBadge');
+            if (miOptionGroups.length > 0) {
+                badge.textContent = miOptionGroups.length + '組';
+                badge.style.display = '';
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+
+        // --- 套餐 toggle switch ---
+        function toggleComboSwitch() {
+            miIsComboOn = !miIsComboOn;
+            updateComboSwitchUI();
+            document.getElementById('miComboEditor').style.display = miIsComboOn ? '' : 'none';
+        }
+        function updateComboSwitchUI() {
+            const toggle = document.getElementById('miComboToggle');
+            const knob = document.getElementById('miComboKnob');
+            const label = document.getElementById('miComboLabel');
+            if (miIsComboOn) {
+                toggle.style.background = '#4F46E5';
+                knob.style.left = '22px';
+                label.style.color = '#4F46E5';
+            } else {
+                toggle.style.background = '#CBD5E1';
+                knob.style.left = '2px';
+                label.style.color = '#64748B';
+            }
+        }
 
         async function saveMenuItem() {
             const name = document.getElementById('miName').value.trim();
             const price = parseFloat(document.getElementById('miPrice').value);
             if (!name) return showToast('請輸入品名');
             if (isNaN(price) || price < 0) return showToast('請輸入有效價格');
-            const isCombo = document.getElementById('miIsCombo').checked;
+            syncOptionEditor();
             syncComboEditor();
             const record = {
                 store_id: smCurrentStoreId, name,
@@ -5207,17 +5494,37 @@
                 description: document.getElementById('miDesc').value.trim() || null,
                 image_url: document.getElementById('miImageUrl').value || null,
                 options: miOptionGroups.length > 0 ? miOptionGroups : null,
-                is_combo: isCombo,
-                combo_config: isCombo && miComboGroups.length > 0 ? { groups: miComboGroups } : null
+                is_combo: miIsComboOn,
+                combo_config: miIsComboOn && miComboGroups.length > 0 ? { groups: miComboGroups } : null
             };
             try {
                 const editId = document.getElementById('miEditId').value;
-                if (editId) { record.updated_at = new Date().toISOString(); await sb.from('menu_items').update(record).eq('id', editId); }
-                else { record.sort_order = smItems.length; await sb.from('menu_items').insert(record); }
+                let res;
+                if (editId) {
+                    record.updated_at = new Date().toISOString();
+                    res = await sb.from('menu_items').update(record).eq('id', editId);
+                } else {
+                    record.sort_order = smItems.length;
+                    res = await sb.from('menu_items').insert(record);
+                }
+                if (res.error) throw res.error;
                 showToast('✅ 品項已儲存');
                 cancelMenuItemForm();
                 await loadMenuItems();
-            } catch(e) { showToast('❌ 儲存失敗'); }
+            } catch(e) { showToast('❌ 儲存失敗：' + (e.message || e)); }
+        }
+
+        async function deleteMenuItem() {
+            const editId = document.getElementById('miEditId').value;
+            if (!editId) return;
+            if (!confirm('確定要刪除此品項嗎？')) return;
+            try {
+                const res = await sb.from('menu_items').delete().eq('id', editId);
+                if (res.error) throw res.error;
+                showToast('✅ 品項已刪除');
+                cancelMenuItemForm();
+                await loadMenuItems();
+            } catch(e) { showToast('❌ 刪除失敗：' + (e.message || e)); }
         }
 
         async function toggleItemAvail(id, avail) {
@@ -5252,13 +5559,15 @@
                 const url = urlData?.publicUrl || urlData?.publicURL;
                 document.getElementById('miImageUrl').value = url;
                 const preview = document.getElementById('miImagePreview');
-                preview.src = url; preview.style.display = '';
+                preview.src = url; preview.style.display = 'block';
+                const placeholder = document.getElementById('miImagePlaceholder');
+                if (placeholder) placeholder.style.display = 'none';
                 showToast('✅ 圖片已上傳');
             } catch(e) { showToast('❌ 圖片上傳失敗：' + (e.message || e)); }
             input.value = '';
         }
 
-        // --- 客製化選項 ---
+        // --- 客製化選項（視覺化編輯器）---
         const OPTION_TEMPLATES = {
             drink: [
                 { name: '甜度', required: true, type: 'single', choices: [{label:'正常糖',price:0},{label:'少糖',price:0},{label:'半糖',price:0},{label:'微糖',price:0},{label:'無糖',price:0}] },
@@ -5267,28 +5576,45 @@
             food: [
                 { name: '辣度', required: false, type: 'single', choices: [{label:'不辣',price:0},{label:'小辣',price:0},{label:'中辣',price:0},{label:'大辣',price:0}] },
                 { name: '加料', required: false, type: 'multi', choices: [{label:'加蛋',price:10},{label:'加起司',price:15},{label:'加培根',price:20}] }
+            ],
+            size: [
+                { name: '尺寸', required: true, type: 'single', choices: [{label:'小',price:0},{label:'中',price:10},{label:'大',price:20}] }
             ]
         };
         function applyOptionTemplate(tpl) {
-            miOptionGroups = JSON.parse(JSON.stringify(OPTION_TEMPLATES[tpl] || []));
+            syncOptionEditor();
+            const newGroups = JSON.parse(JSON.stringify(OPTION_TEMPLATES[tpl] || []));
+            miOptionGroups = [...miOptionGroups, ...newGroups];
             renderOptionEditor();
+            updateOptBadge();
         }
         function addOptionGroup() {
+            syncOptionEditor();
             miOptionGroups.push({ name: '', required: false, type: 'single', choices: [{ label: '', price: 0 }] });
             renderOptionEditor();
+            updateOptBadge();
         }
-        function removeOptionGroup(idx) { miOptionGroups.splice(idx, 1); renderOptionEditor(); }
+        function removeOptionGroup(idx) { syncOptionEditor(); miOptionGroups.splice(idx, 1); renderOptionEditor(); updateOptBadge(); }
         function addOptionChoice(gIdx) {
+            syncOptionEditor();
             miOptionGroups[gIdx].choices.push({ label: '', price: 0 });
             renderOptionEditor();
         }
-        function removeOptionChoice(gIdx, cIdx) { miOptionGroups[gIdx].choices.splice(cIdx, 1); renderOptionEditor(); }
+        function removeOptionChoice(gIdx, cIdx) { syncOptionEditor(); miOptionGroups[gIdx].choices.splice(cIdx, 1); renderOptionEditor(); }
+        function toggleOptionType(gIdx, type) {
+            syncOptionEditor();
+            miOptionGroups[gIdx].type = type;
+            renderOptionEditor();
+        }
+        function toggleOptionReq(gIdx) {
+            syncOptionEditor();
+            miOptionGroups[gIdx].required = !miOptionGroups[gIdx].required;
+            renderOptionEditor();
+        }
         function syncOptionEditor() {
             document.querySelectorAll('.optGrp').forEach((grpEl, gIdx) => {
                 if (!miOptionGroups[gIdx]) return;
                 miOptionGroups[gIdx].name = grpEl.querySelector('.optGrpName').value;
-                miOptionGroups[gIdx].required = grpEl.querySelector('.optGrpReq').checked;
-                miOptionGroups[gIdx].type = grpEl.querySelector('.optGrpType').value;
                 grpEl.querySelectorAll('.optChoice').forEach((cEl, cIdx) => {
                     if (!miOptionGroups[gIdx].choices[cIdx]) return;
                     miOptionGroups[gIdx].choices[cIdx].label = cEl.querySelector('.optCLabel').value;
@@ -5298,34 +5624,48 @@
         }
         function renderOptionEditor() {
             const el = document.getElementById('miOptionsEditor');
-            if (miOptionGroups.length === 0) { el.innerHTML = '<p style="font-size:11px;color:#94A3B8;">尚無客製選項</p>'; return; }
-            el.innerHTML = miOptionGroups.map((g, gIdx) => `
-                <div class="optGrp" style="border:1px solid #E2E8F0;border-radius:8px;padding:10px;margin-bottom:8px;background:#fff;">
-                    <div style="display:flex;gap:4px;align-items:center;margin-bottom:6px;">
-                        <input class="optGrpName" value="${escapeHTML(g.name)}" placeholder="群組名" onchange="syncOptionEditor()" style="flex:1;padding:6px;border:1px solid #E2E8F0;border-radius:6px;font-size:12px;">
-                        <select class="optGrpType" onchange="syncOptionEditor()" style="padding:6px;border:1px solid #E2E8F0;border-radius:6px;font-size:11px;">
-                            <option value="single" ${g.type==='single'?'selected':''}>單選</option>
-                            <option value="multi" ${g.type==='multi'?'selected':''}>多選</option>
-                        </select>
-                        <label style="font-size:11px;white-space:nowrap;"><input type="checkbox" class="optGrpReq" ${g.required?'checked':''} onchange="syncOptionEditor()"> 必選</label>
-                        <button onclick="removeOptionGroup(${gIdx})" style="background:none;border:none;color:#EF4444;cursor:pointer;font-size:14px;">×</button>
-                    </div>
-                    ${g.choices.map((c, cIdx) => `
-                        <div class="optChoice" style="display:flex;gap:4px;align-items:center;margin-bottom:4px;margin-left:8px;">
-                            <input class="optCLabel" value="${escapeHTML(c.label)}" placeholder="選項名" onchange="syncOptionEditor()" style="flex:1;padding:4px;border:1px solid #E2E8F0;border-radius:4px;font-size:11px;">
-                            <input class="optCPrice" type="number" value="${c.price}" placeholder="+$" onchange="syncOptionEditor()" style="width:55px;padding:4px;border:1px solid #E2E8F0;border-radius:4px;font-size:11px;">
-                            <button onclick="removeOptionChoice(${gIdx},${cIdx})" style="background:none;border:none;color:#EF4444;cursor:pointer;font-size:12px;">×</button>
+            // 模板按鈕 + 群組列表
+            let html = `<div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;align-items:center;">
+                <span style="font-size:11px;color:#94A3B8;">快速套用：</span>
+                <button class="mi-tpl-btn" onclick="applyOptionTemplate('drink')">☕ 飲料</button>
+                <button class="mi-tpl-btn" onclick="applyOptionTemplate('food')">🍜 餐點</button>
+                <button class="mi-tpl-btn" onclick="applyOptionTemplate('size')">📏 尺寸</button>
+            </div>`;
+            if (miOptionGroups.length === 0) {
+                html += '<p style="font-size:12px;color:#94A3B8;text-align:center;padding:8px;">尚無客製選項</p>';
+            } else {
+                html += miOptionGroups.map((g, gIdx) => `
+                    <div class="optGrp og-card">
+                        <div class="og-header">
+                            <span style="color:#94A3B8;cursor:grab;font-size:14px;">⠿</span>
+                            <input class="optGrpName" value="${escapeHTML(g.name)}" placeholder="群組名稱（如：辣度）" style="flex:1;padding:8px 10px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:13px;font-weight:700;outline:none;background:#fff;">
+                            <div class="og-toggle-group">
+                                <button class="og-toggle${g.type==='single'?' active':''}" onclick="toggleOptionType(${gIdx},'single')">單選</button>
+                                <button class="og-toggle${g.type==='multi'?' active':''}" onclick="toggleOptionType(${gIdx},'multi')">多選</button>
+                            </div>
+                            <button class="og-req-btn ${g.required?'on':'off'}" onclick="toggleOptionReq(${gIdx})">必選</button>
+                            <button class="og-del-btn" onclick="removeOptionGroup(${gIdx})">✕</button>
                         </div>
-                    `).join('')}
-                    <button onclick="addOptionChoice(${gIdx})" style="font-size:11px;color:#4F46E5;background:none;border:none;cursor:pointer;margin-left:8px;">+ 新增選項</button>
-                </div>
-            `).join('');
+                        ${g.choices.map((c, cIdx) => `
+                            <div class="optChoice og-choice">
+                                <span style="font-size:10px;color:#CBD5E1;">${g.type === 'single' ? '○' : '☐'}</span>
+                                <input class="optCLabel og-choice-name" value="${escapeHTML(c.label)}" placeholder="選項名稱">
+                                <div class="og-price-wrap">
+                                    <span class="prefix">+$</span>
+                                    <input class="optCPrice" type="number" value="${c.price}" min="0">
+                                </div>
+                                <button onclick="removeOptionChoice(${gIdx},${cIdx})" style="width:24px;height:24px;border:none;border-radius:6px;background:transparent;color:#94A3B8;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;">✕</button>
+                            </div>
+                        `).join('')}
+                        <button onclick="addOptionChoice(${gIdx})" style="padding:4px 10px;border:1px dashed #CBD5E1;border-radius:6px;background:transparent;font-size:11px;color:#64748B;cursor:pointer;margin-top:2px;margin-left:24px;">+ 新增選項</button>
+                    </div>
+                `).join('');
+            }
+            html += `<button onclick="addOptionGroup()" style="width:100%;padding:10px;border:1.5px dashed #CBD5E1;border-radius:10px;background:transparent;font-size:12px;font-weight:700;color:#64748B;cursor:pointer;margin-top:4px;">+ 新增選項群組</button>`;
+            el.innerHTML = html;
         }
 
         // --- 套餐組合編輯器 ---
-        function toggleComboEditor() {
-            document.getElementById('miComboEditor').style.display = document.getElementById('miIsCombo').checked ? '' : 'none';
-        }
         function addComboGroup() {
             miComboGroups.push({ name: '', pick: 1, items: [] });
             renderComboEditor();
