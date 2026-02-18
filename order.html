@@ -829,24 +829,26 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 const THEMES = {
   // --- 暖色系 ---
   fire:    { name: '熱情橘紅', group: 'warm', primary: '#E8430A', primaryLight: '#FF6B35', primaryDark: '#C23508', accent: '#FFB800', accentLight: '#FFD466', bg: '#F5F0EB', bgCard: '#FFFFFF', bgSidebar: '#FAFAFA', textPrimary: '#1A1A1A', textSecondary: '#666666', textMuted: '#999999', border: '#E8E8E8', borderLight: '#F0F0F0', headerGrad: 'linear-gradient(135deg,#E8430A 0%,#C23508 50%,#8B1A00 100%)' },
-  rose:    { name: '玫瑰典雅', group: 'warm', primary: '#E11D48', primaryLight: '#FB7185', primaryDark: '#BE123C', accent: '#F59E0B', accentLight: '#FCD34D', bg: '#FFF5F7', bgCard: '#FFFFFF', bgSidebar: '#FFF8FA', textPrimary: '#2E1A1E', textSecondary: '#7A5060', textMuted: '#B08090', border: '#F0D8DF', borderLight: '#F8E8EE', headerGrad: 'linear-gradient(135deg,#E11D48 0%,#9F1239 50%,#7F1D3A 100%)' },
-  coral:   { name: '珊瑚甜橙', group: 'warm', primary: '#F97066', primaryLight: '#FCA5A5', primaryDark: '#DC2626', accent: '#FBBF24', accentLight: '#FDE68A', bg: '#FFF7F5', bgCard: '#FFFFFF', bgSidebar: '#FFFAF9', textPrimary: '#1F1717', textSecondary: '#7A5A5A', textMuted: '#B09090', border: '#F0E0DD', borderLight: '#F8EEEC', headerGrad: 'linear-gradient(135deg,#F97066 0%,#E74C3C 50%,#C0392B 100%)' },
-  amber:   { name: '琥珀金黃', group: 'warm', primary: '#D97706', primaryLight: '#F59E0B', primaryDark: '#B45309', accent: '#EF4444', accentLight: '#FCA5A5', bg: '#FFFBEB', bgCard: '#FFFFFF', bgSidebar: '#FFFDF5', textPrimary: '#1C1408', textSecondary: '#78600A', textMuted: '#A09060', border: '#F0E6C8', borderLight: '#F8F0DD', headerGrad: 'linear-gradient(135deg,#D97706 0%,#B45309 50%,#8B4000 100%)' },
+  rose:    { name: '玫瑰典雅', group: 'warm', primary: '#E11D48', primaryLight: '#FB7185', primaryDark: '#BE123C', accent: '#F59E0B', accentLight: '#FCD34D', bg: '#FFF5F7', bgCard: '#FFF0F3', bgSidebar: '#FFF8FA', textPrimary: '#2E1A1E', textSecondary: '#7A5060', textMuted: '#B08090', border: '#F0D8DF', borderLight: '#F8E8EE', headerGrad: 'linear-gradient(135deg,#E11D48 0%,#9F1239 50%,#7F1D3A 100%)' },
+  coral:   { name: '珊瑚甜橙', group: 'warm', primary: '#F97066', primaryLight: '#FCA5A5', primaryDark: '#DC2626', accent: '#FBBF24', accentLight: '#FDE68A', bg: '#FFF7F5', bgCard: '#FFF3F0', bgSidebar: '#FFFAF9', textPrimary: '#1F1717', textSecondary: '#7A5A5A', textMuted: '#B09090', border: '#F0E0DD', borderLight: '#F8EEEC', headerGrad: 'linear-gradient(135deg,#F97066 0%,#E74C3C 50%,#C0392B 100%)' },
+  amber:   { name: '琥珀金黃', group: 'warm', primary: '#D97706', primaryLight: '#F59E0B', primaryDark: '#B45309', accent: '#EF4444', accentLight: '#FCA5A5', bg: '#FFFBEB', bgCard: '#FFF8E0', bgSidebar: '#FFFDF5', textPrimary: '#1C1408', textSecondary: '#78600A', textMuted: '#A09060', border: '#F0E6C8', borderLight: '#F8F0DD', headerGrad: 'linear-gradient(135deg,#D97706 0%,#B45309 50%,#8B4000 100%)' },
+  cherry:  { name: '櫻花粉嫩', group: 'warm', primary: '#EC4899', primaryLight: '#F472B6', primaryDark: '#DB2777', accent: '#A855F7', accentLight: '#C084FC', bg: '#FDF2F8', bgCard: '#FFF0F6', bgSidebar: '#FFF5F9', textPrimary: '#2E1A28', textSecondary: '#8A5070', textMuted: '#C090A8', border: '#F5D0E0', borderLight: '#FAE8F0', headerGrad: 'linear-gradient(135deg,#EC4899 0%,#DB2777 40%,#BE185D 100%)' },
   // --- 冷色系 ---
-  indigo:  { name: '靛藍經典', group: 'cool', primary: '#4F46E5', primaryLight: '#6366F1', primaryDark: '#3730A3', accent: '#F59E0B', accentLight: '#FCD34D', bg: '#F0F0FF', bgCard: '#FFFFFF', bgSidebar: '#F8F8FF', textPrimary: '#1A1A2E', textSecondary: '#5B5B7A', textMuted: '#9090A8', border: '#E0E0F0', borderLight: '#F0F0F8', headerGrad: 'linear-gradient(135deg,#4F46E5 0%,#3730A3 50%,#2E1E80 100%)' },
-  ocean:   { name: '海洋清新', group: 'cool', primary: '#0891B2', primaryLight: '#22D3EE', primaryDark: '#0E7490', accent: '#F59E0B', accentLight: '#FCD34D', bg: '#F0F9FF', bgCard: '#FFFFFF', bgSidebar: '#F5FBFF', textPrimary: '#1A2530', textSecondary: '#506A7A', textMuted: '#90B0C0', border: '#D0E8F0', borderLight: '#E8F4F8', headerGrad: 'linear-gradient(135deg,#0891B2 0%,#0E7490 40%,#164E63 100%)' },
-  sky:     { name: '天空蔚藍', group: 'cool', primary: '#2563EB', primaryLight: '#3B82F6', primaryDark: '#1D4ED8', accent: '#F59E0B', accentLight: '#FCD34D', bg: '#F0F5FF', bgCard: '#FFFFFF', bgSidebar: '#F5F8FF', textPrimary: '#1A2040', textSecondary: '#506080', textMuted: '#90A0B8', border: '#D0DCF0', borderLight: '#E8EEF8', headerGrad: 'linear-gradient(135deg,#2563EB 0%,#1D4ED8 50%,#1E3A8A 100%)' },
-  violet:  { name: '夢幻紫羅', group: 'cool', primary: '#7C3AED', primaryLight: '#A78BFA', primaryDark: '#6D28D9', accent: '#F472B6', accentLight: '#FBCFE8', bg: '#F5F0FF', bgCard: '#FFFFFF', bgSidebar: '#FAF5FF', textPrimary: '#1A1030', textSecondary: '#6A5080', textMuted: '#A090B8', border: '#E0D0F0', borderLight: '#F0E8F8', headerGrad: 'linear-gradient(135deg,#7C3AED 0%,#6D28D9 40%,#4C1D95 100%)' },
+  indigo:  { name: '靛藍經典', group: 'cool', primary: '#4F46E5', primaryLight: '#6366F1', primaryDark: '#3730A3', accent: '#F59E0B', accentLight: '#FCD34D', bg: '#F0F0FF', bgCard: '#EEEEFF', bgSidebar: '#F8F8FF', textPrimary: '#1A1A2E', textSecondary: '#5B5B7A', textMuted: '#9090A8', border: '#E0E0F0', borderLight: '#F0F0F8', headerGrad: 'linear-gradient(135deg,#4F46E5 0%,#3730A3 50%,#2E1E80 100%)' },
+  ocean:   { name: '海洋清新', group: 'cool', primary: '#0891B2', primaryLight: '#22D3EE', primaryDark: '#0E7490', accent: '#F59E0B', accentLight: '#FCD34D', bg: '#F0F9FF', bgCard: '#E8F4FA', bgSidebar: '#F5FBFF', textPrimary: '#1A2530', textSecondary: '#506A7A', textMuted: '#90B0C0', border: '#D0E8F0', borderLight: '#E8F4F8', headerGrad: 'linear-gradient(135deg,#0891B2 0%,#0E7490 40%,#164E63 100%)' },
+  sky:     { name: '天空蔚藍', group: 'cool', primary: '#2563EB', primaryLight: '#3B82F6', primaryDark: '#1D4ED8', accent: '#F59E0B', accentLight: '#FCD34D', bg: '#F0F5FF', bgCard: '#E8F0FF', bgSidebar: '#F5F8FF', textPrimary: '#1A2040', textSecondary: '#506080', textMuted: '#90A0B8', border: '#D0DCF0', borderLight: '#E8EEF8', headerGrad: 'linear-gradient(135deg,#2563EB 0%,#1D4ED8 50%,#1E3A8A 100%)' },
+  violet:  { name: '夢幻紫羅', group: 'cool', primary: '#7C3AED', primaryLight: '#A78BFA', primaryDark: '#6D28D9', accent: '#F472B6', accentLight: '#FBCFE8', bg: '#F5F0FF', bgCard: '#F0EAFF', bgSidebar: '#FAF5FF', textPrimary: '#1A1030', textSecondary: '#6A5080', textMuted: '#A090B8', border: '#E0D0F0', borderLight: '#F0E8F8', headerGrad: 'linear-gradient(135deg,#7C3AED 0%,#6D28D9 40%,#4C1D95 100%)' },
+  teal:    { name: '青碧雅致', group: 'cool', primary: '#0D9488', primaryLight: '#14B8A6', primaryDark: '#0F766E', accent: '#F59E0B', accentLight: '#FCD34D', bg: '#F0FDFA', bgCard: '#E6FAF5', bgSidebar: '#F5FEFC', textPrimary: '#1A2E2A', textSecondary: '#4A706A', textMuted: '#80AAA0', border: '#C8E8E4', borderLight: '#E0F5F0', headerGrad: 'linear-gradient(135deg,#0D9488 0%,#0F766E 50%,#115E59 100%)' },
   // --- 自然系 ---
-  forest:  { name: '森綠自然', group: 'nature', primary: '#059669', primaryLight: '#10B981', primaryDark: '#047857', accent: '#F59E0B', accentLight: '#FCD34D', bg: '#F0FAF4', bgCard: '#FFFFFF', bgSidebar: '#F5FBF8', textPrimary: '#1A2E1A', textSecondary: '#4A6A4A', textMuted: '#8AAA8A', border: '#D0E8D0', borderLight: '#E8F5E8', headerGrad: 'linear-gradient(135deg,#059669 0%,#047857 50%,#064E3B 100%)' },
-  mint:    { name: '薄荷沁涼', group: 'nature', primary: '#14B8A6', primaryLight: '#2DD4BF', primaryDark: '#0D9488', accent: '#F59E0B', accentLight: '#FCD34D', bg: '#F0FDFA', bgCard: '#FFFFFF', bgSidebar: '#F5FEFC', textPrimary: '#1A2E2A', textSecondary: '#4A706A', textMuted: '#80AAA0', border: '#C8E8E4', borderLight: '#E0F5F0', headerGrad: 'linear-gradient(135deg,#14B8A6 0%,#0D9488 50%,#115E59 100%)' },
-  earth:   { name: '大地棕調', group: 'nature', primary: '#92400E', primaryLight: '#B45309', primaryDark: '#78350F', accent: '#059669', accentLight: '#34D399', bg: '#FAF5F0', bgCard: '#FFFFFF', bgSidebar: '#FBF8F5', textPrimary: '#1C1510', textSecondary: '#6A5A48', textMuted: '#A09080', border: '#E8DDD0', borderLight: '#F0EAE0', headerGrad: 'linear-gradient(135deg,#92400E 0%,#78350F 50%,#5C2A0A 100%)' },
-  olive:   { name: '橄欖田園', group: 'nature', primary: '#65A30D', primaryLight: '#84CC16', primaryDark: '#4D7C0F', accent: '#EAB308', accentLight: '#FDE047', bg: '#F7FEE7', bgCard: '#FFFFFF', bgSidebar: '#FBFFF0', textPrimary: '#1A2E10', textSecondary: '#4A6A30', textMuted: '#88AA68', border: '#D4E8B8', borderLight: '#E8F5D8', headerGrad: 'linear-gradient(135deg,#65A30D 0%,#4D7C0F 50%,#365314 100%)' },
-  // --- 暗色系 ---
-  night:   { name: '暗夜質感', group: 'dark', dark: true, primary: '#F97316', primaryLight: '#FB923C', primaryDark: '#EA580C', accent: '#FBBF24', accentLight: '#FDE68A', bg: '#1A1A2E', bgCard: '#2A2A40', bgSidebar: '#222238', textPrimary: '#F0F0F0', textSecondary: '#A0A0B8', textMuted: '#707088', border: '#3A3A50', borderLight: '#2E2E44', headerGrad: 'linear-gradient(135deg,#2A2A40 0%,#1A1A2E 50%,#10101E 100%)' },
-  midnight:{ name: '午夜深藍', group: 'dark', dark: true, primary: '#60A5FA', primaryLight: '#93C5FD', primaryDark: '#3B82F6', accent: '#FBBF24', accentLight: '#FDE68A', bg: '#0F172A', bgCard: '#1E293B', bgSidebar: '#162032', textPrimary: '#E8EEF8', textSecondary: '#94A3B8', textMuted: '#64748B', border: '#334155', borderLight: '#1E293B', headerGrad: 'linear-gradient(135deg,#1E293B 0%,#0F172A 50%,#020617 100%)' },
-  carbon:  { name: '極簡碳黑', group: 'dark', dark: true, primary: '#10B981', primaryLight: '#34D399', primaryDark: '#059669', accent: '#F59E0B', accentLight: '#FCD34D', bg: '#111111', bgCard: '#1C1C1C', bgSidebar: '#161616', textPrimary: '#EBEBEB', textSecondary: '#999999', textMuted: '#666666', border: '#2E2E2E', borderLight: '#222222', headerGrad: 'linear-gradient(135deg,#1C1C1C 0%,#111111 50%,#050505 100%)' },
-  wine:    { name: '紅酒之夜', group: 'dark', dark: true, primary: '#FB7185', primaryLight: '#FDA4AF', primaryDark: '#F43F5E', accent: '#FBBF24', accentLight: '#FDE68A', bg: '#1A1018', bgCard: '#2A1E28', bgSidebar: '#221620', textPrimary: '#F0E8EE', textSecondary: '#B8A0B0', textMuted: '#887080', border: '#3E2E3A', borderLight: '#2E2028', headerGrad: 'linear-gradient(135deg,#2A1E28 0%,#1A1018 50%,#0E080D 100%)' },
+  forest:  { name: '森綠自然', group: 'nature', primary: '#059669', primaryLight: '#10B981', primaryDark: '#047857', accent: '#F59E0B', accentLight: '#FCD34D', bg: '#F0FAF4', bgCard: '#E8F5EE', bgSidebar: '#F5FBF8', textPrimary: '#1A2E1A', textSecondary: '#4A6A4A', textMuted: '#8AAA8A', border: '#D0E8D0', borderLight: '#E8F5E8', headerGrad: 'linear-gradient(135deg,#059669 0%,#047857 50%,#064E3B 100%)' },
+  earth:   { name: '大地棕調', group: 'nature', primary: '#92400E', primaryLight: '#B45309', primaryDark: '#78350F', accent: '#059669', accentLight: '#34D399', bg: '#FAF5F0', bgCard: '#F5EDE4', bgSidebar: '#FBF8F5', textPrimary: '#1C1510', textSecondary: '#6A5A48', textMuted: '#A09080', border: '#E8DDD0', borderLight: '#F0EAE0', headerGrad: 'linear-gradient(135deg,#92400E 0%,#78350F 50%,#5C2A0A 100%)' },
+  olive:   { name: '橄欖田園', group: 'nature', primary: '#65A30D', primaryLight: '#84CC16', primaryDark: '#4D7C0F', accent: '#EAB308', accentLight: '#FDE047', bg: '#F7FEE7', bgCard: '#F0FADB', bgSidebar: '#FBFFF0', textPrimary: '#1A2E10', textSecondary: '#4A6A30', textMuted: '#88AA68', border: '#D4E8B8', borderLight: '#E8F5D8', headerGrad: 'linear-gradient(135deg,#65A30D 0%,#4D7C0F 50%,#365314 100%)' },
+  sand:    { name: '沙漠暖陽', group: 'nature', primary: '#CA8A04', primaryLight: '#EAB308', primaryDark: '#A16207', accent: '#DC2626', accentLight: '#F87171', bg: '#FEFCE8', bgCard: '#FEF9C3', bgSidebar: '#FFFDE6', textPrimary: '#1C1A08', textSecondary: '#78720A', textMuted: '#A0980A', border: '#F0E8A0', borderLight: '#F8F0C8', headerGrad: 'linear-gradient(135deg,#CA8A04 0%,#A16207 50%,#854D0E 100%)' },
+  // --- 特色系 ---
+  sunset:  { name: '夕陽晚霞', group: 'special', primary: '#E44D26', primaryLight: '#F97316', primaryDark: '#C2410C', accent: '#A855F7', accentLight: '#C084FC', bg: '#FEF3EC', bgCard: '#FFEDE0', bgSidebar: '#FFF8F3', textPrimary: '#2A1510', textSecondary: '#7A5040', textMuted: '#B08878', border: '#F0D8C8', borderLight: '#F8EAE0', headerGrad: 'linear-gradient(135deg,#F97316 0%,#E44D26 30%,#9333EA 100%)' },
+  candy:   { name: '糖果繽紛', group: 'special', primary: '#D946EF', primaryLight: '#E879F9', primaryDark: '#C026D3', accent: '#06B6D4', accentLight: '#67E8F9', bg: '#FDF4FF', bgCard: '#FAE8FF', bgSidebar: '#FEF5FF', textPrimary: '#2A1030', textSecondary: '#7A4890', textMuted: '#A878C0', border: '#E8D0F8', borderLight: '#F5E8FC', headerGrad: 'linear-gradient(135deg,#D946EF 0%,#C026D3 40%,#7C3AED 100%)' },
+  matcha:  { name: '抹茶拿鐵', group: 'special', primary: '#4D7C0F', primaryLight: '#65A30D', primaryDark: '#3F6212', accent: '#92400E', accentLight: '#B45309', bg: '#F5F5DC', bgCard: '#FAFAE0', bgSidebar: '#F8F8E0', textPrimary: '#1A1A10', textSecondary: '#5A5A30', textMuted: '#8A8A60', border: '#E0E0B8', borderLight: '#ECECD0', headerGrad: 'linear-gradient(135deg,#4D7C0F 0%,#3F6212 40%,#365314 100%)' },
+  cafe:    { name: '咖啡時光', group: 'special', primary: '#78350F', primaryLight: '#92400E', primaryDark: '#5C2A0A', accent: '#D97706', accentLight: '#F59E0B', bg: '#FAF5F0', bgCard: '#F5EBE0', bgSidebar: '#FBF6F0', textPrimary: '#1A1210', textSecondary: '#6A5848', textMuted: '#9A8878', border: '#E0D4C4', borderLight: '#F0E8D8', headerGrad: 'linear-gradient(135deg,#78350F 0%,#5C2A0A 40%,#451A03 100%)' },
 };
 
 function applyTheme(name) {
@@ -897,10 +899,10 @@ function closeThemePanel() {
 
 function renderThemePanel() {
   var groups = [
-    { key: 'warm',   label: '\u{2600}\u{FE0F} \u6EAB\u6696\u7CFB' },
-    { key: 'cool',   label: '\u{2744}\u{FE0F} \u6E05\u6DBC\u7CFB' },
-    { key: 'nature', label: '\u{1F33F} \u81EA\u7136\u7CFB' },
-    { key: 'dark',   label: '\u{1F319} \u6697\u8272\u7CFB' }
+    { key: 'warm',    label: '\u{2600}\u{FE0F} \u6EAB\u6696\u7CFB' },
+    { key: 'cool',    label: '\u{2744}\u{FE0F} \u6E05\u6DBC\u7CFB' },
+    { key: 'nature',  label: '\u{1F33F} \u81EA\u7136\u7CFB' },
+    { key: 'special', label: '\u{2728} \u7279\u8272\u7CFB' }
   ];
   var html = '<div class="theme-panel-handle"></div>' +
     '<h4>\u{1F3A8} \u9078\u64C7\u98A8\u683C</h4>' +
@@ -933,22 +935,27 @@ function renderThemePanel() {
   document.getElementById('themePanel').innerHTML = html;
 }
 
-// Apply store's custom theme color (skip if user already saved a preference)
-function applyStoreThemeColor(hex) {
-  var saved = localStorage.getItem('selectedTheme');
-  if (saved && THEMES[saved]) { applyTheme(saved); return; }
-  // 找最接近的內建主題
+// Apply store theme — 支援主題 key（如 "fire"）或 hex 色碼（如 "#E8430A"）
+function applyStoreThemeColor(val) {
+  // 1. 消費者模式下不讀 localStorage（看商店設定）；預覽模式可用個人偏好
+  if (!window._orderMode) {
+    var saved = localStorage.getItem('selectedTheme');
+    if (saved && THEMES[saved]) { applyTheme(saved); return; }
+  }
+  // 2. 如果值是主題 key，直接套用
+  if (THEMES[val]) { applyTheme(val); return; }
+  // 3. Hex 色碼：找最接近的內建主題
   var bestKey = null, bestDist = Infinity;
   Object.entries(THEMES).forEach(function(entry) {
-    var d = colorDistance(hex, entry[1].primary);
+    var d = colorDistance(val, entry[1].primary);
     if (d < bestDist) { bestDist = d; bestKey = entry[0]; }
   });
   if (bestDist < 80) { applyTheme(bestKey); return; }
-  // 自訂色：直接套用 CSS 變數
+  // 4. 無匹配：直接套用色碼
   var r = document.documentElement.style;
-  r.setProperty('--primary', hex);
-  r.setProperty('--primary-light', adjustBrightness(hex, 30));
-  r.setProperty('--primary-dark', adjustBrightness(hex, -30));
+  r.setProperty('--primary', val);
+  r.setProperty('--primary-light', adjustBrightness(val, 30));
+  r.setProperty('--primary-dark', adjustBrightness(val, -30));
 }
 function colorDistance(a, b) {
   var ra = parseInt(a.slice(1,3),16), ga = parseInt(a.slice(3,5),16), ba = parseInt(a.slice(5,7),16);
@@ -962,7 +969,7 @@ function adjustBrightness(hex, amount) {
   return '#' + [r,g,b].map(function(c){return c.toString(16).padStart(2,'0');}).join('');
 }
 
-// Save theme to store (Supabase)
+// Save theme to store (Supabase) — 存主題 key，確保所有人看到同樣風格
 async function saveThemeToStore() {
   var t = THEMES[currentTheme];
   if (!t || !currentStoreId) { showToast('無法儲存：未連接商店'); return; }
@@ -970,10 +977,10 @@ async function saveThemeToStore() {
     var res = await fetch(SUPABASE_URL + '/rest/v1/store_profiles?id=eq.' + currentStoreId, {
       method: 'PATCH',
       headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
-      body: JSON.stringify({ theme_color: t.primary })
+      body: JSON.stringify({ theme_color: currentTheme })
     });
     if (!res.ok) throw new Error('HTTP ' + res.status);
-    showToast('✅ 風格已儲存！');
+    showToast('✅ 風格已儲存！所有消費者將看到「' + t.name + '」');
     closeThemePanel();
   } catch(e) {
     showToast('❌ 儲存失敗: ' + e.message);
