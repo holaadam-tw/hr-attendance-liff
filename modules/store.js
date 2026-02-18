@@ -128,6 +128,13 @@ export function previewStoreOrder() {
     window.open(getStoreOrderUrl(s), '_blank');
 }
 
+export function openKDS() {
+    const s = smStores.find(x => x.id === rdCurrentStoreId);
+    if (!s) return showToast('找不到商店資料');
+    const base = location.origin + location.pathname.replace(/\/[^/]*$/, '/');
+    window.open(base + 'kds.html?store=' + encodeURIComponent(s.store_slug), '_blank');
+}
+
 function renderAcceptOrderToggle(s) {
     const on = s.accept_orders !== false;
     document.getElementById('rdAcceptOrderToggle').innerHTML = `
@@ -153,9 +160,11 @@ export function switchRestaurantTab(tab, el) {
     if (el) { el.style.borderBottom = '3px solid #4F46E5'; el.style.color = '#4F46E5'; el.classList.add('rdTabActive'); }
     document.getElementById('rdOrdersTab').style.display = tab === 'orders' ? '' : 'none';
     document.getElementById('rdMenuTab').style.display = tab === 'menu' ? '' : 'none';
+    document.getElementById('rdReportTab').style.display = tab === 'report' ? '' : 'none';
     document.getElementById('rdSettingsTab').style.display = tab === 'settings' ? '' : 'none';
     if (tab === 'orders') loadStoreOrders();
     if (tab === 'menu') { loadMenuCategories(); loadMenuItems(); }
+    if (tab === 'report') loadSalesReport();
     if (tab === 'settings') loadStoreSettings();
 }
 
@@ -544,14 +553,23 @@ export async function loadMenuCategories() {
 function renderMenuCatList() {
     const el = document.getElementById('menuCatList');
     if (smCategories.length === 0) { el.innerHTML = '<p style="font-size:12px;color:#94A3B8;">尚無分大類</p>'; return; }
-    el.innerHTML = smCategories.map(c => `
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #F1F5F9;">
-            <span style="font-size:13px;font-weight:600;">${escapeHTML(c.name)}</span>
+    el.innerHTML = smCategories.map(c => {
+        const tp = c.time_periods;
+        const timeStr = tp && tp.length > 0
+            ? tp.map(p => `${p.label || ''} ${p.from}-${p.to}`).join(', ')
+            : '全天';
+        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #F1F5F9;">
+            <div>
+                <span style="font-size:13px;font-weight:600;">${escapeHTML(c.name)}</span>
+                <span style="font-size:10px;color:#94A3B8;margin-left:6px;">🕐 ${escapeHTML(timeStr)}</span>
+            </div>
             <div style="display:flex;gap:8px;">
                 <button onclick="renameMenuCategory('${c.id}','${escapeHTML(c.name)}')" style="background:none;border:none;color:#4F46E5;cursor:pointer;font-size:12px;font-weight:600;">編輯</button>
+                <button onclick="editCategoryTime('${c.id}')" style="background:none;border:none;color:#7C3AED;cursor:pointer;font-size:12px;">時段</button>
                 <button onclick="deleteMenuCategory('${c.id}')" style="background:none;border:none;color:#EF4444;cursor:pointer;font-size:12px;">刪除</button>
             </div>
-        </div>`).join('');
+        </div>`;
+    }).join('');
 }
 
 function updateMiCategorySelect() {
@@ -584,6 +602,47 @@ export async function deleteMenuCategory(id) {
     if (!confirm('確定刪除此分大類？（品項不會被刪除）')) return;
     try { await sb.from('menu_categories').delete().eq('id', id); showToast('✅ 已刪除'); await loadMenuCategories(); }
     catch(e) { showToast('❌ 刪除失敗'); }
+}
+
+export function editCategoryTime(catId) {
+    const cat = smCategories.find(c => c.id === catId);
+    if (!cat) return;
+    const periods = cat.time_periods || [];
+    const presets = [
+        { label: '全天候（清除時段）', value: 'all' },
+        { label: '早餐 06:00-10:30', value: JSON.stringify([{ label: '早餐', from: '06:00', to: '10:30' }]) },
+        { label: '午餐 11:00-14:00', value: JSON.stringify([{ label: '午餐', from: '11:00', to: '14:00' }]) },
+        { label: '下午茶 14:00-17:00', value: JSON.stringify([{ label: '下午茶', from: '14:00', to: '17:00' }]) },
+        { label: '晚餐 17:00-21:00', value: JSON.stringify([{ label: '晚餐', from: '17:00', to: '21:00' }]) },
+        { label: '全日餐 11:00-21:00', value: JSON.stringify([{ label: '全日', from: '11:00', to: '21:00' }]) },
+    ];
+    const current = periods.length > 0 ? periods.map(p => `${p.label || ''} ${p.from}-${p.to}`).join(', ') : '全天候';
+    const msg = `「${cat.name}」目前時段：${current}\n\n選擇預設時段（輸入數字）或輸入自訂時段（格式：HH:MM-HH:MM）\n\n` +
+        presets.map((p, i) => `${i + 1}. ${p.label}`).join('\n');
+    const input = prompt(msg, '1');
+    if (input === null) return;
+    const idx = parseInt(input) - 1;
+    let newPeriods = null;
+    if (idx >= 0 && idx < presets.length) {
+        newPeriods = presets[idx].value === 'all' ? null : JSON.parse(presets[idx].value);
+    } else {
+        // Custom: parse "HH:MM-HH:MM" or "HH:MM-HH:MM,HH:MM-HH:MM"
+        const parts = input.split(',').map(s => s.trim());
+        newPeriods = parts.map(p => {
+            const m = p.match(/(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})/);
+            return m ? { from: m[1], to: m[2], label: '' } : null;
+        }).filter(Boolean);
+        if (newPeriods.length === 0) { showToast('格式錯誤'); return; }
+    }
+    saveCategoryTime(catId, newPeriods);
+}
+
+async function saveCategoryTime(catId, timePeriods) {
+    try {
+        await sb.from('menu_categories').update({ time_periods: timePeriods }).eq('id', catId);
+        showToast('✅ 時段已更新');
+        await loadMenuCategories();
+    } catch(e) { showToast('❌ 更新失敗'); }
 }
 
 export async function loadMenuItems() {
@@ -1417,4 +1476,189 @@ export async function executeCopyMenu() {
         showToast(`✅ 已複製到 ${targets.length} 間商店`);
         closeCopyMenuModal();
     } catch(e) { showToast('❌ 複製失敗：' + (e.message || e)); }
+}
+
+// ===== 銷售報表 =====
+let _dailyChart = null;
+let _hourlyChart = null;
+let _reportOrders = [];
+
+export async function loadSalesReport() {
+    const range = document.getElementById('reportRange')?.value || 'month';
+    const fromEl = document.getElementById('reportFrom');
+    const toEl = document.getElementById('reportTo');
+    // Show/hide custom date inputs
+    if (fromEl && toEl) {
+        fromEl.style.display = range === 'custom' ? '' : 'none';
+        toEl.style.display = range === 'custom' ? '' : 'none';
+    }
+
+    const now = new Date();
+    let fromDate, toDate;
+    if (range === 'today') {
+        fromDate = fmtDate(now);
+        toDate = fromDate;
+    } else if (range === 'week') {
+        const d = new Date(now); d.setDate(d.getDate() - d.getDay());
+        fromDate = fmtDate(d);
+        toDate = fmtDate(now);
+    } else if (range === 'month') {
+        fromDate = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-01';
+        toDate = fmtDate(now);
+    } else {
+        fromDate = fromEl?.value || fmtDate(now);
+        toDate = toEl?.value || fmtDate(now);
+    }
+
+    try {
+        const { data } = await sb.from('orders').select('*')
+            .eq('store_id', rdCurrentStoreId)
+            .gte('created_at', fromDate + 'T00:00:00')
+            .lte('created_at', toDate + 'T23:59:59')
+            .neq('status', 'cancelled')
+            .order('created_at', { ascending: true });
+        _reportOrders = data || [];
+        renderSalesReport();
+    } catch(e) { showToast('❌ 報表載入失敗'); console.error(e); }
+}
+
+function renderSalesReport() {
+    const orders = _reportOrders;
+    const revenue = orders.reduce((s, o) => s + (parseFloat(o.total) || 0), 0);
+    const itemsSold = orders.reduce((s, o) => s + (o.items || []).reduce((ss, i) => ss + (i.qty || 1), 0), 0);
+    const avg = orders.length > 0 ? Math.round(revenue / orders.length) : 0;
+
+    document.getElementById('rptTotalRevenue').textContent = '$' + revenue.toLocaleString();
+    document.getElementById('rptOrderCount').textContent = orders.length;
+    document.getElementById('rptAvgOrder').textContent = '$' + avg.toLocaleString();
+    document.getElementById('rptItemsSold').textContent = itemsSold;
+
+    renderDailyChart(orders);
+    renderHourlyChart(orders);
+    renderTopItemsReport(orders);
+    renderOrderTypes(orders);
+}
+
+function renderDailyChart(orders) {
+    const daily = {};
+    orders.forEach(o => {
+        const d = o.created_at?.split('T')[0];
+        if (d) daily[d] = (daily[d] || 0) + (parseFloat(o.total) || 0);
+    });
+    const labels = Object.keys(daily).sort();
+    const data = labels.map(d => daily[d]);
+
+    const ctx = document.getElementById('dailyRevenueChart');
+    if (!ctx) return;
+    if (_dailyChart) _dailyChart.destroy();
+    _dailyChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels.map(d => d.slice(5)), // MM-DD
+            datasets: [{ label: '營業額', data, backgroundColor: '#3B82F6', borderRadius: 6 }]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: true, ticks: { callback: v => '$' + v } } }
+        }
+    });
+}
+
+function renderHourlyChart(orders) {
+    const hourly = Array(24).fill(0);
+    orders.forEach(o => {
+        if (!o.created_at) return;
+        const h = new Date(o.created_at).getHours();
+        hourly[h] += (parseFloat(o.total) || 0);
+    });
+    const ctx = document.getElementById('hourlyChart');
+    if (!ctx) return;
+    if (_hourlyChart) _hourlyChart.destroy();
+    _hourlyChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: Array.from({ length: 24 }, (_, i) => i + '時'),
+            datasets: [{ label: '營業額', data: hourly, borderColor: '#8B5CF6', backgroundColor: 'rgba(139,92,246,0.1)', fill: true, tension: 0.3 }]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: true, ticks: { callback: v => '$' + v } } }
+        }
+    });
+}
+
+function renderTopItemsReport(orders) {
+    const itemCount = {};
+    const itemRevenue = {};
+    orders.forEach(o => (o.items || []).forEach(i => {
+        const name = i.name || '?';
+        itemCount[name] = (itemCount[name] || 0) + (i.qty || 1);
+        itemRevenue[name] = (itemRevenue[name] || 0) + (i.subtotal || i.price * (i.qty || 1) || 0);
+    }));
+    const sorted = Object.entries(itemCount).sort((a, b) => b[1] - a[1]).slice(0, 10);
+    const el = document.getElementById('rptTopItems');
+    if (!el) return;
+    if (sorted.length === 0) { el.innerHTML = '<p style="color:#94A3B8;font-size:13px;">暫無資料</p>'; return; }
+    el.innerHTML = sorted.map((s, i) => {
+        const rev = itemRevenue[s[0]] || 0;
+        const maxQty = sorted[0][1];
+        const pct = Math.round(s[1] / maxQty * 100);
+        return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+            <span style="font-weight:700;width:24px;text-align:right;font-size:13px;color:#64748B;">${i+1}</span>
+            <div style="flex:1;">
+                <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:2px;">
+                    <span style="font-weight:600;">${escapeHTML(s[0])}</span>
+                    <span style="color:#64748B;">${s[1]}份 · $${rev.toLocaleString()}</span>
+                </div>
+                <div style="background:#E2E8F0;height:6px;border-radius:3px;overflow:hidden;">
+                    <div style="background:#3B82F6;height:100%;width:${pct}%;border-radius:3px;"></div>
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function renderOrderTypes(orders) {
+    const types = {};
+    orders.forEach(o => {
+        const t = o.order_type || 'dine_in';
+        types[t] = (types[t] || 0) + 1;
+    });
+    const labels = { dine_in: '內用', takeout: '外帶', delivery: '外送' };
+    const colors = { dine_in: '#3B82F6', takeout: '#F59E0B', delivery: '#10B981' };
+    const el = document.getElementById('rptOrderTypes');
+    if (!el) return;
+    const total = orders.length || 1;
+    el.innerHTML = Object.entries(types).map(([k, v]) => {
+        const pct = Math.round(v / total * 100);
+        return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+            <span style="width:36px;font-size:13px;font-weight:600;">${labels[k] || k}</span>
+            <div style="flex:1;background:#E2E8F0;height:24px;border-radius:12px;overflow:hidden;">
+                <div style="background:${colors[k] || '#64748B'};height:100%;width:${pct}%;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;font-weight:600;min-width:40px;">${pct}%</div>
+            </div>
+            <span style="font-size:13px;color:#64748B;width:40px;text-align:right;">${v}筆</span>
+        </div>`;
+    }).join('');
+}
+
+export function exportSalesCSV() {
+    if (_reportOrders.length === 0) return showToast('無資料可匯出');
+    const rows = [['訂單號', '日期', '時間', '類型', '品項', '金額', '狀態']];
+    _reportOrders.forEach(o => {
+        const dt = o.created_at ? new Date(o.created_at) : null;
+        const dateStr = dt ? fmtDate(dt) : '';
+        const timeStr = dt ? dt.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' }) : '';
+        const typeLabel = { dine_in: '內用', takeout: '外帶', delivery: '外送' };
+        const items = (o.items || []).map(i => i.name + 'x' + (i.qty || 1)).join('; ');
+        rows.push([o.order_number || '', dateStr, timeStr, typeLabel[o.order_type] || o.order_type || '', items, o.total || 0, o.status || '']);
+    });
+    const csv = rows.map(r => r.map(c => '"' + String(c).replace(/"/g, '""') + '"').join(',')).join('\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'sales_report_' + fmtDate(new Date()) + '.csv';
+    a.click();
+    showToast('✅ 已匯出 CSV');
 }

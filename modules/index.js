@@ -52,13 +52,13 @@ import {
 } from './payroll.js';
 
 import {
-    loadRestaurantList, openRestaurantDetail, previewStoreOrder,
+    loadRestaurantList, openRestaurantDetail, previewStoreOrder, openKDS,
     toggleAcceptOrders, switchRestaurantTab, loadStoreOrders,
     showOrderDetail, closeOrderDetail, updateOrderStatus, toggleOrderSound,
     showStoreModal, editStore, closeStoreModal, saveStore, uploadStoreImage,
     showStoreQR, closeStoreQR, getStoreOrderUrl, copyStoreUrl,
     openStorePreview, loadMenuCategories, addMenuCategory,
-    renameMenuCategory, deleteMenuCategory, loadMenuItems, showMenuItemForm,
+    renameMenuCategory, deleteMenuCategory, editCategoryTime, loadMenuItems, showMenuItemForm,
     editMenuItem, cancelMenuItemForm, toggleMiSection, toggleMiPreview,
     updateOptBadge, toggleComboSwitch, saveMenuItem, deleteMenuItem,
     toggleItemAvail, handleMenuImageUpload,
@@ -68,7 +68,8 @@ import {
     saveBusinessHours, saveLineGroupId, saveLoyaltyConfig,
     generateTableQRCodes, printTableQRCodes,
     handleMenuPhotoUpload, analyzeMenuPhoto, confirmAIMenu, cancelAIMenu,
-    showCopyMenuModal, closeCopyMenuModal, executeCopyMenu
+    showCopyMenuModal, closeCopyMenuModal, executeCopyMenu,
+    loadSalesReport, exportSalesCSV
 } from './store.js';
 
 import {
@@ -194,6 +195,7 @@ window.updateAllInsRates = updateAllInsRates;
 window.loadRestaurantList = loadRestaurantList;
 window.openRestaurantDetail = openRestaurantDetail;
 window.previewStoreOrder = previewStoreOrder;
+window.openKDS = openKDS;
 window.toggleAcceptOrders = toggleAcceptOrders;
 window.switchRestaurantTab = switchRestaurantTab;
 window.loadStoreOrders = loadStoreOrders;
@@ -215,6 +217,7 @@ window.loadMenuCategories = loadMenuCategories;
 window.addMenuCategory = addMenuCategory;
 window.renameMenuCategory = renameMenuCategory;
 window.deleteMenuCategory = deleteMenuCategory;
+window.editCategoryTime = editCategoryTime;
 window.loadMenuItems = loadMenuItems;
 window.showMenuItemForm = showMenuItemForm;
 window.editMenuItem = editMenuItem;
@@ -249,6 +252,8 @@ window.cancelAIMenu = cancelAIMenu;
 window.showCopyMenuModal = showCopyMenuModal;
 window.closeCopyMenuModal = closeCopyMenuModal;
 window.executeCopyMenu = executeCopyMenu;
+window.loadSalesReport = loadSalesReport;
+window.exportSalesCSV = exportSalesCSV;
 
 // settings
 window.ADMIN_FEATURE_LIST = ADMIN_FEATURE_LIST;

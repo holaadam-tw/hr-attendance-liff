@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#4F46E5">
+<title>商家註冊</title>
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+<style>
+:root {
+  --primary: #4F46E5;
+  --primary-light: #818CF8;
+  --bg: #F8FAFC;
+  --card: #FFFFFF;
+  --text: #1E293B;
+  --text-muted: #64748B;
+  --border: #E2E8F0;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Noto Sans TC',-apple-system,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+.container{max-width:480px;margin:0 auto;padding:20px;}
+.logo-section{text-align:center;padding:30px 0 20px;}
+.logo-icon{font-size:48px;margin-bottom:8px;}
+.logo-title{font-size:22px;font-weight:900;color:var(--primary);}
+.logo-sub{font-size:13px;color:var(--text-muted);margin-top:4px;}
+.card{background:var(--card);border-radius:16px;padding:24px;box-shadow:0 2px 8px rgba(0,0,0,0.06);margin-bottom:16px;}
+.card h2{font-size:16px;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:8px;}
+.form-group{margin-bottom:14px;}
+.form-group label{display:block;font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px;}
+.form-group .hint{font-size:11px;color:var(--text-muted);margin-top:2px;}
+input,select,textarea{width:100%;padding:12px;border:1px solid var(--border);border-radius:10px;font-size:14px;font-family:inherit;background:#fff;transition:border-color 0.2s;}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px rgba(79,70,229,0.1);}
+textarea{resize:vertical;min-height:80px;}
+.btn{display:block;width:100%;padding:14px;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;transition:all 0.2s;}
+.btn-primary{background:var(--primary);color:#fff;}
+.btn-primary:hover{background:#4338CA;}
+.btn-primary:disabled{background:#C7D2FE;cursor:not-allowed;}
+.btn-outline{background:#fff;color:var(--primary);border:2px solid var(--primary);margin-top:10px;}
+.features-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:16px;}
+.feature-card{background:var(--bg);border:2px solid var(--border);border-radius:10px;padding:10px;text-align:center;cursor:pointer;transition:all 0.2s;}
+.feature-card.selected{border-color:var(--primary);background:#EEF2FF;}
+.feature-card .icon{font-size:24px;}
+.feature-card .name{font-size:12px;font-weight:600;margin-top:4px;}
+.step-indicator{display:flex;justify-content:center;gap:8px;margin-bottom:20px;}
+.step-dot{width:10px;height:10px;border-radius:50%;background:var(--border);}
+.step-dot.active{background:var(--primary);}
+.step-dot.done{background:#10B981;}
+.success-icon{font-size:64px;margin-bottom:16px;}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#EF4444;color:#fff;padding:10px 24px;border-radius:10px;font-size:14px;font-weight:600;z-index:9999;opacity:0;transition:opacity 0.3s;pointer-events:none;}
+.toast.show{opacity:1;}
+.hidden{display:none;}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="logo-section">
+    <div class="logo-icon">🏪</div>
+    <div class="logo-title">商家註冊</div>
+    <div class="logo-sub">快速建立您的線上點餐系統</div>
+  </div>
+
+  <div class="step-indicator" id="steps">
+    <div class="step-dot active" id="step1"></div>
+    <div class="step-dot" id="step2"></div>
+    <div class="step-dot" id="step3"></div>
+  </div>
+
+  <!-- STEP 1: 基本資料 -->
+  <div id="page1">
+    <div class="card">
+      <h2>📋 基本資料</h2>
+      <div class="form-group">
+        <label>商店名稱 *</label>
+        <input type="text" id="regStoreName" placeholder="例：Mike's Cafe">
+      </div>
+      <div class="form-group">
+        <label>商店代號（英文，用於點餐連結）</label>
+        <input type="text" id="regStoreSlug" placeholder="例：mikes-cafe" pattern="[a-z0-9-]+" oninput="this.value=this.value.toLowerCase().replace(/[^a-z0-9-]/g,'')">
+        <div class="hint">將顯示在點餐網址中，留空自動產生</div>
+      </div>
+      <div class="form-group">
+        <label>商店類型 *</label>
+        <select id="regStoreType">
+          <option value="restaurant">🍽️ 餐飲</option>
+          <option value="cafe">☕ 咖啡/飲料</option>
+          <option value="bakery">🍞 烘焙</option>
+          <option value="service">💼 服務業</option>
+          <option value="retail">🛍️ 零售</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>聯絡電話</label>
+        <input type="tel" id="regPhone" placeholder="02-1234-5678">
+      </div>
+      <div class="form-group">
+        <label>地址</label>
+        <input type="text" id="regAddress" placeholder="商店地址">
+      </div>
+      <button class="btn btn-primary" onclick="goStep2()">下一步 →</button>
+    </div>
+  </div>
+
+  <!-- STEP 2: 功能選擇 -->
+  <div id="page2" class="hidden">
+    <div class="card">
+      <h2>⚙️ 選擇功能</h2>
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px;">選擇您需要的功能模組（之後都可以在管理後台調整）</p>
+      <div class="features-grid" id="featureGrid">
+        <div class="feature-card selected" onclick="toggleRegFeature(this)" data-feature="store_ordering">
+          <div class="icon">📱</div><div class="name">線上點餐</div>
+        </div>
+        <div class="feature-card selected" onclick="toggleRegFeature(this)" data-feature="basic_hr">
+          <div class="icon">👥</div><div class="name">員工管理</div>
+        </div>
+        <div class="feature-card" onclick="toggleRegFeature(this)" data-feature="attendance">
+          <div class="icon">⏰</div><div class="name">考勤打卡</div>
+        </div>
+        <div class="feature-card" onclick="toggleRegFeature(this)" data-feature="leave">
+          <div class="icon">📅</div><div class="name">請假管理</div>
+        </div>
+        <div class="feature-card" onclick="toggleRegFeature(this)" data-feature="payroll">
+          <div class="icon">💰</div><div class="name">薪資計算</div>
+        </div>
+        <div class="feature-card" onclick="toggleRegFeature(this)" data-feature="lunch_order">
+          <div class="icon">🍱</div><div class="name">便當訂餐</div>
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="goStep3()">下一步 →</button>
+      <button class="btn btn-outline" onclick="backStep1()">← 返回</button>
+    </div>
+  </div>
+
+  <!-- STEP 3: 確認 & 建立 -->
+  <div id="page3" class="hidden">
+    <div class="card">
+      <h2>✅ 確認資訊</h2>
+      <div id="regSummary" style="font-size:13px;margin-bottom:16px;"></div>
+      <div class="form-group">
+        <label>商店簡介</label>
+        <textarea id="regDesc" placeholder="簡短介紹您的商店（選填）"></textarea>
+      </div>
+      <button class="btn btn-primary" id="regSubmitBtn" onclick="submitRegistration()">🚀 建立商店</button>
+      <button class="btn btn-outline" onclick="backStep2()">← 返回修改</button>
+    </div>
+  </div>
+
+  <!-- SUCCESS -->
+  <div id="pageSuccess" class="hidden">
+    <div class="card" style="text-align:center;padding:40px 24px;">
+      <div class="success-icon">🎉</div>
+      <h2 style="justify-content:center;font-size:20px;">商店建立成功！</h2>
+      <p style="color:var(--text-muted);font-size:13px;margin-bottom:20px;" id="successMsg"></p>
+      <div style="background:#F0FDF4;border:2px solid #86EFAC;border-radius:12px;padding:16px;margin-bottom:20px;text-align:left;">
+        <div style="font-size:12px;color:#16A34A;margin-bottom:4px;">您的點餐網址</div>
+        <div style="font-size:14px;font-weight:700;word-break:break-all;" id="successUrl"></div>
+      </div>
+      <button class="btn btn-primary" onclick="goAdmin()">進入管理後台 →</button>
+      <button class="btn btn-outline" onclick="copyRegUrl()">📋 複製點餐連結</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SUPABASE_URL = 'https://nssuisyvlrqnqfxupklb.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5zc3Vpc3l2bHJxbnFmeHVwa2xiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkyOTAwMzUsImV4cCI6MjA4NDg2NjAzNX0.q_B6v3gf1TOCuAq7z0xIw10wDueCSJn0p37VzdMfmbc';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const LIFF_ID = '2008962829-bnsS1bbB';
+
+let regLineProfile = null;
+let createdStoreSlug = '';
+
+// ===== LIFF INIT =====
+async function initLiff() {
+    try {
+        await liff.init({ liffId: LIFF_ID });
+        if (liff.isLoggedIn()) {
+            regLineProfile = await liff.getProfile();
+        }
+    } catch(e) { console.warn('LIFF init failed:', e); }
+}
+initLiff();
+
+// ===== STEP NAVIGATION =====
+function setStep(n) {
+    for (let i = 1; i <= 3; i++) {
+        document.getElementById('page' + i).classList.toggle('hidden', i !== n);
+        const dot = document.getElementById('step' + i);
+        dot.classList.toggle('active', i === n);
+        dot.classList.toggle('done', i < n);
+    }
+}
+
+function goStep2() {
+    const name = document.getElementById('regStoreName').value.trim();
+    if (!name) { showToast('請輸入商店名稱'); return; }
+    setStep(2);
+}
+function backStep1() { setStep(1); }
+
+function goStep3() {
+    const name = document.getElementById('regStoreName').value.trim();
+    const type = document.getElementById('regStoreType').value;
+    const phone = document.getElementById('regPhone').value.trim();
+    const features = Array.from(document.querySelectorAll('.feature-card.selected')).map(el => el.dataset.feature);
+    const typeLabels = { restaurant:'餐飲', cafe:'咖啡/飲料', bakery:'烘焙', service:'服務業', retail:'零售' };
+    document.getElementById('regSummary').innerHTML =
+        '<div style="padding:8px;background:var(--bg);border-radius:8px;">' +
+        '<div><b>商店名稱：</b>' + esc(name) + '</div>' +
+        '<div><b>類型：</b>' + (typeLabels[type] || type) + '</div>' +
+        (phone ? '<div><b>電話：</b>' + esc(phone) + '</div>' : '') +
+        '<div><b>功能：</b>' + features.join(', ') + '</div>' +
+        '</div>';
+    setStep(3);
+}
+function backStep2() { setStep(2); }
+
+// ===== FEATURE TOGGLE =====
+function toggleRegFeature(el) {
+    el.classList.toggle('selected');
+}
+
+// ===== SUBMIT =====
+async function submitRegistration() {
+    const btn = document.getElementById('regSubmitBtn');
+    btn.disabled = true;
+    btn.textContent = '建立中...';
+
+    try {
+        const name = document.getElementById('regStoreName').value.trim();
+        let slug = document.getElementById('regStoreSlug').value.trim();
+        const type = document.getElementById('regStoreType').value;
+        const phone = document.getElementById('regPhone').value.trim();
+        const address = document.getElementById('regAddress').value.trim();
+        const desc = document.getElementById('regDesc').value.trim();
+        const features = {};
+        document.querySelectorAll('.feature-card.selected').forEach(el => { features[el.dataset.feature] = true; });
+
+        // Auto-generate slug if empty
+        if (!slug) {
+            slug = name.toLowerCase()
+                .replace(/[^a-z0-9\u4e00-\u9fff]+/g, '-')
+                .replace(/^-|-$/g, '')
+                .substring(0, 30);
+            if (!/[a-z]/.test(slug)) slug = 'store-' + Date.now().toString(36);
+        }
+
+        // Check slug uniqueness
+        const { data: existing } = await sb.from('store_profiles').select('id').eq('store_slug', slug).limit(1);
+        if (existing && existing.length > 0) {
+            slug = slug + '-' + Date.now().toString(36).slice(-4);
+        }
+
+        // First check if company exists for this user, or create one
+        let companyId = null;
+        if (regLineProfile) {
+            // Check if employee record exists
+            const { data: emp } = await sb.from('employees').select('company_id').eq('line_user_id', regLineProfile.userId).limit(1);
+            if (emp && emp.length > 0) {
+                companyId = emp[0].company_id;
+            }
+        }
+
+        // Create store profile
+        const storeData = {
+            store_name: name,
+            store_slug: slug,
+            store_type: type,
+            phone: phone || null,
+            address: address || null,
+            description: desc || null,
+            accept_orders: true,
+            company_id: companyId
+        };
+
+        const { data: newStore, error } = await sb.from('store_profiles').insert(storeData).select().single();
+        if (error) throw error;
+
+        createdStoreSlug = slug;
+        const orderUrl = location.origin + location.pathname.replace(/\/[^/]*$/, '/') + 'order.html?store=' + slug;
+
+        document.getElementById('successMsg').textContent = '「' + name + '」已建立完成！';
+        document.getElementById('successUrl').textContent = orderUrl;
+
+        document.getElementById('page3').classList.add('hidden');
+        document.getElementById('pageSuccess').classList.remove('hidden');
+        document.querySelectorAll('.step-dot').forEach(d => d.classList.add('done'));
+
+    } catch(e) {
+        console.error('Registration error:', e);
+        showToast('建立失敗：' + (e.message || e));
+        btn.disabled = false;
+        btn.textContent = '🚀 建立商店';
+    }
+}
+
+function goAdmin() {
+    window.location.href = 'admin.html';
+}
+
+function copyRegUrl() {
+    const url = document.getElementById('successUrl').textContent;
+    if (navigator.clipboard) {
+        navigator.clipboard.writeText(url);
+        showToast('✅ 已複製');
+    }
+}
+
+function esc(s) {
+    if (!s) return '';
+    const d = document.createElement('div');
+    d.textContent = String(s);
+    return d.innerHTML;
+}
+
+function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2500);
+}
+</script>
+</body>
+</html>

@@ -7,6 +7,7 @@
     <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
     <link rel="stylesheet" href="style.css">
     <style>
         #lcTable th, #lcTable td, #smTable th, #smTable td { border: 1px solid #F1F5F9; }
@@ -1132,6 +1133,7 @@
                     <h2 id="rdStoreName" style="margin:0;font-size:18px;"></h2>
                     <div style="display:flex;gap:6px;">
                         <button onclick="previewStoreOrder()" style="padding:6px 10px;border:none;border-radius:8px;background:#4F46E5;color:#fff;font-size:12px;cursor:pointer;">👁️ 預覽</button>
+                        <button onclick="openKDS()" style="padding:6px 10px;border:none;border-radius:8px;background:#1E293B;color:#fff;font-size:12px;cursor:pointer;">🍳 KDS</button>
                         <button onclick="showStoreQR(rdCurrentStoreId)" style="padding:6px 10px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;font-size:12px;cursor:pointer;">📱 QR</button>
                         <button onclick="editStore(rdCurrentStoreId)" style="padding:6px 10px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;font-size:12px;cursor:pointer;">📝 編輯</button>
                     </div>
@@ -1143,6 +1145,7 @@
                 <div style="display:flex;gap:0;margin-bottom:14px;border-bottom:2px solid #E2E8F0;">
                     <div class="rdTab rdTabActive" onclick="switchRestaurantTab('orders',this)" style="flex:1;text-align:center;padding:10px 0;font-size:13px;font-weight:700;cursor:pointer;border-bottom:3px solid #4F46E5;margin-bottom:-2px;color:#4F46E5;">📋 訂單</div>
                     <div class="rdTab" onclick="switchRestaurantTab('menu',this)" style="flex:1;text-align:center;padding:10px 0;font-size:13px;font-weight:600;cursor:pointer;color:#94A3B8;">🍽️ 菜單</div>
+                    <div class="rdTab" onclick="switchRestaurantTab('report',this)" style="flex:1;text-align:center;padding:10px 0;font-size:13px;font-weight:600;cursor:pointer;color:#94A3B8;">📊 報表</div>
                     <div class="rdTab" onclick="switchRestaurantTab('settings',this)" style="flex:1;text-align:center;padding:10px 0;font-size:13px;font-weight:600;cursor:pointer;color:#94A3B8;">⚙️ 設定</div>
                 </div>
 
@@ -1334,6 +1337,62 @@
                 </div>
 
                 <!-- 設定 Tab -->
+                <!-- 報表 Tab -->
+                <div id="rdReportTab" style="display:none;">
+                    <!-- 日期選擇 -->
+                    <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center;flex-wrap:wrap;">
+                        <select id="reportRange" onchange="loadSalesReport()" style="padding:8px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;">
+                            <option value="today">今日</option>
+                            <option value="week">本週</option>
+                            <option value="month" selected>本月</option>
+                            <option value="custom">自訂</option>
+                        </select>
+                        <input type="date" id="reportFrom" style="padding:8px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;display:none;">
+                        <input type="date" id="reportTo" style="padding:8px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;display:none;">
+                        <button onclick="loadSalesReport()" class="btn btn-primary" style="font-size:12px;padding:8px 14px;">查詢</button>
+                        <button onclick="exportSalesCSV()" style="padding:8px 14px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;font-size:12px;cursor:pointer;">📥 匯出</button>
+                    </div>
+                    <!-- 摘要卡片 -->
+                    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:14px;">
+                        <div style="background:#DBEAFE;border-radius:10px;padding:12px;text-align:center;">
+                            <div style="font-size:22px;font-weight:900;color:#1E40AF;" id="rptTotalRevenue">$0</div>
+                            <div style="font-size:11px;color:#1E40AF;">營業額</div>
+                        </div>
+                        <div style="background:#D1FAE5;border-radius:10px;padding:12px;text-align:center;">
+                            <div style="font-size:22px;font-weight:900;color:#059669;" id="rptOrderCount">0</div>
+                            <div style="font-size:11px;color:#059669;">訂單數</div>
+                        </div>
+                        <div style="background:#FEF3C7;border-radius:10px;padding:12px;text-align:center;">
+                            <div style="font-size:22px;font-weight:900;color:#92400E;" id="rptAvgOrder">$0</div>
+                            <div style="font-size:11px;color:#92400E;">平均客單</div>
+                        </div>
+                        <div style="background:#F5F3FF;border-radius:10px;padding:12px;text-align:center;">
+                            <div style="font-size:22px;font-weight:900;color:#7C3AED;" id="rptItemsSold">0</div>
+                            <div style="font-size:11px;color:#7C3AED;">品項數</div>
+                        </div>
+                    </div>
+                    <!-- 每日營業額圖表 -->
+                    <div style="background:#F8FAFC;border-radius:12px;padding:14px;margin-bottom:14px;">
+                        <div style="font-weight:700;font-size:14px;margin-bottom:10px;">📈 每日營業額</div>
+                        <canvas id="dailyRevenueChart" height="200"></canvas>
+                    </div>
+                    <!-- 熱銷排行 -->
+                    <div style="background:#F8FAFC;border-radius:12px;padding:14px;margin-bottom:14px;">
+                        <div style="font-weight:700;font-size:14px;margin-bottom:10px;">🔥 熱銷排行 TOP 10</div>
+                        <div id="rptTopItems"></div>
+                    </div>
+                    <!-- 時段分析 -->
+                    <div style="background:#F8FAFC;border-radius:12px;padding:14px;margin-bottom:14px;">
+                        <div style="font-weight:700;font-size:14px;margin-bottom:10px;">🕐 時段分析</div>
+                        <canvas id="hourlyChart" height="180"></canvas>
+                    </div>
+                    <!-- 訂單類型分析 -->
+                    <div style="background:#F8FAFC;border-radius:12px;padding:14px;margin-bottom:14px;">
+                        <div style="font-weight:700;font-size:14px;margin-bottom:10px;">📊 訂單類型</div>
+                        <div id="rptOrderTypes"></div>
+                    </div>
+                </div>
+
                 <div id="rdSettingsTab" style="display:none;">
                     <!-- 基本資料（用現有 storeModal 編輯） -->
                     <div style="background:#F8FAFC;border-radius:12px;padding:14px;margin-bottom:14px;">

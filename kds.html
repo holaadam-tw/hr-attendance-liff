@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#1E293B">
+<title>KDS 廚房出單系統</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root {
+  --bg: #0F172A;
+  --bg-card: #1E293B;
+  --bg-card-hover: #334155;
+  --text: #F1F5F9;
+  --text-muted: #94A3B8;
+  --border: #334155;
+  --pending: #F59E0B;
+  --pending-bg: rgba(245,158,11,0.15);
+  --confirmed: #3B82F6;
+  --confirmed-bg: rgba(59,130,246,0.15);
+  --preparing: #8B5CF6;
+  --preparing-bg: rgba(139,92,246,0.15);
+  --ready: #10B981;
+  --ready-bg: rgba(16,185,129,0.15);
+  --danger: #EF4444;
+}
+*,*::before,*::after { box-sizing:border-box;margin:0;padding:0; }
+body {
+  font-family:'Noto Sans TC',-apple-system,sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  min-height:100vh;
+  overflow-x:hidden;
+}
+
+/* HEADER */
+.kds-header {
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px 20px;background:var(--bg-card);border-bottom:1px solid var(--border);
+  position:sticky;top:0;z-index:100;
+}
+.kds-header h1 { font-size:18px;font-weight:700; }
+.kds-header .store-name { font-size:13px;color:var(--text-muted);margin-left:12px; }
+.kds-controls { display:flex;gap:8px;align-items:center; }
+.kds-controls button {
+  padding:6px 14px;border:1px solid var(--border);border-radius:8px;
+  background:var(--bg-card);color:var(--text);font-size:13px;cursor:pointer;
+  font-family:inherit;
+}
+.kds-controls button:hover { background:var(--bg-card-hover); }
+.kds-controls button.active { background:#3B82F6;border-color:#3B82F6;color:#fff; }
+
+/* STATS BAR */
+.kds-stats {
+  display:flex;gap:12px;padding:10px 20px;background:var(--bg-card);
+  border-bottom:1px solid var(--border);flex-wrap:wrap;
+}
+.kds-stat {
+  display:flex;align-items:center;gap:6px;font-size:13px;
+}
+.kds-stat .dot {
+  width:10px;height:10px;border-radius:50%;
+}
+.kds-stat .count { font-weight:700;font-size:16px; }
+
+/* ORDER GRID */
+.kds-grid {
+  display:grid;
+  grid-template-columns:repeat(auto-fill, minmax(300px, 1fr));
+  gap:12px;padding:16px;
+}
+
+/* ORDER CARD */
+.kds-card {
+  background:var(--bg-card);border-radius:12px;overflow:hidden;
+  border:2px solid transparent;transition:border-color 0.2s;
+}
+.kds-card.status-pending { border-color:var(--pending); }
+.kds-card.status-confirmed { border-color:var(--confirmed); }
+.kds-card.status-preparing { border-color:var(--preparing); }
+.kds-card.status-ready { border-color:var(--ready); }
+
+.kds-card-header {
+  padding:10px 14px;display:flex;justify-content:space-between;align-items:center;
+}
+.kds-card.status-pending .kds-card-header { background:var(--pending-bg); }
+.kds-card.status-confirmed .kds-card-header { background:var(--confirmed-bg); }
+.kds-card.status-preparing .kds-card-header { background:var(--preparing-bg); }
+.kds-card.status-ready .kds-card-header { background:var(--ready-bg); }
+
+.kds-order-num { font-weight:700;font-size:18px; }
+.kds-order-meta { font-size:12px;color:var(--text-muted); }
+.kds-order-type {
+  padding:2px 10px;border-radius:10px;font-size:12px;font-weight:600;
+}
+.kds-order-type.dine_in { background:#3B82F6;color:#fff; }
+.kds-order-type.takeout { background:#F59E0B;color:#000; }
+
+.kds-timer {
+  font-size:12px;font-weight:700;padding:2px 8px;border-radius:8px;
+  background:rgba(255,255,255,0.1);
+}
+.kds-timer.urgent { background:var(--danger);color:#fff;animation:pulse 1s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.6} }
+
+.kds-card-body { padding:10px 14px; }
+.kds-item {
+  padding:6px 0;border-bottom:1px solid var(--border);
+  display:flex;justify-content:space-between;align-items:flex-start;
+}
+.kds-item:last-child { border-bottom:none; }
+.kds-item-qty {
+  font-weight:700;font-size:18px;min-width:32px;
+  color:var(--pending);
+}
+.kds-item-name { flex:1;font-size:14px;font-weight:500; }
+.kds-item-opts { font-size:11px;color:var(--text-muted);margin-top:2px; }
+.kds-item-note { font-size:12px;color:#F59E0B;margin-top:2px; }
+
+.kds-card-footer {
+  padding:8px 14px;display:flex;gap:6px;
+}
+.kds-card-footer button {
+  flex:1;padding:10px;border:none;border-radius:8px;
+  font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;
+}
+.kds-btn-confirm { background:#3B82F6;color:#fff; }
+.kds-btn-prepare { background:#8B5CF6;color:#fff; }
+.kds-btn-ready { background:#10B981;color:#fff; }
+.kds-btn-complete { background:#64748B;color:#fff; }
+.kds-btn-cancel { background:var(--bg-card-hover);color:var(--danger); }
+
+.kds-notes {
+  padding:6px 14px;font-size:12px;color:#F59E0B;background:rgba(245,158,11,0.08);
+  border-top:1px solid var(--border);
+}
+
+/* EMPTY STATE */
+.kds-empty {
+  text-align:center;padding:80px 20px;color:var(--text-muted);
+}
+.kds-empty-icon { font-size:48px;margin-bottom:12px; }
+
+/* SOUND ALERT */
+.sound-indicator {
+  width:8px;height:8px;border-radius:50%;background:#10B981;
+  display:inline-block;margin-right:4px;
+}
+.sound-indicator.off { background:var(--danger); }
+
+/* LOADING */
+.kds-loading {
+  text-align:center;padding:80px 20px;color:var(--text-muted);
+  font-size:14px;
+}
+
+/* TOAST */
+.kds-toast {
+  position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
+  background:#10B981;color:#fff;padding:10px 24px;border-radius:10px;
+  font-size:14px;font-weight:600;z-index:9999;
+  opacity:0;transition:opacity 0.3s;pointer-events:none;
+}
+.kds-toast.show { opacity:1; }
+
+/* RESPONSIVE */
+@media (max-width: 640px) {
+  .kds-grid { grid-template-columns:1fr;padding:10px; }
+  .kds-header { padding:10px 14px; }
+  .kds-header h1 { font-size:15px; }
+}
+</style>
+</head>
+<body>
+
+<header class="kds-header">
+  <div style="display:flex;align-items:center;">
+    <h1>KDS 廚房出單</h1>
+    <span class="store-name" id="storeName"></span>
+  </div>
+  <div class="kds-controls">
+    <button onclick="toggleFilter('all')" id="filterAll" class="active">全部</button>
+    <button onclick="toggleFilter('active')" id="filterActive">進行中</button>
+    <button onclick="toggleFilter('ready')" id="filterReady">可取餐</button>
+    <button onclick="toggleSound()" id="soundBtn">🔔 音效</button>
+    <button onclick="toggleFullscreen()">⛶</button>
+  </div>
+</header>
+
+<div class="kds-stats" id="statsBar">
+  <div class="kds-stat"><span class="dot" style="background:var(--pending)"></span>待處理 <span class="count" id="statPending">0</span></div>
+  <div class="kds-stat"><span class="dot" style="background:var(--confirmed)"></span>已確認 <span class="count" id="statConfirmed">0</span></div>
+  <div class="kds-stat"><span class="dot" style="background:var(--preparing)"></span>準備中 <span class="count" id="statPreparing">0</span></div>
+  <div class="kds-stat"><span class="dot" style="background:var(--ready)"></span>可取餐 <span class="count" id="statReady">0</span></div>
+</div>
+
+<div class="kds-grid" id="orderGrid">
+  <div class="kds-loading">載入中...</div>
+</div>
+
+<div class="kds-toast" id="toast"></div>
+
+<script>
+// ===== CONFIG =====
+const SUPABASE_URL = 'https://nssuisyvlrqnqfxupklb.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5zc3Vpc3l2bHJxbnFmeHVwa2xiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkyOTAwMzUsImV4cCI6MjA4NDg2NjAzNX0.q_B6v3gf1TOCuAq7z0xIw10wDueCSJn0p37VzdMfmbc';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let currentStoreId = null;
+let orders = [];
+let filterMode = 'all'; // 'all' | 'active' | 'ready'
+let soundEnabled = true;
+let pollTimer = null;
+let lastOrderIds = new Set();
+
+// Sound effect (short bell)
+const bellSound = typeof Audio !== 'undefined' ? new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgkKuslnRRRXKXrK2UZko+ZJCnp5RoTEFpmauspHdVSXOaraugeVlPd56sqp57XVR8oKeonX5hWICfqaadgGNagZ+op5+AZVuCn6imnoBmXIOeqKadgGZdg5+opZ2AZl2Dn6iknYBmXYOfp6OdgGZdg5+oo52AZl2Dn6ejnX9mXYOfp6SdgGZdg5+no52AZl2Dn6ejnYBmXYOfp6OdgGZdg5+no52AZl2Dn6ejnYBmXQ==') : null;
+
+// ===== INIT =====
+async function init() {
+    const params = new URLSearchParams(location.search);
+    const storeSlug = params.get('store');
+    if (!storeSlug) {
+        document.getElementById('orderGrid').innerHTML = '<div class="kds-empty"><div class="kds-empty-icon">⚠️</div><div>缺少 store 參數</div></div>';
+        return;
+    }
+    // Lookup store
+    const { data: store } = await sb.from('store_profiles').select('id, store_name').eq('store_slug', storeSlug).single();
+    if (!store) {
+        document.getElementById('orderGrid').innerHTML = '<div class="kds-empty"><div class="kds-empty-icon">❌</div><div>找不到商店</div></div>';
+        return;
+    }
+    currentStoreId = store.id;
+    document.getElementById('storeName').textContent = store.store_name;
+    document.title = 'KDS · ' + store.store_name;
+
+    // Request notification permission
+    if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+        Notification.requestPermission();
+    }
+
+    await loadOrders();
+    startPolling();
+}
+
+// ===== LOAD ORDERS =====
+async function loadOrders() {
+    const today = new Date().toISOString().split('T')[0];
+    const { data } = await sb.from('orders').select('*')
+        .eq('store_id', currentStoreId)
+        .gte('created_at', today + 'T00:00:00')
+        .in('status', ['pending', 'confirmed', 'preparing', 'ready'])
+        .order('created_at', { ascending: true });
+    orders = data || [];
+    renderOrders();
+    updateStats();
+}
+
+// ===== POLLING =====
+function startPolling() {
+    if (pollTimer) clearInterval(pollTimer);
+    lastOrderIds = new Set(orders.map(o => o.id));
+    pollTimer = setInterval(async () => {
+        if (!currentStoreId) return;
+        try {
+            const today = new Date().toISOString().split('T')[0];
+            const { data } = await sb.from('orders').select('*')
+                .eq('store_id', currentStoreId)
+                .gte('created_at', today + 'T00:00:00')
+                .in('status', ['pending', 'confirmed', 'preparing', 'ready'])
+                .order('created_at', { ascending: true });
+            if (!data) return;
+            const newOrders = data.filter(o => !lastOrderIds.has(o.id));
+            if (newOrders.length > 0) {
+                if (soundEnabled && bellSound) {
+                    try { bellSound.currentTime = 0; bellSound.play(); } catch(e) {}
+                }
+                if (Notification.permission === 'granted') {
+                    const o = newOrders[0];
+                    const items = (o.items || []).map(i => `${i.name}x${i.qty}`).join(', ');
+                    new Notification('🔔 新訂單！', {
+                        body: `#${o.order_number} · ${items}`,
+                        tag: 'kds-new-order'
+                    });
+                }
+                showToast('🔔 新訂單 +' + newOrders.length);
+            }
+            lastOrderIds = new Set(data.map(o => o.id));
+            orders = data;
+            renderOrders();
+            updateStats();
+        } catch(e) { console.warn('Poll error:', e); }
+    }, 5000); // KDS polls every 5 seconds (faster than admin)
+}
+
+// ===== RENDER =====
+function renderOrders() {
+    const grid = document.getElementById('orderGrid');
+    let filtered = orders;
+    if (filterMode === 'active') filtered = orders.filter(o => ['pending', 'confirmed', 'preparing'].includes(o.status));
+    if (filterMode === 'ready') filtered = orders.filter(o => o.status === 'ready');
+
+    if (filtered.length === 0) {
+        grid.innerHTML = '<div class="kds-empty"><div class="kds-empty-icon">✅</div><div>目前沒有訂單</div></div>';
+        return;
+    }
+
+    grid.innerHTML = filtered.map(o => {
+        const pickup = o.pickup_number ? '#' + String(o.pickup_number).padStart(3, '0') : '#' + o.order_number;
+        const typeLabel = o.order_type === 'takeout' ? '外帶' : (o.table_number ? '桌' + esc(o.table_number) : '內用');
+        const typeClass = o.order_type || 'dine_in';
+        const elapsed = getElapsed(o.created_at);
+        const isUrgent = elapsed.minutes >= 15 && o.status !== 'ready';
+        const items = o.items || [];
+
+        let buttons = '';
+        if (o.status === 'pending') buttons = `<button class="kds-btn-confirm" onclick="updateStatus('${o.id}','confirmed')">✅ 確認</button><button class="kds-btn-cancel" onclick="updateStatus('${o.id}','cancelled')">✕</button>`;
+        else if (o.status === 'confirmed') buttons = `<button class="kds-btn-prepare" onclick="updateStatus('${o.id}','preparing')">🍳 開始準備</button>`;
+        else if (o.status === 'preparing') buttons = `<button class="kds-btn-ready" onclick="updateStatus('${o.id}','ready')">🔔 可取餐</button>`;
+        else if (o.status === 'ready') buttons = `<button class="kds-btn-complete" onclick="updateStatus('${o.id}','completed')">✅ 完成取餐</button>`;
+
+        return `<div class="kds-card status-${o.status}">
+            <div class="kds-card-header">
+                <div>
+                    <span class="kds-order-num">${esc(pickup)}</span>
+                    <span class="kds-order-type ${typeClass}">${typeLabel}</span>
+                </div>
+                <span class="kds-timer ${isUrgent ? 'urgent' : ''}">${elapsed.text}</span>
+            </div>
+            <div class="kds-card-body">
+                ${items.map(i => {
+                    const opts = formatOpts(i.options || i.selectedOpts);
+                    return `<div class="kds-item">
+                        <span class="kds-item-qty">${i.qty}x</span>
+                        <div>
+                            <div class="kds-item-name">${esc(i.name)}</div>
+                            ${opts ? '<div class="kds-item-opts">' + esc(opts) + '</div>' : ''}
+                            ${i.note ? '<div class="kds-item-note">📝 ' + esc(i.note) + '</div>' : ''}
+                        </div>
+                    </div>`;
+                }).join('')}
+            </div>
+            ${o.notes ? '<div class="kds-notes">📝 ' + esc(o.notes) + '</div>' : ''}
+            <div class="kds-card-footer">${buttons}</div>
+        </div>`;
+    }).join('');
+}
+
+function formatOpts(opts) {
+    if (!opts) return '';
+    if (typeof opts === 'string') return opts;
+    if (Array.isArray(opts)) return opts.map(g => {
+        if (typeof g === 'string') return g;
+        if (g.group && g.choices) return g.group + ': ' + g.choices.join(', ');
+        return JSON.stringify(g);
+    }).join(' / ');
+    return '';
+}
+
+function getElapsed(createdAt) {
+    if (!createdAt) return { text: '--', minutes: 0 };
+    const diff = Date.now() - new Date(createdAt).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return { text: '剛剛', minutes: 0 };
+    if (mins < 60) return { text: mins + '分', minutes: mins };
+    return { text: Math.floor(mins / 60) + '時' + (mins % 60) + '分', minutes: mins };
+}
+
+function updateStats() {
+    const count = (s) => orders.filter(o => o.status === s).length;
+    document.getElementById('statPending').textContent = count('pending');
+    document.getElementById('statConfirmed').textContent = count('confirmed');
+    document.getElementById('statPreparing').textContent = count('preparing');
+    document.getElementById('statReady').textContent = count('ready');
+}
+
+// ===== UPDATE STATUS =====
+async function updateStatus(orderId, newStatus) {
+    try {
+        await sb.from('orders').update({ status: newStatus, updated_at: new Date().toISOString() }).eq('id', orderId);
+        // Optimistic update
+        const idx = orders.findIndex(o => o.id === orderId);
+        if (idx >= 0) {
+            if (newStatus === 'completed' || newStatus === 'cancelled') {
+                orders.splice(idx, 1);
+            } else {
+                orders[idx].status = newStatus;
+            }
+        }
+        renderOrders();
+        updateStats();
+        showToast(newStatus === 'cancelled' ? '❌ 已取消' : '✅ 狀態已更新');
+    } catch(e) {
+        console.error(e);
+        showToast('❌ 更新失敗');
+    }
+}
+
+// ===== FILTER =====
+function toggleFilter(mode) {
+    filterMode = mode;
+    document.querySelectorAll('.kds-controls button[id^="filter"]').forEach(b => b.classList.remove('active'));
+    const btn = document.getElementById('filter' + mode.charAt(0).toUpperCase() + mode.slice(1));
+    if (btn) btn.classList.add('active');
+    renderOrders();
+}
+
+// ===== SOUND =====
+function toggleSound() {
+    soundEnabled = !soundEnabled;
+    document.getElementById('soundBtn').innerHTML = soundEnabled ? '🔔 音效' : '🔕 靜音';
+    showToast(soundEnabled ? '音效已開啟' : '音效已關閉');
+}
+
+// ===== FULLSCREEN =====
+function toggleFullscreen() {
+    if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+    } else {
+        document.exitFullscreen();
+    }
+}
+
+// ===== UTILS =====
+function esc(s) {
+    if (!s) return '';
+    const d = document.createElement('div');
+    d.textContent = String(s);
+    return d.innerHTML;
+}
+
+function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// ===== START =====
+init();
+</script>
+</body>
+</html>

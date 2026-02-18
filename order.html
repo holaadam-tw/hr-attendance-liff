@@ -774,6 +774,20 @@ body {
   </div>
 </div>
 
+<!-- ===== MEMBERSHIP / PHONE ===== -->
+<div id="memberSection" style="display:none;margin:0 16px 8px;background:var(--bg-card);border-radius:12px;padding:12px 14px;box-shadow:var(--shadow-sm);">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+    <span style="font-size:18px;">🎯</span>
+    <span style="font-weight:700;font-size:14px;">會員集點</span>
+    <span id="memberPoints" style="margin-left:auto;font-size:13px;color:var(--text-secondary);"></span>
+  </div>
+  <div style="display:flex;gap:8px;">
+    <input type="tel" id="memberPhone" placeholder="手機號碼（集點用）" maxlength="10" style="flex:1;padding:10px;border:1px solid var(--border);border-radius:10px;font-size:14px;">
+    <button onclick="checkMemberPoints()" style="padding:8px 14px;border:none;border-radius:10px;background:var(--primary);color:#fff;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;">查點數</button>
+  </div>
+  <div id="memberInfo" style="display:none;margin-top:8px;padding:8px;background:rgba(0,0,0,0.03);border-radius:8px;font-size:12px;color:var(--text-secondary);"></div>
+</div>
+
 <!-- ===== SEARCH BAR ===== -->
 <div class="search-bar">
   <div class="search-input-wrap">
@@ -1026,6 +1040,8 @@ let modalQtyVal = 1;
 let modalSelectedSize = null;
 let guestCount = 3;
 let isScrollingByClick = false;
+let loyaltyConfig = null;
+let memberPointsData = null;
 
 // ===== EMOJI ICONS (ES6 \u{} safe encoding) =====
 const ICONS = {
@@ -1209,15 +1225,32 @@ async function loadStoreFromSupabase(slug) {
     document.getElementById('shopSubtitle').textContent = '\u{1F534} 目前暫停接單';
   }
 
+  // 會員集點設定
+  loyaltyConfig = store.loyalty_config || null;
+  if (loyaltyConfig && loyaltyConfig.spend_per_point) {
+    document.getElementById('memberSection').style.display = '';
+    // 從 localStorage 回填手機
+    const savedPhone = localStorage.getItem('member_phone_' + currentStoreId);
+    if (savedPhone) {
+      document.getElementById('memberPhone').value = savedPhone;
+      checkMemberPoints();
+    }
+  }
+
   // 2. 載入分類
   const catRes = await fetch(SUPABASE_URL + '/rest/v1/menu_categories?store_id=eq.' + currentStoreId + '&is_active=eq.true&order=sort_order', { headers });
   const catData = await catRes.json();
 
-  // 從分類名稱提取 emoji 作為 icon
-  categories = (catData || []).map(function(c) {
+  // 從分類名稱提取 emoji 作為 icon，並過濾時段
+  var nowHHMM = new Date().toTimeString().slice(0, 5); // "HH:MM"
+  categories = (catData || []).filter(function(c) {
+    // 若無設定時段，全天顯示
+    if (!c.time_periods || !Array.isArray(c.time_periods) || c.time_periods.length === 0) return true;
+    // 檢查是否在任一時段內
+    return c.time_periods.some(function(p) { return nowHHMM >= p.from && nowHHMM <= p.to; });
+  }).map(function(c) {
     var icon = ICONS.star;
     var name = c.name;
-    // 如果名稱開頭是 emoji，分離出來
     var emojiMatch = name.match(/^([\u{1F000}-\u{1FFFF}][\u{FE00}-\u{FE0F}]?|[\u{2600}-\u{27BF}]|[\u{2B00}-\u{2BFF}]|[\u{E000}-\u{F8FF}]|[\u2702-\u27B0]|➕)\s*/u);
     if (emojiMatch) {
       icon = emojiMatch[1];
@@ -1785,6 +1818,7 @@ async function confirmAndSubmitOrder() {
   });
 
   var orderNum = '';
+  const memberPhone = document.getElementById('memberPhone')?.value?.trim() || '';
   const order = {
     store_id: currentStoreId,
     table_number: tableNum,
@@ -1792,6 +1826,7 @@ async function confirmAndSubmitOrder() {
     total: totalPrice,
     status: 'pending',
     order_type: isTakeout ? 'takeout' : 'dine_in',
+    customer_phone: memberPhone || null,
     notes: isTakeout ? '' : '用餐人數: ' + guestCount
   };
   try {
@@ -1818,17 +1853,24 @@ async function confirmAndSubmitOrder() {
     btn.textContent = '確認送出';
     return;
   }
-  showOrderSuccess(totalQty, totalPrice, tableNum, orderNum);
+  // 會員集點
+  let earnedPts = 0;
+  if (loyaltyConfig) {
+    earnedPts = await awardLoyaltyPoints(totalPrice) || 0;
+  }
+  showOrderSuccess(totalQty, totalPrice, tableNum, orderNum, earnedPts);
 }
 
-function showOrderSuccess(qty, price, table, orderNum) {
+function showOrderSuccess(qty, price, table, orderNum, earnedPts) {
   const isTakeout = table === '外帶';
+  const pointsHtml = earnedPts > 0 ? '<div style="background:#FEF3C7;border-radius:10px;padding:8px 16px;margin-bottom:16px;display:inline-block;font-size:13px;color:#92400E;">🎯 本次獲得 <b>' + earnedPts + '</b> 點</div>' : '';
   const overlay = document.getElementById('itemModalOverlay');
   overlay.innerHTML = '<div class="item-modal" onclick="event.stopPropagation()" style="text-align:center; padding: 40px 20px;">' +
     '<div style="font-size:64px; margin-bottom:16px; color:#4CAF50;">&#10003;</div>' +
     '<h2 style="font-size:22px; font-weight:800; margin-bottom:8px;">訂單已送出！</h2>' +
     (orderNum ? '<div style="background:#F0FDF4;border:2px solid #86EFAC;border-radius:12px;padding:12px 20px;margin-bottom:16px;display:inline-block;"><div style="font-size:11px;color:#16A34A;margin-bottom:2px;">' + (isTakeout ? '取餐號碼' : '訂單號碼') + '</div><div style="font-size:36px;font-weight:900;color:#15803D;letter-spacing:4px;">' + orderNum + '</div></div>' : '') +
     '<p style="color:#666; font-size:14px; margin-bottom:20px;">' + (isTakeout ? '外帶' : '桌號 ' + table) + '&#12288;' + qty + ' 道菜品&#12288;合計 $' + price + '</p>' +
+    pointsHtml +
     '<p style="color:#999; font-size:12px; margin-bottom:24px;">' + (isTakeout ? '請至櫃檯等候叫號取餐' : '廚房正在準備您的餐點，請稍候') + '</p>' +
     '<button onclick="resetOrder()" style="background: var(--primary); color: white; border: none; padding: 14px 40px; border-radius: 12px; font-size: 15px; font-weight: 700; cursor: pointer; font-family: inherit;">繼續點餐</button></div>';
   overlay.classList.add('show');
@@ -1858,6 +1900,74 @@ function showToast(msg) {
   toast.textContent = msg;
   toast.classList.add('show');
   setTimeout(function() { toast.classList.remove('show'); }, 2000);
+}
+
+// ===== 會員集點 =====
+async function checkMemberPoints() {
+  const phone = document.getElementById('memberPhone').value.trim();
+  if (!phone || phone.length < 9) { showToast('請輸入正確手機號碼'); return; }
+  localStorage.setItem('member_phone_' + currentStoreId, phone);
+  try {
+    const res = await fetch(SUPABASE_URL + '/rest/v1/loyalty_points?store_id=eq.' + currentStoreId + '&customer_line_id=eq.' + encodeURIComponent(phone) + '&limit=1', {
+      headers: { 'apikey': SUPABASE_KEY }
+    });
+    const data = await res.json();
+    const info = document.getElementById('memberInfo');
+    if (data && data.length > 0) {
+      memberPointsData = data[0];
+      const pts = memberPointsData.points || 0;
+      const cfg = loyaltyConfig || {};
+      const needed = cfg.points_per_reward || 10;
+      const discount = cfg.reward_discount || 50;
+      document.getElementById('memberPoints').textContent = '🎯 ' + pts + ' 點';
+      info.style.display = '';
+      if (pts >= needed) {
+        info.innerHTML = '🎉 您有 <b>' + pts + '</b> 點，可兌換 <b>$' + discount + '</b> 折扣！<br><span style="font-size:11px;color:#94A3B8;">下次結帳時自動折抵</span>';
+      } else {
+        info.innerHTML = '目前 <b>' + pts + '</b> 點，再集 <b>' + (needed - pts) + '</b> 點可兌換 $' + discount + ' 折扣';
+      }
+    } else {
+      memberPointsData = null;
+      document.getElementById('memberPoints').textContent = '新會員';
+      info.style.display = '';
+      info.innerHTML = '歡迎加入！消費即可開始集點';
+    }
+  } catch(e) { console.warn('Check points error:', e); }
+}
+
+async function awardLoyaltyPoints(orderTotal) {
+  const phone = document.getElementById('memberPhone')?.value?.trim();
+  if (!phone || phone.length < 9 || !loyaltyConfig) return;
+  const spendPer = loyaltyConfig.spend_per_point || 50;
+  const earnedPoints = Math.floor(orderTotal / spendPer);
+  if (earnedPoints <= 0) return;
+  try {
+    if (memberPointsData) {
+      // Update existing
+      await fetch(SUPABASE_URL + '/rest/v1/loyalty_points?id=eq.' + memberPointsData.id, {
+        method: 'PATCH',
+        headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+        body: JSON.stringify({
+          points: (memberPointsData.points || 0) + earnedPoints,
+          total_earned: (memberPointsData.total_earned || 0) + earnedPoints,
+          updated_at: new Date().toISOString()
+        })
+      });
+    } else {
+      // Insert new
+      await fetch(SUPABASE_URL + '/rest/v1/loyalty_points', {
+        method: 'POST',
+        headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+        body: JSON.stringify({
+          store_id: currentStoreId,
+          customer_line_id: phone,
+          points: earnedPoints,
+          total_earned: earnedPoints
+        })
+      });
+    }
+    return earnedPoints;
+  } catch(e) { console.warn('Award points error:', e); return 0; }
 }
 </script>
 </body>
