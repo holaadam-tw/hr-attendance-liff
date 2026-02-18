@@ -1,25 +1,29 @@
 -- ============================================================
 -- seed_benmi_menu.sql
 -- 本米 Benmi - 土城中央路餐廳 菜單種子資料
--- Bánh mì Việt Nam 越南法國麵包
+-- Bánh mì Việt Nam 越式法國麵包
 -- ============================================================
 
 -- 先取得或建立商店 (使用 slug = 'benmi-tucheng')
--- 若商店已存在則跳過建立
+-- 若商店已存在則更新資訊
 INSERT INTO store_profiles (
     store_name, store_slug, description, phone, address,
-    store_type, accept_orders, theme_color, is_active
+    store_type, accept_orders, theme_color, is_active, business_hours
 ) VALUES (
     '本米 Benmi - 土城中央路餐廳',
     'benmi-tucheng',
-    'Bánh mì Việt Nam 越南法國麵包',
+    'Bánh mì Việt Nam 越式法國麵包',
     NULL,
-    '新北市土城區中央路二段149巷8-1號',
+    '新北市土城區中央路二段135號',
     'restaurant',
     true,
     '#E85D26',
-    true
-) ON CONFLICT (store_slug) DO NOTHING;
+    true,
+    '{"sun":{"open":"07:30","close":"21:00"},"mon":{"open":"11:00","close":"21:00"},"tue":{"open":"11:00","close":"21:00"},"wed":{"open":"11:00","close":"21:00"},"thu":{"open":"11:00","close":"21:00"},"fri":{"open":"11:00","close":"21:00"},"sat":{"open":"07:30","close":"21:00"}}'::jsonb
+) ON CONFLICT (store_slug) DO UPDATE SET
+    address = EXCLUDED.address,
+    business_hours = EXCLUDED.business_hours,
+    description = EXCLUDED.description;
 
 -- 取得 store_id
 DO $$
@@ -66,146 +70,153 @@ BEGIN
 
     -- ========================
     -- 麵包單點 Bánh mì
-    -- 每款有 Mini / L 兩種尺寸 (用 options)
+    -- 每款有 Mini / L-SIZE 兩種尺寸
     -- ========================
 
-    -- 1. 燒肉法國麵包
+    -- 1. 燒肉麵包
     INSERT INTO menu_items (store_id, category_id, name, description, price, sort_order, options, tags)
     VALUES (v_store_id, v_cat_bread,
-        '燒肉法國麵包', 'Bánh mì thịt nướng',
+        '燒肉麵包', 'Braised pork / Thịt nguội',
         80, 1,
         '[{"group":"尺寸","required":true,"items":[{"name":"Mini","price":56},{"name":"L-SIZE","price":80}]}]'::jsonb,
         ARRAY['推薦']
     );
 
-    -- 2. 火腿法國麵包
+    -- 2. 火腿麵包
     INSERT INTO menu_items (store_id, category_id, name, description, price, sort_order, options)
     VALUES (v_store_id, v_cat_bread,
-        '火腿法國麵包', 'Bánh mì chả lụa',
+        '火腿麵包', 'Ham / Chả',
         80, 2,
         '[{"group":"尺寸","required":true,"items":[{"name":"Mini","price":56},{"name":"L-SIZE","price":80}]}]'::jsonb
     );
 
-    -- 3. 雞肉法國麵包
+    -- 3. 雞肉麵包
     INSERT INTO menu_items (store_id, category_id, name, description, price, sort_order, options)
     VALUES (v_store_id, v_cat_bread,
-        '雞肉法國麵包', 'Bánh mì gà',
-        90, 3,
-        '[{"group":"尺寸","required":true,"items":[{"name":"Mini","price":66},{"name":"L-SIZE","price":90}]}]'::jsonb
+        '雞肉麵包', 'Chicken / Thịt gà',
+        100, 3,
+        '[{"group":"尺寸","required":true,"items":[{"name":"Mini","price":68},{"name":"L-SIZE","price":100}]}]'::jsonb
     );
 
-    -- 4. 烤肉法國麵包
+    -- 4. 烤肉麵包
     INSERT INTO menu_items (store_id, category_id, name, description, price, sort_order, options)
     VALUES (v_store_id, v_cat_bread,
-        '烤肉法國麵包', 'Bánh mì thịt nướng đặc biệt',
-        100, 4,
-        '[{"group":"尺寸","required":true,"items":[{"name":"Mini","price":69},{"name":"L-SIZE","price":100}]}]'::jsonb
+        '烤肉麵包', 'Grilled Meat / Thịt nướng',
+        105, 4,
+        '[{"group":"尺寸","required":true,"items":[{"name":"Mini","price":72},{"name":"L-SIZE","price":105}]}]'::jsonb
     );
 
-    -- 5. 雙層烤肉法國麵包
+    -- 5. 雙層烤肉麵包
+    INSERT INTO menu_items (store_id, category_id, name, description, price, sort_order, options, tags)
+    VALUES (v_store_id, v_cat_bread,
+        '雙層烤肉麵包', 'Double Cheesebanhmi / Thịt nướng phô mai',
+        115, 5,
+        '[{"group":"尺寸","required":true,"items":[{"name":"Mini","price":78},{"name":"L-SIZE","price":115}]}]'::jsonb,
+        ARRAY['推薦']
+    );
+
+    -- 6. 綜合麵包
     INSERT INTO menu_items (store_id, category_id, name, description, price, sort_order, options)
     VALUES (v_store_id, v_cat_bread,
-        '雙層烤肉法國麵包', 'Bánh mì thịt nướng x2',
-        130, 5,
+        '綜合麵包', 'Mixed / Thập cẩm',
+        130, 6,
         '[{"group":"尺寸","required":true,"items":[{"name":"Mini","price":79},{"name":"L-SIZE","price":130}]}]'::jsonb
     );
 
-    -- 6. 綜合法國麵包
-    INSERT INTO menu_items (store_id, category_id, name, description, price, sort_order, options)
-    VALUES (v_store_id, v_cat_bread,
-        '綜合法國麵包', 'Bánh mì đặc biệt (tổng hợp)',
-        100, 6,
-        '[{"group":"尺寸","required":true,"items":[{"name":"Mini","price":69},{"name":"L-SIZE","price":100}]}]'::jsonb
-    );
-
     -- ========================
-    -- 大套餐 SET L-SIZE (麵包 L + 飲料)
+    -- 大套餐 SET L-SIZE (麵包 L-SIZE + 飲料)
     -- ========================
 
-    -- SET 1: 燒肉 + 越南咖啡
-    INSERT INTO menu_items (store_id, category_id, name, description, price, sort_order, tags)
+    INSERT INTO menu_items (store_id, category_id, name, description, price, sort_order, options, tags)
     VALUES (v_store_id, v_cat_set_l,
-        'SET 1 燒肉 + 越南咖啡', '燒肉法國麵包 L-SIZE + 越南咖啡',
-        120, 1, ARRAY['套餐']
+        'Set 1 燒肉+飲料', 'L-SIZE 燒肉麵包+飲料',
+        90, 1,
+        '[{"group":"飲料","required":true,"items":[{"name":"越南咖啡","price":0},{"name":"豆漿","price":0},{"name":"紅茶","price":0},{"name":"可樂","price":0},{"name":"雪碧","price":0}]}]'::jsonb,
+        ARRAY['套餐']
     );
 
-    -- SET 2: 燒肉 + 豆漿/紅茶
-    INSERT INTO menu_items (store_id, category_id, name, description, price, sort_order, options)
+    INSERT INTO menu_items (store_id, category_id, name, description, price, sort_order, options, tags)
     VALUES (v_store_id, v_cat_set_l,
-        'SET 2 燒肉 + 豆漿/紅茶', '燒肉法國麵包 L-SIZE + 豆漿或紅茶',
-        110, 2,
-        '[{"group":"飲料","required":true,"items":[{"name":"豆漿","price":0},{"name":"紅茶","price":0}]}]'::jsonb
+        'Set 2 火腿+飲料', 'L-SIZE 火腿麵包+飲料',
+        90, 2,
+        '[{"group":"飲料","required":true,"items":[{"name":"越南咖啡","price":0},{"name":"豆漿","price":0},{"name":"紅茶","price":0},{"name":"可樂","price":0},{"name":"雪碧","price":0}]}]'::jsonb,
+        ARRAY['套餐']
     );
 
-    -- SET 3: 火腿 + 越南咖啡
-    INSERT INTO menu_items (store_id, category_id, name, description, price, sort_order)
+    INSERT INTO menu_items (store_id, category_id, name, description, price, sort_order, options, tags)
     VALUES (v_store_id, v_cat_set_l,
-        'SET 3 火腿 + 越南咖啡', '火腿法國麵包 L-SIZE + 越南咖啡',
-        120, 3
+        'Set 3 雞肉+飲料', 'L-SIZE 雞肉麵包+飲料',
+        118, 3,
+        '[{"group":"飲料","required":true,"items":[{"name":"越南咖啡","price":0},{"name":"豆漿","price":0},{"name":"紅茶","price":0},{"name":"可樂","price":0},{"name":"雪碧","price":0}]}]'::jsonb,
+        ARRAY['套餐']
     );
 
-    -- SET 4: 火腿 + 豆漿/紅茶
-    INSERT INTO menu_items (store_id, category_id, name, description, price, sort_order, options)
+    INSERT INTO menu_items (store_id, category_id, name, description, price, sort_order, options, tags)
     VALUES (v_store_id, v_cat_set_l,
-        'SET 4 火腿 + 豆漿/紅茶', '火腿法國麵包 L-SIZE + 豆漿或紅茶',
-        110, 4,
-        '[{"group":"飲料","required":true,"items":[{"name":"豆漿","price":0},{"name":"紅茶","price":0}]}]'::jsonb
+        'Set 4 烤肉+飲料', 'L-SIZE 烤肉麵包+飲料',
+        128, 4,
+        '[{"group":"飲料","required":true,"items":[{"name":"越南咖啡","price":0},{"name":"豆漿","price":0},{"name":"紅茶","price":0},{"name":"可樂","price":0},{"name":"雪碧","price":0}]}]'::jsonb,
+        ARRAY['套餐']
     );
 
-    -- SET 5: 雞肉 + 越南咖啡
-    INSERT INTO menu_items (store_id, category_id, name, description, price, sort_order)
+    INSERT INTO menu_items (store_id, category_id, name, description, price, sort_order, options, tags)
     VALUES (v_store_id, v_cat_set_l,
-        'SET 5 雞肉 + 越南咖啡', '雞肉法國麵包 L-SIZE + 越南咖啡',
-        130, 5
+        'Set 5 雙層烤肉+飲料', 'L-SIZE 雙層烤肉麵包+飲料',
+        135, 5,
+        '[{"group":"飲料","required":true,"items":[{"name":"越南咖啡","price":0},{"name":"豆漿","price":0},{"name":"紅茶","price":0},{"name":"可樂","price":0},{"name":"雪碧","price":0}]}]'::jsonb,
+        ARRAY['套餐']
     );
 
-    -- SET 6: 烤肉 + 越南咖啡
-    INSERT INTO menu_items (store_id, category_id, name, description, price, sort_order)
+    INSERT INTO menu_items (store_id, category_id, name, description, price, sort_order, options, tags)
     VALUES (v_store_id, v_cat_set_l,
-        'SET 6 烤肉 + 越南咖啡', '烤肉法國麵包 L-SIZE + 越南咖啡',
-        142, 6
+        'Set 6 綜合+飲料', 'L-SIZE 綜合麵包+飲料',
+        142, 6,
+        '[{"group":"飲料","required":true,"items":[{"name":"越南咖啡","price":0},{"name":"豆漿","price":0},{"name":"紅茶","price":0},{"name":"可樂","price":0},{"name":"雪碧","price":0}]}]'::jsonb,
+        ARRAY['套餐']
     );
 
     -- ========================
     -- 小套餐 SET Mini (麵包 Mini + 飲料)
     -- ========================
 
-    -- SET 7: 燒肉 Mini + 越南咖啡
-    INSERT INTO menu_items (store_id, category_id, name, description, price, sort_order)
+    INSERT INTO menu_items (store_id, category_id, name, description, price, sort_order, options, tags)
     VALUES (v_store_id, v_cat_set_m,
-        'SET 7 燒肉 Mini + 越南咖啡', '燒肉法國麵包 Mini + 越南咖啡',
-        100, 1
+        'Set 7 燒肉/火腿+飲料', 'Mini 燒肉或火腿麵包+飲料',
+        77, 1,
+        '[{"group":"麵包","required":true,"items":[{"name":"燒肉","price":0},{"name":"火腿","price":0}]},{"group":"飲料","required":true,"items":[{"name":"越南咖啡","price":0},{"name":"豆漿","price":0},{"name":"紅茶","price":0},{"name":"可樂","price":0},{"name":"雪碧","price":0}]}]'::jsonb,
+        ARRAY['套餐']
     );
 
-    -- SET 8: 燒肉 Mini + 豆漿/紅茶
-    INSERT INTO menu_items (store_id, category_id, name, description, price, sort_order, options)
+    INSERT INTO menu_items (store_id, category_id, name, description, price, sort_order, options, tags)
     VALUES (v_store_id, v_cat_set_m,
-        'SET 8 燒肉 Mini + 豆漿/紅茶', '燒肉法國麵包 Mini + 豆漿或紅茶',
-        90, 2,
-        '[{"group":"飲料","required":true,"items":[{"name":"豆漿","price":0},{"name":"紅茶","price":0}]}]'::jsonb
+        'Set 8 雞肉+飲料', 'Mini 雞肉麵包+飲料',
+        88, 2,
+        '[{"group":"飲料","required":true,"items":[{"name":"越南咖啡","price":0},{"name":"豆漿","price":0},{"name":"紅茶","price":0},{"name":"可樂","price":0},{"name":"雪碧","price":0}]}]'::jsonb,
+        ARRAY['套餐']
     );
 
-    -- SET 9: 火腿 Mini + 越南咖啡
-    INSERT INTO menu_items (store_id, category_id, name, description, price, sort_order)
+    INSERT INTO menu_items (store_id, category_id, name, description, price, sort_order, options, tags)
     VALUES (v_store_id, v_cat_set_m,
-        'SET 9 火腿 Mini + 越南咖啡', '火腿法國麵包 Mini + 越南咖啡',
-        100, 3
+        'Set 9 烤肉+飲料', 'Mini 烤肉麵包+飲料',
+        95, 3,
+        '[{"group":"飲料","required":true,"items":[{"name":"越南咖啡","price":0},{"name":"豆漿","price":0},{"name":"紅茶","price":0},{"name":"可樂","price":0},{"name":"雪碧","price":0}]}]'::jsonb,
+        ARRAY['套餐']
     );
 
-    -- SET 10: 火腿 Mini + 豆漿/紅茶
-    INSERT INTO menu_items (store_id, category_id, name, description, price, sort_order, options)
+    INSERT INTO menu_items (store_id, category_id, name, description, price, sort_order, options, tags)
     VALUES (v_store_id, v_cat_set_m,
-        'SET 10 火腿 Mini + 豆漿/紅茶', '火腿法國麵包 Mini + 豆漿或紅茶',
-        90, 4,
-        '[{"group":"飲料","required":true,"items":[{"name":"豆漿","price":0},{"name":"紅茶","price":0}]}]'::jsonb
+        'Set 10 雙層烤肉+飲料', 'Mini 雙層烤肉麵包+飲料',
+        99, 4,
+        '[{"group":"飲料","required":true,"items":[{"name":"越南咖啡","price":0},{"name":"豆漿","price":0},{"name":"紅茶","price":0},{"name":"可樂","price":0},{"name":"雪碧","price":0}]}]'::jsonb,
+        ARRAY['套餐']
     );
 
-    -- SET 11: 雞肉 Mini + 豆漿/紅茶
-    INSERT INTO menu_items (store_id, category_id, name, description, price, sort_order, options)
+    INSERT INTO menu_items (store_id, category_id, name, description, price, sort_order, options, tags)
     VALUES (v_store_id, v_cat_set_m,
-        'SET 11 雞肉 Mini + 豆漿/紅茶', '雞肉法國麵包 Mini + 豆漿或紅茶',
+        'Set 11 綜合+飲料', 'Mini 綜合麵包+飲料',
         100, 5,
-        '[{"group":"飲料","required":true,"items":[{"name":"豆漿","price":0},{"name":"紅茶","price":0}]}]'::jsonb
+        '[{"group":"飲料","required":true,"items":[{"name":"越南咖啡","price":0},{"name":"豆漿","price":0},{"name":"紅茶","price":0},{"name":"可樂","price":0},{"name":"雪碧","price":0}]}]'::jsonb,
+        ARRAY['套餐']
     );
 
     -- ========================
@@ -214,60 +225,60 @@ BEGIN
 
     INSERT INTO menu_items (store_id, category_id, name, description, price, sort_order, tags)
     VALUES (v_store_id, v_cat_drink,
-        '越南咖啡', 'Cà phê sữa đá',
+        '越南咖啡', 'Cà phê sữa / Coffee with Condensed Milk',
         48, 1, ARRAY['推薦']
     );
 
     INSERT INTO menu_items (store_id, category_id, name, description, price, sort_order)
     VALUES (v_store_id, v_cat_drink,
-        '豆漿', 'Sữa đậu nành',
+        '豆漿', 'Sữa đậu nành / Soy Milk',
         37, 2
     );
 
     INSERT INTO menu_items (store_id, category_id, name, description, price, sort_order)
     VALUES (v_store_id, v_cat_drink,
-        '紅茶', 'Trà đá',
+        '紅茶', 'Hồng trà / Black Tea',
         37, 3
     );
 
     INSERT INTO menu_items (store_id, category_id, name, description, price, sort_order, options)
     VALUES (v_store_id, v_cat_drink,
-        '可樂/雪碧', 'Coca-Cola / Sprite',
+        '可樂/雪碧', 'Cocacola / Sprite',
         37, 4,
         '[{"group":"選擇","required":true,"items":[{"name":"可樂","price":0},{"name":"雪碧","price":0}]}]'::jsonb
     );
 
     -- ========================
-    -- 加料 Add-on
+    -- 加料 Add-on / Extra Filling
     -- ========================
 
     INSERT INTO menu_items (store_id, category_id, name, description, price, sort_order)
     VALUES (v_store_id, v_cat_addon,
-        '加起司', 'Thêm phô mai',
+        '加起司', 'Cheese / Phô mai',
         15, 1
     );
 
     INSERT INTO menu_items (store_id, category_id, name, description, price, sort_order)
     VALUES (v_store_id, v_cat_addon,
-        '加火腿', 'Thêm chả lụa',
+        '加火腿', 'Ham / Chả lụa',
         20, 2
     );
 
     INSERT INTO menu_items (store_id, category_id, name, description, price, sort_order)
     VALUES (v_store_id, v_cat_addon,
-        '加燒肉', 'Thêm thịt nướng',
+        '加燒肉', 'Braised Meat / Thịt nguội',
         20, 3
     );
 
     INSERT INTO menu_items (store_id, category_id, name, description, price, sort_order)
     VALUES (v_store_id, v_cat_addon,
-        '加烤肉', 'Thêm thịt nướng đặc biệt',
+        '加烤肉', 'Grilled Meat / Thịt nướng',
         25, 4
     );
 
     INSERT INTO menu_items (store_id, category_id, name, description, price, sort_order)
     VALUES (v_store_id, v_cat_addon,
-        '加雞肉', 'Thêm gà',
+        '加雞肉', 'Chicken / Thịt gà',
         25, 5
     );
 
