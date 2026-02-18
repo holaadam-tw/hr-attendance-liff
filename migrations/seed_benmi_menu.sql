@@ -19,7 +19,7 @@ INSERT INTO store_profiles (
     true,
     '#E85D26',
     true,
-    '{"sun":{"open":"07:30","close":"21:00"},"mon":{"open":"11:00","close":"21:00"},"tue":{"open":"11:00","close":"21:00"},"wed":{"open":"11:00","close":"21:00"},"thu":{"open":"11:00","close":"21:00"},"fri":{"open":"11:00","close":"21:00"},"sat":{"open":"07:30","close":"21:00"}}'::jsonb
+    '{"mon":{"open":true,"start":"11:00","end":"21:00"},"tue":{"open":true,"start":"11:00","end":"21:00"},"wed":{"open":true,"start":"11:00","end":"21:00"},"thu":{"open":true,"start":"11:00","end":"21:00"},"fri":{"open":true,"start":"11:00","end":"21:00"},"sat":{"open":true,"start":"07:30","end":"21:00"},"sun":{"open":true,"start":"07:30","end":"21:00"}}'::jsonb
 ) ON CONFLICT (store_slug) DO UPDATE SET
     address = EXCLUDED.address,
     business_hours = EXCLUDED.business_hours,

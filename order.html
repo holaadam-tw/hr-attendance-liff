@@ -1089,7 +1089,11 @@ async function loadStoreFromSupabase(slug) {
     const dayNames = { mon:'週一', tue:'週二', wed:'週三', thu:'週四', fri:'週五', sat:'週六', sun:'週日' };
     const parts = [];
     Object.keys(dayNames).forEach(function(d) {
-      if (bh[d] && bh[d].open && bh[d].close) parts.push(dayNames[d] + ' ' + bh[d].open + '-' + bh[d].close);
+      if (bh[d] && bh[d].open !== false && (bh[d].start || bh[d].close)) {
+        var st = bh[d].start || bh[d].open || '';
+        var en = bh[d].end || bh[d].close || '';
+        if (st && en) parts.push(dayNames[d] + ' ' + st + '-' + en);
+      }
     });
     if (parts.length > 0) shopInfo.hours = parts.join(' / ');
   }
