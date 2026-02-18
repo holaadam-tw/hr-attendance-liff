@@ -1117,7 +1117,7 @@ async function initApp() {
     // 顯示外帶標籤
     var badge = document.createElement('div');
     badge.style.cssText = 'text-align:center;padding:8px;margin:8px 16px;background:#FEF3C7;border-radius:10px;font-size:13px;font-weight:700;color:#B45309;';
-    badge.textContent = '\u{1F6CD}\u{FE0F} 外帶模式';
+    badge.textContent = '\u{1F6CD}\u{FE0F} 外帶點餐';
     document.getElementById('tableSelector').parentNode.insertBefore(badge, document.getElementById('tableSelector'));
   } else if (tbl) {
     // 內用：自動帶入桌號，鎖定
@@ -1660,12 +1660,13 @@ async function submitOrder() {
 
   const order = {
     store_id: currentStoreId,
+    order_number: '',
     table_number: tableNum,
-    guest_count: isTakeout ? 0 : guestCount,
     items: orderItems,
     total: totalPrice,
     status: 'pending',
-    order_type: isTakeout ? 'takeout' : 'dine_in'
+    order_type: isTakeout ? 'takeout' : 'dine_in',
+    notes: isTakeout ? '' : '用餐人數: ' + guestCount
   };
   try {
     if (currentStoreId) {
