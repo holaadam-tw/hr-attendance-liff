@@ -1068,6 +1068,180 @@ export function printTableQRCodes() {
     setTimeout(() => w.print(), 500);
 }
 
+// ===== AI 菜單辨識 =====
+let _aiMenuData = null;
+let _aiMenuBase64 = null;
+
+export function handleMenuPhotoUpload(input) {
+    const file = input.files[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+        showToast('圖片不能超過 10MB');
+        input.value = '';
+        return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const dataUrl = e.target.result;
+        _aiMenuBase64 = dataUrl.split(',')[1];
+        document.getElementById('menuPhotoImg').src = dataUrl;
+        document.getElementById('menuPhotoPreview').style.display = 'block';
+        document.getElementById('menuAIResult').style.display = 'none';
+        document.getElementById('menuPhotoStatus').textContent = '';
+    };
+    reader.readAsDataURL(file);
+}
+
+export async function analyzeMenuPhoto() {
+    if (!_aiMenuBase64) return showToast('請先選擇圖片');
+    const btn = document.getElementById('menuPhotoAnalyzeBtn');
+    const status = document.getElementById('menuPhotoStatus');
+    btn.disabled = true;
+    btn.textContent = '🤖 AI 辨識中...';
+    status.textContent = '正在上傳圖片並分析，約需 10-30 秒...';
+
+    try {
+        const fnUrl = CONFIG.SUPABASE_URL + '/functions/v1/analyze-menu';
+        const res = await fetch(fnUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + CONFIG.SUPABASE_ANON_KEY
+            },
+            body: JSON.stringify({ image_base64: _aiMenuBase64 })
+        });
+        const json = await res.json();
+        if (!json.success || !json.data) {
+            throw new Error(json.error || 'AI 回傳格式錯誤');
+        }
+        _aiMenuData = json.data;
+        renderAIMenuPreview(_aiMenuData);
+        status.textContent = '';
+    } catch (err) {
+        status.textContent = '❌ ' + err.message;
+        showToast('辨識失敗：' + err.message);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '🤖 AI 辨識菜單';
+    }
+}
+
+function renderAIMenuPreview(data) {
+    // Categories
+    const catEl = document.getElementById('menuAICategories');
+    const cats = data.categories || [];
+    catEl.innerHTML = '<div style="font-size:12px;color:#64748B;margin-bottom:4px;">分類 (' + cats.length + ')</div>' +
+        '<div style="display:flex;flex-wrap:wrap;gap:4px;">' +
+        cats.map(c => '<span style="background:#EEF2FF;color:#4F46E5;padding:3px 8px;border-radius:12px;font-size:11px;font-weight:600;">' +
+            (c.icon || '') + ' ' + escapeHTML(c.name) + '</span>').join('') +
+        '</div>';
+
+    // Items
+    const itemEl = document.getElementById('menuAIItems');
+    const items = data.items || [];
+    itemEl.innerHTML = items.map((it, i) => {
+        let sizeText = '';
+        if (it.sizes && it.sizes.length > 0) {
+            sizeText = it.sizes.map(s => s.name + ' $' + s.price).join(' / ');
+        }
+        return '<div style="padding:8px 10px;border-bottom:1px solid #F1F5F9;font-size:12px;display:flex;justify-content:space-between;align-items:center;">' +
+            '<div>' +
+                '<span style="font-weight:600;">' + escapeHTML(it.name) + '</span>' +
+                (it.description ? '<span style="color:#94A3B8;margin-left:6px;">' + escapeHTML(it.description) + '</span>' : '') +
+                (it.tags && it.tags.length ? it.tags.map(t => ' <span style="background:#FEF3C7;color:#D97706;padding:1px 5px;border-radius:8px;font-size:10px;">' + escapeHTML(t) + '</span>').join('') : '') +
+                (sizeText ? '<div style="color:#6366F1;font-size:10px;margin-top:2px;">' + escapeHTML(sizeText) + '</div>' : '') +
+            '</div>' +
+            '<span style="font-weight:700;color:#059669;white-space:nowrap;">$' + (it.price || 0) + '</span>' +
+        '</div>';
+    }).join('');
+
+    document.getElementById('menuAIResult').style.display = 'block';
+    showToast('辨識完成！共 ' + cats.length + ' 分類、' + items.length + ' 品項');
+}
+
+export async function confirmAIMenu() {
+    if (!_aiMenuData) return;
+    const storeId = rdCurrentStoreId;
+    if (!storeId) return showToast('請先選擇商店');
+
+    const cats = _aiMenuData.categories || [];
+    const items = _aiMenuData.items || [];
+    if (items.length === 0) return showToast('沒有可匯入的品項');
+
+    if (!confirm('確定要匯入 ' + cats.length + ' 個分類、' + items.length + ' 個品項嗎？\n（現有菜單不會被刪除，會新增在後面）')) return;
+
+    try {
+        showToast('匯入中...');
+        // 1. Insert categories and build name → id mapping
+        const catMap = {};
+        for (let i = 0; i < cats.length; i++) {
+            const c = cats[i];
+            const catName = (c.icon ? c.icon + ' ' : '') + c.name;
+            const { data, error } = await sb.from('menu_categories')
+                .insert({ store_id: storeId, name: catName, sort_order: 100 + i })
+                .select('id').single();
+            if (error) throw error;
+            catMap[c.name] = data.id;
+        }
+
+        // 2. Insert items
+        for (let i = 0; i < items.length; i++) {
+            const it = items[i];
+            const catId = catMap[it.category] || Object.values(catMap)[0] || null;
+            const opts = [];
+            // sizes → option group
+            if (it.sizes && it.sizes.length > 0) {
+                opts.push({
+                    group: '尺寸',
+                    required: true,
+                    items: it.sizes.map(s => ({ name: s.name, price: s.price || 0 }))
+                });
+            }
+            // options
+            if (it.options && it.options.length > 0) {
+                it.options.forEach(og => {
+                    opts.push({
+                        group: og.group,
+                        required: og.required || false,
+                        items: (og.items || []).map(oi => ({ name: oi.name, price: oi.price || 0 }))
+                    });
+                });
+            }
+
+            const row = {
+                store_id: storeId,
+                category_id: catId,
+                name: it.name,
+                description: it.description || '',
+                price: it.price || 0,
+                sort_order: i + 1,
+                is_available: true
+            };
+            if (opts.length > 0) row.options = opts;
+            if (it.tags && it.tags.length > 0) row.tags = it.tags;
+
+            const { error } = await sb.from('menu_items').insert(row);
+            if (error) throw error;
+        }
+
+        showToast('✅ 匯入完成！' + cats.length + ' 分類、' + items.length + ' 品項');
+        cancelAIMenu();
+        // Reload menu
+        loadMenuCategories(storeId);
+        loadMenuItems(storeId);
+    } catch (err) {
+        showToast('匯入失敗：' + err.message);
+    }
+}
+
+export function cancelAIMenu() {
+    _aiMenuData = null;
+    _aiMenuBase64 = null;
+    document.getElementById('menuAIResult').style.display = 'none';
+    document.getElementById('menuPhotoPreview').style.display = 'none';
+    document.getElementById('menuPhotoInput').value = '';
+}
+
 // ===== 菜單複製 =====
 export function showCopyMenuModal() {
     const targets = smStores.filter(s => s.id !== smCurrentStoreId);

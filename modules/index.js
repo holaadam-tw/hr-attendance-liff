@@ -67,6 +67,7 @@ import {
     toggleOptionType, toggleOptionReq, addComboGroup, removeComboGroup,
     saveBusinessHours, saveLineGroupId, saveLoyaltyConfig,
     generateTableQRCodes, printTableQRCodes,
+    handleMenuPhotoUpload, analyzeMenuPhoto, confirmAIMenu, cancelAIMenu,
     showCopyMenuModal, closeCopyMenuModal, executeCopyMenu
 } from './store.js';
 
@@ -239,6 +240,10 @@ window.saveLineGroupId = saveLineGroupId;
 window.saveLoyaltyConfig = saveLoyaltyConfig;
 window.generateTableQRCodes = generateTableQRCodes;
 window.printTableQRCodes = printTableQRCodes;
+window.handleMenuPhotoUpload = handleMenuPhotoUpload;
+window.analyzeMenuPhoto = analyzeMenuPhoto;
+window.confirmAIMenu = confirmAIMenu;
+window.cancelAIMenu = cancelAIMenu;
 window.showCopyMenuModal = showCopyMenuModal;
 window.closeCopyMenuModal = closeCopyMenuModal;
 window.executeCopyMenu = executeCopyMenu;
