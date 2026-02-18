@@ -322,6 +322,19 @@ export async function showStoreModal(storeId) {
         document.getElementById('storeColorInput').value = s.theme_color || '#4F46E5';
         document.getElementById('storeBannerInput').value = s.banner_url || '';
         document.getElementById('storeLogoInput').value = s.logo_url || '';
+        // 顯示圖片預覽
+        if (s.banner_url) {
+            document.getElementById('storeBannerPreviewImg').src = s.banner_url;
+            document.getElementById('storeBannerPreview').style.display = 'block';
+        } else {
+            document.getElementById('storeBannerPreview').style.display = 'none';
+        }
+        if (s.logo_url) {
+            document.getElementById('storeLogoPreviewImg').src = s.logo_url;
+            document.getElementById('storeLogoPreview').style.display = 'block';
+        } else {
+            document.getElementById('storeLogoPreview').style.display = 'none';
+        }
     } else {
         document.getElementById('storeModalTitle').textContent = '新增商店';
         document.getElementById('storeEditId').value = '';
@@ -334,12 +347,51 @@ export async function showStoreModal(storeId) {
         document.getElementById('storeColorInput').value = '#4F46E5';
         document.getElementById('storeBannerInput').value = '';
         document.getElementById('storeLogoInput').value = '';
+        document.getElementById('storeBannerPreview').style.display = 'none';
+        document.getElementById('storeLogoPreview').style.display = 'none';
     }
     document.getElementById('storeModal').style.display = 'flex';
 }
 
 export function editStore(id) { showStoreModal(id); }
 export function closeStoreModal() { document.getElementById('storeModal').style.display = 'none'; }
+
+// 上傳商店圖片到 Supabase Storage
+export async function uploadStoreImage(inputEl, type) {
+    const file = inputEl.files[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) { showToast('圖片不能超過 5MB'); return; }
+
+    const ext = file.name.split('.').pop().toLowerCase();
+    const fileName = type + '_' + Date.now() + '.' + ext;
+    const filePath = 'stores/' + fileName;
+
+    showToast('上傳中...');
+    try {
+        const { data, error } = await sb.storage.from('store-images').upload(filePath, file, {
+            cacheControl: '3600',
+            upsert: true
+        });
+        if (error) throw error;
+
+        const { data: urlData } = sb.storage.from('store-images').getPublicUrl(filePath);
+        const publicUrl = urlData.publicUrl;
+
+        if (type === 'banner') {
+            document.getElementById('storeBannerInput').value = publicUrl;
+            document.getElementById('storeBannerPreviewImg').src = publicUrl;
+            document.getElementById('storeBannerPreview').style.display = 'block';
+        } else {
+            document.getElementById('storeLogoInput').value = publicUrl;
+            document.getElementById('storeLogoPreviewImg').src = publicUrl;
+            document.getElementById('storeLogoPreview').style.display = 'block';
+        }
+        showToast('✅ 圖片上傳成功');
+    } catch (e) {
+        showToast('❌ 上傳失敗：' + (e.message || e));
+    }
+    inputEl.value = '';
+}
 
 export async function saveStore() {
     const name = document.getElementById('storeNameInput').value.trim();

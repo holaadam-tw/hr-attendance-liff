@@ -1426,12 +1426,30 @@
                 </div>
                 <div class="form-group">
                     <label>品牌形象圖（Banner）</label>
-                    <input type="url" id="storeBannerInput" placeholder="選填，圖片網址（建議 800x400）" style="width:100%;padding:12px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;box-sizing:border-box;">
-                    <div style="font-size:11px;color:#94A3B8;margin-top:4px;">客戶掃碼後顯示的品牌 DM 圖片</div>
+                    <div style="display:flex;gap:8px;align-items:center;">
+                        <input type="url" id="storeBannerInput" placeholder="圖片網址或點右側上傳" style="flex:1;padding:12px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;box-sizing:border-box;">
+                        <label style="padding:10px 16px;background:#4F46E5;color:#fff;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;">
+                            📷 上傳
+                            <input type="file" accept="image/*" onchange="uploadStoreImage(this,'banner')" style="display:none;">
+                        </label>
+                    </div>
+                    <div id="storeBannerPreview" style="margin-top:8px;display:none;">
+                        <img id="storeBannerPreviewImg" src="" style="max-width:100%;max-height:120px;border-radius:8px;border:1px solid #E2E8F0;">
+                    </div>
+                    <div style="font-size:11px;color:#94A3B8;margin-top:4px;">客戶掃碼後顯示的品牌 DM 圖片（建議 800x400）</div>
                 </div>
                 <div class="form-group">
-                    <label>Logo 網址</label>
-                    <input type="url" id="storeLogoInput" placeholder="選填，Logo 圖片網址" style="width:100%;padding:12px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;box-sizing:border-box;">
+                    <label>Logo</label>
+                    <div style="display:flex;gap:8px;align-items:center;">
+                        <input type="url" id="storeLogoInput" placeholder="Logo 圖片網址或點右側上傳" style="flex:1;padding:12px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;box-sizing:border-box;">
+                        <label style="padding:10px 16px;background:#4F46E5;color:#fff;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;">
+                            📷 上傳
+                            <input type="file" accept="image/*" onchange="uploadStoreImage(this,'logo')" style="display:none;">
+                        </label>
+                    </div>
+                    <div id="storeLogoPreview" style="margin-top:8px;display:none;">
+                        <img id="storeLogoPreviewImg" src="" style="max-width:80px;max-height:80px;border-radius:8px;border:1px solid #E2E8F0;">
+                    </div>
                 </div>
                 <div class="form-group">
                     <label>主題色</label>
