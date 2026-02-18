@@ -336,22 +336,23 @@ function renderCompanySwitcher() {
     const companyNameEl = document.getElementById('homeCompanyName');
     if (!companyNameEl) return;
 
-    // 更新公司名稱
-    companyNameEl.textContent = currentCompanyName || '';
-    companyNameEl.style.display = 'block';
+    // 隱藏原本的文字
+    companyNameEl.style.display = 'none';
 
-    // 如果只有一間公司，不需要下拉選單
-    if (managedCompanies.length <= 1) return;
+    // 如果只有一間公司，顯示文字即可
+    if (managedCompanies.length <= 1) {
+        companyNameEl.textContent = currentCompanyName || '';
+        companyNameEl.style.cssText = 'font-size:15px;font-weight:700;color:#4F46E5;margin-bottom:8px;';
+        companyNameEl.style.display = 'block';
+        return;
+    }
 
     // 避免重複渲染
     if (document.getElementById('companySwitcher')) return;
 
-    const wrapper = document.createElement('div');
-    wrapper.style.cssText = 'margin-top:6px;display:flex;align-items:center;gap:6px;';
-
     const select = document.createElement('select');
     select.id = 'companySwitcher';
-    select.style.cssText = 'flex:1;padding:6px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;background:#fff;color:#333;cursor:pointer;';
+    select.style.cssText = 'width:100%;padding:8px 12px;border:none;border-radius:8px;font-size:15px;font-weight:700;color:#4F46E5;background:transparent;cursor:pointer;appearance:auto;margin-bottom:4px;';
     managedCompanies.forEach(c => {
         const opt = document.createElement('option');
         opt.value = c.id;
@@ -361,17 +362,8 @@ function renderCompanySwitcher() {
     });
     select.addEventListener('change', () => switchCompany(select.value));
 
-    const badge = document.createElement('span');
-    badge.textContent = managedCompanies.length + ' 間公司';
-    badge.style.cssText = 'font-size:11px;color:#888;white-space:nowrap;';
-
-    wrapper.appendChild(select);
-    wrapper.appendChild(badge);
-
-    // 插入到 companyName 之後
-    companyNameEl.parentNode.insertBefore(wrapper, companyNameEl.nextSibling);
-    // 隱藏原本的 companyName（下拉已含公司名）
-    companyNameEl.style.display = 'none';
+    // 插入到 companyName 的位置
+    companyNameEl.parentNode.insertBefore(select, companyNameEl);
 }
 
 // 更新用戶資訊

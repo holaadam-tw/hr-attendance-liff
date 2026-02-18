@@ -224,12 +224,12 @@ export function renderAdminCompanySwitcher() {
     const target = document.getElementById('adminCompanyName');
     if (!target) return;
 
-    const wrapper = document.createElement('div');
-    wrapper.style.cssText = 'margin-top:4px;display:flex;align-items:center;gap:6px;';
+    // 隱藏原本文字
+    target.style.display = 'none';
 
     const select = document.createElement('select');
     select.id = 'adminCompanySwitcher';
-    select.style.cssText = 'flex:1;padding:5px 8px;border:1px solid #ddd;border-radius:8px;font-size:13px;background:#fff;color:#333;cursor:pointer;';
+    select.style.cssText = 'width:100%;padding:8px 12px;border:none;border-radius:8px;font-size:15px;font-weight:700;color:#4F46E5;background:transparent;cursor:pointer;appearance:auto;margin-bottom:4px;';
     companies.forEach(c => {
         const opt = document.createElement('option');
         opt.value = c.id;
@@ -239,9 +239,7 @@ export function renderAdminCompanySwitcher() {
     });
     select.addEventListener('change', () => switchCompanyAdmin(select.value));
 
-    wrapper.appendChild(select);
-    target.parentNode.insertBefore(wrapper, target.nextSibling);
-    target.style.display = 'none';
+    target.parentNode.insertBefore(select, target);
 }
 
 export async function switchCompanyAdmin(companyId) {
