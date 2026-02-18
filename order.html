@@ -1676,8 +1676,8 @@ async function submitOrder() {
       });
       if (!res.ok) {
         const errText = await res.text();
-        console.error('Order API error:', res.status, errText);
-        showToast('訂單送出失敗: ' + res.status);
+        console.error('Order API error:', res.status, errText, JSON.stringify(order));
+        showToast('訂單送出失敗: ' + res.status + ' ' + (errText || '').substring(0, 80));
         return;
       }
       const resData = await res.json();
