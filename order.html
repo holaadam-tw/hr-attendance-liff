@@ -868,6 +868,7 @@ function applyTheme(name) {
   r.setProperty('--border-light', t.borderLight);
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', t.primary);
   currentTheme = name;
+  try { localStorage.setItem('selectedTheme', name); } catch(e) {}
 }
 
 let currentTheme = 'fire';
@@ -1035,9 +1036,10 @@ async function initApp() {
   const params = new URLSearchParams(window.location.search);
   const storeSlug = params.get('store');
 
-  // Apply theme (URL param or default, store theme applied after load)
+  // Apply theme (URL param > localStorage > default)
   const urlTheme = params.get('theme');
-  applyTheme(urlTheme || 'fire');
+  const savedTheme = localStorage.getItem('selectedTheme');
+  applyTheme(urlTheme || savedTheme || 'fire');
 
   try {
     if (storeSlug) {
