@@ -395,8 +395,16 @@
                     const { error } = await sb.from('companies').update(row).eq('id', id);
                     if (error) throw error;
                 } else {
-                    const { error } = await sb.from('companies').insert(row);
+                    const { data: newComp, error } = await sb.from('companies').insert(row).select().single();
                     if (error) throw error;
+                    // 自動連結平台管理員為 owner
+                    if (currentPlatformAdmin?.id && newComp.id) {
+                        await sb.from('platform_admin_companies').insert({
+                            platform_admin_id: currentPlatformAdmin.id,
+                            company_id: newComp.id,
+                            role: 'owner'
+                        });
+                    }
                 }
                 closePCompanyModal();
                 showToast('✅ 已儲存');

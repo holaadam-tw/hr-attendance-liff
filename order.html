@@ -1115,8 +1115,8 @@ async function loadStoreFromSupabase(slug) {
   }
   updateShopHeader(shopInfo);
 
-  // 套用商店主題色（找最接近的內建主題，或自訂）
-  if (store.theme_color) {
+  // 套用商店主題色（用戶手動選過的優先，不覆蓋）
+  if (store.theme_color && !localStorage.getItem('_order_theme')) {
     applyStoreThemeColor(store.theme_color);
   }
 
