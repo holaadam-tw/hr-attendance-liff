@@ -722,9 +722,28 @@ export async function saveCompany() {
             if (error) throw error;
             writeAuditLog('update', 'companies', id, name);
         } else {
-            const { error } = await sb.from('companies').insert(row);
+            const { data: newComp, error } = await sb.from('companies').insert(row).select().single();
             if (error) throw error;
-            writeAuditLog('create', 'companies', null, `${name} (${code})`);
+            writeAuditLog('create', 'companies', newComp.id, `${name} (${code})`);
+
+            // 平台管理員建立公司 → 自動連結為 owner
+            if (window.isPlatformAdmin && window.currentPlatformAdmin?.id && newComp.id) {
+                await sb.from('platform_admin_companies').insert({
+                    platform_admin_id: window.currentPlatformAdmin.id,
+                    company_id: newComp.id,
+                    role: 'owner'
+                });
+                // 更新記憶中的公司列表
+                if (window.managedCompanies) {
+                    window.managedCompanies.push({
+                        id: newComp.id,
+                        name: newComp.name,
+                        features: newComp.features || null,
+                        status: newComp.status || 'active',
+                        role: 'owner'
+                    });
+                }
+            }
         }
         closeCompanyModal();
         showToast('✅ 已儲存');
