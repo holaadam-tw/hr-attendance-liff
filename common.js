@@ -236,7 +236,6 @@ async function checkUserStatus() {
             // 顯示公司名稱
             const hcn = document.getElementById('homeCompanyName');
             if (hcn && currentCompanyName) { hcn.textContent = currentCompanyName; hcn.style.display = 'block'; }
-            renderCompanySwitcher();
             if (currentEmployee.id) await checkTodayAttendance();
             return true;
         }
@@ -276,94 +275,6 @@ async function checkUserStatus() {
         if (loadingEl) loadingEl.style.display = 'none';
         return false;
     }
-}
-
-// ===== 公司切換 =====
-async function switchCompany(companyId) {
-    const company = managedCompanies.find(c => c.id === companyId);
-    if (!company) return;
-
-    currentCompanyId = company.id;
-    currentCompanyFeatures = company.features;
-    currentCompanyName = company.name;
-    sessionStorage.setItem('selectedCompanyId', company.id);
-
-    // 嘗試取得該公司的 employee 記錄
-    const { data: empData } = await sb.from('employees')
-        .select('*')
-        .eq('line_user_id', liffProfile.userId)
-        .eq('company_id', companyId)
-        .maybeSingle();
-
-    currentEmployee = empData || {
-        id: null,
-        name: currentPlatformAdmin.name,
-        role: 'admin',
-        department: '平台管理',
-        position: '平台管理員',
-        employee_number: 'PA-001',
-        line_user_id: currentPlatformAdmin.line_user_id,
-        company_id: companyId
-    };
-
-    // 清除 settings 快取，重新載入該公司設定
-    sessionStorage.removeItem('system_settings_cache');
-    _settingsCache = null;
-    await loadSettings();
-
-    // 更新 UI
-    updateUserInfo(currentEmployee);
-    applyFeatureVisibility();
-
-    // 更新公司名稱顯示
-    const companyNameEl = document.getElementById('homeCompanyName');
-    if (companyNameEl) { companyNameEl.textContent = currentCompanyName; companyNameEl.style.display = 'block'; }
-
-    if (currentEmployee.id) {
-        await checkTodayAttendance();
-    } else {
-        todayAttendance = null;
-    }
-
-    showToast('已切換至 ' + currentCompanyName);
-}
-
-// ===== 公司切換器 UI =====
-function renderCompanySwitcher() {
-    if (!isPlatformAdmin || managedCompanies.length < 1) return;
-
-    // index.html 的 user-card 區域
-    const companyNameEl = document.getElementById('homeCompanyName');
-    if (!companyNameEl) return;
-
-    // 隱藏原本的文字
-    companyNameEl.style.display = 'none';
-
-    // 如果只有一間公司，顯示文字即可
-    if (managedCompanies.length <= 1) {
-        companyNameEl.textContent = currentCompanyName || '';
-        companyNameEl.style.cssText = 'font-size:15px;font-weight:700;color:#4F46E5;margin-bottom:8px;';
-        companyNameEl.style.display = 'block';
-        return;
-    }
-
-    // 避免重複渲染
-    if (document.getElementById('companySwitcher')) return;
-
-    const select = document.createElement('select');
-    select.id = 'companySwitcher';
-    select.style.cssText = 'width:100%;padding:8px 12px;border:none;border-radius:8px;font-size:15px;font-weight:700;color:#4F46E5;background:transparent;cursor:pointer;appearance:auto;margin-bottom:4px;';
-    managedCompanies.forEach(c => {
-        const opt = document.createElement('option');
-        opt.value = c.id;
-        opt.textContent = c.name + (c.role === 'manager' ? ' (代管)' : '');
-        if (c.id === currentCompanyId) opt.selected = true;
-        select.appendChild(opt);
-    });
-    select.addEventListener('change', () => switchCompany(select.value));
-
-    // 插入到 companyName 的位置
-    companyNameEl.parentNode.insertBefore(select, companyNameEl);
 }
 
 // 更新用戶資訊
