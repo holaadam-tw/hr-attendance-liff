@@ -159,17 +159,79 @@ export function switchRestaurantTab(tab, el) {
     if (tab === 'settings') loadStoreSettings();
 }
 
+// ===== 訂單即時通知 =====
+let _orderPollTimer = null;
+let _lastOrderIds = new Set();
+let _orderSoundEnabled = true;
+const _orderSound = typeof Audio !== 'undefined' ? new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgkKuslnRRRXKXrK2UZko+ZJCnp5RoTEFpmauspHdVSXOaraugeVlPd56sqp57XVR8oKeonX5hWICfqaadgGNagZ+op5+AZVuCn6imnoBmXIOeqKadgGZdg5+opZ2AZl2Dn6iknYBmXYOfp6OdgGZdg5+oo52AZl2Dn6ejnX9mXYOfp6SdgGZdg5+no52AZl2Dn6ejnYBmXYOfp6OdgGZdg5+no52AZl2Dn6ejnYBmXQ==') : null;
+
+function startOrderPolling() {
+    stopOrderPolling();
+    // 記住目前的訂單 ID
+    _lastOrderIds = new Set(rdOrders.map(o => o.id));
+    _orderPollTimer = setInterval(async () => {
+        if (!rdCurrentStoreId) return;
+        try {
+            const statusFilter = document.getElementById('rdStatusFilter')?.value;
+            let q = sb.from('orders').select('*').eq('store_id', rdCurrentStoreId).order('created_at', { ascending: false }).limit(100);
+            if (statusFilter) q = q.eq('status', statusFilter);
+            const { data } = await q;
+            if (!data) return;
+            // 找新訂單
+            const newOrders = data.filter(o => !_lastOrderIds.has(o.id));
+            if (newOrders.length > 0) {
+                // 播放音效
+                if (_orderSoundEnabled && _orderSound) {
+                    try { _orderSound.currentTime = 0; _orderSound.play(); } catch(e) {}
+                }
+                // 桌面通知
+                if (Notification.permission === 'granted') {
+                    const o = newOrders[0];
+                    const itemCount = (o.items || []).reduce((s, i) => s + (i.qty || 1), 0);
+                    new Notification('🔔 新訂單！', {
+                        body: `#${o.order_number} · ${o.order_type === 'takeout' ? '外帶' : '桌' + (o.table_number || '?')} · ${itemCount}品 · $${o.total}`,
+                        icon: '🍽️', tag: 'new-order'
+                    });
+                }
+                showToast('🔔 收到 ' + newOrders.length + ' 筆新訂單！');
+            }
+            _lastOrderIds = new Set(data.map(o => o.id));
+            rdOrders = data;
+            renderStoreOrderList();
+            updateStoreOrderStats();
+            renderTopSelling();
+        } catch(e) { console.warn('Order poll error:', e); }
+    }, 10000); // 每 10 秒
+}
+
+function stopOrderPolling() {
+    if (_orderPollTimer) { clearInterval(_orderPollTimer); _orderPollTimer = null; }
+}
+
+export function toggleOrderSound() {
+    _orderSoundEnabled = !_orderSoundEnabled;
+    const btn = document.getElementById('soundToggleBtn');
+    if (btn) btn.textContent = _orderSoundEnabled ? '🔔' : '🔕';
+    showToast(_orderSoundEnabled ? '音效已開啟' : '音效已關閉');
+}
+
 // ===== 訂單 Tab =====
 export async function loadStoreOrders() {
     try {
         let q = sb.from('orders').select('*').eq('store_id', rdCurrentStoreId).order('created_at', { ascending: false }).limit(100);
-        const statusFilter = document.getElementById('rdStatusFilter').value;
+        const statusFilter = document.getElementById('rdStatusFilter')?.value;
         if (statusFilter) q = q.eq('status', statusFilter);
         const { data } = await q;
         rdOrders = data || [];
         renderStoreOrderList();
         updateStoreOrderStats();
         renderTopSelling();
+        // 啟動即時通知 polling
+        startOrderPolling();
+        // 請求桌面通知權限
+        if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+            Notification.requestPermission();
+        }
     } catch(e) { console.error(e); }
 }
 

@@ -54,7 +54,7 @@ import {
 import {
     loadRestaurantList, openRestaurantDetail, previewStoreOrder,
     toggleAcceptOrders, switchRestaurantTab, loadStoreOrders,
-    showOrderDetail, closeOrderDetail, updateOrderStatus,
+    showOrderDetail, closeOrderDetail, updateOrderStatus, toggleOrderSound,
     showStoreModal, editStore, closeStoreModal, saveStore, uploadStoreImage,
     showStoreQR, closeStoreQR, getStoreOrderUrl, copyStoreUrl,
     openStorePreview, loadMenuCategories, addMenuCategory,
@@ -200,6 +200,7 @@ window.loadStoreOrders = loadStoreOrders;
 window.showOrderDetail = showOrderDetail;
 window.closeOrderDetail = closeOrderDetail;
 window.updateOrderStatus = updateOrderStatus;
+window.toggleOrderSound = toggleOrderSound;
 window.showStoreModal = showStoreModal;
 window.editStore = editStore;
 window.closeStoreModal = closeStoreModal;
