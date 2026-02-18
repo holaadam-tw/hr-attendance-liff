@@ -71,6 +71,38 @@ body {
   0% { content: ''; } 25% { content: '.'; } 50% { content: '..'; } 75% { content: '...'; }
 }
 
+/* ===== BRAND HERO ===== */
+.brand-hero {
+  display: none; background: #FFF; text-align: center;
+  border-bottom: 1px solid var(--border-light);
+}
+.brand-hero.show { display: block; }
+.brand-hero-img {
+  width: 100%; max-height: 260px; object-fit: contain;
+  background: #F8F8F8;
+}
+.brand-hero-info {
+  padding: 16px 20px 12px;
+}
+.brand-hero-name {
+  font-size: 20px; font-weight: 800; color: var(--text-primary);
+  margin-bottom: 4px;
+}
+.brand-hero-desc {
+  font-size: 13px; color: var(--text-secondary); margin-bottom: 12px;
+}
+.brand-hero-meta {
+  display: flex; justify-content: center; align-items: center; gap: 16px;
+  font-size: 13px; color: var(--text-muted);
+}
+.brand-hero-meta .meta-item {
+  display: flex; align-items: center; gap: 4px;
+}
+.brand-hero-share {
+  color: var(--primary); font-weight: 700; cursor: pointer;
+  text-decoration: none; display: flex; align-items: center; gap: 4px;
+}
+
 /* ===== SHOP HEADER ===== */
 .shop-header {
   background: var(--header-gradient, linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 60%, var(--primary-dark) 100%));
@@ -728,6 +760,16 @@ body {
   </div>
 </header>
 
+<!-- ===== BRAND HERO (DM) ===== -->
+<div class="brand-hero" id="brandHero">
+  <img class="brand-hero-img" id="brandHeroImg" src="" alt="" style="display:none;">
+  <div class="brand-hero-info">
+    <div class="brand-hero-name" id="brandHeroName"></div>
+    <div class="brand-hero-desc" id="brandHeroDesc"></div>
+    <div class="brand-hero-meta" id="brandHeroMeta"></div>
+  </div>
+</div>
+
 <!-- ===== TABLE / GUEST SELECTOR ===== -->
 <div class="table-selector" id="tableSelector">
   <h3>&#9745; 選擇桌號 / 用餐人數</h3>
@@ -1152,7 +1194,8 @@ async function loadStoreFromSupabase(slug) {
     subtitle: store.description || '',
     address: store.address || '',
     phone: store.phone || '',
-    hours: ''
+    hours: '',
+    logo: store.logo_url || ''
   };
   // 解析營業時間
   if (store.business_hours && typeof store.business_hours === 'object') {
@@ -1169,6 +1212,9 @@ async function loadStoreFromSupabase(slug) {
     if (parts.length > 0) shopInfo.hours = parts.join(' / ');
   }
   updateShopHeader(shopInfo);
+
+  // 品牌形象 DM
+  renderBrandHero(store);
 
   // 套用商店主題色
   if (store.theme_color) {
@@ -1237,6 +1283,60 @@ function updateShopHeader(shop) {
   if (shop.address) document.getElementById('shopAddress').textContent = shop.address;
   if (shop.phone) document.getElementById('shopPhone').textContent = shop.phone;
   if (shop.hours) document.getElementById('shopHours').textContent = shop.hours;
+  if (shop.logo) {
+    var logoEl = document.getElementById('shopLogo');
+    logoEl.innerHTML = '<img src="' + shop.logo + '" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;">';
+  }
+}
+
+function renderBrandHero(store) {
+  var hero = document.getElementById('brandHero');
+  var hasBanner = store.banner_url && store.banner_url.trim();
+  var hasLogo = store.logo_url && store.logo_url.trim();
+  if (!hasBanner && !hasLogo) return; // 沒有形象圖就不顯示
+
+  // 顯示圖片
+  var img = document.getElementById('brandHeroImg');
+  if (hasBanner) {
+    img.src = store.banner_url;
+    img.alt = store.store_name || '';
+    img.style.display = 'block';
+  } else if (hasLogo) {
+    img.src = store.logo_url;
+    img.alt = store.store_name || '';
+    img.style.display = 'block';
+    img.style.maxHeight = '180px';
+    img.style.padding = '20px';
+  }
+
+  // 商店名稱 & 描述
+  document.getElementById('brandHeroName').textContent = store.store_name || '';
+  document.getElementById('brandHeroDesc').textContent = store.description || '';
+
+  // Meta 資訊（桌號 + 分享）
+  var metaHtml = '';
+  var tbl = new URLSearchParams(window.location.search).get('table');
+  var mode = new URLSearchParams(window.location.search).get('mode');
+  if (tbl) {
+    metaHtml += '<span class="meta-item">&#x1F37D;&#xFE0F; 桌號 ' + tbl + '</span>';
+  } else if (mode === 'takeout') {
+    metaHtml += '<span class="meta-item">&#x1F6CD;&#xFE0F; 外帶點餐</span>';
+  }
+  if (navigator.share) {
+    metaHtml += '<a class="brand-hero-share" onclick="shareOrder()">&#x1F4E4; 分享訂單</a>';
+  }
+  document.getElementById('brandHeroMeta').innerHTML = metaHtml;
+
+  hero.classList.add('show');
+}
+
+function shareOrder() {
+  var name = document.getElementById('shopName').textContent;
+  navigator.share({
+    title: name + ' — 線上點餐',
+    text: '一起來 ' + name + ' 點餐吧！',
+    url: window.location.href
+  }).catch(function() {});
 }
 
 // ===== RENDER SIDEBAR =====

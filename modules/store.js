@@ -320,6 +320,8 @@ export async function showStoreModal(storeId) {
         document.getElementById('storePhoneInput').value = s.phone || '';
         document.getElementById('storeAddressInput').value = s.address || '';
         document.getElementById('storeColorInput').value = s.theme_color || '#4F46E5';
+        document.getElementById('storeBannerInput').value = s.banner_url || '';
+        document.getElementById('storeLogoInput').value = s.logo_url || '';
     } else {
         document.getElementById('storeModalTitle').textContent = '新增商店';
         document.getElementById('storeEditId').value = '';
@@ -330,6 +332,8 @@ export async function showStoreModal(storeId) {
         document.getElementById('storePhoneInput').value = '';
         document.getElementById('storeAddressInput').value = '';
         document.getElementById('storeColorInput').value = '#4F46E5';
+        document.getElementById('storeBannerInput').value = '';
+        document.getElementById('storeLogoInput').value = '';
     }
     document.getElementById('storeModal').style.display = 'flex';
 }
@@ -363,7 +367,9 @@ export async function saveStore() {
         description: document.getElementById('storeDescInput').value.trim() || null,
         phone: document.getElementById('storePhoneInput').value.trim() || null,
         address: document.getElementById('storeAddressInput').value.trim() || null,
-        theme_color: document.getElementById('storeColorInput').value
+        theme_color: document.getElementById('storeColorInput').value,
+        banner_url: document.getElementById('storeBannerInput').value.trim() || null,
+        logo_url: document.getElementById('storeLogoInput').value.trim() || null
     };
     if (window.currentCompanyId) record.company_id = window.currentCompanyId;
     try {
