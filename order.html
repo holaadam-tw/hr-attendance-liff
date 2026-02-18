@@ -697,7 +697,7 @@ body {
 <div class="toast" id="toast"></div>
 
 <!-- THEME PICKER -->
-<div class="theme-fab" id="themeFab" onclick="toggleThemePanel()">
+<div class="theme-fab" id="themeFab" onclick="toggleThemePanel()" style="display:none;">
   <span class="theme-fab-icon">&#x1F3A8;</span>
   <span class="theme-fab-label">風格</span>
 </div>
@@ -868,8 +868,6 @@ function applyTheme(name) {
   r.setProperty('--border-light', t.borderLight);
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', t.primary);
   currentTheme = name;
-  localStorage.setItem('_order_theme', name);
-  renderThemePanel();
 }
 
 let currentTheme = 'fire';
@@ -1035,11 +1033,9 @@ async function initApp() {
   const params = new URLSearchParams(window.location.search);
   const storeSlug = params.get('store');
 
-  // Apply saved theme or URL param
+  // Apply theme (URL param or default, store theme applied after load)
   const urlTheme = params.get('theme');
-  const savedTheme = localStorage.getItem('_order_theme');
-  applyTheme(urlTheme || savedTheme || 'fire');
-  renderThemePanel();
+  applyTheme(urlTheme || 'fire');
 
   try {
     if (storeSlug) {
@@ -1119,8 +1115,8 @@ async function loadStoreFromSupabase(slug) {
   }
   updateShopHeader(shopInfo);
 
-  // 套用商店主題色（用戶手動選過的優先，不覆蓋）
-  if (store.theme_color && !localStorage.getItem('_order_theme')) {
+  // 套用商店主題色
+  if (store.theme_color) {
     applyStoreThemeColor(store.theme_color);
   }
 
@@ -1602,6 +1598,14 @@ async function submitOrder() {
     const item = menuItems.find(i => i.id === c.id);
     return { item_id: c.id, name: item ? item.name : 'Unknown', size: c.sizeName || null, options: c.selectedOpts || [], qty: c.qty, unit_price: c.price, subtotal: c.price * c.qty };
   });
+  // 產生取餐號碼（當日流水號）
+  var orderNum = '';
+  var now = new Date();
+  var todayKey = '_orderSeq_' + now.getFullYear() + (now.getMonth()+1) + now.getDate();
+  var seq = parseInt(localStorage.getItem(todayKey) || '0') + 1;
+  localStorage.setItem(todayKey, String(seq));
+  orderNum = String(seq).padStart(3, '0');
+
   const order = {
     store_id: currentStoreId,
     table_number: tableNum,
@@ -1609,27 +1613,32 @@ async function submitOrder() {
     items: orderItems,
     total: totalPrice,
     status: 'pending',
-    order_type: isTakeout ? 'takeout' : 'dine_in'
+    order_type: isTakeout ? 'takeout' : 'dine_in',
+    order_number: orderNum
   };
   try {
     if (currentStoreId) {
       const res = await fetch(SUPABASE_URL + '/rest/v1/orders', {
-        method: 'POST', headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+        method: 'POST', headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=representation' },
         body: JSON.stringify(order)
       });
       if (!res.ok) throw new Error('Submit failed');
+      const resData = await res.json();
+      if (resData && resData[0] && resData[0].order_number) orderNum = resData[0].order_number;
     }
   } catch (e) { console.warn('Order submit failed:', e); }
-  showOrderSuccess(totalQty, totalPrice, tableNum);
+  showOrderSuccess(totalQty, totalPrice, tableNum, orderNum);
 }
 
-function showOrderSuccess(qty, price, table) {
+function showOrderSuccess(qty, price, table, orderNum) {
+  const isTakeout = table === '外帶';
   const overlay = document.getElementById('itemModalOverlay');
   overlay.innerHTML = '<div class="item-modal" onclick="event.stopPropagation()" style="text-align:center; padding: 40px 20px;">' +
     '<div style="font-size:64px; margin-bottom:16px; color:#4CAF50;">&#10003;</div>' +
     '<h2 style="font-size:22px; font-weight:800; margin-bottom:8px;">訂單已送出！</h2>' +
-    '<p style="color:#666; font-size:14px; margin-bottom:20px;">' + (table === '外帶' ? '外帶' : '桌號 ' + table) + '&#12288;' + qty + ' 道菜品&#12288;合計 $' + price + '</p>' +
-    '<p style="color:#999; font-size:12px; margin-bottom:24px;">' + (table === '外帶' ? '請至櫃檯等候取餐' : '廚房正在準備您的餐點，請稍候') + '</p>' +
+    (orderNum ? '<div style="background:#F0FDF4;border:2px solid #86EFAC;border-radius:12px;padding:12px 20px;margin-bottom:16px;display:inline-block;"><div style="font-size:11px;color:#16A34A;margin-bottom:2px;">' + (isTakeout ? '取餐號碼' : '訂單號碼') + '</div><div style="font-size:36px;font-weight:900;color:#15803D;letter-spacing:4px;">' + orderNum + '</div></div>' : '') +
+    '<p style="color:#666; font-size:14px; margin-bottom:20px;">' + (isTakeout ? '外帶' : '桌號 ' + table) + '&#12288;' + qty + ' 道菜品&#12288;合計 $' + price + '</p>' +
+    '<p style="color:#999; font-size:12px; margin-bottom:24px;">' + (isTakeout ? '請至櫃檯等候叫號取餐' : '廚房正在準備您的餐點，請稍候') + '</p>' +
     '<button onclick="resetOrder()" style="background: var(--primary); color: white; border: none; padding: 14px 40px; border-radius: 12px; font-size: 15px; font-weight: 700; cursor: pointer; font-family: inherit;">繼續點餐</button></div>';
   overlay.classList.add('show');
   document.getElementById('cartOverlay').classList.remove('show');
