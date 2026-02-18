@@ -697,7 +697,7 @@ body {
 <div class="toast" id="toast"></div>
 
 <!-- THEME PICKER -->
-<div class="theme-fab" id="themeFab" onclick="toggleThemePanel()" style="display:none;">
+<div class="theme-fab" id="themeFab" onclick="toggleThemePanel()">
   <span class="theme-fab-icon">&#x1F3A8;</span>
   <span class="theme-fab-label">風格</span>
 </div>
@@ -1058,6 +1058,11 @@ async function initApp() {
   const mode = params.get('mode');   // 'dine-in' | 'takeout'
   const tbl = params.get('table');
   window._orderMode = mode || (tbl ? 'dine-in' : null);
+
+  // 消費者模式（有 mode 參數）隱藏風格選擇按鈕；預覽模式顯示
+  if (mode) {
+    document.getElementById('themeFab').style.display = 'none';
+  }
 
   if (mode === 'takeout') {
     // 外帶：隱藏桌號/人數區塊
