@@ -73,34 +73,19 @@ body {
 
 /* ===== BRAND HERO ===== */
 .brand-hero {
-  display: none; background: #FFF; text-align: center;
-  border-bottom: 1px solid var(--border-light);
+  display: none; background: #FFF;
 }
 .brand-hero.show { display: block; }
 .brand-hero-img {
-  width: 100%; max-height: 260px; object-fit: contain;
+  width: 100%; display: block; object-fit: contain;
   background: #F8F8F8;
 }
-.brand-hero-info {
-  padding: 16px 20px 12px;
-}
-.brand-hero-name {
-  font-size: 20px; font-weight: 800; color: var(--text-primary);
-  margin-bottom: 4px;
-}
-.brand-hero-desc {
-  font-size: 13px; color: var(--text-secondary); margin-bottom: 12px;
-}
-.brand-hero-meta {
-  display: flex; justify-content: center; align-items: center; gap: 16px;
-  font-size: 13px; color: var(--text-muted);
-}
-.brand-hero-meta .meta-item {
-  display: flex; align-items: center; gap: 4px;
-}
-.brand-hero-share {
-  color: var(--primary); font-weight: 700; cursor: pointer;
-  text-decoration: none; display: flex; align-items: center; gap: 4px;
+/* ===== SHARE BTN ===== */
+.share-btn {
+  background: rgba(255,255,255,0.2); padding: 3px 10px;
+  border-radius: 20px; font-size: 11px; font-weight: 600;
+  color: #FFF; cursor: pointer; backdrop-filter: blur(5px);
+  text-decoration: none; white-space: nowrap;
 }
 
 /* ===== SHOP HEADER ===== */
@@ -738,11 +723,19 @@ body {
   <div class="theme-panel" id="themePanel"></div>
 </div>
 
+<!-- ===== BRAND HERO (DM) ===== -->
+<div class="brand-hero" id="brandHero">
+  <img class="brand-hero-img" id="brandHeroImg" src="" alt="">
+</div>
+
 <!-- ===== SHOP HEADER ===== -->
 <header class="shop-header" id="shopHeader">
   <div class="header-status-bar">
     <span>掃碼點餐</span>
-    <span class="badge open" id="shopStatus">營業中</span>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span class="badge open" id="shopStatus">營業中</span>
+      <a class="share-btn" id="shareBtn" onclick="shareOrder()" style="display:none;">&#x1F4E4; 分享訂單</a>
+    </div>
   </div>
   <div class="shop-info">
     <div class="shop-name-row">
@@ -759,16 +752,6 @@ body {
     </div>
   </div>
 </header>
-
-<!-- ===== BRAND HERO (DM) ===== -->
-<div class="brand-hero" id="brandHero">
-  <img class="brand-hero-img" id="brandHeroImg" src="" alt="" style="display:none;">
-  <div class="brand-hero-info">
-    <div class="brand-hero-name" id="brandHeroName"></div>
-    <div class="brand-hero-desc" id="brandHeroDesc"></div>
-    <div class="brand-hero-meta" id="brandHeroMeta"></div>
-  </div>
-</div>
 
 <!-- ===== TABLE / GUEST SELECTOR ===== -->
 <div class="table-selector" id="tableSelector">
@@ -1293,41 +1276,25 @@ function renderBrandHero(store) {
   var hero = document.getElementById('brandHero');
   var hasBanner = store.banner_url && store.banner_url.trim();
   var hasLogo = store.logo_url && store.logo_url.trim();
-  if (!hasBanner && !hasLogo) return; // 沒有形象圖就不顯示
+  if (!hasBanner && !hasLogo) return;
 
-  // 顯示圖片
   var img = document.getElementById('brandHeroImg');
   if (hasBanner) {
     img.src = store.banner_url;
     img.alt = store.store_name || '';
-    img.style.display = 'block';
   } else if (hasLogo) {
     img.src = store.logo_url;
     img.alt = store.store_name || '';
-    img.style.display = 'block';
     img.style.maxHeight = '180px';
     img.style.padding = '20px';
+    img.style.margin = '0 auto';
   }
-
-  // 商店名稱 & 描述
-  document.getElementById('brandHeroName').textContent = store.store_name || '';
-  document.getElementById('brandHeroDesc').textContent = store.description || '';
-
-  // Meta 資訊（桌號 + 分享）
-  var metaHtml = '';
-  var tbl = new URLSearchParams(window.location.search).get('table');
-  var mode = new URLSearchParams(window.location.search).get('mode');
-  if (tbl) {
-    metaHtml += '<span class="meta-item">&#x1F37D;&#xFE0F; 桌號 ' + tbl + '</span>';
-  } else if (mode === 'takeout') {
-    metaHtml += '<span class="meta-item">&#x1F6CD;&#xFE0F; 外帶點餐</span>';
-  }
-  if (navigator.share) {
-    metaHtml += '<a class="brand-hero-share" onclick="shareOrder()">&#x1F4E4; 分享訂單</a>';
-  }
-  document.getElementById('brandHeroMeta').innerHTML = metaHtml;
-
   hero.classList.add('show');
+
+  // 顯示分享按鈕（支援 Web Share API 的裝置）
+  if (navigator.share) {
+    document.getElementById('shareBtn').style.display = 'inline-block';
+  }
 }
 
 function shareOrder() {
