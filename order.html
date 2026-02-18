@@ -1639,25 +1639,74 @@ function animateAddToCart(event) {
 }
 
 // ===== SUBMIT ORDER =====
-async function submitOrder() {
+function submitOrder() {
   if (cart.length === 0) { showToast('請先選擇菜品'); return; }
   const isTakeout = window._orderMode === 'takeout';
   const tableNum = isTakeout ? '外帶' : document.getElementById('tableNumber').value.trim();
   if (!isTakeout && !tableNum) { showToast('請輸入桌號'); document.getElementById('tableNumber').focus(); return; }
   const totalQty = cart.reduce((s, c) => s + c.qty, 0);
   const totalPrice = cart.reduce((s, c) => s + c.price * c.qty, 0);
+
+  // 組合確認清單 HTML
+  var listHtml = '';
+  cart.forEach(function(c) {
+    var item = menuItems.find(function(i) { return i.id === c.id; });
+    var name = item ? item.name : 'Unknown';
+    var detail = '';
+    if (c.sizeName) detail += c.sizeName;
+    if (c.selectedOpts && c.selectedOpts.length > 0) {
+      var optNames = c.selectedOpts.map(function(o) { return o.name || o; }).join(', ');
+      detail += (detail ? ' / ' : '') + optNames;
+    }
+    listHtml += '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #F0F0F0;">' +
+      '<div style="flex:1;min-width:0;">' +
+        '<div style="font-weight:700;font-size:15px;color:#1A1A2E;">' + name + '</div>' +
+        (detail ? '<div style="font-size:12px;color:#888;margin-top:2px;">' + detail + '</div>' : '') +
+      '</div>' +
+      '<div style="text-align:right;white-space:nowrap;margin-left:12px;">' +
+        '<span style="font-size:13px;color:#666;">x' + c.qty + '</span>' +
+        '<div style="font-weight:800;font-size:15px;color:var(--primary);">$' + (c.price * c.qty) + '</div>' +
+      '</div></div>';
+  });
+
+  var overlay = document.getElementById('itemModalOverlay');
+  overlay.innerHTML = '<div class="item-modal" onclick="event.stopPropagation()" style="padding:24px 20px;max-height:85vh;overflow-y:auto;">' +
+    '<h2 style="text-align:center;font-size:20px;font-weight:800;margin:0 0 4px;">確認訂單</h2>' +
+    '<div style="text-align:center;font-size:13px;color:#888;margin-bottom:16px;">' +
+      (isTakeout ? '外帶點餐' : '內用 — 桌號 ' + tableNum + '・' + guestCount + ' 人') +
+    '</div>' +
+    '<div style="margin-bottom:16px;">' + listHtml + '</div>' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 0;border-top:2px solid #E5E5E5;">' +
+      '<span style="font-size:15px;font-weight:700;">合計 (' + totalQty + ' 件)</span>' +
+      '<span style="font-size:22px;font-weight:900;color:var(--primary);">$' + totalPrice + '</span>' +
+    '</div>' +
+    '<div style="display:flex;gap:10px;margin-top:16px;">' +
+      '<button onclick="closeConfirmOrder()" style="flex:1;padding:14px;border:2px solid #DDD;border-radius:12px;background:#FFF;font-size:15px;font-weight:700;color:#666;cursor:pointer;">返回修改</button>' +
+      '<button onclick="confirmAndSubmitOrder()" id="confirmSubmitBtn" style="flex:2;padding:14px;border:none;border-radius:12px;background:var(--primary);color:#FFF;font-size:15px;font-weight:700;cursor:pointer;">確認送出</button>' +
+    '</div>' +
+  '</div>';
+  overlay.style.display = 'flex';
+}
+
+function closeConfirmOrder() {
+  document.getElementById('itemModalOverlay').style.display = 'none';
+}
+
+async function confirmAndSubmitOrder() {
+  var btn = document.getElementById('confirmSubmitBtn');
+  btn.disabled = true;
+  btn.textContent = '送出中...';
+
+  const isTakeout = window._orderMode === 'takeout';
+  const tableNum = isTakeout ? '外帶' : document.getElementById('tableNumber').value.trim();
+  const totalQty = cart.reduce((s, c) => s + c.qty, 0);
+  const totalPrice = cart.reduce((s, c) => s + c.price * c.qty, 0);
   const orderItems = cart.map(c => {
     const item = menuItems.find(i => i.id === c.id);
     return { item_id: c.id, name: item ? item.name : 'Unknown', size: c.sizeName || null, options: c.selectedOpts || [], qty: c.qty, unit_price: c.price, subtotal: c.price * c.qty };
   });
-  // 產生取餐號碼（當日流水號）
-  var orderNum = '';
-  var now = new Date();
-  var todayKey = '_orderSeq_' + now.getFullYear() + (now.getMonth()+1) + now.getDate();
-  var seq = parseInt(localStorage.getItem(todayKey) || '0') + 1;
-  localStorage.setItem(todayKey, String(seq));
-  orderNum = String(seq).padStart(3, '0');
 
+  var orderNum = '';
   const order = {
     store_id: currentStoreId,
     order_number: '',
@@ -1678,16 +1727,18 @@ async function submitOrder() {
         const errText = await res.text();
         console.error('Order API error:', res.status, errText, JSON.stringify(order));
         showToast('訂單送出失敗: ' + res.status + ' ' + (errText || '').substring(0, 80));
+        btn.disabled = false;
+        btn.textContent = '確認送出';
         return;
       }
       const resData = await res.json();
       if (resData && resData[0] && resData[0].order_number) orderNum = resData[0].order_number;
-    } else {
-      console.warn('No currentStoreId — DEMO mode, order not saved to DB');
     }
   } catch (e) {
     console.error('Order submit error:', e);
     showToast('訂單送出失敗: ' + e.message);
+    btn.disabled = false;
+    btn.textContent = '確認送出';
     return;
   }
   showOrderSuccess(totalQty, totalPrice, tableNum, orderNum);
