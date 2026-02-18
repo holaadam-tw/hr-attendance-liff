@@ -15,16 +15,19 @@ VALUES (
 ON CONFLICT (id) DO NOTHING;
 
 -- RLS policies: 任何人可讀取（public bucket）
-CREATE POLICY IF NOT EXISTS "selfies_public_read"
+DROP POLICY IF EXISTS "selfies_public_read" ON storage.objects;
+CREATE POLICY "selfies_public_read"
     ON storage.objects FOR SELECT
     USING (bucket_id = 'selfies');
 
 -- RLS policies: anon 可上傳
-CREATE POLICY IF NOT EXISTS "selfies_anon_insert"
+DROP POLICY IF EXISTS "selfies_anon_insert" ON storage.objects;
+CREATE POLICY "selfies_anon_insert"
     ON storage.objects FOR INSERT
     WITH CHECK (bucket_id = 'selfies');
 
 -- RLS policies: anon 可更新（覆蓋圖片）
-CREATE POLICY IF NOT EXISTS "selfies_anon_update"
+DROP POLICY IF EXISTS "selfies_anon_update" ON storage.objects;
+CREATE POLICY "selfies_anon_update"
     ON storage.objects FOR UPDATE
     USING (bucket_id = 'selfies');
