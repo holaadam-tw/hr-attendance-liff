@@ -1613,8 +1613,7 @@ async function submitOrder() {
     items: orderItems,
     total: totalPrice,
     status: 'pending',
-    order_type: isTakeout ? 'takeout' : 'dine_in',
-    order_number: orderNum
+    order_type: isTakeout ? 'takeout' : 'dine_in'
   };
   try {
     if (currentStoreId) {
@@ -1622,11 +1621,22 @@ async function submitOrder() {
         method: 'POST', headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=representation' },
         body: JSON.stringify(order)
       });
-      if (!res.ok) throw new Error('Submit failed');
+      if (!res.ok) {
+        const errText = await res.text();
+        console.error('Order API error:', res.status, errText);
+        showToast('訂單送出失敗: ' + res.status);
+        return;
+      }
       const resData = await res.json();
       if (resData && resData[0] && resData[0].order_number) orderNum = resData[0].order_number;
+    } else {
+      console.warn('No currentStoreId — DEMO mode, order not saved to DB');
     }
-  } catch (e) { console.warn('Order submit failed:', e); }
+  } catch (e) {
+    console.error('Order submit error:', e);
+    showToast('訂單送出失敗: ' + e.message);
+    return;
+  }
   showOrderSuccess(totalQty, totalPrice, tableNum, orderNum);
 }
 
