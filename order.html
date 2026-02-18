@@ -937,12 +937,8 @@ function renderThemePanel() {
 
 // Apply store theme — 支援主題 key（如 "fire"）或 hex 色碼（如 "#E8430A"）
 function applyStoreThemeColor(val) {
-  // 1. 消費者模式下不讀 localStorage（看商店設定）；預覽模式可用個人偏好
-  if (!window._orderMode) {
-    var saved = localStorage.getItem('selectedTheme');
-    if (saved && THEMES[saved]) { applyTheme(saved); return; }
-  }
-  // 2. 如果值是主題 key，直接套用
+  // 永遠套用 DB 儲存的風格，確保預覽和消費者看到一致的結果
+  // 如果值是主題 key，直接套用
   if (THEMES[val]) { applyTheme(val); return; }
   // 3. Hex 色碼：找最接近的內建主題
   var bestKey = null, bestDist = Infinity;
@@ -1083,7 +1079,12 @@ async function initApp() {
   const params = new URLSearchParams(window.location.search);
   const storeSlug = params.get('store');
 
-  // Apply theme (URL param > localStorage > default)
+  // 先設定模式，讓 applyStoreThemeColor 知道是否為消費者模式
+  const mode = params.get('mode');   // 'dine-in' | 'takeout'
+  const tbl = params.get('table');
+  window._orderMode = mode || (tbl ? 'dine-in' : null);
+
+  // Apply theme (URL param > localStorage > default) — 快速顯示，等 DB 載入後再覆蓋
   const urlTheme = params.get('theme');
   const savedTheme = localStorage.getItem('selectedTheme');
   applyTheme(urlTheme || savedTheme || 'fire');
@@ -1104,11 +1105,6 @@ async function initApp() {
   setupScrollSpy();
   setupSearch();
   setupGuestSelector();
-
-  // 內用/外帶模式
-  const mode = params.get('mode');   // 'dine-in' | 'takeout'
-  const tbl = params.get('table');
-  window._orderMode = mode || (tbl ? 'dine-in' : null);
 
   // 消費者模式（有 mode 參數）隱藏風格選擇按鈕；預覽模式顯示
   if (mode) {
