@@ -623,9 +623,9 @@ body {
 /* ===== THEME PICKER ===== */
 .theme-fab {
   position: fixed; top: 12px; right: 12px; z-index: 150;
-  height: 34px; border-radius: 17px;
+  height: 40px; border-radius: 20px;
   background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-  border: none; padding: 0 14px 0 10px;
+  border: none; padding: 0 16px 0 12px;
   display: flex; align-items: center; gap: 6px;
   cursor: pointer; font-size: 14px; transition: all 0.25s;
   box-shadow: 0 3px 12px rgba(0,0,0,0.2);
@@ -633,42 +633,42 @@ body {
 }
 .theme-fab:hover { transform: scale(1.05); box-shadow: 0 4px 16px rgba(0,0,0,0.25); }
 .theme-fab:active { transform: scale(0.97); }
-.theme-fab-icon { font-size: 16px; display: flex; }
-.theme-fab-label { font-size: 11px; letter-spacing: 0.3px; }
+.theme-fab-icon { font-size: 18px; display: flex; }
+.theme-fab-label { font-size: 13px; font-weight: 700; letter-spacing: 0.3px; }
 .theme-overlay {
   position: fixed; inset: 0; z-index: 200;
-  background: rgba(0,0,0,0.4); backdrop-filter: blur(3px);
+  background: rgba(0,0,0,0.5);
   display: none; align-items: flex-end; justify-content: center;
 }
 .theme-overlay.show { display: flex; }
 .theme-panel {
   background: white; border-radius: 20px 20px 0 0;
-  padding: 20px 16px calc(20px + env(safe-area-inset-bottom, 0px));
-  width: 100%; max-width: 480px; max-height: 70vh; overflow-y: auto;
+  padding: 24px 20px calc(24px + env(safe-area-inset-bottom, 0px));
+  width: 100%; max-width: 480px; max-height: 75vh; overflow-y: auto;
   box-shadow: 0 -4px 24px rgba(0,0,0,0.15);
   animation: slideUpPanel 0.3s ease-out;
 }
 @keyframes slideUpPanel { from { transform: translateY(100%); } to { transform: translateY(0); } }
-.theme-panel-handle { width: 36px; height: 4px; border-radius: 2px; background: #D1D5DB; margin: 0 auto 16px; }
-.theme-panel h4 { font-size: 15px; font-weight: 800; margin-bottom: 4px; color: var(--text-primary); text-align: center; }
-.theme-panel-sub { font-size: 11px; color: var(--text-muted); text-align: center; margin-bottom: 16px; }
-.theme-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.theme-panel-handle { width: 40px; height: 4px; border-radius: 2px; background: #D1D5DB; margin: 0 auto 16px; }
+.theme-panel h4 { font-size: 18px; font-weight: 800; margin-bottom: 4px; color: var(--text-primary); text-align: center; }
+.theme-panel-sub { font-size: 12px; color: var(--text-muted); text-align: center; margin-bottom: 16px; }
+.theme-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
 .theme-card {
-  position: relative; border-radius: 14px; padding: 14px 10px 10px;
+  position: relative; border-radius: 16px; padding: 16px 10px 12px;
   cursor: pointer; transition: all 0.2s; text-align: center;
-  border: 2px solid transparent;
+  border: 2.5px solid transparent;
 }
 .theme-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-.theme-card.active { border-color: var(--primary); box-shadow: 0 0 0 2px var(--primary); }
+.theme-card.active { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary); }
 .theme-card.active::after {
-  content: '\2713'; position: absolute; top: 6px; right: 6px;
-  width: 18px; height: 18px; border-radius: 50%;
+  content: '\2713'; position: absolute; top: 8px; right: 8px;
+  width: 22px; height: 22px; border-radius: 50%;
   background: var(--primary); color: #fff;
-  font-size: 11px; font-weight: 700; line-height: 18px; text-align: center;
+  font-size: 13px; font-weight: 700; line-height: 22px; text-align: center;
 }
-.theme-card-dots { display: flex; gap: 4px; justify-content: center; margin-bottom: 8px; }
-.theme-card-dot { width: 18px; height: 18px; border-radius: 50%; }
-.theme-card-name { font-size: 12px; font-weight: 600; color: #333; }
+.theme-card-dots { display: flex; gap: 6px; justify-content: center; margin-bottom: 10px; }
+.theme-card-dot { width: 24px; height: 24px; border-radius: 50%; box-shadow: 0 1px 3px rgba(0,0,0,0.15); }
+.theme-card-name { font-size: 13px; font-weight: 700; color: #333; }
 .theme-card-dark .theme-card-name { color: #eee; }
 
 /* ===== RESPONSIVE ===== */
