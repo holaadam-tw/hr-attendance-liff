@@ -1331,6 +1331,22 @@
                         <input type="text" id="rdLineGroupId" placeholder="LINE Group ID" style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;box-sizing:border-box;">
                         <button onclick="saveLineGroupId()" class="btn btn-success" style="margin-top:8px;font-size:13px;padding:10px 20px;">💾 儲存</button>
                     </div>
+                    <!-- 桌號 QR Code -->
+                    <div style="background:#F8FAFC;border-radius:12px;padding:14px;margin-bottom:14px;">
+                        <div style="font-weight:700;font-size:14px;margin-bottom:10px;">🪑 桌號 QR Code</div>
+                        <p style="font-size:11px;color:#94A3B8;margin-bottom:8px;">自動產生每桌的內用 QR Code + 外帶 QR Code，可列印成桌上立牌</p>
+                        <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;">
+                            <label style="font-size:12px;white-space:nowrap;">桌數</label>
+                            <input type="number" id="rdTableCount" min="1" max="50" value="6" style="width:80px;padding:8px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;">
+                            <button onclick="generateTableQRCodes()" class="btn btn-primary" style="font-size:12px;padding:8px 14px;white-space:nowrap;">產生 QR Code</button>
+                        </div>
+                        <div id="rdTableQRList" style="display:none;">
+                            <div style="display:flex;justify-content:flex-end;margin-bottom:8px;">
+                                <button onclick="printTableQRCodes()" style="padding:6px 12px;border:1px solid #C7D2FE;border-radius:8px;background:#fff;font-size:11px;cursor:pointer;">🖨️ 列印全部</button>
+                            </div>
+                            <div id="rdTableQRGrid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;"></div>
+                        </div>
+                    </div>
                     <!-- 集點設定 -->
                     <div style="background:#F8FAFC;border-radius:12px;padding:14px;margin-bottom:14px;">
                         <div style="font-weight:700;font-size:14px;margin-bottom:10px;">🎯 會員集點</div>

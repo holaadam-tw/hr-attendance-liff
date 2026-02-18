@@ -66,6 +66,7 @@ import {
     removeOptionGroup, addOptionChoice, removeOptionChoice,
     toggleOptionType, toggleOptionReq, addComboGroup, removeComboGroup,
     saveBusinessHours, saveLineGroupId, saveLoyaltyConfig,
+    generateTableQRCodes, printTableQRCodes,
     showCopyMenuModal, closeCopyMenuModal, executeCopyMenu
 } from './store.js';
 
@@ -236,6 +237,8 @@ window.removeComboGroup = removeComboGroup;
 window.saveBusinessHours = saveBusinessHours;
 window.saveLineGroupId = saveLineGroupId;
 window.saveLoyaltyConfig = saveLoyaltyConfig;
+window.generateTableQRCodes = generateTableQRCodes;
+window.printTableQRCodes = printTableQRCodes;
 window.showCopyMenuModal = showCopyMenuModal;
 window.closeCopyMenuModal = closeCopyMenuModal;
 window.executeCopyMenu = executeCopyMenu;

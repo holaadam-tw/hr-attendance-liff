@@ -1006,6 +1006,68 @@ export async function saveLoyaltyConfig() {
     } catch(e) { showToast('❌ 儲存失敗'); }
 }
 
+// ===== 桌號 QR Code 產生 =====
+export function generateTableQRCodes() {
+    const s = smStores.find(x => x.id === rdCurrentStoreId);
+    if (!s) return showToast('找不到商店資料');
+    const count = parseInt(document.getElementById('rdTableCount').value) || 6;
+    if (count < 1 || count > 50) return showToast('桌數請輸入 1~50');
+
+    const baseUrl = getStoreOrderUrl(s).split('?')[0] + '?store=' + (s.store_slug || s.id);
+    const grid = document.getElementById('rdTableQRGrid');
+    grid.innerHTML = '';
+    document.getElementById('rdTableQRList').style.display = 'block';
+
+    if (typeof QRCode === 'undefined') {
+        grid.innerHTML = '<p style="color:#DC2626;grid-column:1/-1;">QRCode 元件未載入</p>';
+        return;
+    }
+
+    // 外帶 QR
+    const takeoutCard = createQRCard('外帶點餐', baseUrl + '&mode=takeout');
+    grid.appendChild(takeoutCard);
+
+    // 每桌 QR
+    for (let i = 1; i <= count; i++) {
+        const card = createQRCard('桌 ' + i, baseUrl + '&mode=dine-in&table=' + i);
+        grid.appendChild(card);
+    }
+}
+
+function createQRCard(label, url) {
+    const card = document.createElement('div');
+    card.className = 'qr-card';
+    card.style.cssText = 'background:#fff;border:1px solid #E2E8F0;border-radius:10px;padding:10px;text-align:center;';
+    card.innerHTML = '<div style="font-weight:700;font-size:13px;margin-bottom:6px;color:#4F46E5;">' + label + '</div><div class="qr-img"></div><div style="font-size:9px;color:#94A3B8;margin-top:4px;word-break:break-all;line-height:1.3;">' + url.replace(/https?:\/\/[^/]+/, '') + '</div>';
+    new QRCode(card.querySelector('.qr-img'), { text: url, width: 140, height: 140 });
+    return card;
+}
+
+export function printTableQRCodes() {
+    const grid = document.getElementById('rdTableQRGrid');
+    if (!grid) return;
+    const w = window.open('', '_blank');
+    w.document.write('<html><head><title>桌號 QR Code</title><style>body{font-family:sans-serif;padding:20px;}' +
+        '.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}' +
+        '.card{border:2px solid #ddd;border-radius:12px;padding:12px;text-align:center;break-inside:avoid;}' +
+        '.card h3{margin:0 0 8px;font-size:16px;color:#4F46E5;}' +
+        '.card img{width:160px;height:160px;}' +
+        '@media print{body{padding:0;}.grid{gap:8px;}.card{border:1px solid #999;}}</style></head><body>');
+    w.document.write('<h2 style="text-align:center;margin-bottom:16px;">' + (smStores.find(x => x.id === rdCurrentStoreId)?.store_name || '') + ' — QR Code</h2>');
+    w.document.write('<div class="grid">');
+    grid.querySelectorAll('.qr-card').forEach(c => {
+        const label = c.querySelector('div').textContent;
+        const img = c.querySelector('.qr-img img') || c.querySelector('.qr-img canvas');
+        let imgSrc = '';
+        if (img && img.tagName === 'IMG') imgSrc = img.src;
+        else if (img && img.tagName === 'CANVAS') imgSrc = img.toDataURL();
+        w.document.write('<div class="card"><h3>' + label + '</h3>' + (imgSrc ? '<img src="' + imgSrc + '">' : '') + '</div>');
+    });
+    w.document.write('</div></body></html>');
+    w.document.close();
+    setTimeout(() => w.print(), 500);
+}
+
 // ===== 菜單複製 =====
 export function showCopyMenuModal() {
     const targets = smStores.filter(s => s.id !== smCurrentStoreId);

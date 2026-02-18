@@ -1058,8 +1058,28 @@ async function initApp() {
   setupSearch();
   setupGuestSelector();
 
+  // 內用/外帶模式
+  const mode = params.get('mode');   // 'dine-in' | 'takeout'
   const tbl = params.get('table');
-  if (tbl) document.getElementById('tableNumber').value = tbl;
+  window._orderMode = mode || (tbl ? 'dine-in' : null);
+
+  if (mode === 'takeout') {
+    // 外帶：隱藏桌號/人數區塊
+    document.getElementById('tableSelector').style.display = 'none';
+    // 顯示外帶標籤
+    var badge = document.createElement('div');
+    badge.style.cssText = 'text-align:center;padding:8px;margin:8px 16px;background:#FEF3C7;border-radius:10px;font-size:13px;font-weight:700;color:#B45309;';
+    badge.textContent = '\u{1F6CD}\u{FE0F} 外帶模式';
+    document.getElementById('tableSelector').parentNode.insertBefore(badge, document.getElementById('tableSelector'));
+  } else if (tbl) {
+    // 內用：自動帶入桌號，鎖定
+    document.getElementById('tableNumber').value = tbl;
+    document.getElementById('tableNumber').readOnly = true;
+    document.getElementById('tableNumber').style.background = '#F1F5F9';
+    // 顯示內用標籤
+    var h3 = document.querySelector('#tableSelector h3');
+    if (h3) h3.innerHTML = '\u{1F37D}\u{FE0F} 內用 \u2014 桌號 ' + tbl;
+  }
 
   setTimeout(() => { document.getElementById('loadingScreen').classList.add('hide'); }, 600);
 }
@@ -1573,8 +1593,9 @@ function animateAddToCart(event) {
 // ===== SUBMIT ORDER =====
 async function submitOrder() {
   if (cart.length === 0) { showToast('請先選擇菜品'); return; }
-  const tableNum = document.getElementById('tableNumber').value.trim();
-  if (!tableNum) { showToast('請輸入桌號'); document.getElementById('tableNumber').focus(); return; }
+  const isTakeout = window._orderMode === 'takeout';
+  const tableNum = isTakeout ? '外帶' : document.getElementById('tableNumber').value.trim();
+  if (!isTakeout && !tableNum) { showToast('請輸入桌號'); document.getElementById('tableNumber').focus(); return; }
   const totalQty = cart.reduce((s, c) => s + c.qty, 0);
   const totalPrice = cart.reduce((s, c) => s + c.price * c.qty, 0);
   const orderItems = cart.map(c => {
@@ -1584,11 +1605,11 @@ async function submitOrder() {
   const order = {
     store_id: currentStoreId,
     table_number: tableNum,
-    guest_count: guestCount,
+    guest_count: isTakeout ? 0 : guestCount,
     items: orderItems,
     total: totalPrice,
     status: 'pending',
-    order_type: 'dine_in'
+    order_type: isTakeout ? 'takeout' : 'dine_in'
   };
   try {
     if (currentStoreId) {
@@ -1607,8 +1628,8 @@ function showOrderSuccess(qty, price, table) {
   overlay.innerHTML = '<div class="item-modal" onclick="event.stopPropagation()" style="text-align:center; padding: 40px 20px;">' +
     '<div style="font-size:64px; margin-bottom:16px; color:#4CAF50;">&#10003;</div>' +
     '<h2 style="font-size:22px; font-weight:800; margin-bottom:8px;">訂單已送出！</h2>' +
-    '<p style="color:#666; font-size:14px; margin-bottom:20px;">桌號 ' + table + '&#12288;' + qty + ' 道菜品&#12288;合計 $' + price + '</p>' +
-    '<p style="color:#999; font-size:12px; margin-bottom:24px;">廚房正在準備您的餐點，請稍候</p>' +
+    '<p style="color:#666; font-size:14px; margin-bottom:20px;">' + (table === '外帶' ? '外帶' : '桌號 ' + table) + '&#12288;' + qty + ' 道菜品&#12288;合計 $' + price + '</p>' +
+    '<p style="color:#999; font-size:12px; margin-bottom:24px;">' + (table === '外帶' ? '請至櫃檯等候取餐' : '廚房正在準備您的餐點，請稍候') + '</p>' +
     '<button onclick="resetOrder()" style="background: var(--primary); color: white; border: none; padding: 14px 40px; border-radius: 12px; font-size: 15px; font-weight: 700; cursor: pointer; font-family: inherit;">繼續點餐</button></div>';
   overlay.classList.add('show');
   document.getElementById('cartOverlay').classList.remove('show');
