@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#E8430A">
 <title>掃碼點餐</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;600;700;900&display=swap" rel="stylesheet">
@@ -167,7 +168,7 @@ body {
 
 /* ===== MAIN LAYOUT ===== */
 .menu-container {
-  display: flex; height: calc(100vh - 280px);
+  display: flex; height: calc(100vh - 280px); height: calc(100dvh - 280px);
   margin-top: 12px; position: relative;
 }
 
@@ -1114,6 +1115,8 @@ async function initApp() {
   if (mode === 'takeout') {
     // 外帶：隱藏桌號/人數區塊
     document.getElementById('tableSelector').style.display = 'none';
+    // 外帶模式菜單區域加高（桌號區塊隱藏後空間回收）
+    document.getElementById('menuContainer').style.height = 'calc(100dvh - 170px)';
     // 顯示外帶標籤
     var badge = document.createElement('div');
     badge.style.cssText = 'text-align:center;padding:8px;margin:8px 16px;background:#FEF3C7;border-radius:10px;font-size:13px;font-weight:700;color:#B45309;';
@@ -1264,7 +1267,7 @@ function renderMenuContent(filter) {
 
   categories.forEach(cat => {
     let items = menuItems.filter(i => i.category === cat.id);
-    if (filter) items = items.filter(i => i.name.includes(filter) || (i.desc && i.desc.includes(filter)));
+    if (filter) { var q = filter.toLowerCase(); items = items.filter(i => i.name.toLowerCase().includes(q) || (i.desc && i.desc.toLowerCase().includes(q))); }
     if (items.length === 0 && filter) return;
 
     html += '<div class="category-section" id="catSection_' + cat.id + '" data-cat="' + cat.id + '">' +
@@ -1431,6 +1434,14 @@ function changeQty(itemId, delta, event) {
   updateCartUI();
   refreshItemDisplay(itemId);
 }
+function changeCartIdx(idx, delta) {
+  if (idx < 0 || idx >= cart.length) return;
+  var itemId = cart[idx].id;
+  cart[idx].qty += delta;
+  if (cart[idx].qty <= 0) cart.splice(idx, 1);
+  updateCartUI();
+  refreshItemDisplay(itemId);
+}
 
 function getCartQty(itemId) {
   return cart.filter(c => c.id === itemId).reduce((sum, c) => sum + c.qty, 0);
@@ -1474,7 +1485,7 @@ function renderDrawerItems() {
     container.innerHTML = '<div class="empty-state"><div class="empty-icon">' + ICONS.cart + '</div><div class="empty-title">購物車是空的</div><div class="empty-desc">快去選幾道好菜吧！</div></div>';
     return;
   }
-  container.innerHTML = cart.map(c => {
+  container.innerHTML = cart.map(function(c, idx) {
     const item = menuItems.find(i => i.id === c.id);
     if (!item) return '';
     const imgSrc = item.image || generatePlaceholder(item.name);
@@ -1483,9 +1494,9 @@ function renderDrawerItems() {
       '<div class="drawer-item-info"><div class="drawer-item-name">' + item.name + '</div>' +
       (c.optKey ? '<div class="drawer-item-size">' + c.optKey + '</div>' : '') +
       '<div class="drawer-item-price"><span class="currency">$</span>' + (c.price * c.qty) + '</div></div>' +
-      '<div class="drawer-item-qty"><button class="drawer-qty-btn" onclick="changeQty(' + qid(c.id) + ', -1)">&#8722;</button>' +
+      '<div class="drawer-item-qty"><button class="drawer-qty-btn" onclick="changeCartIdx(' + idx + ', -1)">&#8722;</button>' +
       '<span class="drawer-qty-num">' + c.qty + '</span>' +
-      '<button class="drawer-qty-btn" onclick="changeQty(' + qid(c.id) + ', 1)">+</button></div></div>';
+      '<button class="drawer-qty-btn" onclick="changeCartIdx(' + idx + ', 1)">+</button></div></div>';
   }).join('');
 }
 
@@ -1655,7 +1666,7 @@ function submitOrder() {
     var detail = '';
     if (c.sizeName) detail += c.sizeName;
     if (c.selectedOpts && c.selectedOpts.length > 0) {
-      var optNames = c.selectedOpts.map(function(o) { return o.name || o; }).join(', ');
+      var optNames = c.selectedOpts.map(function(o) { return typeof o === 'string' ? o : (o.name || ''); }).filter(Boolean).join(', ');
       detail += (detail ? ' / ' : '') + optNames;
     }
     listHtml += '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #F0F0F0;">' +
@@ -1685,11 +1696,11 @@ function submitOrder() {
       '<button onclick="confirmAndSubmitOrder()" id="confirmSubmitBtn" style="flex:2;padding:14px;border:none;border-radius:12px;background:var(--primary);color:#FFF;font-size:15px;font-weight:700;cursor:pointer;">確認送出</button>' +
     '</div>' +
   '</div>';
-  overlay.style.display = 'flex';
+  overlay.classList.add('show');
 }
 
 function closeConfirmOrder() {
-  document.getElementById('itemModalOverlay').style.display = 'none';
+  document.getElementById('itemModalOverlay').classList.remove('show');
 }
 
 async function confirmAndSubmitOrder() {
@@ -1709,7 +1720,6 @@ async function confirmAndSubmitOrder() {
   var orderNum = '';
   const order = {
     store_id: currentStoreId,
-    order_number: '',
     table_number: tableNum,
     items: orderItems,
     total: totalPrice,
