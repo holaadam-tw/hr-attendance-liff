@@ -873,7 +873,9 @@ function applyTheme(name) {
 let currentTheme = 'fire';
 
 function toggleThemePanel() {
-  document.getElementById('themeOverlay').classList.toggle('show');
+  var overlay = document.getElementById('themeOverlay');
+  if (!overlay.classList.contains('show')) renderThemePanel();
+  overlay.classList.toggle('show');
 }
 function closeThemePanel() {
   document.getElementById('themeOverlay').classList.remove('show');
