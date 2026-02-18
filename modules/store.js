@@ -210,7 +210,7 @@ function startOrderPolling() {
             updateStoreOrderStats();
             renderTopSelling();
         } catch(e) { console.warn('Order poll error:', e); }
-    }, 10000); // 每 10 秒
+    }, 30000); // 每 30 秒（降低 API 壓力）
 }
 
 function stopOrderPolling() {

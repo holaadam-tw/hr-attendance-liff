@@ -1527,6 +1527,9 @@ function addToCart(itemId, event) {
 
 function changeQty(itemId, delta, event) {
   if (event) event.stopPropagation();
+  // 同品項可能有多筆（不同規格/選項），若多筆則打開 drawer 讓用戶選
+  const matches = cart.filter(c => c.id === itemId);
+  if (matches.length > 1) { toggleCartDrawer(); return; }
   const idx = cart.findIndex(c => c.id === itemId);
   if (idx === -1) return;
   cart[idx].qty += delta;
@@ -1895,11 +1898,13 @@ function resetOrder() {
   }, 400);
 }
 
+let _toastTimer = null;
 function showToast(msg) {
   const toast = document.getElementById('toast');
   toast.textContent = msg;
   toast.classList.add('show');
-  setTimeout(function() { toast.classList.remove('show'); }, 2000);
+  if (_toastTimer) clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(function() { toast.classList.remove('show'); _toastTimer = null; }, 2000);
 }
 
 // ===== 會員集點 =====
