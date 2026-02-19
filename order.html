@@ -1576,7 +1576,7 @@ document.addEventListener('keydown', function(e) {
 });
 
 // ===== UTILS =====
-function escHtml(s) { if (!s) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function escHtml(s) { if (!s) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#x27;'); }
 
 // ===== STATE =====
 let currentStoreId = null;
@@ -1727,7 +1727,7 @@ async function initApp() {
     document.getElementById('tableNumber').style.background = '#F1F5F9';
     // 顯示內用標籤
     var h3 = document.querySelector('#tableSelector h3');
-    if (h3) h3.innerHTML = '\u{1F37D}\u{FE0F} 內用 \u2014 桌號 ' + tbl;
+    if (h3) h3.innerHTML = '\u{1F37D}\u{FE0F} 內用 \u2014 桌號 ' + escHtml(tbl);
   }
 
   setTimeout(() => { document.getElementById('loadingScreen').classList.add('hide'); }, 600);
@@ -1861,7 +1861,7 @@ function updateShopHeader(shop) {
   if (shop.hours) document.getElementById('shopHours').textContent = shop.hours;
   if (shop.logo) {
     var logoEl = document.getElementById('shopLogo');
-    logoEl.innerHTML = '<img src="' + shop.logo + '" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;">';
+    logoEl.innerHTML = '<img src="' + escHtml(shop.logo) + '" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;">';
   }
 }
 
@@ -2934,8 +2934,8 @@ function renderSidebar() {
   const sidebar = document.getElementById('categorySidebar');
   sidebar.innerHTML = categories.map((cat, i) =>
     '<div class="cat-item ' + (i === 0 ? 'active' : '') + '" data-cat="' + cat.id + '" onclick="scrollToCategory(\'' + cat.id + '\')">' +
-      '<span class="cat-icon">' + cat.icon + '</span>' +
-      '<span class="cat-name">' + cat.name + '</span>' +
+      '<span class="cat-icon">' + escHtml(cat.icon) + '</span>' +
+      '<span class="cat-name">' + escHtml(cat.name) + '</span>' +
       '<span class="cat-badge" id="catBadge_' + cat.id + '">0</span>' +
     '</div>'
   ).join('');
@@ -2961,7 +2961,7 @@ function renderMenuContent(filter) {
     if (items.length === 0 && filter) return;
 
     html += '<div class="category-section" id="catSection_' + cat.id + '" data-cat="' + cat.id + '">' +
-      '<div class="category-header"><span class="cat-emoji">' + cat.icon + '</span><h3>' + cat.name + '</h3><span class="count">' + items.length + ' 道</span>' +
+      '<div class="category-header"><span class="cat-emoji">' + escHtml(cat.icon) + '</span><h3>' + escHtml(cat.name) + '</h3><span class="count">' + items.length + ' 道</span>' +
       '<div class="view-toggle"><button class="view-toggle-btn active" onclick="setViewMode(\'list\', this)" title="列表"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="0" y="1" width="14" height="2.5" rx="1" fill="currentColor"/><rect x="0" y="5.75" width="14" height="2.5" rx="1" fill="currentColor"/><rect x="0" y="10.5" width="14" height="2.5" rx="1" fill="currentColor"/></svg></button><button class="view-toggle-btn" onclick="setViewMode(\'grid\', this)" title="大圖"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="0" y="0" width="6" height="6" rx="1.5" fill="currentColor"/><rect x="8" y="0" width="6" height="6" rx="1.5" fill="currentColor"/><rect x="0" y="8" width="6" height="6" rx="1.5" fill="currentColor"/><rect x="8" y="8" width="6" height="6" rx="1.5" fill="currentColor"/></svg></button></div>' +
       '</div>' +
       (items.length === 0
@@ -3239,13 +3239,13 @@ function openItemModal(itemId) {
           return '<div class="modal-opt-card ' + (i === modalSelectedSize ? 'active' : '') + '" onclick="selectModalSize(' + i + ')">' +
             '<img class="opt-card-img" src="' + sImg + '" onerror="this.src=\'' + generatePlaceholder(s.name) + '\'">' +
             '<div class="opt-card-check">✓</div>' +
-            '<div class="opt-card-info"><div class="opt-card-name">' + s.name + '</div>' +
+            '<div class="opt-card-info"><div class="opt-card-name">' + escHtml(s.name) + '</div>' +
             '<div class="opt-card-price">$' + s.price + '</div></div></div>';
         }).join('') +
       '</div></div>';
     } else {
       optHtml += '<div class="modal-option-group"><div class="modal-option-title">份量 <span class="required">必選</span></div><div class="modal-options">' +
-        item.sizes.map((s, i) => '<button class="modal-opt-btn ' + (i === modalSelectedSize ? 'active' : '') + '" onclick="selectModalSize(' + i + ')">' + s.name + ' - $' + s.price + '</button>').join('') +
+        item.sizes.map((s, i) => '<button class="modal-opt-btn ' + (i === modalSelectedSize ? 'active' : '') + '" onclick="selectModalSize(' + i + ')">' + escHtml(s.name) + ' - $' + s.price + '</button>').join('') +
       '</div></div>';
     }
   }
@@ -3257,21 +3257,21 @@ function openItemModal(itemId) {
       var grpItems = grp.items || [];
       var grpHasImgs = grpItems.some(function(o) { return o.image; });
       if (grpHasImgs) {
-        optHtml += '<div class="modal-option-group" data-optgrp="' + gi + '"><div class="modal-option-title">' + grp.group + reqHtml + '</div><div class="modal-options has-images">' +
+        optHtml += '<div class="modal-option-group" data-optgrp="' + gi + '"><div class="modal-option-title">' + escHtml(grp.group) + reqHtml + '</div><div class="modal-options has-images">' +
           grpItems.map(function(opt, oi) {
             var oImg = opt.image || generatePlaceholder(opt.name);
             var priceText = opt.price ? '+$' + opt.price : '免費';
             return '<div class="modal-opt-card' + (oi === 0 ? ' active' : '') + '" onclick="selectOption(this, ' + gi + ', ' + oi + ')">' +
               '<img class="opt-card-img" src="' + oImg + '" onerror="this.src=\'' + generatePlaceholder(opt.name) + '\'">' +
               '<div class="opt-card-check">✓</div>' +
-              '<div class="opt-card-info"><div class="opt-card-name">' + opt.name + '</div>' +
+              '<div class="opt-card-info"><div class="opt-card-name">' + escHtml(opt.name) + '</div>' +
               '<div class="opt-card-price">' + priceText + '</div></div></div>';
           }).join('') +
         '</div></div>';
       } else {
-        optHtml += '<div class="modal-option-group" data-optgrp="' + gi + '"><div class="modal-option-title">' + grp.group + reqHtml + '</div><div class="modal-options">' +
+        optHtml += '<div class="modal-option-group" data-optgrp="' + gi + '"><div class="modal-option-title">' + escHtml(grp.group) + reqHtml + '</div><div class="modal-options">' +
           grpItems.map(function(opt, oi) {
-            return '<button class="modal-opt-btn' + (oi === 0 ? ' active' : '') + '" onclick="selectOption(this, ' + gi + ', ' + oi + ')">' + opt.name + (opt.price ? ' +$' + opt.price : '') + '</button>';
+            return '<button class="modal-opt-btn' + (oi === 0 ? ' active' : '') + '" onclick="selectOption(this, ' + gi + ', ' + oi + ')">' + escHtml(opt.name) + (opt.price ? ' +$' + opt.price : '') + '</button>';
           }).join('') +
         '</div></div>';
       }
