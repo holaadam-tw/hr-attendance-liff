@@ -1419,12 +1419,6 @@ const THEMES = {
   cafe:    { name: '咖啡時光', group: 'special', primary: '#78350F', primaryLight: '#92400E', primaryDark: '#5C2A0A', accent: '#D97706', accentLight: '#F59E0B', bg: '#FAF5F0', bgCard: '#F5EBE0', bgSidebar: '#FBF6F0', textPrimary: '#1A1210', textSecondary: '#6A5848', textMuted: '#9A8878', border: '#E0D4C4', borderLight: '#F0E8D8', headerGrad: 'linear-gradient(135deg,#78350F 0%,#5C2A0A 40%,#451A03 100%)' },
   wine:    { name: '紅酒奢華', group: 'special', primary: '#881337', primaryLight: '#BE185D', primaryDark: '#6B0F2A', accent: '#D4A574', accentLight: '#E8C9A8', bg: '#FBF5F5', bgCard: '#FFF5F5', bgSidebar: '#FDF8F8', textPrimary: '#1A0E12', textSecondary: '#6A4050', textMuted: '#A08090', border: '#E8D0D8', borderLight: '#F5E8EE', headerGrad: 'linear-gradient(135deg,#881337 0%,#6B0F2A 50%,#4A0A1E 100%)' },
   sakura:  { name: '日式和風', group: 'special', primary: '#C2185B', primaryLight: '#E91E63', primaryDark: '#880E4F', accent: '#4DB6AC', accentLight: '#80CBC4', bg: '#FFF8FA', bgCard: '#FFF0F4', bgSidebar: '#FFFBFC', textPrimary: '#2D1520', textSecondary: '#7A4560', textMuted: '#B08898', border: '#F0D0DC', borderLight: '#F8E4EC', headerGrad: 'linear-gradient(135deg,#C2185B 0%,#880E4F 50%,#560027 100%)' },
-  // --- 暗色系 ---
-  midnight:{ name: '午夜深邃', group: 'dark', dark: true, primary: '#6366F1', primaryLight: '#818CF8', primaryDark: '#4F46E5', accent: '#FBBF24', accentLight: '#FDE68A', bg: '#0F1117', bgCard: '#181B25', bgSidebar: '#12141C', textPrimary: '#E8EAF0', textSecondary: '#8A8FA8', textMuted: '#5A5F78', border: '#262A38', borderLight: '#1E2230', headerGrad: 'linear-gradient(160deg,#1A1D2E 0%,#0F1117 100%)' },
-  charcoal:{ name: '碳黑質感', group: 'dark', dark: true, primary: '#10B981', primaryLight: '#34D399', primaryDark: '#059669', accent: '#F59E0B', accentLight: '#FBBF24', bg: '#111111', bgCard: '#1A1A1A', bgSidebar: '#151515', textPrimary: '#E5E5E5', textSecondary: '#888888', textMuted: '#555555', border: '#2A2A2A', borderLight: '#222222', headerGrad: 'linear-gradient(160deg,#1A1A1A 0%,#111111 100%)' },
-  darkocean:{ name: '深海幽藍', group: 'dark', dark: true, primary: '#06B6D4', primaryLight: '#22D3EE', primaryDark: '#0891B2', accent: '#F472B6', accentLight: '#FBCFE8', bg: '#0B1120', bgCard: '#111828', bgSidebar: '#0E1520', textPrimary: '#E0E8F0', textSecondary: '#7090AA', textMuted: '#406080', border: '#1C2838', borderLight: '#162030', headerGrad: 'linear-gradient(160deg,#111828 0%,#0B1120 100%)' },
-  darkrose:{ name: '暗夜玫瑰', group: 'dark', dark: true, primary: '#F43F5E', primaryLight: '#FB7185', primaryDark: '#E11D48', accent: '#A78BFA', accentLight: '#C4B5FD', bg: '#110B10', bgCard: '#1A1218', bgSidebar: '#140E12', textPrimary: '#F0E0E8', textSecondary: '#A07888', textMuted: '#684858', border: '#2A1E28', borderLight: '#221820', headerGrad: 'linear-gradient(160deg,#1A1218 0%,#110B10 100%)' },
-  noir:    { name: '極致純黑', group: 'dark', dark: true, primary: '#E2E8F0', primaryLight: '#F1F5F9', primaryDark: '#CBD5E1', accent: '#FBBF24', accentLight: '#FDE68A', bg: '#000000', bgCard: '#0A0A0A', bgSidebar: '#050505', textPrimary: '#F0F0F0', textSecondary: '#808080', textMuted: '#484848', border: '#1A1A1A', borderLight: '#121212', headerGrad: 'linear-gradient(160deg,#0A0A0A 0%,#000000 100%)' },
 };
 
 function applyTheme(name) {
@@ -1448,26 +1442,25 @@ function applyTheme(name) {
   if (t.headerGrad) {
     r.setProperty('--header-gradient', t.headerGrad);
   }
-  // Dark theme: update shadows for dark backgrounds
-  if (t.dark) {
-    r.setProperty('--shadow-sm', '0 1px 4px rgba(0,0,0,0.2)');
-    r.setProperty('--shadow-md', '0 4px 16px rgba(0,0,0,0.3)');
-    r.setProperty('--shadow-lg', '0 8px 30px rgba(0,0,0,0.35)');
-    r.setProperty('--shadow-xl', '0 16px 48px rgba(0,0,0,0.4)');
-  } else {
-    r.setProperty('--shadow-sm', '0 1px 4px rgba(0,0,0,0.05)');
-    r.setProperty('--shadow-md', '0 4px 16px rgba(0,0,0,0.07)');
-    r.setProperty('--shadow-lg', '0 8px 30px rgba(0,0,0,0.10)');
-    r.setProperty('--shadow-xl', '0 16px 48px rgba(0,0,0,0.14)');
-  }
+  r.setProperty('--shadow-sm', '0 1px 4px rgba(0,0,0,0.05)');
+  r.setProperty('--shadow-md', '0 4px 16px rgba(0,0,0,0.07)');
+  r.setProperty('--shadow-lg', '0 8px 30px rgba(0,0,0,0.10)');
+  r.setProperty('--shadow-xl', '0 16px 48px rgba(0,0,0,0.14)');
   // Menu cards use theme bg
   document.querySelectorAll('.menu-card, .featured-card').forEach(function(el) {
     el.style.background = t.bgCard;
-    if (t.dark) el.style.borderColor = t.border;
   });
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', t.primary);
   currentTheme = name;
   try { localStorage.setItem('selectedTheme', name); } catch(e) {}
+  // 重新套用濃淡（如果不是標準）
+  if (window._themeIntensity && window._themeIntensity !== 'standard') {
+    setTimeout(function() { setThemeIntensity(window._themeIntensity); }, 10);
+  }
+  // 重新套用花紋
+  if (window._themePattern && window._themePattern !== 'none') {
+    setTimeout(function() { setThemePattern(window._themePattern); }, 10);
+  }
   // Update theme panel active state if open
   document.querySelectorAll('.theme-card').forEach(function(c) {
     c.classList.toggle('active', c.getAttribute('onclick')?.includes("'" + name + "'"));
@@ -1475,6 +1468,89 @@ function applyTheme(name) {
 }
 
 let currentTheme = 'fire';
+
+// ── 色彩濃淡調整 ──
+function hexToRgb(hex) {
+  var r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+  return [r, g, b];
+}
+function mixColor(base, mix, amount) {
+  var b = hexToRgb(base), m = hexToRgb(mix);
+  var r = Math.round(b[0] + (m[0] - b[0]) * amount);
+  var g = Math.round(b[1] + (m[1] - b[1]) * amount);
+  var bl = Math.round(b[2] + (m[2] - b[2]) * amount);
+  return '#' + [r, g, bl].map(function(c) { return Math.max(0, Math.min(255, c)).toString(16).padStart(2, '0'); }).join('');
+}
+function setThemeIntensity(level) {
+  window._themeIntensity = level;
+  try { localStorage.setItem('themeIntensity', level); } catch(e) {}
+  var t = THEMES[currentTheme];
+  if (!t) return;
+  var r = document.documentElement.style;
+  var map = { lightest: 0.6, light: 0.3, standard: 0, rich: -0.2, richest: -0.4 };
+  var amt = map[level] || 0;
+  if (amt === 0) {
+    // 標準：還原原色
+    r.setProperty('--primary', t.primary);
+    r.setProperty('--primary-light', t.primaryLight);
+    r.setProperty('--primary-dark', t.primaryDark);
+    r.setProperty('--bg', t.bg);
+    r.setProperty('--bg-card', t.bgCard);
+    r.setProperty('--bg-sidebar', t.bgSidebar);
+  } else if (amt > 0) {
+    // 淡化：混白
+    r.setProperty('--primary', mixColor(t.primary, '#FFFFFF', amt));
+    r.setProperty('--primary-light', mixColor(t.primaryLight, '#FFFFFF', amt));
+    r.setProperty('--primary-dark', mixColor(t.primaryDark, '#FFFFFF', amt));
+    r.setProperty('--bg', mixColor(t.bg, '#FFFFFF', amt * 0.5));
+    r.setProperty('--bg-card', mixColor(t.bgCard, '#FFFFFF', amt * 0.5));
+    r.setProperty('--bg-sidebar', mixColor(t.bgSidebar, '#FFFFFF', amt * 0.5));
+  } else {
+    // 加濃：混黑
+    var a = Math.abs(amt);
+    r.setProperty('--primary', mixColor(t.primary, '#000000', a));
+    r.setProperty('--primary-light', mixColor(t.primaryLight, '#000000', a * 0.5));
+    r.setProperty('--primary-dark', mixColor(t.primaryDark, '#000000', a));
+    r.setProperty('--bg', mixColor(t.bg, '#000000', a * 0.08));
+    r.setProperty('--bg-card', mixColor(t.bgCard, '#000000', a * 0.05));
+    r.setProperty('--bg-sidebar', mixColor(t.bgSidebar, '#000000', a * 0.05));
+  }
+  // 更新面板按鈕狀態
+  renderThemePanel();
+}
+
+// ── 花紋背景 ──
+function setThemePattern(patternKey) {
+  window._themePattern = patternKey;
+  try { localStorage.setItem('themePattern', patternKey); } catch(e) {}
+  var body = document.body;
+  // 移除舊花紋
+  body.style.backgroundImage = '';
+  body.style.backgroundSize = '';
+  body.style.backgroundRepeat = '';
+  if (patternKey === 'none' || !patternKey) return;
+  var t = THEMES[currentTheme];
+  var c = t ? t.primary : 'var(--primary)';
+  var opacity = '0.06';
+  // 用 rgba 取代直接色碼，確保花紋不會太搶眼
+  var rgb = hexToRgb(t ? t.primary : '#E8430A');
+  var co = 'rgba(' + rgb[0] + ',' + rgb[1] + ',' + rgb[2] + ',' + opacity + ')';
+  var patternMap = {
+    dots:    { bg: 'radial-gradient(circle,' + co + ' 1px,transparent 1px)', size: '16px 16px' },
+    stripes: { bg: 'repeating-linear-gradient(45deg,' + co + ' 0,' + co + ' 1px,transparent 1px,transparent 8px)', size: 'auto' },
+    grid:    { bg: 'linear-gradient(' + co + ' 1px,transparent 1px),linear-gradient(90deg,' + co + ' 1px,transparent 1px)', size: '20px 20px' },
+    wave:    { bg: 'repeating-linear-gradient(135deg,' + co + ' 0,' + co + ' 2px,transparent 2px,transparent 10px)', size: 'auto' },
+    diamond: { bg: 'repeating-conic-gradient(' + co + ' 0% 25%,transparent 0% 50%) 0 0/16px 16px', size: '16px 16px' },
+    zigzag:  { bg: 'linear-gradient(135deg,' + co + ' 25%,transparent 25%) -7px 0/14px 14px,linear-gradient(225deg,' + co + ' 25%,transparent 25%) -7px 0/14px 14px', size: '14px 14px' }
+  };
+  var pat = patternMap[patternKey];
+  if (pat) {
+    body.style.backgroundImage = pat.bg;
+    if (pat.size !== 'auto') body.style.backgroundSize = pat.size;
+    body.style.backgroundRepeat = 'repeat';
+  }
+  renderThemePanel();
+}
 
 function toggleThemePanel() {
   var overlay = document.getElementById('themeOverlay');
@@ -1490,8 +1566,7 @@ function renderThemePanel() {
     { key: 'warm',    label: '\u{2600}\u{FE0F} \u6EAB\u6696\u7CFB' },
     { key: 'cool',    label: '\u{2744}\u{FE0F} \u6E05\u6DBC\u7CFB' },
     { key: 'nature',  label: '\u{1F33F} \u81EA\u7136\u7CFB' },
-    { key: 'special', label: '\u{2728} \u7279\u8272\u7CFB' },
-    { key: 'dark',    label: '\u{1F30C} \u6697\u8272\u7CFB' }
+    { key: 'special', label: '\u{2728} \u7279\u8272\u7CFB' }
   ];
   var html = '<div class="theme-panel-handle"></div>' +
     '<h4>\u{1F3A8} \u9078\u64C7\u98A8\u683C</h4>' +
@@ -1501,10 +1576,8 @@ function renderThemePanel() {
     Object.entries(THEMES).forEach(function(entry) {
       var key = entry[0], t = entry[1];
       if (t.group !== g.key) return;
-      var cardBg = t.dark ? t.bgCard : t.bg;
-      var isDark = t.dark ? ' theme-card-dark' : '';
-      html += '<div class="theme-card' + (key === currentTheme ? ' active' : '') + isDark + '" ' +
-        'style="background:' + cardBg + ';" onclick="applyTheme(\'' + key + '\')">' +
+      html += '<div class="theme-card' + (key === currentTheme ? ' active' : '') + '" ' +
+        'style="background:' + t.bg + ';" onclick="applyTheme(\'' + key + '\')">' +
         '<div style="height:28px;border-radius:8px;margin-bottom:8px;' + (t.headerGrad ? 'background:' + t.headerGrad : 'background:' + t.primary) + ';"></div>' +
         '<div class="theme-card-dots">' +
           '<div class="theme-card-dot" style="background:' + t.primary + ';"></div>' +
@@ -1515,6 +1588,45 @@ function renderThemePanel() {
     });
     html += '</div>';
   });
+  // ── 濃淡調整 ──
+  var curIntensity = window._themeIntensity || 'standard';
+  var intensityLevels = [
+    { key: 'lightest', label: '最淡' },
+    { key: 'light',    label: '淡' },
+    { key: 'standard', label: '標準' },
+    { key: 'rich',     label: '濃' },
+    { key: 'richest',  label: '最濃' }
+  ];
+  html += '<div style="font-size:12px;font-weight:700;color:var(--text-secondary);margin:16px 0 8px;padding-left:4px;">\u{1F3A8} \u8272\u5F69\u6FC3\u6DE1</div>';
+  html += '<div style="display:flex;gap:6px;flex-wrap:wrap;">';
+  intensityLevels.forEach(function(lv) {
+    var isActive = lv.key === curIntensity;
+    html += '<button onclick="setThemeIntensity(\'' + lv.key + '\')" style="flex:1;min-width:52px;padding:8px 4px;border-radius:10px;font-size:12px;font-weight:' + (isActive ? '700' : '500') + ';cursor:pointer;border:2px solid ' + (isActive ? 'var(--primary)' : 'var(--border)') + ';background:' + (isActive ? 'var(--primary)' : 'var(--bg-card)') + ';color:' + (isActive ? '#fff' : 'var(--text-secondary)') + ';">' + lv.label + '</button>';
+  });
+  html += '</div>';
+
+  // ── 花紋背景 ──
+  var curPattern = window._themePattern || 'none';
+  var patterns = [
+    { key: 'none',     label: '\u274C \u7121',     preview: '' },
+    { key: 'dots',     label: '\u25CF \u5713\u9EDE',     preview: 'radial-gradient(circle,var(--primary) 1px,transparent 1px)' },
+    { key: 'stripes',  label: '\u2571 \u659C\u7DDA',  preview: 'repeating-linear-gradient(45deg,var(--primary) 0,var(--primary) 1px,transparent 1px,transparent 6px)' },
+    { key: 'grid',     label: '\u25A6 \u683C\u7D0B',     preview: 'linear-gradient(var(--primary) 1px,transparent 1px),linear-gradient(90deg,var(--primary) 1px,transparent 1px)' },
+    { key: 'wave',     label: '\u223F \u6CE2\u6D6A',     preview: 'repeating-linear-gradient(135deg,var(--primary) 0,var(--primary) 2px,transparent 2px,transparent 8px)' },
+    { key: 'diamond',  label: '\u25C7 \u83F1\u5F62',  preview: 'repeating-conic-gradient(var(--primary) 0% 25%,transparent 0% 50%) 0 0/14px 14px' },
+    { key: 'zigzag',   label: '\u2A3E \u92F8\u9F52',   preview: 'linear-gradient(135deg,var(--primary) 25%,transparent 25%) -7px 0/14px 14px,linear-gradient(225deg,var(--primary) 25%,transparent 25%) -7px 0/14px 14px' }
+  ];
+  html += '<div style="font-size:12px;font-weight:700;color:var(--text-secondary);margin:16px 0 8px;padding-left:4px;">\u{1F48E} \u82B1\u7D0B\u80CC\u666F</div>';
+  html += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">';
+  patterns.forEach(function(p) {
+    var isActive = p.key === curPattern;
+    var border = isActive ? '2px solid var(--primary)' : '2px solid var(--border)';
+    var bg = p.preview ? p.preview : 'var(--bg-card)';
+    html += '<div onclick="setThemePattern(\'' + p.key + '\')" style="cursor:pointer;border-radius:10px;border:' + border + ';padding:6px;text-align:center;background-size:10px 10px;' + (p.preview ? 'background:' + bg + ';background-size:10px 10px;' : '') + '">' +
+      '<div style="font-size:11px;font-weight:' + (isActive ? '700' : '500') + ';color:' + (isActive ? 'var(--primary)' : 'var(--text-secondary)') + ';">' + p.label + '</div></div>';
+  });
+  html += '</div>';
+
   // 預覽模式才顯示儲存按鈕
   if (!window._orderMode) {
     html += '<div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border);">' +
@@ -1562,7 +1674,11 @@ async function saveThemeToStore() {
     var res = await fetch(SUPABASE_URL + '/rest/v1/store_profiles?id=eq.' + currentStoreId, {
       method: 'PATCH',
       headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
-      body: JSON.stringify({ theme_color: currentTheme })
+      body: JSON.stringify({
+        theme_color: currentTheme,
+        theme_intensity: window._themeIntensity || 'standard',
+        theme_pattern: window._themePattern || 'none'
+      })
     });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     showToast('✅ 風格已儲存！所有消費者將看到「' + t.name + '」');
@@ -1683,6 +1799,13 @@ async function initApp() {
   const urlTheme = params.get('theme');
   const savedTheme = localStorage.getItem('selectedTheme');
   applyTheme(urlTheme || savedTheme || 'fire');
+  // 載入濃淡 + 花紋
+  try {
+    var savedIntensity = localStorage.getItem('themeIntensity');
+    if (savedIntensity && savedIntensity !== 'standard') { window._themeIntensity = savedIntensity; setThemeIntensity(savedIntensity); }
+    var savedPattern = localStorage.getItem('themePattern');
+    if (savedPattern && savedPattern !== 'none') { window._themePattern = savedPattern; setThemePattern(savedPattern); }
+  } catch(e) {}
 
   try {
     if (storeSlug) {
@@ -1774,9 +1897,17 @@ async function loadStoreFromSupabase(slug) {
   // 品牌形象 DM
   renderBrandHero(store);
 
-  // 套用商店主題色
+  // 套用商店主題色 + 濃淡 + 花紋
   if (store.theme_color) {
     applyStoreThemeColor(store.theme_color);
+  }
+  if (store.theme_intensity && store.theme_intensity !== 'standard') {
+    window._themeIntensity = store.theme_intensity;
+    setThemeIntensity(store.theme_intensity);
+  }
+  if (store.theme_pattern && store.theme_pattern !== 'none') {
+    window._themePattern = store.theme_pattern;
+    setThemePattern(store.theme_pattern);
   }
 
   // 不接受訂單時顯示提示
