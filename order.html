@@ -1169,6 +1169,7 @@ body {
 }
 .animate-in { animation: fadeInUp 0.4s ease-out both; }
 .menu-item { animation: fadeInUp 0.35s ease-out both; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
 </style>
 </head>
 <body>
@@ -3604,6 +3605,15 @@ async function confirmAndSubmitOrder() {
 
 function showOrderSuccess(qty, price, table, orderNum, earnedPts) {
   const isTakeout = table === '外帶';
+
+  // 記錄本次訂單，清空購物車
+  if (orderNum) {
+    if (!window._myOrders) window._myOrders = [];
+    window._myOrders.push({ orderNum: orderNum, time: new Date(), qty: qty, total: price, status: 'pending', table: table });
+  }
+  cart = [];
+  updateCartUI();
+  showMyOrdersBtn();
   const pointsHtml = earnedPts > 0 ? '<div style="background:#FEF3C7;border-radius:10px;padding:8px 16px;margin-bottom:16px;display:inline-block;font-size:13px;color:#92400E;">🎯 本次獲得 <b>' + earnedPts + '</b> 點</div>' : '';
   const overlay = document.getElementById('itemModalOverlay');
   overlay.innerHTML = '<div class="item-modal" onclick="event.stopPropagation()" style="text-align:center; padding: 40px 20px;">' +
@@ -3613,7 +3623,10 @@ function showOrderSuccess(qty, price, table, orderNum, earnedPts) {
     '<p style="color:#666; font-size:14px; margin-bottom:20px;">' + (isTakeout ? '外帶' : '桌號 ' + table) + '&#12288;' + qty + ' 道菜品&#12288;合計 $' + price + '</p>' +
     pointsHtml +
     '<p style="color:#999; font-size:12px; margin-bottom:24px;">' + (isTakeout ? '請至櫃檯等候叫號取餐' : '廚房正在準備您的餐點，請稍候') + '</p>' +
-    '<button onclick="resetOrder()" style="background: var(--primary); color: white; border: none; padding: 14px 40px; border-radius: 12px; font-size: 15px; font-weight: 700; cursor: pointer; font-family: inherit;">繼續點餐</button></div>';
+    '<div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">' +
+    '<button onclick="showMyOrdersPanel()" style="background:#fff; color:var(--primary); border:2px solid var(--primary); padding:14px 24px; border-radius:12px; font-size:14px; font-weight:700; cursor:pointer; font-family:inherit;">📋 查看訂單</button>' +
+    '<button onclick="resetOrder()" style="background:var(--primary); color:white; border:none; padding:14px 24px; border-radius:12px; font-size:14px; font-weight:700; cursor:pointer; font-family:inherit;">🍽️ 繼續點餐</button>' +
+    '</div></div>';
   overlay.classList.add('show');
   document.getElementById('cartOverlay').classList.remove('show');
   document.getElementById('cartDrawer').classList.remove('show');
@@ -3634,6 +3647,98 @@ function resetOrder() {
       '<div class="modal-qty-area"><div class="qty-control"><button class="qty-btn minus" onclick="modalQtyChange(-1)">&#8722;</button><span class="qty-num" id="modalQty">1</span><button class="qty-btn" onclick="modalQtyChange(1)">+</button></div></div>' +
       '<button class="modal-add-cart" onclick="modalAddToCart()">加入購物車</button></div></div>';
   }, 400);
+}
+
+// ===== MY ORDERS (訂單追蹤) =====
+function showMyOrdersBtn() {
+  var btn = document.getElementById('myOrdersBtn');
+  if (!window._myOrders || window._myOrders.length === 0) { btn.style.display = 'none'; return; }
+  btn.style.display = 'block';
+  var activeCount = window._myOrders.filter(function(o) { return o.status !== 'completed' && o.status !== 'cancelled'; }).length;
+  var badge = document.getElementById('myOrdersBadge');
+  if (activeCount > 0) { badge.textContent = activeCount; badge.style.display = 'block'; }
+  else { badge.style.display = 'none'; }
+}
+
+function showMyOrdersPanel() {
+  document.getElementById('itemModalOverlay').classList.remove('show');
+  var overlay = document.getElementById('myOrdersOverlay');
+  var panel = document.getElementById('myOrdersPanel');
+  overlay.style.display = 'block';
+  panel.style.display = 'block';
+  requestAnimationFrame(function() { panel.style.transform = 'translateY(0)'; });
+  renderMyOrders();
+  if (window._orderPollTimer) clearInterval(window._orderPollTimer);
+  window._orderPollTimer = setInterval(pollMyOrders, 8000);
+  pollMyOrders();
+}
+
+function closeMyOrdersPanel() {
+  var panel = document.getElementById('myOrdersPanel');
+  panel.style.transform = 'translateY(100%)';
+  setTimeout(function() {
+    document.getElementById('myOrdersOverlay').style.display = 'none';
+    panel.style.display = 'none';
+  }, 350);
+  if (window._orderPollTimer) { clearInterval(window._orderPollTimer); window._orderPollTimer = null; }
+}
+
+var ORDER_STATUS_MAP = {
+  pending:    { icon: '🕐', text: '等待確認', color: '#F59E0B', bg: '#FFFBEB' },
+  confirmed:  { icon: '✅', text: '已確認',   color: '#3B82F6', bg: '#EFF6FF' },
+  preparing:  { icon: '🍳', text: '準備中',   color: '#8B5CF6', bg: '#F5F3FF' },
+  ready:      { icon: '🔔', text: '可取餐',   color: '#10B981', bg: '#ECFDF5' },
+  completed:  { icon: '✅', text: '已完成',   color: '#6B7280', bg: '#F3F4F6' },
+  cancelled:  { icon: '❌', text: '已取消',   color: '#EF4444', bg: '#FEF2F2' }
+};
+
+function renderMyOrders() {
+  var list = document.getElementById('myOrdersList');
+  if (!window._myOrders || window._myOrders.length === 0) {
+    list.innerHTML = '<div style="text-align:center;padding:24px;color:#94A3B8;">目前沒有訂單</div>';
+    return;
+  }
+  var sorted = window._myOrders.slice().reverse();
+  list.innerHTML = sorted.map(function(o) {
+    var s = ORDER_STATUS_MAP[o.status] || ORDER_STATUS_MAP.pending;
+    var timeStr = o.time ? new Date(o.time).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' }) : '';
+    var isActive = o.status !== 'completed' && o.status !== 'cancelled';
+    return '<div style="background:' + s.bg + ';border-radius:14px;padding:16px;margin-bottom:10px;' + (isActive ? 'border:2px solid ' + s.color + ';' : 'opacity:0.7;') + '">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">' +
+        '<div style="font-size:20px;font-weight:900;color:' + s.color + ';">#' + escHtml(String(o.orderNum)) + '</div>' +
+        '<div style="font-size:13px;font-weight:700;color:' + s.color + ';background:' + s.color + '22;padding:4px 10px;border-radius:20px;">' + s.icon + ' ' + s.text + '</div>' +
+      '</div>' +
+      '<div style="display:flex;justify-content:space-between;font-size:13px;color:#64748B;">' +
+        '<span>' + (o.table === '外帶' ? '🛍️ 外帶' : '🍽️ ' + escHtml(String(o.table))) + '・' + o.qty + ' 件</span>' +
+        '<span>$' + o.total + '・' + timeStr + '</span>' +
+      '</div>' +
+      (isActive && o.status === 'ready' ? '<div style="text-align:center;margin-top:10px;font-size:14px;font-weight:700;color:#10B981;animation:pulse 1.5s infinite;">🔔 您的餐點已準備好，請取餐！</div>' : '') +
+    '</div>';
+  }).join('');
+}
+
+async function pollMyOrders() {
+  if (!window._myOrders || window._myOrders.length === 0 || !currentStoreId) return;
+  var activeOrders = window._myOrders.filter(function(o) { return o.status !== 'completed' && o.status !== 'cancelled'; });
+  if (activeOrders.length === 0) return;
+  try {
+    var orderNums = activeOrders.map(function(o) { return o.orderNum; });
+    var url = SUPABASE_URL + '/rest/v1/orders?store_id=eq.' + currentStoreId + '&order_number=in.(' + orderNums.join(',') + ')&select=order_number,status';
+    var res = await fetch(url, { headers: { 'apikey': SUPABASE_KEY } });
+    if (!res.ok) return;
+    var data = await res.json();
+    var changed = false;
+    (data || []).forEach(function(d) {
+      var found = window._myOrders.find(function(o) { return String(o.orderNum) === String(d.order_number); });
+      if (found && found.status !== d.status) {
+        found.status = d.status;
+        changed = true;
+        var s = ORDER_STATUS_MAP[d.status] || {};
+        showToast(s.icon + ' #' + d.order_number + ' ' + (s.text || d.status));
+      }
+    });
+    if (changed) { renderMyOrders(); showMyOrdersBtn(); }
+  } catch(e) { /* 靜默 */ }
 }
 
 function showToast(msg) {
@@ -3712,5 +3817,19 @@ async function awardLoyaltyPoints(orderTotal) {
   } catch(e) { console.warn('Award points error:', e); return 0; }
 }
 </script>
+
+<!-- ===== MY ORDERS FLOATING BTN + PANEL ===== -->
+<div id="myOrdersBtn" style="display:none; position:fixed; bottom:90px; right:16px; z-index:800; background:var(--primary); color:#fff; width:52px; height:52px; border-radius:50%; box-shadow:0 4px 16px rgba(0,0,0,0.2); cursor:pointer; font-size:20px; font-weight:700; text-align:center; line-height:52px;" onclick="showMyOrdersPanel()">
+  📋
+  <span id="myOrdersBadge" style="position:absolute;top:-4px;right:-4px;background:#EF4444;color:#fff;font-size:11px;font-weight:700;min-width:18px;height:18px;border-radius:9px;line-height:18px;text-align:center;padding:0 4px;display:none;"></span>
+</div>
+
+<div id="myOrdersOverlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:900;" onclick="closeMyOrdersPanel()"></div>
+<div id="myOrdersPanel" style="display:none; position:fixed; bottom:0; left:0; right:0; z-index:901; background:#fff; border-radius:20px 20px 0 0; max-height:70vh; overflow-y:auto; box-shadow:0 -8px 30px rgba(0,0,0,0.15); padding:20px; transform:translateY(100%); transition:transform 0.35s cubic-bezier(0.32,0.72,0,1);">
+  <div style="width:40px;height:4px;background:#DDD;border-radius:2px;margin:0 auto 16px;"></div>
+  <h3 style="font-size:18px;font-weight:800;margin:0 0 16px;">📋 我的訂單</h3>
+  <div id="myOrdersList"></div>
+</div>
+
 </body>
 </html>
