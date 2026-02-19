@@ -17,7 +17,7 @@
     <div class="container">
         <!-- 便當訂購頁面 -->
         <div id="lunchPage" class="page active">
-            <button class="btn btn-secondary" onclick="window.location.href='index.html'" class="btn-auto-mb">← 返回</button>
+            <button class="btn btn-secondary btn-auto-mb" onclick="window.location.href='index.html'">← 返回</button>
             <div class="checkin-page">
                 <h2>🍱 便當訂購</h2>
                 <div class="lunar-notice" id="lunarNotice">🌙 明天是農曆初一/十五，建議訂購素食</div>
@@ -351,7 +351,7 @@
 
         <!-- 系統設定頁面 -->
         <div id="settingsPage" class="page">
-            <button class="btn btn-secondary" onclick="window.location.href='index.html'" class="btn-auto-mb">← 返回</button>
+            <button class="btn btn-secondary btn-auto-mb" onclick="window.location.href='index.html'">← 返回</button>
             <div class="checkin-page">
                 <h2>⚙️ 系統設定</h2>
                 
@@ -753,7 +753,12 @@
             if (dateEl) dateEl.textContent = getTaiwanDate();
             fwPhotoUrls = [];
             fwCurrentLogId = null;
-            await Promise.all([loadClients(), loadServiceItems(), loadFieldWorkLogs()]);
+            try {
+                await Promise.all([loadClients(), loadServiceItems(), loadFieldWorkLogs()]);
+            } catch(e) {
+                console.error('外勤頁面初始化失敗', e);
+                showToast('⚠️ 部分資料載入失敗，請重新整理');
+            }
         }
 
         async function loadClients() {
@@ -860,7 +865,7 @@
         }
 
         function renderFwItemCard(s, on) {
-            return `<div class="fwItemCard" data-id="${s.id}" onclick="toggleProductCard(this)" style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:${on ? '#F5F3FF' : '#fff'};border:2px solid ${on ? '#4F46E5' : '#E5E7EB'};border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;transition:all 0.2s;">
+            return `<div class="fwItemCard" data-id="${s.id}" data-selected="${on ? 'true' : 'false'}" onclick="toggleProductCard(this)" style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:${on ? '#F5F3FF' : '#fff'};border:2px solid ${on ? '#4F46E5' : '#E5E7EB'};border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;transition:all 0.2s;">
                 <div style="width:22px;height:22px;border:2px solid ${on ? '#4F46E5' : '#CBD5E1'};border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:${on ? '#4F46E5' : '#fff'};color:#fff;font-size:14px;transition:all 0.2s;">${on ? '✓' : ''}</div>
                 <span style="flex:1;">${escapeHTML(s.name)}</span>
                 <span onclick="event.stopPropagation();editFwItem('${s.id}')" style="font-size:14px;opacity:0.4;padding:2px;">✏️</span>
@@ -1067,7 +1072,7 @@
         function getSelectedFwItems() {
             const ids = [];
             document.querySelectorAll('.fwItemCard').forEach(card => {
-                if (card.style.borderColor === 'rgb(79, 70, 229)') ids.push(card.dataset.id);
+                if (card.dataset.selected === 'true') ids.push(card.dataset.id);
             });
             return ids;
         }
@@ -1233,6 +1238,11 @@
         async function fwHandleFileSelect(event) {
             const file = event.target.files[0];
             if (!file) return;
+            if (file.size > 20 * 1024 * 1024) {
+                showToast('⚠️ 檔案過大（上限 20MB）');
+                event.target.value = '';
+                return;
+            }
             try {
                 showToast('☁️ 上傳中...');
                 // 壓縮
@@ -1272,7 +1282,7 @@
             if (!el) return;
             el.innerHTML = fwPhotoUrls.map((url, i) =>
                 `<div style="position:relative;width:80px;height:80px;">
-                    <img src="${url}" style="width:80px;height:80px;object-fit:cover;border-radius:8px;border:1px solid #E2E8F0;">
+                    <img src="${escapeHTML(url)}" style="width:80px;height:80px;object-fit:cover;border-radius:8px;border:1px solid #E2E8F0;">
                     <button onclick="fwRemovePhoto(${i})" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#EF4444;color:#fff;border:none;font-size:12px;cursor:pointer;line-height:20px;text-align:center;">×</button>
                 </div>`
             ).join('');
@@ -1626,7 +1636,7 @@
         }
 
         function renderSaItemCard(s, on) {
-            return `<div class="saProductCard" data-id="${s.id}" onclick="toggleProductCard(this)" style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:${on ? '#F5F3FF' : '#fff'};border:2px solid ${on ? '#4F46E5' : '#E5E7EB'};border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;transition:all 0.2s;">
+            return `<div class="saProductCard" data-id="${s.id}" data-selected="${on ? 'true' : 'false'}" onclick="toggleProductCard(this)" style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:${on ? '#F5F3FF' : '#fff'};border:2px solid ${on ? '#4F46E5' : '#E5E7EB'};border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;transition:all 0.2s;">
                 <div style="width:22px;height:22px;border:2px solid ${on ? '#4F46E5' : '#CBD5E1'};border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:${on ? '#4F46E5' : '#fff'};color:#fff;font-size:14px;transition:all 0.2s;">${on ? '✓' : ''}</div>
                 <span style="flex:1;">${escapeHTML(s.name)}</span>
                 <span onclick="event.stopPropagation();editFwItem('${s.id}')" style="font-size:14px;opacity:0.4;padding:2px;">✏️</span>
@@ -1635,11 +1645,13 @@
 
         function toggleProductCard(card) {
             const box = card.querySelector('div');
-            const isOn = card.style.borderColor === 'rgb(79, 70, 229)';
+            const isOn = card.dataset.selected === 'true';
             if (isOn) {
+                card.dataset.selected = 'false';
                 card.style.borderColor = '#E5E7EB'; card.style.background = '#fff';
                 box.style.borderColor = '#CBD5E1'; box.style.background = '#fff'; box.textContent = '';
             } else {
+                card.dataset.selected = 'true';
                 card.style.borderColor = '#4F46E5'; card.style.background = '#F5F3FF';
                 box.style.borderColor = '#4F46E5'; box.style.background = '#4F46E5'; box.textContent = '✓';
             }
@@ -1691,7 +1703,7 @@
             // 收集勾選的產品
             const checkedProducts = [];
             document.querySelectorAll('.saProductCard').forEach(card => {
-                if (card.style.borderColor === 'rgb(79, 70, 229)') checkedProducts.push(card.dataset.id);
+                if (card.dataset.selected === 'true') checkedProducts.push(card.dataset.id);
             });
             // 儲存本次勾選，供下次預設
             localStorage.setItem('sa_last_products', JSON.stringify(checkedProducts));

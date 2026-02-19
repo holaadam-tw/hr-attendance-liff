@@ -205,6 +205,12 @@ async function checkUserStatus() {
             const savedCompany = savedCompanyId && managedCompanies.find(c => c.id === savedCompanyId);
             const selected = savedCompany || managedCompanies[0];
 
+            if (!selected) {
+                if (loadingEl) loadingEl.style.display = 'none';
+                showToast('⚠️ 尚無可管理的公司');
+                return false;
+            }
+
             if (selected) {
                 currentCompanyId = selected.id;
                 currentCompanyFeatures = selected.features;
@@ -510,26 +516,6 @@ async function loadLunchSummary() {
         if (el('regularCount')) el('regularCount').textContent = regularCount;
     } catch(e) {
         console.error('便當統計失敗', e);
-    }
-}
-
-async function submitLunchOrder() {
-    if (!currentEmployee) return showToast('❌ 請先登入');
-    const date = document.getElementById('lunchDate')?.value;
-    const isVeg = document.getElementById('lunchVegetarian')?.checked;
-    const notes = document.getElementById('lunchNotes')?.value;
-    if (!date) return showToast('請選擇日期');
-    
-    try {
-        const { data, error } = await sb.rpc('order_lunch', {
-            p_line_user_id: liffProfile.userId,
-            p_order_date: date, p_is_vegetarian: isVeg, p_special_requirements: notes
-        });
-        if (error) throw error;
-        showToast('✅ 訂購成功'); 
-        loadLunchSummary();
-    } catch(e) { 
-        showToast('❌ 訂購失敗：' + friendlyError(e)); 
     }
 }
 
