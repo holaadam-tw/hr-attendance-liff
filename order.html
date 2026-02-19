@@ -1817,7 +1817,7 @@ async function loadStoreFromSupabase(slug) {
       icon = emojiMatch[1];
       name = name.substring(emojiMatch[0].length);
     }
-    return { id: c.id, name: name, icon: icon, sort: c.sort_order };
+    return { id: c.id, name: name, icon: icon, sort: c.sort_order, translations: c.name_translations || {} };
   });
 
   // 3. 載入品項
@@ -1844,7 +1844,9 @@ async function loadStoreFromSupabase(slug) {
       price: i.price, category: i.category_id,
       image: i.image_url || '', tags: tags,
       spicy: 0, featured: featured, sizes: sizes,
-      options: opts  // 保留完整 options 供 modal 使用
+      options: opts,  // 保留完整 options 供 modal 使用
+      translations: i.name_translations || {},
+      descTranslations: i.desc_translations || {}
     };
   });
 }
@@ -2078,13 +2080,26 @@ function translateFoodName(name, lang) {
 
 function getTranslatedName(item) {
   if (currentLang === 'zh') return '';
-  // 如果 desc 中有目標語言，解析出來
+  // 優先：DB name_translations 欄位（精確翻譯）
+  if (item.translations && item.translations[currentLang]) {
+    return item.translations[currentLang];
+  }
+  // 次選：description 中解析
   if (item.desc) {
     var parts = item.desc.split('/').map(function(s) { return s.trim(); });
     if (currentLang === 'en' && parts.length >= 1 && /[a-zA-Z]/.test(parts[0])) return parts[0];
     if (currentLang === 'vi' && parts.length >= 2) return parts[parts.length - 1];
   }
+  // 最後：FOOD_DICT 關鍵字替換（fallback）
   return translateFoodName(item.name, currentLang);
+}
+
+function getTranslatedCatName(cat) {
+  if (currentLang === 'zh') return cat.name;
+  if (cat.translations && cat.translations[currentLang]) {
+    return cat.translations[currentLang];
+  }
+  return cat.name;
 }
 
 function toggleLangMenu() {
@@ -2936,7 +2951,7 @@ function renderSidebar() {
   sidebar.innerHTML = categories.map((cat, i) =>
     '<div class="cat-item ' + (i === 0 ? 'active' : '') + '" data-cat="' + cat.id + '" onclick="scrollToCategory(\'' + cat.id + '\')">' +
       '<span class="cat-icon">' + escHtml(cat.icon) + '</span>' +
-      '<span class="cat-name">' + escHtml(cat.name) + '</span>' +
+      '<span class="cat-name">' + escHtml(getTranslatedCatName(cat)) + '</span>' +
       '<span class="cat-badge" id="catBadge_' + cat.id + '">0</span>' +
     '</div>'
   ).join('');
@@ -2962,7 +2977,7 @@ function renderMenuContent(filter) {
     if (items.length === 0 && filter) return;
 
     html += '<div class="category-section" id="catSection_' + cat.id + '" data-cat="' + cat.id + '">' +
-      '<div class="category-header"><span class="cat-emoji">' + escHtml(cat.icon) + '</span><h3>' + escHtml(cat.name) + '</h3><span class="count">' + items.length + ' 道</span>' +
+      '<div class="category-header"><span class="cat-emoji">' + escHtml(cat.icon) + '</span><h3>' + escHtml(getTranslatedCatName(cat)) + '</h3><span class="count">' + items.length + ' 道</span>' +
       '<div class="view-toggle"><button class="view-toggle-btn active" onclick="setViewMode(\'list\', this)" title="列表"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="0" y="1" width="14" height="2.5" rx="1" fill="currentColor"/><rect x="0" y="5.75" width="14" height="2.5" rx="1" fill="currentColor"/><rect x="0" y="10.5" width="14" height="2.5" rx="1" fill="currentColor"/></svg></button><button class="view-toggle-btn" onclick="setViewMode(\'grid\', this)" title="大圖"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="0" y="0" width="6" height="6" rx="1.5" fill="currentColor"/><rect x="8" y="0" width="6" height="6" rx="1.5" fill="currentColor"/><rect x="0" y="8" width="6" height="6" rx="1.5" fill="currentColor"/><rect x="8" y="8" width="6" height="6" rx="1.5" fill="currentColor"/></svg></button></div>' +
       '</div>' +
       (items.length === 0
