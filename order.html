@@ -806,7 +806,7 @@ body {
 <!-- ===== BOTTOM CART BAR ===== -->
 <div class="cart-bar hidden" id="cartBar">
   <div class="cart-inner">
-    <div class="cart-icon-wrap" onclick="toggleCartDrawer()">
+    <div class="cart-icon-wrap" onclick="toggleCartDrawer()" role="button" aria-label="開啟購物車">
       <div class="cart-icon">&#9635;</div>
       <span class="cart-count" id="cartCount">0</span>
     </div>
@@ -814,7 +814,7 @@ body {
       <div class="cart-items-text" id="cartItemsText">已選 0 件</div>
       <div class="cart-total"><span class="currency">$</span><span id="cartTotal">0</span></div>
     </div>
-    <button class="cart-submit" id="cartSubmit" onclick="submitOrder()">送出訂單 &#8594;</button>
+    <button class="cart-submit" id="cartSubmit" aria-label="送出訂單" onclick="submitOrder()">送出訂單 &#8594;</button>
   </div>
 </div>
 
@@ -824,7 +824,7 @@ body {
   <div class="drawer-handle"></div>
   <div class="drawer-header">
     <h3>&#9635; 已選菜品</h3>
-    <button class="drawer-clear" onclick="clearCart()">清空</button>
+    <button class="drawer-clear" aria-label="清空購物車" onclick="clearCart()">清空</button>
   </div>
   <div class="drawer-items" id="drawerItems"></div>
   <div class="drawer-footer">
@@ -832,7 +832,7 @@ body {
       <span class="drawer-total-label">合計</span>
       <span class="drawer-total-price"><span class="currency">$</span><span id="drawerTotal">0</span></span>
     </div>
-    <button class="drawer-submit" onclick="submitOrder()">送出訂單（<span id="drawerCount">0</span> 件）</button>
+    <button class="drawer-submit" aria-label="送出訂單" onclick="submitOrder()">送出訂單（<span id="drawerCount">0</span> 件）</button>
   </div>
 </div>
 
@@ -840,7 +840,7 @@ body {
 <div class="item-modal-overlay" id="itemModalOverlay" onclick="closeItemModal(event)">
   <div class="item-modal" onclick="event.stopPropagation()">
     <img class="modal-img" id="modalImg" src="" alt="">
-    <button class="modal-close" onclick="closeItemModal()">&#10005;</button>
+    <button class="modal-close" aria-label="關閉" onclick="closeItemModal()">&#10005;</button>
     <div class="modal-body">
       <div class="modal-name" id="modalName"></div>
       <div class="modal-desc" id="modalDesc"></div>
@@ -850,12 +850,12 @@ body {
       <div class="modal-price"><span class="currency">$</span><span id="modalPrice">0</span></div>
       <div class="modal-qty-area">
         <div class="qty-control">
-          <button class="qty-btn minus" onclick="modalQtyChange(-1)">&#8722;</button>
+          <button class="qty-btn minus" aria-label="減少數量" onclick="modalQtyChange(-1)">&#8722;</button>
           <span class="qty-num" id="modalQty">1</span>
-          <button class="qty-btn" onclick="modalQtyChange(1)">+</button>
+          <button class="qty-btn" aria-label="增加數量" onclick="modalQtyChange(1)">+</button>
         </div>
       </div>
-      <button class="modal-add-cart" onclick="modalAddToCart()">加入購物車</button>
+      <button class="modal-add-cart" aria-label="加入購物車" onclick="modalAddToCart()">加入購物車</button>
     </div>
   </div>
 </div>
@@ -1027,6 +1027,9 @@ async function saveThemeToStore() {
 document.addEventListener('keydown', function(e) {
   if (e.key === 'Escape') closeThemePanel();
 });
+
+// ===== UTILS =====
+function escHtml(s) { if (!s) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
 // ===== STATE =====
 let currentStoreId = null;
@@ -1246,8 +1249,11 @@ async function loadStoreFromSupabase(slug) {
   categories = (catData || []).filter(function(c) {
     // 若無設定時段，全天顯示
     if (!c.time_periods || !Array.isArray(c.time_periods) || c.time_periods.length === 0) return true;
-    // 檢查是否在任一時段內
-    return c.time_periods.some(function(p) { return nowHHMM >= p.from && nowHHMM <= p.to; });
+    // 檢查是否在任一時段內（支援跨午夜，如 22:00~02:00）
+    return c.time_periods.some(function(p) {
+      if (p.from <= p.to) return nowHHMM >= p.from && nowHHMM <= p.to;
+      return nowHHMM >= p.from || nowHHMM <= p.to;
+    });
   }).map(function(c) {
     var icon = ICONS.star;
     var name = c.name;
@@ -1388,11 +1394,11 @@ function qid(id) { return "'" + id + "'"; }
 function renderFeaturedCard(item) {
   const imgSrc = item.image || generatePlaceholder(item.name);
   return '<div class="featured-card" onclick="openItemModal(' + qid(item.id) + ')">' +
-    '<img class="featured-img" src="' + imgSrc + '" alt="' + item.name + '" onerror="this.src=\'' + generatePlaceholder(item.name) + '\'">' +
+    '<img class="featured-img" src="' + imgSrc + '" alt="' + escHtml(item.name) + '" onerror="this.src=\'' + generatePlaceholder(item.name) + '\'">' +
     '<span class="featured-badge">必點</span>' +
-    '<div class="featured-info"><div class="featured-name">' + item.name + '</div>' +
+    '<div class="featured-info"><div class="featured-name">' + escHtml(item.name) + '</div>' +
     '<div class="featured-price"><span class="currency">$</span>' + item.price + '</div></div>' +
-    '<button class="featured-add" onclick="event.stopPropagation(); addToCart(' + qid(item.id) + ', event)">+</button></div>';
+    '<button class="featured-add" aria-label="加入 ' + escHtml(item.name) + '" onclick="event.stopPropagation(); addToCart(' + qid(item.id) + ', event)">+</button></div>';
 }
 
 function renderMenuItem(item) {
@@ -1400,27 +1406,27 @@ function renderMenuItem(item) {
   const cartQty = getCartQty(item.id);
   const tagHtml = (item.tags || []).map(t => {
     const labels = { hot: '熱銷', new: '新品', chef: '主廚推薦', '推薦': '推薦', '套餐': '套餐' };
-    return '<span class="item-tag ' + t + '">' + (labels[t] || t) + '</span>';
+    return '<span class="item-tag ' + t + '">' + escHtml(labels[t] || t) + '</span>';
   }).join('');
   const spicyIcons = item.spicy > 0 ? ICONS.chili.repeat(Math.min(item.spicy, 3)) : '';
   let sizeHtml = '';
   if (item.sizes && item.sizes.length > 0) {
     sizeHtml = '<div class="item-sizes">' + item.sizes.map((s, i) =>
-      '<span class="size-option ' + (i === item.sizes.length - 1 ? 'active' : '') + '" onclick="event.stopPropagation(); selectSize(' + qid(item.id) + ', ' + i + ')">' + s.name + ' $' + s.price + '</span>'
+      '<span class="size-option ' + (i === item.sizes.length - 1 ? 'active' : '') + '" onclick="event.stopPropagation(); selectSize(' + qid(item.id) + ', ' + i + ')">' + escHtml(s.name) + ' $' + s.price + '</span>'
     ).join('') + '</div>';
   }
   return '<div class="menu-item" data-id="' + item.id + '" onclick="openItemModal(' + qid(item.id) + ')">' +
-    '<div class="item-img-wrap"><img class="item-img" src="' + imgSrc + '" alt="' + item.name + '" loading="lazy" onerror="this.src=\'' + generatePlaceholder(item.name) + '\'">' +
+    '<div class="item-img-wrap"><img class="item-img" src="' + imgSrc + '" alt="' + escHtml(item.name) + '" loading="lazy" onerror="this.src=\'' + generatePlaceholder(item.name) + '\'">' +
     (spicyIcons ? '<span class="item-spicy">' + spicyIcons + '</span>' : '') + '</div>' +
-    '<div class="item-info"><div class="item-name">' + item.name + '</div>' +
-    '<div class="item-desc">' + (item.desc || '') + '</div>' +
+    '<div class="item-info"><div class="item-name">' + escHtml(item.name) + '</div>' +
+    '<div class="item-desc">' + escHtml(item.desc) + '</div>' +
     (tagHtml ? '<div class="item-tags">' + tagHtml + '</div>' : '') +
     '<div class="item-bottom"><div class="item-price-area">' +
     '<div class="item-price"><span class="currency">$</span>' + getItemDisplayPrice(item) + '</div>' + sizeHtml + '</div>' +
     '<div class="item-actions" onclick="event.stopPropagation()">' +
     (cartQty > 0
-      ? '<div class="qty-control"><button class="qty-btn minus" onclick="changeQty(' + qid(item.id) + ', -1, event)">&#8722;</button><span class="qty-num">' + cartQty + '</span><button class="qty-btn" onclick="changeQty(' + qid(item.id) + ', 1, event)">+</button></div>'
-      : '<button class="add-btn" onclick="addToCart(' + qid(item.id) + ', event)">+</button>') +
+      ? '<div class="qty-control"><button class="qty-btn minus" aria-label="減少數量" onclick="changeQty(' + qid(item.id) + ', -1, event)">&#8722;</button><span class="qty-num">' + cartQty + '</span><button class="qty-btn" aria-label="增加數量" onclick="changeQty(' + qid(item.id) + ', 1, event)">+</button></div>'
+      : '<button class="add-btn" aria-label="加入 ' + escHtml(item.name) + '" onclick="addToCart(' + qid(item.id) + ', event)">+</button>') +
     '</div></div></div></div>';
 }
 
@@ -1513,7 +1519,7 @@ function promptGuestCount() {
 function addToCart(itemId, event) {
   const item = menuItems.find(i => i.id === itemId);
   if (!item) return;
-  const existing = cart.find(c => c.id === itemId && !c.sizeIdx);
+  const existing = cart.find(c => c.id === itemId && !c.optKey);
   if (existing) { existing.qty += 1; }
   else {
     const price = item.sizes ? item.sizes[item.sizes.length - 1].price : item.price;
@@ -1557,9 +1563,10 @@ function refreshItemDisplay(itemId) {
   if (!item) return;
   const actionsEl = itemEl.querySelector('.item-actions');
   const cartQty = getCartQty(itemId);
+  var itemName = item ? escHtml(item.name) : '';
   actionsEl.innerHTML = cartQty > 0
-    ? '<div class="qty-control"><button class="qty-btn minus" onclick="changeQty(' + qid(itemId) + ', -1, event)">&#8722;</button><span class="qty-num">' + cartQty + '</span><button class="qty-btn" onclick="changeQty(' + qid(itemId) + ', 1, event)">+</button></div>'
-    : '<button class="add-btn" onclick="addToCart(' + qid(itemId) + ', event)">+</button>';
+    ? '<div class="qty-control"><button class="qty-btn minus" aria-label="減少數量" onclick="changeQty(' + qid(itemId) + ', -1, event)">&#8722;</button><span class="qty-num">' + cartQty + '</span><button class="qty-btn" aria-label="增加數量" onclick="changeQty(' + qid(itemId) + ', 1, event)">+</button></div>'
+    : '<button class="add-btn" aria-label="加入 ' + itemName + '" onclick="addToCart(' + qid(itemId) + ', event)">+</button>';
 }
 
 function updateCartUI() {
@@ -1593,9 +1600,9 @@ function renderDrawerItems() {
     if (!item) return '';
     const imgSrc = item.image || generatePlaceholder(item.name);
     return '<div class="drawer-item">' +
-      '<img class="drawer-item-img" src="' + imgSrc + '" alt="' + item.name + '" onerror="this.src=\'' + generatePlaceholder(item.name) + '\'">' +
-      '<div class="drawer-item-info"><div class="drawer-item-name">' + item.name + '</div>' +
-      (c.optKey ? '<div class="drawer-item-size">' + c.optKey + '</div>' : '') +
+      '<img class="drawer-item-img" src="' + imgSrc + '" alt="' + escHtml(item.name) + '" onerror="this.src=\'' + generatePlaceholder(item.name) + '\'">' +
+      '<div class="drawer-item-info"><div class="drawer-item-name">' + escHtml(item.name) + '</div>' +
+      (c.optKey ? '<div class="drawer-item-size">' + escHtml(c.optKey) + '</div>' : '') +
       '<div class="drawer-item-price"><span class="currency">$</span>' + (c.price * c.qty) + '</div></div>' +
       '<div class="drawer-item-qty"><button class="drawer-qty-btn" onclick="changeCartIdx(' + idx + ', -1)">&#8722;</button>' +
       '<span class="drawer-qty-num">' + c.qty + '</span>' +
@@ -1774,8 +1781,8 @@ function submitOrder() {
     }
     listHtml += '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #F0F0F0;">' +
       '<div style="flex:1;min-width:0;">' +
-        '<div style="font-weight:700;font-size:15px;color:#1A1A2E;">' + name + '</div>' +
-        (detail ? '<div style="font-size:12px;color:#888;margin-top:2px;">' + detail + '</div>' : '') +
+        '<div style="font-weight:700;font-size:15px;color:#1A1A2E;">' + escHtml(name) + '</div>' +
+        (detail ? '<div style="font-size:12px;color:#888;margin-top:2px;">' + escHtml(detail) + '</div>' : '') +
       '</div>' +
       '<div style="text-align:right;white-space:nowrap;margin-left:12px;">' +
         '<span style="font-size:13px;color:#666;">x' + c.qty + '</span>' +
