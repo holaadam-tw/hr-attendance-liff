@@ -355,8 +355,8 @@
                         <div class="shift-day-label ${isToday ? 'today-label' : ''}">${dateLabel}${isToday ? ' ：' : '：'}</div>
                         <div class="shift-items">
                             <div class="shift-chip ${shift.code}">
-                                <span class="shift-chip-name">${shift.name}</span>
-                                <span class="shift-chip-time">${shift.time}</span>
+                                <span class="shift-chip-name">${escapeHTML(shift.name)}</span>
+                                <span class="shift-chip-time">${escapeHTML(shift.time)}</span>
                             </div>
                         </div>
                     </div>
@@ -389,7 +389,7 @@
                     .select('id, name, department').eq('is_active', true).neq('id', currentEmployee.id).order('name');
                 const sel = document.getElementById('swapTarget');
                 sel.innerHTML = '<option value="">-- 請選擇同事 --</option>';
-                (data||[]).forEach(e => { sel.innerHTML += `<option value="${e.id}">${e.name}（${e.department||''}）</option>`; });
+                (data||[]).forEach(e => { sel.innerHTML += `<option value="${e.id}">${escapeHTML(e.name)}（${escapeHTML(e.department||'')}）</option>`; });
             } catch(e) { showToast('❌ 載入同事失敗'); }
         }
         function closeSwapModal() { document.getElementById('swapModal').style.display = 'none'; }
@@ -449,10 +449,10 @@
                     return `
                     <div style="padding:10px 0;border-bottom:1px solid #F1F5F9;font-size:13px;">
                         <div style="display:flex;justify-content:space-between;align-items:center;">
-                            <span>📅 ${r.swap_date} · 🔄 ${otherName || '?'}</span>
+                            <span>📅 ${escapeHTML(r.swap_date)} · 🔄 ${escapeHTML(otherName || '?')}</span>
                             <span style="font-size:11px;padding:3px 8px;border-radius:6px;background:${statusColor[r.status]||'#eee'}20;color:${statusColor[r.status]||'#666'};font-weight:700;">${statusMap[r.status]||r.status}</span>
                         </div>
-                        <div style="font-size:11px;color:#64748B;margin-top:3px;">${r.requester_original_shift||''} ↔ ${r.target_original_shift||''}${r.reason ? ' · '+r.reason : ''}</div>
+                        <div style="font-size:11px;color:#64748B;margin-top:3px;">${escapeHTML(r.requester_original_shift||'')} ↔ ${escapeHTML(r.target_original_shift||'')}${r.reason ? ' · '+escapeHTML(r.reason) : ''}</div>
                         ${showAgree ? `
                             <div style="display:flex;gap:6px;margin-top:8px;">
                                 <button onclick="agreeSwap('${r.id}')" style="flex:1;padding:8px;border:none;border-radius:8px;background:#ECFDF5;color:#059669;font-weight:700;font-size:12px;cursor:pointer;">✅ 同意換班</button>

@@ -135,7 +135,7 @@
             </div>
 
             <!-- QR Code Modal -->
-            <div id="pQrModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:999;display:none;">
+            <div id="pQrModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:999;">
                 <div style="background:#fff;margin:80px auto;max-width:350px;border-radius:16px;padding:24px;text-align:center;">
                     <h3 style="margin-bottom:12px;">📱 員工綁定 QR Code</h3>
                     <div id="pQrCode" style="display:inline-block;margin-bottom:12px;"></div>
@@ -398,7 +398,7 @@
                     const { data: newComp, error } = await sb.from('companies').insert(row).select().single();
                     if (error) throw error;
                     // 自動連結平台管理員為 owner
-                    if (currentPlatformAdmin?.id && newComp.id) {
+                    if (currentPlatformAdmin?.id && newComp?.id) {
                         await sb.from('platform_admin_companies').insert({
                             platform_admin_id: currentPlatformAdmin.id,
                             company_id: newComp.id,
