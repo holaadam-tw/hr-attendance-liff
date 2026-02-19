@@ -171,14 +171,55 @@ body {
   .kds-header { padding:10px 14px; }
   .kds-header h1 { font-size:15px; }
 }
+/* 入單時間 */
+.kds-order-time { font-size:11px;color:var(--text-muted); }
+/* 訂單金額 */
+.kds-order-price { font-size:11px;color:var(--text-muted);margin-left:8px; }
+/* 多級緊急度 */
+.kds-timer.warning { background:#F59E0B;color:#000; }
+.kds-timer.critical { background:var(--danger);color:#fff;animation:pulse 0.8s infinite; }
+/* 嚴重超時卡片閃爍邊框 */
+.kds-card.kds-critical { animation:urgentBorder 1.5s infinite; }
+@keyframes urgentBorder {
+  0%,100% { border-color:var(--danger); box-shadow:0 0 0 0 rgba(239,68,68,0); }
+  50% { border-color:#FF6B6B; box-shadow:0 0 12px 2px rgba(239,68,68,0.3); }
+}
+/* 催單標記 */
+.kds-rush-tag {
+  display:inline-block;margin-left:6px;padding:2px 8px;border-radius:8px;
+  background:#EF4444;color:#fff;font-size:11px;font-weight:700;
+  animation:rushPulse 1s infinite;
+}
+@keyframes rushPulse {
+  0%,100% { opacity:1;transform:scale(1); }
+  50% { opacity:0.8;transform:scale(1.05); }
+}
+.kds-card.kds-rushed { box-shadow:0 0 16px rgba(239,68,68,0.4); }
+/* 已取消訂單 */
+.kds-card.status-cancelled { border-color:var(--danger); opacity:0.5; }
+.kds-card.status-cancelled .kds-card-header { background:rgba(239,68,68,0.15); position:relative; }
+.kds-card.status-cancelled .kds-card-header::after {
+  content:'已取消'; position:absolute; top:50%; left:50%;
+  transform:translate(-50%,-50%) rotate(-15deg);
+  font-size:28px; font-weight:900; color:var(--danger); opacity:0.3;
+  pointer-events:none;
+}
+/* 超時倒數警告 */
+.kds-timeout-warn {
+  text-align:center;padding:6px;margin-bottom:4px;
+  font-size:12px;font-weight:700;color:#F59E0B;
+  background:rgba(245,158,11,0.15);border-radius:6px;
+  animation:pulse 1.5s infinite;
+}
 </style>
 </head>
 <body>
 
 <header class="kds-header">
-  <div style="display:flex;align-items:center;">
+  <div style="display:flex;align-items:center;gap:12px;">
     <h1>KDS 廚房出單</h1>
     <span class="store-name" id="storeName"></span>
+    <span style="font-size:13px;color:var(--text-muted);margin-left:auto;" id="kdsClock"></span>
   </div>
   <div class="kds-controls">
     <button onclick="toggleFilter('all')" id="filterAll" class="active">全部</button>
@@ -194,6 +235,11 @@ body {
   <div class="kds-stat"><span class="dot" style="background:var(--confirmed)"></span>已確認 <span class="count" id="statConfirmed">0</span></div>
   <div class="kds-stat"><span class="dot" style="background:var(--preparing)"></span>準備中 <span class="count" id="statPreparing">0</span></div>
   <div class="kds-stat"><span class="dot" style="background:var(--ready)"></span>可取餐 <span class="count" id="statReady">0</span></div>
+  <div class="kds-stat" style="display:none;"><span class="dot" style="background:var(--danger)"></span>已取消 <span class="count" id="statCancelled" style="color:var(--danger);">0</span></div>
+  <div style="margin-left:auto;display:flex;gap:16px;align-items:center;">
+    <div class="kds-stat"><span style="font-size:12px;">⏱️ 平均</span> <span class="count" id="statAvgWait" style="color:#F59E0B;">0分</span></div>
+    <div class="kds-stat"><span style="font-size:12px;">📦 今日</span> <span class="count" id="statTodayTotal" style="color:#10B981;">0</span></div>
+  </div>
 </div>
 
 <div class="kds-grid" id="orderGrid">
@@ -243,6 +289,17 @@ async function init() {
 
     await loadOrders();
     startPolling();
+
+    // 查詢今日已完成數
+    try {
+        const today = new Date().toISOString().split('T')[0];
+        const { count } = await sb.from('orders').select('id', { count: 'exact', head: true })
+            .eq('store_id', currentStoreId)
+            .gte('created_at', today + 'T00:00:00')
+            .in('status', ['completed']);
+        window._todayCompletedCount = count || 0;
+        updateStats();
+    } catch(e) {}
 }
 
 // ===== LOAD ORDERS =====
@@ -251,7 +308,7 @@ async function loadOrders() {
     const { data } = await sb.from('orders').select('*')
         .eq('store_id', currentStoreId)
         .gte('created_at', today + 'T00:00:00')
-        .in('status', ['pending', 'confirmed', 'preparing', 'ready'])
+        .in('status', ['pending', 'confirmed', 'preparing', 'ready', 'cancelled'])
         .order('created_at', { ascending: true });
     orders = data || [];
     renderOrders();
@@ -269,7 +326,7 @@ function startPolling() {
             const { data } = await sb.from('orders').select('*')
                 .eq('store_id', currentStoreId)
                 .gte('created_at', today + 'T00:00:00')
-                .in('status', ['pending', 'confirmed', 'preparing', 'ready'])
+                .in('status', ['pending', 'confirmed', 'preparing', 'ready', 'cancelled'])
                 .order('created_at', { ascending: true });
             if (!data) return;
             const newOrders = data.filter(o => !lastOrderIds.has(o.id));
@@ -287,20 +344,51 @@ function startPolling() {
                 }
                 showToast('🔔 新訂單 +' + newOrders.length);
             }
+            // 偵測催單
+            data.forEach(function(newO) {
+                var oldO = orders.find(function(x) { return x.id === newO.id; });
+                if (oldO && newO.rush_count > (oldO.rush_count || 0)) {
+                    var pickup = newO.pickup_number ? '#' + String(newO.pickup_number).padStart(3,'0') : '#' + newO.order_number;
+                    showToast('🔥🔥 ' + pickup + ' 客人催單！(第' + newO.rush_count + '次)');
+                    if (soundEnabled && bellSound) { try { bellSound.currentTime = 0; bellSound.play(); } catch(e) {} }
+                }
+            });
+
             lastOrderIds = new Set(data.map(o => o.id));
             orders = data;
             renderOrders();
             updateStats();
+
+            // 自動取消超過 20 分鐘未確認的 pending 訂單
+            checkPendingTimeout();
         } catch(e) { console.warn('Poll error:', e); }
-    }, 5000); // KDS polls every 5 seconds (faster than admin)
+    }, 5000);
+
+    // 時鐘每秒更新
+    if (window._clockTimer) clearInterval(window._clockTimer);
+    window._clockTimer = setInterval(updateClock, 1000);
+    updateClock();
+}
+
+function updateClock() {
+    var now = new Date();
+    var days = ['日','一','二','三','四','五','六'];
+    var el = document.getElementById('kdsClock');
+    if (el) el.textContent = (now.getMonth()+1) + '/' + now.getDate() + ' 週' + days[now.getDay()] + ' ' + now.toLocaleTimeString('zh-TW', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
 }
 
 // ===== RENDER =====
 function renderOrders() {
     const grid = document.getElementById('orderGrid');
     let filtered = orders;
-    if (filterMode === 'active') filtered = orders.filter(o => ['pending', 'confirmed', 'preparing'].includes(o.status));
-    if (filterMode === 'ready') filtered = orders.filter(o => o.status === 'ready');
+    // 已取消：只保留 5 分鐘內取消的
+    filtered = filtered.filter(o => {
+        if (o.status !== 'cancelled') return true;
+        var cancelAge = (Date.now() - new Date(o.updated_at || o.created_at).getTime()) / 1000;
+        return cancelAge < 300;
+    });
+    if (filterMode === 'active') filtered = filtered.filter(o => ['pending', 'confirmed', 'preparing'].includes(o.status));
+    if (filterMode === 'ready') filtered = filtered.filter(o => o.status === 'ready');
 
     if (filtered.length === 0) {
         grid.innerHTML = '<div class="kds-empty"><div class="kds-empty-icon">✅</div><div>目前沒有訂單</div></div>';
@@ -312,22 +400,44 @@ function renderOrders() {
         const typeLabel = o.order_type === 'takeout' ? '外帶' : (o.table_number ? '桌' + esc(o.table_number) : '內用');
         const typeClass = o.order_type || 'dine_in';
         const elapsed = getElapsed(o.created_at);
-        const isUrgent = elapsed.minutes >= 15 && o.status !== 'ready';
+        const urgentLevel = o.status === 'ready' || o.status === 'cancelled' ? 'none' : elapsed.minutes >= 20 ? 'critical' : elapsed.minutes >= 10 ? 'warning' : 'normal';
         const items = o.items || [];
+        const orderTime = o.created_at ? new Date(o.created_at).toLocaleTimeString('zh-TW', { hour:'2-digit', minute:'2-digit' }) : '';
+        const orderTotal = o.total || items.reduce((s, i) => s + (i.subtotal || i.unit_price * i.qty || 0), 0);
+        const isRushed = o.rush_count > 0;
 
         let buttons = '';
-        if (o.status === 'pending') buttons = `<button class="kds-btn-confirm" onclick="updateStatus('${o.id}','confirmed')">✅ 確認</button><button class="kds-btn-cancel" onclick="updateStatus('${o.id}','cancelled')">✕</button>`;
+        if (o.status === 'cancelled') {
+            buttons = `<div style="text-align:center;font-size:13px;color:var(--text-muted);">此訂單已取消，稍後自動移除</div>`;
+        } else if (o.status === 'pending') {
+            var pendingMins = getElapsed(o.created_at).minutes;
+            var timeoutWarning = '';
+            if (pendingMins >= 15) {
+                var remainMins = 20 - pendingMins;
+                if (remainMins <= 0) {
+                    timeoutWarning = '<div class="kds-timeout-warn">⚠️ 已超時，即將自動取消</div>';
+                } else {
+                    timeoutWarning = '<div class="kds-timeout-warn">⚠️ ' + remainMins + ' 分鐘後未確認將自動取消</div>';
+                }
+            }
+            buttons = timeoutWarning + `<button class="kds-btn-confirm" onclick="updateStatus('${o.id}','confirmed')">✅ 確認</button><button class="kds-btn-cancel" onclick="updateStatus('${o.id}','cancelled')">✕</button>`;
+        }
         else if (o.status === 'confirmed') buttons = `<button class="kds-btn-prepare" onclick="updateStatus('${o.id}','preparing')">🍳 開始準備</button>`;
         else if (o.status === 'preparing') buttons = `<button class="kds-btn-ready" onclick="updateStatus('${o.id}','ready')">🔔 可取餐</button>`;
         else if (o.status === 'ready') buttons = `<button class="kds-btn-complete" onclick="updateStatus('${o.id}','completed')">✅ 完成取餐</button>`;
 
-        return `<div class="kds-card status-${o.status}">
+        return `<div class="kds-card status-${o.status} ${urgentLevel === 'critical' ? 'kds-critical' : ''} ${isRushed ? 'kds-rushed' : ''}">
             <div class="kds-card-header">
                 <div>
                     <span class="kds-order-num">${esc(pickup)}</span>
                     <span class="kds-order-type ${typeClass}">${typeLabel}</span>
+                    ${isRushed ? '<span class="kds-rush-tag">🔥 催x' + o.rush_count + '</span>' : ''}
+                    ${orderTotal ? '<span class="kds-order-price">$' + orderTotal + '</span>' : ''}
                 </div>
-                <span class="kds-timer ${isUrgent ? 'urgent' : ''}">${elapsed.text}</span>
+                <div style="display:flex;align-items:center;gap:6px;">
+                    <span class="kds-order-time">${orderTime}</span>
+                    <span class="kds-timer ${urgentLevel === 'critical' ? 'critical' : urgentLevel === 'warning' ? 'warning' : ''}">${elapsed.text}</span>
+                </div>
             </div>
             <div class="kds-card-body">
                 ${items.map(i => {
@@ -374,6 +484,27 @@ function updateStats() {
     document.getElementById('statConfirmed').textContent = count('confirmed');
     document.getElementById('statPreparing').textContent = count('preparing');
     document.getElementById('statReady').textContent = count('ready');
+
+    // 已取消（最近 5 分鐘內）
+    var recentCancelled = orders.filter(o => {
+        if (o.status !== 'cancelled') return false;
+        var cancelAge = (Date.now() - new Date(o.updated_at || o.created_at).getTime()) / 1000;
+        return cancelAge < 300;
+    }).length;
+    var cancelBadge = document.getElementById('statCancelled');
+    if (cancelBadge) { cancelBadge.textContent = recentCancelled; cancelBadge.parentElement.style.display = recentCancelled > 0 ? 'flex' : 'none'; }
+
+    // 平均等待時間
+    const activeOrders = orders.filter(o => ['pending','confirmed','preparing'].includes(o.status));
+    if (activeOrders.length > 0) {
+        const totalMins = activeOrders.reduce((s, o) => s + getElapsed(o.created_at).minutes, 0);
+        document.getElementById('statAvgWait').textContent = Math.round(totalMins / activeOrders.length) + '分';
+    } else {
+        document.getElementById('statAvgWait').textContent = '0分';
+    }
+
+    // 今日完成數
+    document.getElementById('statTodayTotal').textContent = window._todayCompletedCount || 0;
 }
 
 // ===== UPDATE STATUS =====
@@ -383,8 +514,12 @@ async function updateStatus(orderId, newStatus) {
         // Optimistic update
         const idx = orders.findIndex(o => o.id === orderId);
         if (idx >= 0) {
-            if (newStatus === 'completed' || newStatus === 'cancelled') {
+            if (newStatus === 'completed') {
+                window._todayCompletedCount = (window._todayCompletedCount || 0) + 1;
                 orders.splice(idx, 1);
+            } else if (newStatus === 'cancelled') {
+                orders[idx].status = 'cancelled';
+                orders[idx].updated_at = new Date().toISOString();
             } else {
                 orders[idx].status = newStatus;
             }
@@ -396,6 +531,29 @@ async function updateStatus(orderId, newStatus) {
         console.error(e);
         showToast('❌ 更新失敗');
     }
+}
+
+async function checkPendingTimeout() {
+    var now = Date.now();
+    var toCancel = orders.filter(function(o) {
+        if (o.status !== 'pending') return false;
+        var age = (now - new Date(o.created_at).getTime()) / 60000;
+        return age >= 20;
+    });
+    for (var i = 0; i < toCancel.length; i++) {
+        var o = toCancel[i];
+        try {
+            await sb.from('orders').update({
+                status: 'cancelled',
+                updated_at: new Date().toISOString(),
+                notes: (o.notes || '') + (o.notes ? ' | ' : '') + '⏰ 系統自動取消：超過20分鐘未確認'
+            }).eq('id', o.id);
+            o.status = 'cancelled';
+            o.updated_at = new Date().toISOString();
+            showToast('⏰ ' + (o.pickup_number ? '#' + String(o.pickup_number).padStart(3,'0') : '#' + o.order_number) + ' 超時自動取消');
+        } catch(e) { console.warn('Auto cancel error:', e); }
+    }
+    if (toCancel.length > 0) { renderOrders(); updateStats(); }
 }
 
 // ===== FILTER =====

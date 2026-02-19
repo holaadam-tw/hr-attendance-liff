@@ -3609,7 +3609,7 @@ function showOrderSuccess(qty, price, table, orderNum, earnedPts) {
   // 記錄本次訂單，清空購物車
   if (orderNum) {
     if (!window._myOrders) window._myOrders = [];
-    window._myOrders.push({ orderNum: orderNum, time: new Date(), qty: qty, total: price, status: 'pending', table: table });
+    window._myOrders.push({ orderNum: orderNum, time: new Date(), qty: qty, total: price, status: 'pending', table: table, rushCount: 0 });
   }
   cart = [];
   updateCartUI();
@@ -3649,7 +3649,7 @@ function resetOrder() {
   }, 400);
 }
 
-// ===== MY ORDERS (訂單追蹤) =====
+// ===== MY ORDERS (訂單追蹤 + 催單) =====
 function showMyOrdersBtn() {
   var btn = document.getElementById('myOrdersBtn');
   if (!window._myOrders || window._myOrders.length === 0) { btn.style.display = 'none'; return; }
@@ -3713,6 +3713,10 @@ function renderMyOrders() {
         '<span>$' + o.total + '・' + timeStr + '</span>' +
       '</div>' +
       (isActive && o.status === 'ready' ? '<div style="text-align:center;margin-top:10px;font-size:14px;font-weight:700;color:#10B981;animation:pulse 1.5s infinite;">🔔 您的餐點已準備好，請取餐！</div>' : '') +
+      (isActive && o.status !== 'ready' ? '<div style="text-align:center;margin-top:10px;">' +
+        (o.rushCount >= 2 ? '<div style="font-size:12px;color:#94A3B8;">已催單 ' + o.rushCount + ' 次，廚房加緊準備中</div>' :
+        '<button onclick="rushOrder(\'' + escHtml(String(o.orderNum)) + '\')" style="background:none;border:2px solid #F59E0B;color:#F59E0B;padding:8px 20px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">🔥 催單</button>') +
+      '</div>' : '') +
     '</div>';
   }).join('');
 }
@@ -3723,22 +3727,43 @@ async function pollMyOrders() {
   if (activeOrders.length === 0) return;
   try {
     var orderNums = activeOrders.map(function(o) { return o.orderNum; });
-    var url = SUPABASE_URL + '/rest/v1/orders?store_id=eq.' + currentStoreId + '&order_number=in.(' + orderNums.join(',') + ')&select=order_number,status';
+    var url = SUPABASE_URL + '/rest/v1/orders?store_id=eq.' + currentStoreId + '&order_number=in.(' + orderNums.join(',') + ')&select=order_number,status,rush_count';
     var res = await fetch(url, { headers: { 'apikey': SUPABASE_KEY } });
     if (!res.ok) return;
     var data = await res.json();
     var changed = false;
     (data || []).forEach(function(d) {
       var found = window._myOrders.find(function(o) { return String(o.orderNum) === String(d.order_number); });
-      if (found && found.status !== d.status) {
-        found.status = d.status;
-        changed = true;
-        var s = ORDER_STATUS_MAP[d.status] || {};
-        showToast(s.icon + ' #' + d.order_number + ' ' + (s.text || d.status));
+      if (found) {
+        if (found.status !== d.status) { found.status = d.status; changed = true;
+          var st = ORDER_STATUS_MAP[d.status] || {};
+          showToast(st.icon + ' #' + d.order_number + ' ' + (st.text || d.status));
+        }
+        if (d.rush_count !== undefined) found.rushCount = d.rush_count;
       }
     });
     if (changed) { renderMyOrders(); showMyOrdersBtn(); }
   } catch(e) { /* 靜默 */ }
+}
+
+async function rushOrder(orderNum) {
+  var found = window._myOrders.find(function(o) { return String(o.orderNum) === String(orderNum); });
+  if (!found) return;
+  if (found.rushCount >= 2) { showToast('已催單 ' + found.rushCount + ' 次，請耐心等候'); return; }
+  try {
+    var url = SUPABASE_URL + '/rest/v1/orders?store_id=eq.' + currentStoreId + '&order_number=eq.' + orderNum;
+    var res = await fetch(url, {
+      method: 'PATCH',
+      headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=representation' },
+      body: JSON.stringify({ rush_count: (found.rushCount || 0) + 1, last_rush_at: new Date().toISOString() })
+    });
+    if (!res.ok) { showToast('催單失敗，請稍後再試'); return; }
+    found.rushCount = (found.rushCount || 0) + 1;
+    showToast('🔥 已催單！廚房已收到通知');
+    renderMyOrders();
+  } catch(e) {
+    showToast('催單失敗：' + (e.message || e));
+  }
 }
 
 function showToast(msg) {
