@@ -429,7 +429,7 @@
             }
             if (info.lv) {
                 const tm = {annual:'特休假',sick:'病假',personal:'事假',compensatory:'補休',maternity:'產假',marriage:'婚假'};
-                r += `<div class="adr"><span style="color:var(--gray)">假別</span><b style="color:#2563EB">${tm[info.lv.leave_type]||info.lv.leave_type}</b></div>`;
+                r += `<div class="adr"><span style="color:var(--gray)">假別</span><b style="color:#2563EB">${tm[info.lv.leave_type]||escapeHTML(info.lv.leave_type)}</b></div>`;
                 r += `<div class="adr"><span style="color:var(--gray)">天數</span><b>${info.lv.days||1} 天</b></div>`;
                 if (info.lv.reason) r += `<div class="adr"><span style="color:var(--gray)">原因</span><b>${escapeHTML(info.lv.reason)}</b></div>`;
             }
@@ -467,11 +467,11 @@
             if (!check.ok) {
                 warn.style.background = '#FEF2F2';
                 warn.style.color = '#DC2626';
-                let html = `<b>${check.message}</b>`;
+                let html = `<b>${escapeHTML(check.message)}</b>`;
                 if (check.conflicts.length > 0) {
                     html += '<div style="margin-top:6px;font-size:12px;">';
                     check.conflicts.slice(0, 5).forEach(c => {
-                        html += `<div style="padding:2px 0;">📅 ${c.date}：${c.names.join('、')}（${c.count}人）</div>`;
+                        html += `<div style="padding:2px 0;">📅 ${escapeHTML(c.date)}：${c.names.map(n => escapeHTML(n)).join('、')}（${c.count}人）</div>`;
                     });
                     html += '</div>';
                 }
@@ -480,13 +480,13 @@
             } else if (check.conflicts && check.conflicts.length > 0) {
                 warn.style.background = '#FFF7ED';
                 warn.style.color = '#EA580C';
-                let html = `<b>${check.message}</b>`;
+                let html = `<b>${escapeHTML(check.message)}</b>`;
                 html += '<div style="margin-top:6px;font-size:12px;">';
                 check.conflicts.slice(0, 5).forEach(c => {
-                    html += `<div style="padding:2px 0;">📅 ${c.date}：${c.names.join('、')}（${c.count}人）</div>`;
+                    html += `<div style="padding:2px 0;">📅 ${escapeHTML(c.date)}：${c.names.map(n => escapeHTML(n)).join('、')}（${c.count}人）</div>`;
                 });
                 html += '</div>';
-                if (check.staffWarning) html += `<div style="margin-top:4px;font-weight:700;">${check.staffWarning}</div>`;
+                if (check.staffWarning) html += `<div style="margin-top:4px;font-weight:700;">${escapeHTML(check.staffWarning)}</div>`;
                 warn.innerHTML = html;
                 if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
             } else {
