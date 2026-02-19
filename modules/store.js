@@ -464,6 +464,19 @@ export async function uploadStoreImage(inputEl, type) {
     inputEl.value = '';
 }
 
+export function clearStoreImage(type) {
+    if (type === 'banner') {
+        document.getElementById('storeBannerInput').value = '';
+        document.getElementById('storeBannerPreviewImg').src = '';
+        document.getElementById('storeBannerPreview').style.display = 'none';
+    } else {
+        document.getElementById('storeLogoInput').value = '';
+        document.getElementById('storeLogoPreviewImg').src = '';
+        document.getElementById('storeLogoPreview').style.display = 'none';
+    }
+    showToast('已移除' + (type === 'banner' ? '品牌形象圖' : 'Logo'));
+}
+
 export async function saveStore() {
     const name = document.getElementById('storeNameInput').value.trim();
     if (!name) return showToast('請輸入商店名稱');

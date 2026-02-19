@@ -55,7 +55,7 @@ import {
     loadRestaurantList, openRestaurantDetail, previewStoreOrder, openKDS,
     toggleAcceptOrders, switchRestaurantTab, loadStoreOrders,
     showOrderDetail, closeOrderDetail, updateOrderStatus, toggleOrderSound,
-    showStoreModal, editStore, closeStoreModal, saveStore, uploadStoreImage,
+    showStoreModal, editStore, closeStoreModal, saveStore, uploadStoreImage, clearStoreImage,
     showStoreQR, closeStoreQR, getStoreOrderUrl, copyStoreUrl,
     openStorePreview, loadMenuCategories, addMenuCategory,
     renameMenuCategory, deleteMenuCategory, editCategoryTime, loadMenuItems, showMenuItemForm,
@@ -208,6 +208,7 @@ window.editStore = editStore;
 window.closeStoreModal = closeStoreModal;
 window.saveStore = saveStore;
 window.uploadStoreImage = uploadStoreImage;
+window.clearStoreImage = clearStoreImage;
 window.showStoreQR = showStoreQR;
 window.closeStoreQR = closeStoreQR;
 window.getStoreOrderUrl = getStoreOrderUrl;

@@ -77,8 +77,9 @@ body {
 .brand-hero.show { display: block; }
 /* Banner 模式：全寬大圖 */
 .brand-hero.mode-banner .brand-hero-img {
-  width: 100%; display: block; object-fit: cover;
-  max-height: 220px; min-height: 120px;
+  width: 100%; display: block; object-fit: contain;
+  max-height: 280px; min-height: 120px;
+  background: var(--bg-card, #f8f8f8);
 }
 /* Logo 模式：居中 logo + 品牌名 + 裝飾背景 */
 .brand-hero.mode-logo {
