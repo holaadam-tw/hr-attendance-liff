@@ -23,20 +23,20 @@
   --text-muted: #999999;
   --border: #E8E8E8;
   --border-light: #F0F0F0;
-  --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
-  --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
-  --shadow-lg: 0 8px 24px rgba(0,0,0,0.12);
-  --shadow-xl: 0 12px 40px rgba(0,0,0,0.16);
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 20px;
+  --shadow-sm: 0 1px 4px rgba(0,0,0,0.05);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.07);
+  --shadow-lg: 0 8px 30px rgba(0,0,0,0.10);
+  --shadow-xl: 0 16px 48px rgba(0,0,0,0.14);
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
   --safe-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 /* ===== RESET & BASE ===== */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { font-size: 16px; -webkit-tap-highlight-color: transparent; }
+html { font-size: 16px; -webkit-tap-highlight-color: transparent; scroll-behavior: smooth; }
 body {
   font-family: 'Noto Sans TC', -apple-system, BlinkMacSystemFont, sans-serif;
   background: var(--bg);
@@ -44,139 +44,187 @@ body {
   line-height: 1.6;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* ===== LOADING SCREEN ===== */
 .loading-screen {
   position: fixed; inset: 0; z-index: 9999;
-  background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+  background: linear-gradient(160deg, var(--primary) 0%, var(--primary-dark) 100%);
   display: flex; flex-direction: column;
   align-items: center; justify-content: center;
-  transition: opacity 0.5s, visibility 0.5s;
+  transition: opacity 0.6s ease, visibility 0.6s;
 }
 .loading-screen.hide { opacity: 0; visibility: hidden; pointer-events: none; }
 .loading-logo {
-  width: 80px; height: 80px; border-radius: 20px;
-  background: rgba(255,255,255,0.15); backdrop-filter: blur(10px);
+  width: 88px; height: 88px; border-radius: 24px;
+  background: rgba(255,255,255,0.12); backdrop-filter: blur(20px);
   display: flex; align-items: center; justify-content: center;
-  font-size: 32px; margin-bottom: 20px; color: white; font-weight: 900;
-  animation: logoPulse 1.5s ease-in-out infinite;
+  font-size: 36px; margin-bottom: 24px; color: white; font-weight: 900;
+  animation: logoPulse 2s ease-in-out infinite;
+  border: 1px solid rgba(255,255,255,0.15);
 }
-@keyframes logoPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.08); } }
-.loading-text { color: white; font-size: 15px; font-weight: 500; letter-spacing: 1px; }
-.loading-dots::after {
-  content: ''; animation: dots 1.2s steps(4) infinite;
-}
-@keyframes dots {
-  0% { content: ''; } 25% { content: '.'; } 50% { content: '..'; } 75% { content: '...'; }
-}
+@keyframes logoPulse { 0%,100% { transform: scale(1) rotate(0); } 50% { transform: scale(1.06) rotate(1deg); } }
+.loading-text { color: rgba(255,255,255,0.9); font-size: 14px; font-weight: 500; letter-spacing: 2px; }
+.loading-dots::after { content: ''; animation: dots 1.2s steps(4) infinite; }
+@keyframes dots { 0% { content: ''; } 25% { content: '.'; } 50% { content: '..'; } 75% { content: '...'; } }
 
 /* ===== BRAND HERO ===== */
 .brand-hero {
-  display: none; background: #FFF;
+  display: none; background: var(--bg-card);
+  position: relative; overflow: hidden;
 }
 .brand-hero.show { display: block; }
-.brand-hero-img {
-  width: 100%; display: block; object-fit: contain;
-  background: #F8F8F8;
+/* Banner 模式：全寬大圖 */
+.brand-hero.mode-banner .brand-hero-img {
+  width: 100%; display: block; object-fit: cover;
+  max-height: 220px; min-height: 120px;
 }
+/* Logo 模式：居中 logo + 品牌名 + 裝飾背景 */
+.brand-hero.mode-logo {
+  background: var(--header-gradient, linear-gradient(160deg, var(--primary) 0%, var(--primary-dark) 100%));
+  padding: 28px 20px 24px; text-align: center;
+}
+.brand-hero.mode-logo .brand-hero-img {
+  width: 88px; height: 88px; border-radius: 22px;
+  object-fit: cover; margin: 0 auto 12px;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.18);
+  border: 3px solid rgba(255,255,255,0.25);
+  display: block; background: rgba(255,255,255,0.1);
+}
+.brand-hero-name {
+  display: none; font-size: 20px; font-weight: 800;
+  color: #fff; letter-spacing: 0.5px;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.12);
+}
+.brand-hero.mode-logo .brand-hero-name { display: block; }
+.brand-hero-tagline {
+  display: none; font-size: 12px; color: rgba(255,255,255,0.75);
+  margin-top: 4px; font-weight: 400;
+}
+.brand-hero.mode-logo .brand-hero-tagline { display: block; }
+/* Banner 模式下的漸層疊加 */
+.brand-hero.mode-banner::after {
+  content: ''; position: absolute; bottom: 0; left: 0; right: 0;
+  height: 50%; background: linear-gradient(to top, rgba(0,0,0,0.15), transparent);
+  pointer-events: none;
+}
+/* Logo 模式裝飾圓 */
+.brand-hero.mode-logo::before {
+  content: ''; position: absolute; top: -40%; right: -20%;
+  width: 200px; height: 200px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,255,255,0.08), transparent 70%);
+  pointer-events: none;
+}
+.brand-hero.mode-logo::after {
+  content: ''; position: absolute; bottom: -30%; left: -15%;
+  width: 160px; height: 160px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,255,255,0.05), transparent 70%);
+  pointer-events: none;
+}
+
 /* ===== SHARE BTN ===== */
 .share-btn {
-  background: rgba(255,255,255,0.2); padding: 3px 10px;
+  background: rgba(255,255,255,0.18); padding: 4px 12px;
   border-radius: 20px; font-size: 11px; font-weight: 600;
-  color: #FFF; cursor: pointer; backdrop-filter: blur(5px);
+  color: #FFF; cursor: pointer; backdrop-filter: blur(8px);
   text-decoration: none; white-space: nowrap;
+  border: 1px solid rgba(255,255,255,0.12);
+  transition: background 0.2s;
 }
+.share-btn:hover { background: rgba(255,255,255,0.28); }
 
 /* ===== SHOP HEADER ===== */
 .shop-header {
-  background: var(--header-gradient, linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 60%, var(--primary-dark) 100%));
-  color: white; padding: 0 0 16px; position: relative; overflow: hidden;
+  background: var(--header-gradient, linear-gradient(160deg, var(--primary) 0%, var(--primary-dark) 100%));
+  color: white; padding: 0 0 20px; position: relative; overflow: hidden;
 }
 .shop-header::before {
-  content: ''; position: absolute; top: -40%; right: -20%;
-  width: 200px; height: 200px; border-radius: 50%;
-  background: rgba(255,255,255,0.06);
+  content: ''; position: absolute; top: -60%; right: -30%;
+  width: 300px; height: 300px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 70%);
 }
 .shop-header::after {
-  content: ''; position: absolute; bottom: -30%; left: -10%;
-  width: 150px; height: 150px; border-radius: 50%;
-  background: rgba(255,255,255,0.04);
+  content: ''; position: absolute; bottom: -40%; left: -15%;
+  width: 200px; height: 200px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,255,255,0.05) 0%, transparent 70%);
 }
 .header-status-bar {
-  padding: 12px 16px 8px; font-size: 12px;
+  padding: 14px 18px 10px; font-size: 12px;
   display: flex; justify-content: space-between; align-items: center;
   position: relative; z-index: 1;
 }
 .header-status-bar .badge {
-  background: rgba(255,255,255,0.2); padding: 3px 10px;
-  border-radius: 20px; font-size: 11px; backdrop-filter: blur(5px);
+  background: rgba(255,255,255,0.18); padding: 4px 12px;
+  border-radius: 20px; font-size: 11px; backdrop-filter: blur(8px);
+  border: 1px solid rgba(255,255,255,0.1);
+  font-weight: 600;
 }
-.badge.open { background: rgba(76,175,80,0.3); }
-.badge.closed { background: rgba(244,67,54,0.3); }
-.shop-info {
-  padding: 0 20px; position: relative; z-index: 1;
-}
-.shop-name-row {
-  display: flex; align-items: center; gap: 12px; margin-bottom: 8px;
-}
+.badge.open { background: rgba(76,175,80,0.25); border-color: rgba(76,175,80,0.2); }
+.badge.closed { background: rgba(244,67,54,0.25); border-color: rgba(244,67,54,0.2); }
+.shop-info { padding: 0 20px; position: relative; z-index: 1; }
+.shop-name-row { display: flex; align-items: center; gap: 14px; margin-bottom: 12px; }
 .shop-logo {
-  width: 56px; height: 56px; border-radius: var(--radius-md);
-  background: rgba(255,255,255,0.15); backdrop-filter: blur(10px);
+  width: 60px; height: 60px; border-radius: 16px;
+  background: rgba(255,255,255,0.12); backdrop-filter: blur(16px);
   display: flex; align-items: center; justify-content: center;
   font-size: 28px; flex-shrink: 0;
-  border: 2px solid rgba(255,255,255,0.2);
+  border: 1.5px solid rgba(255,255,255,0.18);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.1);
 }
 .shop-name {
-  font-size: 22px; font-weight: 900; letter-spacing: 1px;
-  text-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  font-size: 24px; font-weight: 900; letter-spacing: 0.5px;
+  text-shadow: 0 2px 12px rgba(0,0,0,0.12);
+  line-height: 1.3;
 }
-.shop-subtitle { font-size: 12px; opacity: 0.85; margin-top: 2px; }
+.shop-subtitle {
+  font-size: 12.5px; opacity: 0.8; margin-top: 3px; font-weight: 400;
+  letter-spacing: 0.3px;
+}
 .shop-details {
-  display: flex; flex-direction: column; gap: 6px;
-  font-size: 12.5px; opacity: 0.9;
+  display: flex; flex-wrap: wrap; gap: 4px 16px;
+  font-size: 12px; opacity: 0.85; margin-top: 2px;
 }
-.shop-details .detail-row {
-  display: flex; align-items: center; gap: 6px;
-}
-.shop-details .icon { width: 14px; text-align: center; flex-shrink: 0; opacity: 0.8; }
+.shop-details .detail-row { display: flex; align-items: center; gap: 5px; }
+.shop-details .icon { width: 14px; text-align: center; flex-shrink: 0; opacity: 0.75; font-size: 11px; }
 
 /* ===== TABLE / GUEST SELECTOR ===== */
 .table-selector {
-  background: white; margin: -8px 12px 0; border-radius: var(--radius-lg);
-  padding: 16px 18px; position: relative; z-index: 2;
-  box-shadow: var(--shadow-lg);
+  background: var(--bg-card); margin: -10px 14px 0; border-radius: var(--radius-lg);
+  padding: 18px 20px; position: relative; z-index: 2;
+  box-shadow: var(--shadow-lg); border: 1px solid rgba(255,255,255,0.8);
 }
 .table-selector h3 {
-  font-size: 14px; font-weight: 600; color: var(--text-secondary);
-  margin-bottom: 10px; display: flex; align-items: center; gap: 6px;
+  font-size: 14px; font-weight: 700; color: var(--text-primary);
+  margin-bottom: 14px; display: flex; align-items: center; gap: 8px;
 }
-.table-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
-.table-label { font-size: 13px; color: var(--text-secondary); min-width: 48px; }
+.table-row { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.table-label { font-size: 13px; color: var(--text-secondary); min-width: 48px; font-weight: 600; }
 .table-input {
-  flex: 1; height: 40px; border: 1.5px solid var(--border);
-  border-radius: var(--radius-sm); padding: 0 12px;
-  font-size: 15px; font-weight: 600; text-align: center;
-  font-family: inherit; outline: none; transition: border-color 0.2s;
+  flex: 1; height: 44px; border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm); padding: 0 14px;
+  font-size: 16px; font-weight: 700; text-align: center;
+  font-family: inherit; outline: none; transition: all 0.25s;
+  background: var(--bg);
 }
-.table-input:focus { border-color: var(--primary); }
+.table-input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(232,67,10,0.08); background: #fff; }
 .guest-selector { display: flex; gap: 8px; flex-wrap: wrap; }
 .guest-btn {
-  width: 44px; height: 44px; border-radius: 50%;
-  border: 1.5px solid var(--border); background: white;
-  font-size: 15px; font-weight: 600; cursor: pointer;
-  transition: all 0.2s; display: flex; align-items: center; justify-content: center;
-  font-family: inherit;
+  width: 44px; height: 44px; border-radius: 12px;
+  border: 1.5px solid var(--border); background: var(--bg);
+  font-size: 15px; font-weight: 700; cursor: pointer;
+  transition: all 0.2s ease; display: flex; align-items: center; justify-content: center;
+  font-family: inherit; color: var(--text-secondary);
 }
-.guest-btn:hover { border-color: var(--primary); color: var(--primary); }
+.guest-btn:hover { border-color: var(--primary); color: var(--primary); background: #fff; }
 .guest-btn.active {
   background: var(--primary); color: white;
   border-color: var(--primary); transform: scale(1.05);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.12);
 }
 .guest-btn-more {
-  width: 44px; height: 44px; border-radius: 50%;
-  border: 1.5px dashed var(--border); background: white;
+  width: 44px; height: 44px; border-radius: 12px;
+  border: 1.5px dashed var(--border); background: var(--bg);
   font-size: 18px; color: var(--text-muted); cursor: pointer;
   display: flex; align-items: center; justify-content: center;
   transition: all 0.2s; font-family: inherit;
@@ -191,148 +239,174 @@ body {
 
 /* ===== LEFT SIDEBAR CATEGORIES ===== */
 .category-sidebar {
-  width: 82px; flex-shrink: 0;
+  width: 76px; flex-shrink: 0;
   background: var(--bg-sidebar);
   overflow-y: auto; overflow-x: hidden;
   scrollbar-width: none; -ms-overflow-style: none;
   border-right: 1px solid var(--border-light);
+  padding: 6px 0;
 }
 .category-sidebar::-webkit-scrollbar { display: none; }
 .cat-item {
   display: flex; flex-direction: column;
   align-items: center; justify-content: center;
-  padding: 14px 6px; cursor: pointer;
-  position: relative; transition: all 0.2s;
-  border-left: 3px solid transparent;
-  min-height: 60px;
+  padding: 10px 4px; cursor: pointer;
+  position: relative; transition: all 0.25s ease;
+  margin: 2px 6px; border-radius: 12px;
+  min-height: 62px;
 }
 .cat-item:hover { background: rgba(0,0,0,0.03); }
 .cat-item.active {
-  background: white;
-  border-left-color: var(--primary);
+  background: var(--bg-card);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
 }
 .cat-item.active .cat-name { color: var(--primary); font-weight: 700; }
-.cat-icon { font-size: 20px; margin-bottom: 4px; }
+.cat-icon { font-size: 22px; margin-bottom: 3px; transition: transform 0.2s; }
+.cat-item.active .cat-icon { transform: scale(1.1); }
 .cat-name {
-  font-size: 12px; font-weight: 500; text-align: center;
+  font-size: 11px; font-weight: 500; text-align: center;
   color: var(--text-secondary); line-height: 1.3;
-  word-break: keep-all;
+  word-break: keep-all; letter-spacing: -0.2px;
 }
 .cat-badge {
-  position: absolute; top: 6px; right: 8px;
+  position: absolute; top: 4px; right: 4px;
   background: var(--primary); color: white;
-  font-size: 10px; font-weight: 700;
+  font-size: 9px; font-weight: 800;
   min-width: 16px; height: 16px; line-height: 16px;
   border-radius: 8px; text-align: center; padding: 0 4px;
-  display: none;
+  display: none; box-shadow: 0 2px 4px rgba(0,0,0,0.15);
 }
-.cat-badge.show { display: block; }
+.cat-badge.show { display: block; animation: badgePop 0.3s ease; }
+@keyframes badgePop { 0% { transform: scale(0); } 50% { transform: scale(1.3); } 100% { transform: scale(1); } }
 
 /* ===== RIGHT MENU CONTENT ===== */
 .menu-content {
   flex: 1; overflow-y: auto; overflow-x: hidden;
-  scroll-behavior: smooth; padding-bottom: 100px;
+  scroll-behavior: smooth; padding-bottom: 110px;
   scrollbar-width: none; -ms-overflow-style: none;
 }
 .menu-content::-webkit-scrollbar { display: none; }
 
 /* ===== FEATURED / RECOMMENDED ===== */
-.featured-section { padding: 16px 14px 8px; }
+.featured-section { padding: 18px 14px 10px; }
 .section-title {
   display: flex; align-items: center; gap: 8px;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 }
 .section-title .fire { font-size: 18px; }
-.section-title h2 { font-size: 16px; font-weight: 800; color: var(--text-primary); }
-.section-title .subtitle { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+.section-title h2 { font-size: 16px; font-weight: 800; color: var(--text-primary); letter-spacing: -0.3px; }
+.section-title .subtitle { font-size: 11px; color: var(--text-muted); margin-left: auto; font-weight: 500; }
 .featured-scroll {
   display: flex; gap: 10px; overflow-x: auto;
-  padding-bottom: 8px; scrollbar-width: none;
+  padding-bottom: 10px; scrollbar-width: none;
   -ms-overflow-style: none; scroll-snap-type: x mandatory;
+  margin: 0 -4px; padding: 4px;
 }
 .featured-scroll::-webkit-scrollbar { display: none; }
 .featured-card {
-  flex-shrink: 0; width: 140px; scroll-snap-align: start;
-  background: white; border-radius: var(--radius-md);
-  overflow: hidden; box-shadow: var(--shadow-sm);
-  cursor: pointer; transition: transform 0.2s, box-shadow 0.2s;
-  position: relative;
+  flex-shrink: 0; width: 200px; scroll-snap-align: start;
+  background: var(--bg-card); border-radius: var(--radius-lg);
+  overflow: hidden; box-shadow: var(--shadow-md);
+  cursor: pointer; transition: all 0.25s cubic-bezier(0.32,0.72,0,1);
+  position: relative; border: 1px solid var(--border-light);
 }
-.featured-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.featured-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-lg); }
 .featured-card:active { transform: scale(0.97); }
-.featured-img { width: 100%; height: 105px; object-fit: cover; background: #f0ece7; }
+.featured-img {
+  width: 100%; height: 150px; object-fit: cover; background: linear-gradient(135deg, #f5f0eb, #ebe5de);
+  transition: transform 0.4s ease;
+}
+.featured-card:hover .featured-img { transform: scale(1.05); }
+/* 圖片底部漸層疊加 */
+.featured-card::after {
+  content: ''; position: absolute; top: 80px; left: 0; right: 0; height: 70px;
+  background: linear-gradient(to top, rgba(0,0,0,0.35), transparent);
+  pointer-events: none; z-index: 1;
+}
 .featured-badge {
-  position: absolute; top: 8px; left: 8px;
+  position: absolute; top: 10px; left: 10px;
   background: var(--primary); color: white;
-  font-size: 10px; font-weight: 700; padding: 2px 8px;
-  border-radius: 10px;
+  font-size: 10px; font-weight: 700; padding: 4px 12px;
+  border-radius: 20px; letter-spacing: 0.5px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2); z-index: 2;
 }
-.featured-info { padding: 8px 10px 10px; }
+.featured-info { padding: 12px 14px 14px; }
 .featured-name {
-  font-size: 13px; font-weight: 600;
+  font-size: 14px; font-weight: 700;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  margin-bottom: 4px;
+  margin-bottom: 6px; letter-spacing: -0.2px;
 }
-.featured-price { font-size: 15px; font-weight: 800; color: var(--primary); }
-.featured-price .currency { font-size: 11px; font-weight: 600; }
+.featured-desc {
+  font-size: 11px; color: var(--text-muted); line-height: 1.4;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  margin-bottom: 8px;
+}
+.featured-price { font-size: 18px; font-weight: 800; color: var(--primary); }
+.featured-price .currency { font-size: 12px; font-weight: 600; }
 .featured-add {
-  position: absolute; bottom: 8px; right: 8px;
-  width: 28px; height: 28px; border-radius: 50%;
+  position: absolute; bottom: 12px; right: 12px;
+  width: 34px; height: 34px; border-radius: 11px;
   background: var(--primary); color: white;
-  border: none; font-size: 18px; cursor: pointer;
+  border: none; font-size: 20px; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
-  transition: all 0.15s; box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  transition: all 0.2s; box-shadow: 0 2px 8px rgba(0,0,0,0.15);
 }
-.featured-add:hover { transform: scale(1.1); }
-.featured-add:active { transform: scale(0.9); }
+.featured-add:hover { transform: scale(1.1); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+.featured-add:active { transform: scale(0.85); }
 
 /* ===== CATEGORY SECTION ===== */
 .category-section { padding: 12px 14px 4px; }
 .category-header {
   display: flex; align-items: center; gap: 8px;
-  padding: 8px 0 10px; border-bottom: 1px solid var(--border-light);
-  margin-bottom: 8px; position: sticky; top: 0;
+  padding: 10px 0 12px; border-bottom: 1.5px solid var(--border-light);
+  margin-bottom: 6px; position: sticky; top: 0;
   background: var(--bg); z-index: 5;
 }
 .category-header .cat-emoji { font-size: 18px; }
-.category-header h3 { font-size: 15px; font-weight: 700; }
+.category-header h3 { font-size: 15px; font-weight: 800; letter-spacing: -0.2px; }
 .category-header .count {
-  font-size: 11px; color: var(--text-muted); margin-left: auto;
-  background: var(--border-light); padding: 2px 8px; border-radius: 10px;
+  font-size: 10px; color: var(--text-muted); margin-left: auto;
+  background: var(--border-light); padding: 3px 10px; border-radius: 20px;
+  font-weight: 600;
 }
 
 /* ===== MENU ITEM CARD ===== */
 .menu-item {
-  display: flex; gap: 12px; padding: 12px 0;
+  display: flex; gap: 12px; padding: 14px 4px;
   border-bottom: 1px solid var(--border-light);
-  position: relative; cursor: pointer; transition: background 0.15s;
+  position: relative; cursor: pointer;
+  transition: all 0.2s ease; border-radius: var(--radius-sm);
+  margin: 0 -4px;
 }
 .menu-item:last-child { border-bottom: none; }
-.menu-item:active { background: rgba(0,0,0,0.02); }
+.menu-item:active { background: rgba(0,0,0,0.015); transform: scale(0.995); }
 .item-img-wrap {
   width: 100px; height: 100px; flex-shrink: 0;
   border-radius: var(--radius-md); overflow: hidden; position: relative;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
 }
 .item-img {
   width: 100%; height: 100%; object-fit: cover;
-  background: #f0ece7; transition: transform 0.3s;
+  background: linear-gradient(135deg, #f5f0eb, #ebe5de);
+  transition: transform 0.4s ease;
 }
-.menu-item:hover .item-img { transform: scale(1.05); }
+.menu-item:hover .item-img { transform: scale(1.06); }
 .item-sold-tag {
   position: absolute; bottom: 0; left: 0; right: 0;
-  background: rgba(0,0,0,0.55); color: white;
-  font-size: 10px; text-align: center; padding: 2px 0;
-  backdrop-filter: blur(4px);
+  background: rgba(0,0,0,0.6); color: white;
+  font-size: 10px; text-align: center; padding: 3px 0;
+  backdrop-filter: blur(6px);
 }
 .item-spicy {
   position: absolute; top: 6px; right: 6px;
-  font-size: 14px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3));
+  font-size: 14px; filter: drop-shadow(0 1px 3px rgba(0,0,0,0.3));
 }
-.item-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.item-info { flex: 1; min-width: 0; display: flex; flex-direction: column; padding: 2px 0; }
 .item-name {
-  font-size: 14.5px; font-weight: 700; margin-bottom: 3px;
+  font-size: 15px; font-weight: 700; margin-bottom: 4px; letter-spacing: -0.2px;
   display: -webkit-box; -webkit-line-clamp: 2;
   -webkit-box-orient: vertical; overflow: hidden;
+  line-height: 1.4;
 }
 .item-desc {
   font-size: 11.5px; color: var(--text-muted); margin-bottom: auto;
@@ -340,248 +414,422 @@ body {
   -webkit-box-orient: vertical; overflow: hidden; line-height: 1.5;
 }
 .item-tags { display: flex; gap: 4px; margin: 6px 0 4px; flex-wrap: wrap; }
-.item-tag { font-size: 10px; padding: 1px 6px; border-radius: 4px; font-weight: 500; }
+.item-tag {
+  font-size: 10px; padding: 2px 8px; border-radius: 6px; font-weight: 600;
+  letter-spacing: 0.2px;
+}
 .item-tag.hot { background: #FFF3E0; color: #E65100; }
 .item-tag.new { background: #E8F5E9; color: #2E7D32; }
 .item-tag.chef { background: #FFF8E1; color: #F57F17; }
+.item-tag.\u63A8\u85A6 { background: rgba(232,67,10,0.08); color: var(--primary); }
+.item-tag.\u5957\u9910 { background: rgba(79,70,229,0.08); color: #4F46E5; }
 .item-bottom {
   display: flex; align-items: flex-end; justify-content: space-between; margin-top: auto;
 }
-.item-price { font-size: 18px; font-weight: 800; color: var(--primary); }
-.item-price .currency { font-size: 12px; font-weight: 600; }
-.item-sizes { display: flex; gap: 8px; margin-top: 2px; }
+.item-price { font-size: 18px; font-weight: 800; color: var(--primary); letter-spacing: -0.5px; }
+.item-price .currency { font-size: 12px; font-weight: 600; margin-right: 1px; }
+.item-sizes { display: flex; gap: 6px; margin-top: 4px; }
 .size-option {
   font-size: 11px; color: var(--text-muted);
-  cursor: pointer; padding: 2px 8px; border-radius: 4px;
-  border: 1px solid var(--border); transition: all 0.15s;
+  cursor: pointer; padding: 3px 10px; border-radius: 8px;
+  border: 1px solid var(--border); transition: all 0.2s; font-weight: 500;
 }
 .size-option:hover, .size-option.active {
   border-color: var(--primary); color: var(--primary);
-  background: rgba(0,0,0,0.02);
+  background: rgba(232,67,10,0.04);
 }
 .item-actions { display: flex; align-items: center; gap: 0; }
 .qty-control {
   display: flex; align-items: center; gap: 0;
-  background: white; border-radius: 20px; overflow: hidden;
-  box-shadow: var(--shadow-sm); border: 1px solid var(--border);
+  background: var(--bg-card); border-radius: 12px; overflow: hidden;
+  box-shadow: var(--shadow-sm); border: 1.5px solid var(--border);
 }
 .qty-btn {
-  width: 30px; height: 30px; border: none;
+  width: 32px; height: 32px; border: none;
   background: transparent; font-size: 16px; font-weight: 700;
   cursor: pointer; display: flex; align-items: center;
   justify-content: center; transition: all 0.15s;
   color: var(--text-secondary); font-family: inherit;
 }
-.qty-btn:hover { background: rgba(0,0,0,0.05); color: var(--primary); }
-.qty-btn:active { transform: scale(0.9); }
+.qty-btn:hover { background: rgba(0,0,0,0.04); color: var(--primary); }
+.qty-btn:active { transform: scale(0.85); }
 .qty-btn.minus { color: var(--text-muted); }
 .qty-num {
   width: 28px; text-align: center; font-size: 14px;
-  font-weight: 700; color: var(--text-primary);
+  font-weight: 800; color: var(--text-primary);
 }
 .add-btn {
-  width: 32px; height: 32px; border-radius: 50%;
+  width: 34px; height: 34px; border-radius: 11px;
   background: var(--primary); color: white; border: none;
   font-size: 20px; cursor: pointer; display: flex;
   align-items: center; justify-content: center;
-  transition: all 0.15s;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  transition: all 0.2s ease;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.12);
   font-family: inherit;
 }
-.add-btn:hover { transform: scale(1.1); }
+.add-btn:hover { transform: scale(1.1); box-shadow: 0 4px 14px rgba(0,0,0,0.18); }
 .add-btn:active { transform: scale(0.85); }
+
+/* ===== GROUP ORDER (團體點餐) ===== */
+.group-start-btn, .group-join-btn {
+  padding: 8px 16px; border: 1.5px solid var(--primary);
+  border-radius: 10px; background: rgba(232,67,10,0.05);
+  color: var(--primary); font-size: 13px; font-weight: 700;
+  cursor: pointer; font-family: inherit; transition: all 0.2s;
+}
+.group-start-btn:active, .group-join-btn:active { transform: scale(0.96); }
+.group-join-btn { border-color: var(--border); color: var(--text-secondary); background: var(--bg); }
+
+.group-panel {
+  background: var(--bg-card); margin: -6px 14px 0; border-radius: 0 0 18px 18px;
+  padding: 0 16px 14px; position: relative; z-index: 2;
+  box-shadow: var(--shadow-md); border: 1px solid rgba(255,255,255,0.8);
+  border-top: 1.5px dashed var(--border);
+}
+.group-panel-header {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 0 10px;
+}
+.group-panel-title { font-size: 14px; font-weight: 800; }
+.group-panel-session {
+  font-size: 11px; color: var(--text-muted);
+  background: var(--border-light); padding: 3px 10px;
+  border-radius: 12px; font-weight: 600;
+}
+.group-panel-close {
+  margin-left: auto; width: 28px; height: 28px;
+  border: none; border-radius: 50%; background: var(--border-light);
+  color: var(--text-muted); font-size: 14px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.group-members {
+  display: flex; flex-direction: column; gap: 8px;
+  max-height: 180px; overflow-y: auto; padding: 2px 0;
+}
+.group-member {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px; border-radius: 12px;
+  background: var(--bg); border: 1px solid var(--border-light);
+}
+.group-member.me { border-color: var(--primary); background: rgba(232,67,10,0.03); }
+.group-member-avatar {
+  width: 36px; height: 36px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; background: var(--border-light); flex-shrink: 0;
+}
+.group-member-info { flex: 1; min-width: 0; }
+.group-member-name { font-size: 13px; font-weight: 700; }
+.group-member-status { font-size: 11px; color: var(--text-muted); }
+.group-member-total {
+  font-size: 15px; font-weight: 800; color: var(--primary);
+  white-space: nowrap;
+}
+.group-invite-btn {
+  width: 100%; margin-top: 10px; padding: 10px;
+  border: 1.5px dashed var(--border); border-radius: 10px;
+  background: transparent; color: var(--text-secondary);
+  font-size: 13px; font-weight: 600; cursor: pointer;
+  font-family: inherit; transition: all 0.2s;
+}
+.group-invite-btn:hover { border-color: var(--primary); color: var(--primary); }
+
+/* 加入團體點餐 Modal */
+.group-join-modal { text-align: center; }
+.group-avatar-picker {
+  display: flex; justify-content: center; gap: 10px;
+  margin: 16px 0; flex-wrap: wrap;
+}
+.group-avatar-opt {
+  width: 48px; height: 48px; border-radius: 50%;
+  border: 2px solid var(--border); background: var(--bg);
+  font-size: 26px; cursor: pointer; transition: all 0.2s;
+  display: flex; align-items: center; justify-content: center;
+}
+.group-avatar-opt.active {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(232,67,10,0.12);
+  transform: scale(1.1);
+}
+
+/* ===== SERVICE CALL FAB (服務呼叫) ===== */
+.service-call-fab {
+  position: fixed; bottom: 100px; right: 16px; z-index: 90;
+}
+.service-fab-btn {
+  width: 48px; height: 48px; border-radius: 50%;
+  background: var(--bg-card); border: 1.5px solid var(--border);
+  box-shadow: var(--shadow-lg); cursor: pointer;
+  font-size: 22px; display: flex; align-items: center; justify-content: center;
+  transition: all 0.25s cubic-bezier(0.32,0.72,0,1);
+}
+.service-fab-btn:active { transform: scale(0.9); }
+.service-menu {
+  position: absolute; bottom: 56px; right: 0;
+  background: var(--bg-card); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xl); border: 1px solid var(--border-light);
+  padding: 6px; min-width: 160px;
+  opacity: 0; visibility: hidden; transform: translateY(8px) scale(0.95);
+  transition: all 0.2s cubic-bezier(0.32,0.72,0,1);
+}
+.service-menu.show {
+  opacity: 1; visibility: visible; transform: translateY(0) scale(1);
+}
+.service-menu-item {
+  display: flex; align-items: center; gap: 8px;
+  width: 100%; padding: 12px 14px; border: none;
+  background: transparent; border-radius: var(--radius-sm);
+  font-size: 14px; font-weight: 600; cursor: pointer;
+  font-family: inherit; color: var(--text-primary);
+  transition: background 0.15s;
+}
+.service-menu-item:hover { background: var(--border-light); }
+.service-menu-item:active { background: rgba(232,67,10,0.06); }
 
 /* ===== BOTTOM CART BAR ===== */
 .cart-bar {
   position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
-  padding: 0 12px calc(10px + var(--safe-bottom));
-  pointer-events: none; transition: transform 0.3s;
+  padding: 0 14px calc(12px + var(--safe-bottom));
+  pointer-events: none;
+  transition: transform 0.35s cubic-bezier(0.32,0.72,0,1);
 }
-.cart-bar.hidden { transform: translateY(100%); }
+.cart-bar.hidden { transform: translateY(120%); }
 .cart-inner {
-  background: linear-gradient(135deg, #2D2D2D, #1A1A1A);
+  background: linear-gradient(135deg, #1E1E24 0%, #141418 100%);
   border-radius: var(--radius-xl);
   display: flex; align-items: center;
-  padding: 10px 10px 10px 16px;
-  box-shadow: var(--shadow-xl);
+  padding: 10px 12px 10px 16px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.25), 0 0 0 1px rgba(255,255,255,0.05) inset;
   pointer-events: auto; position: relative; overflow: hidden;
 }
 .cart-inner::before {
   content: ''; position: absolute; inset: 0;
-  background: linear-gradient(135deg, rgba(232,67,10,0.08), transparent);
+  background: linear-gradient(135deg, rgba(255,255,255,0.04), transparent 60%);
   pointer-events: none;
 }
-.cart-icon-wrap { position: relative; margin-right: 12px; cursor: pointer; }
+.cart-icon-wrap { position: relative; margin-right: 14px; cursor: pointer; }
 .cart-icon {
-  width: 44px; height: 44px; border-radius: 50%;
+  width: 46px; height: 46px; border-radius: 14px;
   background: var(--primary);
   display: flex; align-items: center; justify-content: center;
-  font-size: 22px; box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  font-size: 22px; box-shadow: 0 4px 12px rgba(0,0,0,0.2);
   transition: transform 0.2s;
 }
 .cart-icon:active { transform: scale(0.9); }
 .cart-count {
-  position: absolute; top: -4px; right: -4px;
+  position: absolute; top: -5px; right: -5px;
   background: var(--accent); color: #1A1A1A;
-  font-size: 11px; font-weight: 800;
+  font-size: 10px; font-weight: 800;
   min-width: 20px; height: 20px; line-height: 20px;
   border-radius: 10px; text-align: center;
-  padding: 0 5px; border: 2px solid #2D2D2D;
+  padding: 0 5px; border: 2px solid #1E1E24;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
 }
 .cart-info { flex: 1; }
-.cart-items-text { color: rgba(255,255,255,0.7); font-size: 12px; }
-.cart-total { color: white; font-size: 20px; font-weight: 800; letter-spacing: -0.5px; }
+.cart-items-text { color: rgba(255,255,255,0.55); font-size: 11px; font-weight: 500; }
+.cart-total { color: white; font-size: 22px; font-weight: 800; letter-spacing: -0.5px; }
 .cart-total .currency { font-size: 13px; font-weight: 600; }
 .cart-submit {
   background: var(--primary); color: white; border: none;
-  height: 48px; padding: 0 24px; border-radius: 14px;
-  font-size: 15px; font-weight: 700; cursor: pointer;
+  height: 48px; padding: 0 22px; border-radius: 14px;
+  font-size: 14px; font-weight: 700; cursor: pointer;
   font-family: inherit; transition: all 0.2s;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
   display: flex; align-items: center; gap: 6px; white-space: nowrap;
+  letter-spacing: 0.3px;
 }
-.cart-submit:hover { filter: brightness(1.1); }
-.cart-submit:active { transform: scale(0.96); }
-.cart-submit:disabled { background: #555; cursor: not-allowed; box-shadow: none; }
+.cart-submit:hover { filter: brightness(1.08); transform: translateY(-1px); }
+.cart-submit:active { transform: scale(0.97); }
+.cart-submit:disabled { background: #3A3A42; cursor: not-allowed; box-shadow: none; }
 
 /* ===== CART DRAWER ===== */
 .cart-overlay {
   position: fixed; inset: 0; z-index: 200;
-  background: rgba(0,0,0,0.5); backdrop-filter: blur(3px);
+  background: rgba(0,0,0,0.45); backdrop-filter: blur(6px);
   opacity: 0; visibility: hidden; transition: all 0.3s;
 }
 .cart-overlay.show { opacity: 1; visibility: visible; }
 .cart-drawer {
   position: fixed; bottom: 0; left: 0; right: 0;
-  z-index: 201; background: white;
+  z-index: 201; background: var(--bg-card);
   border-radius: var(--radius-xl) var(--radius-xl) 0 0;
   max-height: 70vh; overflow: hidden;
-  transform: translateY(100%); transition: transform 0.35s cubic-bezier(0.32,0.72,0,1);
+  transform: translateY(100%); transition: transform 0.4s cubic-bezier(0.32,0.72,0,1);
   display: flex; flex-direction: column;
+  box-shadow: 0 -8px 32px rgba(0,0,0,0.12);
 }
 .cart-drawer.show { transform: translateY(0); }
 .drawer-handle {
-  width: 36px; height: 4px; background: #DDD;
-  border-radius: 2px; margin: 10px auto;
+  width: 40px; height: 4px; background: var(--border);
+  border-radius: 2px; margin: 12px auto 8px;
 }
 .drawer-header {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 0 20px 14px; border-bottom: 1px solid var(--border-light);
+  padding: 4px 22px 16px; border-bottom: 1px solid var(--border-light);
 }
-.drawer-header h3 { font-size: 17px; font-weight: 700; }
+.drawer-header h3 { font-size: 17px; font-weight: 800; }
 .drawer-clear {
   font-size: 13px; color: var(--text-muted); cursor: pointer;
   background: none; border: none; font-family: inherit;
-  padding: 4px 8px; border-radius: 6px; transition: all 0.15s;
+  padding: 6px 12px; border-radius: 8px; transition: all 0.2s;
+  font-weight: 500;
 }
-.drawer-clear:hover { background: #f5f5f5; color: var(--primary); }
-.drawer-items { flex: 1; overflow-y: auto; padding: 10px 20px; }
+.drawer-clear:hover { background: rgba(0,0,0,0.04); color: var(--primary); }
+.drawer-items { flex: 1; overflow-y: auto; padding: 8px 22px; }
 .drawer-item {
   display: flex; align-items: center; gap: 12px;
-  padding: 12px 0; border-bottom: 1px solid var(--border-light);
+  padding: 14px 0; border-bottom: 1px solid var(--border-light);
 }
 .drawer-item:last-child { border-bottom: none; }
 .drawer-item-img {
   width: 56px; height: 56px; border-radius: var(--radius-sm);
-  object-fit: cover; background: #f0ece7;
+  object-fit: cover; background: linear-gradient(135deg, #f5f0eb, #ebe5de);
 }
 .drawer-item-info { flex: 1; }
-.drawer-item-name { font-size: 14px; font-weight: 600; }
-.drawer-item-size { font-size: 11px; color: var(--text-muted); }
-.drawer-item-price { font-size: 15px; font-weight: 700; color: var(--primary); }
+.drawer-item-name { font-size: 14px; font-weight: 700; }
+.drawer-item-size { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.drawer-item-price { font-size: 15px; font-weight: 800; color: var(--primary); margin-top: 2px; }
 .drawer-item-qty {
   display: flex; align-items: center; gap: 0;
-  border: 1px solid var(--border); border-radius: 20px; overflow: hidden;
+  border: 1.5px solid var(--border); border-radius: 12px; overflow: hidden;
 }
 .drawer-qty-btn {
-  width: 28px; height: 28px; border: none;
-  background: transparent; font-size: 14px; font-weight: 700;
+  width: 30px; height: 30px; border: none;
+  background: transparent; font-size: 15px; font-weight: 700;
   cursor: pointer; display: flex; align-items: center; justify-content: center;
-  transition: background 0.15s; font-family: inherit;
+  transition: all 0.15s; font-family: inherit;
 }
-.drawer-qty-btn:hover { background: rgba(0,0,0,0.05); }
-.drawer-qty-num { width: 24px; text-align: center; font-size: 13px; font-weight: 700; }
+.drawer-qty-btn:hover { background: rgba(0,0,0,0.04); }
+.drawer-qty-num { width: 26px; text-align: center; font-size: 14px; font-weight: 800; }
 .drawer-footer {
-  padding: 14px 20px calc(14px + var(--safe-bottom));
-  border-top: 1px solid var(--border-light); background: white;
+  padding: 16px 22px calc(16px + var(--safe-bottom));
+  border-top: 1px solid var(--border-light); background: var(--bg-card);
 }
 .drawer-total-row {
-  display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;
+  display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;
 }
-.drawer-total-label { font-size: 14px; color: var(--text-secondary); }
-.drawer-total-price { font-size: 22px; font-weight: 800; color: var(--primary); }
+.drawer-total-label { font-size: 14px; color: var(--text-secondary); font-weight: 500; }
+.drawer-total-price { font-size: 24px; font-weight: 800; color: var(--primary); letter-spacing: -0.5px; }
 .drawer-submit {
-  width: 100%; height: 50px; border: none; border-radius: var(--radius-md);
+  width: 100%; height: 52px; border: none; border-radius: var(--radius-md);
   background: var(--primary); color: white;
   font-size: 16px; font-weight: 700; cursor: pointer;
   font-family: inherit; transition: all 0.2s;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  letter-spacing: 0.3px;
 }
 .drawer-submit:active { transform: scale(0.98); }
 
 /* ===== ITEM DETAIL MODAL ===== */
 .item-modal-overlay {
   position: fixed; inset: 0; z-index: 300;
-  background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
+  background: rgba(0,0,0,0.55); backdrop-filter: blur(6px);
   opacity: 0; visibility: hidden; transition: all 0.3s;
   display: flex; align-items: flex-end; justify-content: center;
 }
 .item-modal-overlay.show { opacity: 1; visibility: visible; }
 .item-modal {
-  background: white; border-radius: var(--radius-xl) var(--radius-xl) 0 0;
-  width: 100%; max-height: 85vh; overflow: hidden;
-  transform: translateY(100%); transition: transform 0.35s cubic-bezier(0.32,0.72,0,1);
+  background: var(--bg-card); border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  width: 100%; max-height: 88vh; overflow: hidden;
+  transform: translateY(100%); transition: transform 0.4s cubic-bezier(0.32,0.72,0,1);
   display: flex; flex-direction: column;
+  box-shadow: 0 -8px 40px rgba(0,0,0,0.15);
 }
 .item-modal-overlay.show .item-modal { transform: translateY(0); }
-.modal-img { width: 100%; height: 240px; object-fit: cover; background: #f0ece7; }
+.modal-img {
+  width: 100%; height: 260px; object-fit: cover;
+  background: linear-gradient(135deg, #f5f0eb, #ebe5de);
+}
 .modal-close {
   position: absolute; top: 16px; right: 16px;
-  width: 32px; height: 32px; border-radius: 50%;
-  background: rgba(0,0,0,0.4); color: white; border: none;
-  font-size: 18px; cursor: pointer; backdrop-filter: blur(4px);
+  width: 36px; height: 36px; border-radius: 12px;
+  background: rgba(0,0,0,0.35); color: white; border: none;
+  font-size: 18px; cursor: pointer; backdrop-filter: blur(8px);
   display: flex; align-items: center; justify-content: center;
   transition: all 0.2s;
 }
-.modal-close:hover { background: rgba(0,0,0,0.6); }
-.modal-body { padding: 20px; overflow-y: auto; flex: 1; }
-.modal-name { font-size: 20px; font-weight: 800; margin-bottom: 6px; }
-.modal-desc { font-size: 13px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 16px; }
-.modal-option-group { margin-bottom: 16px; }
+.modal-close:hover { background: rgba(0,0,0,0.55); }
+.modal-body { padding: 22px; overflow-y: auto; flex: 1; }
+.modal-name { font-size: 22px; font-weight: 800; margin-bottom: 8px; letter-spacing: -0.3px; }
+.modal-desc { font-size: 13px; color: var(--text-secondary); line-height: 1.7; margin-bottom: 20px; }
+.modal-option-group { margin-bottom: 18px; }
 .modal-option-title {
-  font-size: 14px; font-weight: 700; margin-bottom: 8px;
-  display: flex; align-items: center; gap: 6px;
+  font-size: 14px; font-weight: 700; margin-bottom: 10px;
+  display: flex; align-items: center; gap: 8px;
 }
 .modal-option-title .required {
   font-size: 10px; background: var(--primary); color: white;
-  padding: 1px 6px; border-radius: 4px; font-weight: 600;
+  padding: 2px 8px; border-radius: 6px; font-weight: 700;
 }
 .modal-options { display: flex; flex-wrap: wrap; gap: 8px; }
 .modal-opt-btn {
-  padding: 8px 16px; border: 1.5px solid var(--border);
-  border-radius: var(--radius-sm); background: white;
-  font-size: 13px; cursor: pointer; transition: all 0.15s;
-  font-family: inherit; font-weight: 500;
+  padding: 10px 18px; border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm); background: var(--bg);
+  font-size: 13px; cursor: pointer; transition: all 0.2s;
+  font-family: inherit; font-weight: 600;
 }
-.modal-opt-btn:hover { border-color: var(--primary); }
+.modal-opt-btn:hover { border-color: var(--primary); background: #fff; }
 .modal-opt-btn.active {
   border-color: var(--primary); color: var(--primary);
-  background: rgba(0,0,0,0.02);
+  background: rgba(232,67,10,0.05);
+  box-shadow: 0 0 0 3px rgba(232,67,10,0.06);
+}
+/* 副餐圖片卡片模式 */
+.modal-options.has-images {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+}
+.modal-opt-card {
+  border: 1.5px solid var(--border); border-radius: var(--radius-md);
+  overflow: hidden; cursor: pointer; transition: all 0.2s;
+  background: var(--bg-card); position: relative;
+}
+.modal-opt-card:active { transform: scale(0.97); }
+.modal-opt-card.active {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(232,67,10,0.08);
+}
+.modal-opt-card .opt-card-img {
+  width: 100%; height: 80px; object-fit: cover;
+  background: linear-gradient(135deg, #f5f0eb, #ebe5de);
+  display: block;
+}
+.modal-opt-card .opt-card-info {
+  padding: 8px 10px 10px;
+}
+.modal-opt-card .opt-card-name {
+  font-size: 12px; font-weight: 700; margin-bottom: 3px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.modal-opt-card .opt-card-price {
+  font-size: 13px; font-weight: 800; color: var(--primary);
+}
+.modal-opt-card .opt-card-check {
+  position: absolute; top: 6px; right: 6px;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: rgba(255,255,255,0.85); border: 1.5px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; color: transparent; transition: all 0.2s;
+  backdrop-filter: blur(4px);
+}
+.modal-opt-card.active .opt-card-check {
+  background: var(--primary); border-color: var(--primary);
+  color: white;
 }
 .modal-footer {
-  padding: 14px 20px calc(14px + var(--safe-bottom));
+  padding: 16px 22px calc(16px + var(--safe-bottom));
   border-top: 1px solid var(--border-light);
-  display: flex; align-items: center; gap: 16px;
+  display: flex; align-items: center; gap: 14px;
+  background: var(--bg-card);
 }
-.modal-price { font-size: 24px; font-weight: 800; color: var(--primary); }
+.modal-price { font-size: 26px; font-weight: 800; color: var(--primary); letter-spacing: -0.5px; }
 .modal-price .currency { font-size: 14px; }
 .modal-qty-area { display: flex; align-items: center; gap: 0; }
 .modal-add-cart {
-  flex: 1; height: 48px; border: none; border-radius: var(--radius-md);
+  flex: 1; height: 50px; border: none; border-radius: var(--radius-md);
   background: var(--primary); color: white;
   font-size: 15px; font-weight: 700; cursor: pointer;
   font-family: inherit; transition: all 0.2s;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  box-shadow: 0 4px 14px rgba(0,0,0,0.12);
+  letter-spacing: 0.3px;
 }
 .modal-add-cart:active { transform: scale(0.97); }
 
@@ -591,8 +839,8 @@ body {
   align-items: center; justify-content: center;
   padding: 60px 30px; text-align: center;
 }
-.empty-icon { font-size: 48px; margin-bottom: 12px; opacity: 0.5; }
-.empty-title { font-size: 16px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px; }
+.empty-icon { font-size: 48px; margin-bottom: 12px; opacity: 0.4; }
+.empty-title { font-size: 16px; font-weight: 700; color: var(--text-secondary); margin-bottom: 4px; }
 .empty-desc { font-size: 13px; color: var(--text-muted); }
 
 /* ===== FLY DOT ANIMATION ===== */
@@ -601,93 +849,312 @@ body {
   width: 14px; height: 14px; border-radius: 50%;
   background: var(--primary); pointer-events: none;
   transition: all 0.55s cubic-bezier(0.2, 0.8, 0.2, 1);
-  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+
+/* ===== LANGUAGE SWITCHER (多語切換) ===== */
+.lang-btn {
+  background: rgba(255,255,255,0.18); padding: 4px 10px;
+  border-radius: 20px; font-size: 11px; font-weight: 600;
+  color: #FFF; cursor: pointer; backdrop-filter: blur(8px);
+  border: 1px solid rgba(255,255,255,0.12);
+  font-family: inherit; transition: all 0.2s;
+}
+.lang-btn:active { transform: scale(0.95); }
+.lang-menu {
+  position: fixed; top: 50px; right: 16px; z-index: 200;
+  background: var(--bg-card); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xl); border: 1px solid var(--border-light);
+  padding: 6px; min-width: 150px;
+  opacity: 0; visibility: hidden; transform: translateY(-8px) scale(0.95);
+  transition: all 0.2s cubic-bezier(0.32,0.72,0,1);
+}
+.lang-menu.show {
+  opacity: 1; visibility: visible; transform: translateY(0) scale(1);
+}
+.lang-menu-item {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%; padding: 11px 14px; border: none;
+  background: transparent; border-radius: var(--radius-sm);
+  font-size: 14px; cursor: pointer; font-family: inherit;
+  color: var(--text-primary); transition: background 0.15s;
+}
+.lang-menu-item:hover { background: var(--border-light); }
+.lang-menu-item.active { color: var(--primary); font-weight: 700; }
+.lang-menu-item .lang-flag { font-size: 18px; }
+.lang-menu-item .lang-check {
+  margin-left: auto; color: var(--primary); font-size: 16px;
+  display: none;
+}
+.lang-menu-item.active .lang-check { display: block; }
+
+/* translated item name secondary */
+.item-name-translated {
+  font-size: 11px; color: var(--text-muted); font-weight: 400;
+  margin-top: 1px; line-height: 1.3;
+  display: -webkit-box; -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical; overflow: hidden;
+}
+
+/* ===== AI SMART RECOMMENDATIONS (智慧推薦) ===== */
+.smart-rec-bar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 14px; margin: 8px 14px 0;
+  background: linear-gradient(135deg, rgba(232,67,10,0.06), rgba(255,184,0,0.06));
+  border-radius: var(--radius-md); border: 1px solid rgba(232,67,10,0.1);
+  overflow-x: auto; scrollbar-width: none;
+}
+.smart-rec-bar::-webkit-scrollbar { display: none; }
+.smart-rec-chip {
+  flex-shrink: 0; display: flex; align-items: center; gap: 6px;
+  padding: 6px 14px; border-radius: 20px;
+  background: var(--bg-card); border: 1px solid var(--border-light);
+  font-size: 12px; font-weight: 600; cursor: pointer;
+  transition: all 0.2s; white-space: nowrap;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+}
+.smart-rec-chip:active { transform: scale(0.95); }
+.smart-rec-chip.highlight {
+  background: var(--primary); color: white;
+  border-color: var(--primary); box-shadow: 0 2px 8px rgba(232,67,10,0.2);
+}
+.smart-rec-chip .rec-emoji { font-size: 14px; }
+
+.smart-rec-section {
+  margin: 12px 14px 0; padding: 14px 16px;
+  background: var(--bg-card); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm); border: 1px solid var(--border-light);
+}
+.smart-rec-title {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 12px;
+}
+.smart-rec-title .rec-ai-badge {
+  font-size: 10px; font-weight: 700; padding: 3px 8px;
+  border-radius: 6px; background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white; letter-spacing: 0.5px;
+}
+.smart-rec-title h4 { font-size: 14px; font-weight: 700; }
+.smart-rec-title .rec-reason {
+  font-size: 11px; color: var(--text-muted); margin-left: auto;
+}
+.smart-rec-items {
+  display: flex; gap: 10px; overflow-x: auto;
+  padding-bottom: 4px; scrollbar-width: none;
+}
+.smart-rec-items::-webkit-scrollbar { display: none; }
+.smart-rec-item {
+  flex-shrink: 0; width: 110px; cursor: pointer;
+  transition: all 0.2s; text-align: center;
+}
+.smart-rec-item:active { transform: scale(0.96); }
+.smart-rec-item-img {
+  width: 100%; height: 80px; border-radius: var(--radius-sm);
+  object-fit: cover; background: linear-gradient(135deg, #f5f0eb, #ebe5de);
+  margin-bottom: 6px; display: block;
+}
+.smart-rec-item-name {
+  font-size: 12px; font-weight: 600;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.smart-rec-item-price {
+  font-size: 14px; font-weight: 800; color: var(--primary);
+}
+
+/* ===== UPSELL SECTION (結帳前加購推薦) ===== */
+.upsell-section {
+  margin: 16px 0 10px; padding: 16px 0 4px;
+  border-top: 1.5px dashed var(--border);
+}
+.upsell-header {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 12px; padding: 0 2px;
+}
+.upsell-header .upsell-icon { font-size: 18px; }
+.upsell-header h4 {
+  font-size: 14px; font-weight: 700; color: var(--text-primary);
+  letter-spacing: -0.2px;
+}
+.upsell-header .upsell-hint {
+  font-size: 11px; color: var(--text-muted); margin-left: auto;
+}
+.upsell-scroll {
+  display: flex; gap: 10px; overflow-x: auto;
+  padding-bottom: 8px; scrollbar-width: none;
+}
+.upsell-scroll::-webkit-scrollbar { display: none; }
+.upsell-card {
+  flex-shrink: 0; width: 120px; background: var(--bg-card);
+  border-radius: var(--radius-md); overflow: hidden;
+  border: 1px solid var(--border-light); cursor: pointer;
+  transition: all 0.2s; position: relative;
+}
+.upsell-card:active { transform: scale(0.96); }
+.upsell-card-img {
+  width: 100%; height: 80px; object-fit: cover;
+  background: linear-gradient(135deg, #f5f0eb, #ebe5de);
+}
+.upsell-card-info { padding: 8px 10px 10px; }
+.upsell-card-name {
+  font-size: 12px; font-weight: 600; margin-bottom: 4px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.upsell-card-price {
+  font-size: 14px; font-weight: 800; color: var(--primary);
+}
+.upsell-card-add {
+  position: absolute; bottom: 8px; right: 8px;
+  width: 26px; height: 26px; border-radius: 8px;
+  background: var(--primary); color: white; border: none;
+  font-size: 16px; cursor: pointer; display: flex;
+  align-items: center; justify-content: center;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+}
+
+/* ===== VIEW MODE TOGGLE (大圖/列表切換) ===== */
+.view-toggle {
+  display: flex; gap: 4px; margin-left: auto;
+  background: var(--border-light); border-radius: 8px; padding: 2px;
+}
+.view-toggle-btn {
+  width: 28px; height: 28px; border: none; border-radius: 6px;
+  background: transparent; cursor: pointer; font-size: 14px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-muted); transition: all 0.2s;
+}
+.view-toggle-btn.active {
+  background: var(--bg-card); color: var(--primary);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+}
+/* 大圖模式 */
+.menu-items.grid-view {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+  padding: 8px 0;
+}
+.menu-items.grid-view .menu-item {
+  flex-direction: column; gap: 0; padding: 0;
+  border-bottom: none; border-radius: var(--radius-md);
+  background: var(--bg-card); overflow: hidden;
+  border: 1px solid var(--border-light);
+  box-shadow: var(--shadow-sm); margin: 0;
+}
+.menu-items.grid-view .item-img-wrap {
+  width: 100%; height: 120px; border-radius: 0;
+  box-shadow: none;
+}
+.menu-items.grid-view .item-info {
+  padding: 10px 12px 12px;
+}
+.menu-items.grid-view .item-desc { display: none; }
+.menu-items.grid-view .item-tags { display: none; }
+.menu-items.grid-view .item-sizes { display: none; }
+.menu-items.grid-view .item-name {
+  font-size: 13px; -webkit-line-clamp: 1; margin-bottom: 6px;
+}
+.menu-items.grid-view .item-bottom {
+  flex-direction: row; align-items: center;
+}
+.menu-items.grid-view .item-price { font-size: 16px; }
+.menu-items.grid-view .add-btn {
+  width: 30px; height: 30px; font-size: 16px;
 }
 
 /* ===== TOAST ===== */
 .toast {
-  position: fixed; top: 60px; left: 50%; transform: translateX(-50%) translateY(-20px);
-  z-index: 500; background: #333; color: white;
-  padding: 10px 20px; border-radius: var(--radius-sm);
-  font-size: 13px; font-weight: 500;
-  opacity: 0; visibility: hidden; transition: all 0.3s;
-  box-shadow: var(--shadow-lg); white-space: nowrap;
+  position: fixed; top: 56px; left: 50%; transform: translateX(-50%) translateY(-24px);
+  z-index: 500; background: rgba(30,30,30,0.92); color: white;
+  padding: 12px 24px; border-radius: 14px;
+  font-size: 13px; font-weight: 600;
+  opacity: 0; visibility: hidden; transition: all 0.35s cubic-bezier(0.32,0.72,0,1);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.18); white-space: nowrap;
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.08);
 }
 .toast.show { opacity: 1; visibility: visible; transform: translateX(-50%) translateY(0); }
 
 /* ===== SEARCH BAR ===== */
-.search-bar { padding: 10px 14px 6px; background: var(--bg); }
+.search-bar { padding: 12px 14px 8px; background: var(--bg); }
 .search-input-wrap {
-  display: flex; align-items: center; gap: 8px;
-  background: white; border-radius: var(--radius-sm);
-  padding: 0 12px; height: 38px; border: 1px solid var(--border);
-  transition: border-color 0.2s;
+  display: flex; align-items: center; gap: 10px;
+  background: var(--bg-card); border-radius: 12px;
+  padding: 0 14px; height: 42px; border: 1.5px solid var(--border);
+  transition: all 0.25s;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.03);
 }
-.search-input-wrap:focus-within { border-color: var(--primary); }
+.search-input-wrap:focus-within { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(232,67,10,0.06); }
 .search-input-wrap .icon { color: var(--text-muted); font-size: 14px; flex-shrink: 0; }
 .search-input {
-  flex: 1; border: none; outline: none; font-size: 13px;
-  font-family: inherit; background: transparent;
+  flex: 1; border: none; outline: none; font-size: 14px;
+  font-family: inherit; background: transparent; font-weight: 500;
 }
-.search-input::placeholder { color: var(--text-muted); }
+.search-input::placeholder { color: var(--text-muted); font-weight: 400; }
 .search-clear {
-  width: 20px; height: 20px; border-radius: 50%;
-  background: #eee; border: none; font-size: 12px;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--border); border: none; font-size: 12px;
   cursor: pointer; display: none; align-items: center; justify-content: center;
-  color: var(--text-muted);
+  color: var(--text-muted); transition: all 0.15s;
 }
+.search-clear:hover { background: var(--primary); color: white; }
 .search-clear.show { display: flex; }
 
 /* ===== THEME PICKER ===== */
 .theme-fab {
   position: fixed; top: 12px; right: 12px; z-index: 150;
-  height: 40px; border-radius: 20px;
-  background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-  border: none; padding: 0 16px 0 12px;
+  height: 40px; border-radius: 12px;
+  background: rgba(0,0,0,0.5); backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.12);
+  padding: 0 14px 0 12px;
   display: flex; align-items: center; gap: 6px;
   cursor: pointer; font-size: 14px; transition: all 0.25s;
-  box-shadow: 0 3px 12px rgba(0,0,0,0.2);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.2);
   color: #fff; font-weight: 600;
 }
-.theme-fab:hover { transform: scale(1.05); box-shadow: 0 4px 16px rgba(0,0,0,0.25); }
-.theme-fab:active { transform: scale(0.97); }
-.theme-fab-icon { font-size: 18px; display: flex; }
-.theme-fab-label { font-size: 13px; font-weight: 700; letter-spacing: 0.3px; }
+.theme-fab:hover { transform: scale(1.05); background: rgba(0,0,0,0.6); }
+.theme-fab:active { transform: scale(0.95); }
+.theme-fab-icon { font-size: 17px; display: flex; }
+.theme-fab-label { font-size: 12px; font-weight: 700; letter-spacing: 0.5px; }
 .theme-overlay {
   position: fixed; inset: 0; z-index: 200;
-  background: rgba(0,0,0,0.5);
+  background: rgba(0,0,0,0.45); backdrop-filter: blur(4px);
   display: none; align-items: flex-end; justify-content: center;
 }
 .theme-overlay.show { display: flex; }
 .theme-panel {
-  background: white; border-radius: 20px 20px 0 0;
-  padding: 24px 20px calc(24px + env(safe-area-inset-bottom, 0px));
-  width: 100%; max-width: 480px; max-height: 75vh; overflow-y: auto;
-  box-shadow: 0 -4px 24px rgba(0,0,0,0.15);
-  animation: slideUpPanel 0.3s ease-out;
+  background: var(--bg-card); border-radius: 24px 24px 0 0;
+  padding: 20px 20px calc(24px + env(safe-area-inset-bottom, 0px));
+  width: 100%; max-width: 480px; max-height: 80vh; overflow-y: auto;
+  box-shadow: 0 -8px 40px rgba(0,0,0,0.15);
+  animation: slideUpPanel 0.35s cubic-bezier(0.32,0.72,0,1);
 }
 @keyframes slideUpPanel { from { transform: translateY(100%); } to { transform: translateY(0); } }
-.theme-panel-handle { width: 40px; height: 4px; border-radius: 2px; background: #D1D5DB; margin: 0 auto 16px; }
-.theme-panel h4 { font-size: 18px; font-weight: 800; margin-bottom: 4px; color: var(--text-primary); text-align: center; }
+.theme-panel-handle { width: 40px; height: 4px; border-radius: 2px; background: var(--border); margin: 0 auto 16px; }
+.theme-panel h4 { font-size: 18px; font-weight: 800; margin-bottom: 4px; color: var(--text-primary); text-align: center; letter-spacing: -0.3px; }
 .theme-panel-sub { font-size: 12px; color: var(--text-muted); text-align: center; margin-bottom: 16px; }
-.theme-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.theme-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 .theme-card {
-  position: relative; border-radius: 16px; padding: 16px 10px 12px;
-  cursor: pointer; transition: all 0.2s; text-align: center;
+  position: relative; border-radius: 14px; padding: 14px 8px 10px;
+  cursor: pointer; transition: all 0.25s ease; text-align: center;
   border: 2.5px solid transparent;
 }
-.theme-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-.theme-card.active { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary); }
-.theme-card.active::after {
-  content: '\2713'; position: absolute; top: 8px; right: 8px;
-  width: 22px; height: 22px; border-radius: 50%;
-  background: var(--primary); color: #fff;
-  font-size: 13px; font-weight: 700; line-height: 22px; text-align: center;
+.theme-card:hover { transform: translateY(-2px); box-shadow: 0 6px 16px rgba(0,0,0,0.08); }
+.theme-card.active {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px var(--primary), 0 4px 16px rgba(0,0,0,0.1);
 }
-.theme-card-dots { display: flex; gap: 6px; justify-content: center; margin-bottom: 10px; }
-.theme-card-dot { width: 24px; height: 24px; border-radius: 50%; box-shadow: 0 1px 3px rgba(0,0,0,0.15); }
-.theme-card-name { font-size: 13px; font-weight: 700; color: #333; }
-.theme-card-dark .theme-card-name { color: #eee; }
+.theme-card.active::after {
+  content: '\2713'; position: absolute; top: 6px; right: 6px;
+  width: 20px; height: 20px; border-radius: 50%;
+  background: var(--primary); color: #fff;
+  font-size: 11px; font-weight: 700; line-height: 20px; text-align: center;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+}
+.theme-card-dots { display: flex; gap: 5px; justify-content: center; margin-bottom: 8px; }
+.theme-card-dot {
+  width: 22px; height: 22px; border-radius: 7px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+}
+.theme-card-name { font-size: 12px; font-weight: 700; color: #444; letter-spacing: -0.2px; }
+.theme-card-dark .theme-card-name { color: #ddd; }
 
 /* ===== RESPONSIVE ===== */
 @media (min-width: 480px) {
@@ -696,11 +1163,11 @@ body {
 
 /* ===== ANIMATIONS ===== */
 @keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(16px); }
+  from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: translateY(0); }
 }
-.animate-in { animation: fadeInUp 0.35s ease-out both; }
-.menu-item { animation: fadeInUp 0.3s ease-out both; }
+.animate-in { animation: fadeInUp 0.4s ease-out both; }
+.menu-item { animation: fadeInUp 0.35s ease-out both; }
 </style>
 </head>
 <body>
@@ -714,6 +1181,28 @@ body {
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
 
+<!-- LANGUAGE MENU -->
+<div class="lang-menu" id="langMenu">
+  <button class="lang-menu-item active" onclick="setLanguage('zh')" data-lang="zh">
+    <span class="lang-flag">🇹🇼</span> 中文 <span class="lang-check">✓</span>
+  </button>
+  <button class="lang-menu-item" onclick="setLanguage('en')" data-lang="en">
+    <span class="lang-flag">🇺🇸</span> English <span class="lang-check">✓</span>
+  </button>
+  <button class="lang-menu-item" onclick="setLanguage('ja')" data-lang="ja">
+    <span class="lang-flag">🇯🇵</span> 日本語 <span class="lang-check">✓</span>
+  </button>
+  <button class="lang-menu-item" onclick="setLanguage('ko')" data-lang="ko">
+    <span class="lang-flag">🇰🇷</span> 한국어 <span class="lang-check">✓</span>
+  </button>
+  <button class="lang-menu-item" onclick="setLanguage('vi')" data-lang="vi">
+    <span class="lang-flag">🇻🇳</span> Tiếng Việt <span class="lang-check">✓</span>
+  </button>
+  <button class="lang-menu-item" onclick="setLanguage('th')" data-lang="th">
+    <span class="lang-flag">🇹🇭</span> ภาษาไทย <span class="lang-check">✓</span>
+  </button>
+</div>
+
 <!-- THEME PICKER -->
 <div class="theme-fab" id="themeFab" onclick="toggleThemePanel()">
   <span class="theme-fab-icon">&#x1F3A8;</span>
@@ -726,13 +1215,16 @@ body {
 <!-- ===== BRAND HERO (DM) ===== -->
 <div class="brand-hero" id="brandHero">
   <img class="brand-hero-img" id="brandHeroImg" src="" alt="">
+  <div class="brand-hero-name" id="brandHeroName"></div>
+  <div class="brand-hero-tagline" id="brandHeroTagline"></div>
 </div>
 
 <!-- ===== SHOP HEADER ===== -->
 <header class="shop-header" id="shopHeader">
   <div class="header-status-bar">
-    <span>掃碼點餐</span>
+    <span id="headerTitle">掃碼點餐</span>
     <div style="display:flex;align-items:center;gap:8px;">
+      <button class="lang-btn" id="langBtn" onclick="toggleLangMenu()">🌐 中</button>
       <span class="badge open" id="shopStatus">營業中</span>
       <a class="share-btn" id="shareBtn" onclick="shareOrder()" style="display:none;">&#x1F4E4; 分享訂單</a>
     </div>
@@ -772,6 +1264,29 @@ body {
       <button class="guest-btn-more" onclick="promptGuestCount()">&#8943;</button>
     </div>
   </div>
+  <!-- 團體點餐入口 -->
+  <div class="group-order-entry" id="groupOrderEntry" style="display:none;">
+    <div class="table-row" style="border-top:1px dashed var(--border);padding-top:12px;margin-top:8px;">
+      <span class="table-label">多人</span>
+      <div style="display:flex;gap:8px;flex:1;">
+        <button class="group-start-btn" id="groupStartBtn" onclick="startGroupOrder()">👥 開啟團體點餐</button>
+        <button class="group-join-btn" id="groupJoinBtn" onclick="showJoinGroup()" style="display:none;">🔗 加入</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- GROUP ORDER PANEL (團體點餐面板) -->
+<div class="group-panel" id="groupPanel" style="display:none;">
+  <div class="group-panel-header">
+    <div class="group-panel-title">👥 團體點餐中</div>
+    <div class="group-panel-session" id="groupSessionInfo"></div>
+    <button class="group-panel-close" onclick="leaveGroupOrder()">✕</button>
+  </div>
+  <div class="group-members" id="groupMembers"></div>
+  <div class="group-panel-actions">
+    <button class="group-invite-btn" onclick="shareGroupLink()">📤 邀請朋友加入</button>
+  </div>
 </div>
 
 <!-- ===== MEMBERSHIP / PHONE ===== -->
@@ -804,9 +1319,20 @@ body {
 </div>
 
 <!-- ===== BOTTOM CART BAR ===== -->
+<!-- ===== SERVICE CALL (服務呼叫) ===== -->
+<div class="service-call-fab" id="serviceCallFab" style="display:none;">
+  <button class="service-fab-btn" onclick="toggleServiceMenu()">🔔</button>
+  <div class="service-menu" id="serviceMenu">
+    <button class="service-menu-item" onclick="sendServiceCall('water')">💧 加水</button>
+    <button class="service-menu-item" onclick="sendServiceCall('utensils')">🍴 加餐具</button>
+    <button class="service-menu-item" onclick="sendServiceCall('napkin')">🧻 加紙巾</button>
+    <button class="service-menu-item" onclick="sendServiceCall('staff')">🙋 呼叫服務員</button>
+  </div>
+</div>
+
 <div class="cart-bar hidden" id="cartBar">
   <div class="cart-inner">
-    <div class="cart-icon-wrap" onclick="toggleCartDrawer()" role="button" aria-label="開啟購物車">
+    <div class="cart-icon-wrap" onclick="toggleCartDrawer()">
       <div class="cart-icon">&#9635;</div>
       <span class="cart-count" id="cartCount">0</span>
     </div>
@@ -814,7 +1340,7 @@ body {
       <div class="cart-items-text" id="cartItemsText">已選 0 件</div>
       <div class="cart-total"><span class="currency">$</span><span id="cartTotal">0</span></div>
     </div>
-    <button class="cart-submit" id="cartSubmit" aria-label="送出訂單" onclick="submitOrder()">送出訂單 &#8594;</button>
+    <button class="cart-submit" id="cartSubmit" onclick="submitOrder()">送出訂單 &#8594;</button>
   </div>
 </div>
 
@@ -824,7 +1350,7 @@ body {
   <div class="drawer-handle"></div>
   <div class="drawer-header">
     <h3>&#9635; 已選菜品</h3>
-    <button class="drawer-clear" aria-label="清空購物車" onclick="clearCart()">清空</button>
+    <button class="drawer-clear" onclick="clearCart()">清空</button>
   </div>
   <div class="drawer-items" id="drawerItems"></div>
   <div class="drawer-footer">
@@ -832,7 +1358,7 @@ body {
       <span class="drawer-total-label">合計</span>
       <span class="drawer-total-price"><span class="currency">$</span><span id="drawerTotal">0</span></span>
     </div>
-    <button class="drawer-submit" aria-label="送出訂單" onclick="submitOrder()">送出訂單（<span id="drawerCount">0</span> 件）</button>
+    <button class="drawer-submit" onclick="submitOrder()">送出訂單（<span id="drawerCount">0</span> 件）</button>
   </div>
 </div>
 
@@ -840,7 +1366,7 @@ body {
 <div class="item-modal-overlay" id="itemModalOverlay" onclick="closeItemModal(event)">
   <div class="item-modal" onclick="event.stopPropagation()">
     <img class="modal-img" id="modalImg" src="" alt="">
-    <button class="modal-close" aria-label="關閉" onclick="closeItemModal()">&#10005;</button>
+    <button class="modal-close" onclick="closeItemModal()">&#10005;</button>
     <div class="modal-body">
       <div class="modal-name" id="modalName"></div>
       <div class="modal-desc" id="modalDesc"></div>
@@ -850,12 +1376,12 @@ body {
       <div class="modal-price"><span class="currency">$</span><span id="modalPrice">0</span></div>
       <div class="modal-qty-area">
         <div class="qty-control">
-          <button class="qty-btn minus" aria-label="減少數量" onclick="modalQtyChange(-1)">&#8722;</button>
+          <button class="qty-btn minus" onclick="modalQtyChange(-1)">&#8722;</button>
           <span class="qty-num" id="modalQty">1</span>
-          <button class="qty-btn" aria-label="增加數量" onclick="modalQtyChange(1)">+</button>
+          <button class="qty-btn" onclick="modalQtyChange(1)">+</button>
         </div>
       </div>
-      <button class="modal-add-cart" aria-label="加入購物車" onclick="modalAddToCart()">加入購物車</button>
+      <button class="modal-add-cart" onclick="modalAddToCart()">加入購物車</button>
     </div>
   </div>
 </div>
@@ -889,6 +1415,14 @@ const THEMES = {
   candy:   { name: '糖果繽紛', group: 'special', primary: '#D946EF', primaryLight: '#E879F9', primaryDark: '#C026D3', accent: '#06B6D4', accentLight: '#67E8F9', bg: '#FDF4FF', bgCard: '#FAE8FF', bgSidebar: '#FEF5FF', textPrimary: '#2A1030', textSecondary: '#7A4890', textMuted: '#A878C0', border: '#E8D0F8', borderLight: '#F5E8FC', headerGrad: 'linear-gradient(135deg,#D946EF 0%,#C026D3 40%,#7C3AED 100%)' },
   matcha:  { name: '抹茶拿鐵', group: 'special', primary: '#4D7C0F', primaryLight: '#65A30D', primaryDark: '#3F6212', accent: '#92400E', accentLight: '#B45309', bg: '#F5F5DC', bgCard: '#FAFAE0', bgSidebar: '#F8F8E0', textPrimary: '#1A1A10', textSecondary: '#5A5A30', textMuted: '#8A8A60', border: '#E0E0B8', borderLight: '#ECECD0', headerGrad: 'linear-gradient(135deg,#4D7C0F 0%,#3F6212 40%,#365314 100%)' },
   cafe:    { name: '咖啡時光', group: 'special', primary: '#78350F', primaryLight: '#92400E', primaryDark: '#5C2A0A', accent: '#D97706', accentLight: '#F59E0B', bg: '#FAF5F0', bgCard: '#F5EBE0', bgSidebar: '#FBF6F0', textPrimary: '#1A1210', textSecondary: '#6A5848', textMuted: '#9A8878', border: '#E0D4C4', borderLight: '#F0E8D8', headerGrad: 'linear-gradient(135deg,#78350F 0%,#5C2A0A 40%,#451A03 100%)' },
+  wine:    { name: '紅酒奢華', group: 'special', primary: '#881337', primaryLight: '#BE185D', primaryDark: '#6B0F2A', accent: '#D4A574', accentLight: '#E8C9A8', bg: '#FBF5F5', bgCard: '#FFF5F5', bgSidebar: '#FDF8F8', textPrimary: '#1A0E12', textSecondary: '#6A4050', textMuted: '#A08090', border: '#E8D0D8', borderLight: '#F5E8EE', headerGrad: 'linear-gradient(135deg,#881337 0%,#6B0F2A 50%,#4A0A1E 100%)' },
+  sakura:  { name: '日式和風', group: 'special', primary: '#C2185B', primaryLight: '#E91E63', primaryDark: '#880E4F', accent: '#4DB6AC', accentLight: '#80CBC4', bg: '#FFF8FA', bgCard: '#FFF0F4', bgSidebar: '#FFFBFC', textPrimary: '#2D1520', textSecondary: '#7A4560', textMuted: '#B08898', border: '#F0D0DC', borderLight: '#F8E4EC', headerGrad: 'linear-gradient(135deg,#C2185B 0%,#880E4F 50%,#560027 100%)' },
+  // --- 暗色系 ---
+  midnight:{ name: '午夜深邃', group: 'dark', dark: true, primary: '#6366F1', primaryLight: '#818CF8', primaryDark: '#4F46E5', accent: '#FBBF24', accentLight: '#FDE68A', bg: '#0F1117', bgCard: '#181B25', bgSidebar: '#12141C', textPrimary: '#E8EAF0', textSecondary: '#8A8FA8', textMuted: '#5A5F78', border: '#262A38', borderLight: '#1E2230', headerGrad: 'linear-gradient(160deg,#1A1D2E 0%,#0F1117 100%)' },
+  charcoal:{ name: '碳黑質感', group: 'dark', dark: true, primary: '#10B981', primaryLight: '#34D399', primaryDark: '#059669', accent: '#F59E0B', accentLight: '#FBBF24', bg: '#111111', bgCard: '#1A1A1A', bgSidebar: '#151515', textPrimary: '#E5E5E5', textSecondary: '#888888', textMuted: '#555555', border: '#2A2A2A', borderLight: '#222222', headerGrad: 'linear-gradient(160deg,#1A1A1A 0%,#111111 100%)' },
+  darkocean:{ name: '深海幽藍', group: 'dark', dark: true, primary: '#06B6D4', primaryLight: '#22D3EE', primaryDark: '#0891B2', accent: '#F472B6', accentLight: '#FBCFE8', bg: '#0B1120', bgCard: '#111828', bgSidebar: '#0E1520', textPrimary: '#E0E8F0', textSecondary: '#7090AA', textMuted: '#406080', border: '#1C2838', borderLight: '#162030', headerGrad: 'linear-gradient(160deg,#111828 0%,#0B1120 100%)' },
+  darkrose:{ name: '暗夜玫瑰', group: 'dark', dark: true, primary: '#F43F5E', primaryLight: '#FB7185', primaryDark: '#E11D48', accent: '#A78BFA', accentLight: '#C4B5FD', bg: '#110B10', bgCard: '#1A1218', bgSidebar: '#140E12', textPrimary: '#F0E0E8', textSecondary: '#A07888', textMuted: '#684858', border: '#2A1E28', borderLight: '#221820', headerGrad: 'linear-gradient(160deg,#1A1218 0%,#110B10 100%)' },
+  noir:    { name: '極致純黑', group: 'dark', dark: true, primary: '#E2E8F0', primaryLight: '#F1F5F9', primaryDark: '#CBD5E1', accent: '#FBBF24', accentLight: '#FDE68A', bg: '#000000', bgCard: '#0A0A0A', bgSidebar: '#050505', textPrimary: '#F0F0F0', textSecondary: '#808080', textMuted: '#484848', border: '#1A1A1A', borderLight: '#121212', headerGrad: 'linear-gradient(160deg,#0A0A0A 0%,#000000 100%)' },
 };
 
 function applyTheme(name) {
@@ -911,6 +1445,18 @@ function applyTheme(name) {
   // Header gradient
   if (t.headerGrad) {
     r.setProperty('--header-gradient', t.headerGrad);
+  }
+  // Dark theme: update shadows for dark backgrounds
+  if (t.dark) {
+    r.setProperty('--shadow-sm', '0 1px 4px rgba(0,0,0,0.2)');
+    r.setProperty('--shadow-md', '0 4px 16px rgba(0,0,0,0.3)');
+    r.setProperty('--shadow-lg', '0 8px 30px rgba(0,0,0,0.35)');
+    r.setProperty('--shadow-xl', '0 16px 48px rgba(0,0,0,0.4)');
+  } else {
+    r.setProperty('--shadow-sm', '0 1px 4px rgba(0,0,0,0.05)');
+    r.setProperty('--shadow-md', '0 4px 16px rgba(0,0,0,0.07)');
+    r.setProperty('--shadow-lg', '0 8px 30px rgba(0,0,0,0.10)');
+    r.setProperty('--shadow-xl', '0 16px 48px rgba(0,0,0,0.14)');
   }
   // Menu cards use theme bg
   document.querySelectorAll('.menu-card, .featured-card').forEach(function(el) {
@@ -942,7 +1488,8 @@ function renderThemePanel() {
     { key: 'warm',    label: '\u{2600}\u{FE0F} \u6EAB\u6696\u7CFB' },
     { key: 'cool',    label: '\u{2744}\u{FE0F} \u6E05\u6DBC\u7CFB' },
     { key: 'nature',  label: '\u{1F33F} \u81EA\u7136\u7CFB' },
-    { key: 'special', label: '\u{2728} \u7279\u8272\u7CFB' }
+    { key: 'special', label: '\u{2728} \u7279\u8272\u7CFB' },
+    { key: 'dark',    label: '\u{1F30C} \u6697\u8272\u7CFB' }
   ];
   var html = '<div class="theme-panel-handle"></div>' +
     '<h4>\u{1F3A8} \u9078\u64C7\u98A8\u683C</h4>' +
@@ -1045,6 +1592,7 @@ let guestCount = 3;
 let isScrollingByClick = false;
 let loyaltyConfig = null;
 let memberPointsData = null;
+let _toastTimer = null;
 
 // ===== EMOJI ICONS (ES6 \u{} safe encoding) =====
 const ICONS = {
@@ -1150,6 +1698,12 @@ async function initApp() {
   setupScrollSpy();
   setupSearch();
   setupGuestSelector();
+  initServiceCall();
+  loadSharedCart();
+  initGroupOrder();
+  hookGroupOrderToCart();
+  initSmartRecommendations();
+  initLanguage();
 
   // 消費者模式（有 mode 參數）隱藏風格選擇按鈕；預覽模式顯示
   if (mode) {
@@ -1249,7 +1803,7 @@ async function loadStoreFromSupabase(slug) {
   categories = (catData || []).filter(function(c) {
     // 若無設定時段，全天顯示
     if (!c.time_periods || !Array.isArray(c.time_periods) || c.time_periods.length === 0) return true;
-    // 檢查是否在任一時段內（支援跨午夜，如 22:00~02:00）
+    // 檢查是否在任一時段內
     return c.time_periods.some(function(p) {
       if (p.from <= p.to) return nowHHMM >= p.from && nowHHMM <= p.to;
       return nowHHMM >= p.from || nowHHMM <= p.to;
@@ -1318,31 +1872,1061 @@ function renderBrandHero(store) {
   if (!hasBanner && !hasLogo) return;
 
   var img = document.getElementById('brandHeroImg');
+
   if (hasBanner) {
+    // Banner 模式：全寬大圖
+    hero.classList.add('mode-banner');
     img.src = store.banner_url;
     img.alt = store.store_name || '';
   } else if (hasLogo) {
+    // Logo 模式：居中圓角 logo + 品牌名稱 + 副標題
+    hero.classList.add('mode-logo');
     img.src = store.logo_url;
     img.alt = store.store_name || '';
-    img.style.maxHeight = '180px';
-    img.style.padding = '20px';
-    img.style.margin = '0 auto';
+    // 填入品牌名稱
+    var nameEl = document.getElementById('brandHeroName');
+    if (nameEl && store.store_name) nameEl.textContent = store.store_name;
+    var tagEl = document.getElementById('brandHeroTagline');
+    if (tagEl && store.description) tagEl.textContent = store.description;
   }
   hero.classList.add('show');
 
-  // 顯示分享按鈕（支援 Web Share API 的裝置）
-  if (navigator.share) {
-    document.getElementById('shareBtn').style.display = 'inline-block';
+  // 如果有 Banner，隱藏下方的 shop-header 重複資訊（避免視覺重複）
+  // 不隱藏 — 保留 header 的營業資訊
+
+  // 顯示分享按鈕（支援 Web Share API 或剪貼簿複製）
+  document.getElementById('shareBtn').style.display = 'inline-block';
+}
+
+// ===== MULTI-LANGUAGE TRANSLATION (多語翻譯) =====
+var currentLang = 'zh';
+var translationCache = {}; // { 'zh_en_燒肉麵包': 'Grilled Pork Sandwich' }
+
+// UI 字串翻譯表
+var UI_STRINGS = {
+  zh: {
+    scanOrder: '掃碼點餐', open: '營業中', closed: '休息中', shareOrder: '📤 分享訂單',
+    selectTable: '☑ 選擇桌號 / 用餐人數', tableLabel: '桌號', guestLabel: '人數',
+    tablePlaceholder: '輸入桌號', featured: '本店必點推薦', popular: '人氣精選',
+    searchPlaceholder: '搜尋菜品...', addToCart: '加入購物車', submitOrder: '送出訂單',
+    confirmOrder: '確認訂單', backEdit: '返回修改', confirmSubmit: '確認送出',
+    dineIn: '內用', takeout: '外帶', guest: '人', items: '件', total: '合計',
+    soldOut: '已售完', required: '必選', portionSize: '份量', spicy: '辣度',
+    noSpicy: '不辣', mildSpicy: '小辣', medSpicy: '中辣', hotSpicy: '大辣',
+    cartEmpty: '購物車是空的', cartEmptyHint: '去挑選美味菜品吧！',
+    clearCart: '清空', upsellTitle: '別人也加了這些', upsellHint: '點擊加入',
+    orderSuccess: '訂單已送出！', orderNum: '訂單編號', newOrder: '再來一單',
+    groupOrder: '開啟團體點餐', groupOrdering: '團體點餐中', groupJoin: '加入',
+    groupInvite: '邀請朋友加入', groupLeave: '離開', groupTotal: '團體合計',
+    serviceWater: '💧 加水', serviceUtensils: '🍴 加餐具', serviceNapkin: '🧻 加紙巾', serviceStaff: '🙋 呼叫服務員',
+    serviceNotified: '已通知店員！', aiRec: 'AI', complementRec: '搭配推薦', popularRec: '人氣必點',
+    budgetRec: '銅板美食', upgradeRec: '升級享受'
+  },
+  en: {
+    scanOrder: 'Scan to Order', open: 'Open', closed: 'Closed', shareOrder: '📤 Share',
+    selectTable: '☑ Table / Guests', tableLabel: 'Table', guestLabel: 'Guests',
+    tablePlaceholder: 'Table No.', featured: 'Chef\'s Picks', popular: 'Popular',
+    searchPlaceholder: 'Search menu...', addToCart: 'Add to Cart', submitOrder: 'Place Order',
+    confirmOrder: 'Confirm Order', backEdit: 'Go Back', confirmSubmit: 'Confirm',
+    dineIn: 'Dine-in', takeout: 'Takeout', guest: ' pax', items: ' items', total: 'Total',
+    soldOut: 'Sold Out', required: 'Required', portionSize: 'Size', spicy: 'Spice Level',
+    noSpicy: 'None', mildSpicy: 'Mild', medSpicy: 'Medium', hotSpicy: 'Hot',
+    cartEmpty: 'Cart is empty', cartEmptyHint: 'Browse the menu!',
+    clearCart: 'Clear', upsellTitle: 'Others also ordered', upsellHint: 'Tap to add',
+    orderSuccess: 'Order placed!', orderNum: 'Order #', newOrder: 'Order Again',
+    groupOrder: '👥 Group Order', groupOrdering: 'Group Ordering', groupJoin: 'Join',
+    groupInvite: 'Invite Friends', groupLeave: 'Leave', groupTotal: 'Group Total',
+    serviceWater: '💧 Water', serviceUtensils: '🍴 Utensils', serviceNapkin: '🧻 Napkins', serviceStaff: '🙋 Staff',
+    serviceNotified: 'Staff notified!', aiRec: 'AI', complementRec: 'Pair With', popularRec: 'Popular',
+    budgetRec: 'Budget Picks', upgradeRec: 'Upgrade'
+  },
+  ja: {
+    scanOrder: 'QR注文', open: '営業中', closed: '準備中', shareOrder: '📤 共有',
+    selectTable: '☑ テーブル / 人数', tableLabel: 'テーブル', guestLabel: '人数',
+    tablePlaceholder: 'テーブル番号', featured: 'おすすめ', popular: '人気',
+    searchPlaceholder: 'メニュー検索...', addToCart: 'カートに追加', submitOrder: '注文する',
+    confirmOrder: '注文確認', backEdit: '戻る', confirmSubmit: '注文確定',
+    dineIn: '店内', takeout: 'テイクアウト', guest: '名', items: '品', total: '合計',
+    soldOut: '売り切れ', required: '必須', portionSize: 'サイズ', spicy: '辛さ',
+    noSpicy: '辛くない', mildSpicy: '少し辛い', medSpicy: '中辛', hotSpicy: '激辛',
+    cartEmpty: 'カートは空です', cartEmptyHint: 'メニューを見てみよう！',
+    clearCart: 'クリア', upsellTitle: '一緒にいかが？', upsellHint: 'タップで追加',
+    orderSuccess: '注文完了！', orderNum: '注文番号', newOrder: 'もう一度注文',
+    groupOrder: '👥 グループ注文', groupOrdering: 'グループ注文中', groupJoin: '参加',
+    groupInvite: '友達を招待', groupLeave: '退出', groupTotal: 'グループ合計',
+    serviceWater: '💧 お水', serviceUtensils: '🍴 食器', serviceNapkin: '🧻 ナプキン', serviceStaff: '🙋 スタッフ',
+    serviceNotified: 'スタッフに通知しました！', aiRec: 'AI', complementRec: 'おすすめ組合せ', popularRec: '人気',
+    budgetRec: 'お手頃', upgradeRec: 'グレードアップ'
+  },
+  ko: {
+    scanOrder: 'QR 주문', open: '영업중', closed: '준비중', shareOrder: '📤 공유',
+    selectTable: '☑ 테이블 / 인원', tableLabel: '테이블', guestLabel: '인원',
+    tablePlaceholder: '테이블 번호', featured: '추천 메뉴', popular: '인기',
+    searchPlaceholder: '메뉴 검색...', addToCart: '담기', submitOrder: '주문하기',
+    confirmOrder: '주문 확인', backEdit: '돌아가기', confirmSubmit: '주문 확정',
+    dineIn: '매장', takeout: '포장', guest: '명', items: '개', total: '합계',
+    soldOut: '품절', required: '필수', portionSize: '사이즈', spicy: '맵기',
+    noSpicy: '안 매움', mildSpicy: '약간', medSpicy: '보통', hotSpicy: '매움',
+    cartEmpty: '장바구니가 비었습니다', cartEmptyHint: '메뉴를 둘러보세요!',
+    clearCart: '비우기', upsellTitle: '이것도 함께 어때요?', upsellHint: '탭하여 추가',
+    orderSuccess: '주문 완료!', orderNum: '주문번호', newOrder: '다시 주문',
+    groupOrder: '👥 단체 주문', groupOrdering: '단체 주문 중', groupJoin: '참여',
+    groupInvite: '친구 초대', groupLeave: '나가기', groupTotal: '단체 합계',
+    serviceWater: '💧 물', serviceUtensils: '🍴 수저', serviceNapkin: '🧻 냅킨', serviceStaff: '🙋 직원호출',
+    serviceNotified: '직원에게 알렸습니다!', aiRec: 'AI', complementRec: '함께 추천', popularRec: '인기',
+    budgetRec: '가성비', upgradeRec: '업그레이드'
+  },
+  vi: {
+    scanOrder: 'Quét QR đặt món', open: 'Đang mở', closed: 'Đã đóng', shareOrder: '📤 Chia sẻ',
+    selectTable: '☑ Bàn / Số người', tableLabel: 'Bàn', guestLabel: 'Người',
+    tablePlaceholder: 'Số bàn', featured: 'Món đề xuất', popular: 'Phổ biến',
+    searchPlaceholder: 'Tìm món...', addToCart: 'Thêm vào giỏ', submitOrder: 'Đặt món',
+    confirmOrder: 'Xác nhận đơn', backEdit: 'Quay lại', confirmSubmit: 'Xác nhận',
+    dineIn: 'Tại chỗ', takeout: 'Mang đi', guest: ' người', items: ' món', total: 'Tổng',
+    soldOut: 'Hết món', required: 'Bắt buộc', portionSize: 'Kích cỡ', spicy: 'Độ cay',
+    noSpicy: 'Không cay', mildSpicy: 'Ít cay', medSpicy: 'Vừa', hotSpicy: 'Rất cay',
+    cartEmpty: 'Giỏ hàng trống', cartEmptyHint: 'Hãy chọn món!',
+    clearCart: 'Xóa', upsellTitle: 'Mọi người cũng gọi thêm', upsellHint: 'Chạm để thêm',
+    orderSuccess: 'Đã đặt món!', orderNum: 'Số đơn', newOrder: 'Gọi thêm',
+    groupOrder: '👥 Đặt nhóm', groupOrdering: 'Đang đặt nhóm', groupJoin: 'Tham gia',
+    groupInvite: 'Mời bạn bè', groupLeave: 'Rời', groupTotal: 'Tổng nhóm',
+    serviceWater: '💧 Nước', serviceUtensils: '🍴 Đồ ăn', serviceNapkin: '🧻 Khăn', serviceStaff: '🙋 Gọi nhân viên',
+    serviceNotified: 'Đã thông báo!', aiRec: 'AI', complementRec: 'Gợi ý kết hợp', popularRec: 'Phổ biến',
+    budgetRec: 'Tiết kiệm', upgradeRec: 'Nâng cấp'
+  },
+  th: {
+    scanOrder: 'สแกนสั่งอาหาร', open: 'เปิดอยู่', closed: 'ปิดแล้ว', shareOrder: '📤 แชร์',
+    selectTable: '☑ โต๊ะ / จำนวนคน', tableLabel: 'โต๊ะ', guestLabel: 'คน',
+    tablePlaceholder: 'หมายเลขโต๊ะ', featured: 'เมนูแนะนำ', popular: 'ยอดนิยม',
+    searchPlaceholder: 'ค้นหาเมนู...', addToCart: 'เพิ่มลงตะกร้า', submitOrder: 'สั่งอาหาร',
+    confirmOrder: 'ยืนยันออเดอร์', backEdit: 'กลับ', confirmSubmit: 'ยืนยัน',
+    dineIn: 'ทานที่ร้าน', takeout: 'สั่งกลับ', guest: ' คน', items: ' รายการ', total: 'รวม',
+    soldOut: 'หมดแล้ว', required: 'จำเป็น', portionSize: 'ขนาด', spicy: 'ระดับความเผ็ด',
+    noSpicy: 'ไม่เผ็ด', mildSpicy: 'เผ็ดน้อย', medSpicy: 'เผ็ดกลาง', hotSpicy: 'เผ็ดมาก',
+    cartEmpty: 'ตะกร้าว่าง', cartEmptyHint: 'เลือกเมนูกันเลย!',
+    clearCart: 'ล้าง', upsellTitle: 'คนอื่นสั่งเพิ่ม', upsellHint: 'แตะเพื่อเพิ่ม',
+    orderSuccess: 'สั่งอาหารแล้ว!', orderNum: 'หมายเลขออเดอร์', newOrder: 'สั่งอีกครั้ง',
+    groupOrder: '👥 สั่งเป็นกลุ่ม', groupOrdering: 'กำลังสั่งกลุ่ม', groupJoin: 'เข้าร่วม',
+    groupInvite: 'เชิญเพื่อน', groupLeave: 'ออก', groupTotal: 'รวมกลุ่ม',
+    serviceWater: '💧 น้ำ', serviceUtensils: '🍴 ช้อนส้อม', serviceNapkin: '🧻 ทิชชู่', serviceStaff: '🙋 เรียกพนักงาน',
+    serviceNotified: 'แจ้งพนักงานแล้ว!', aiRec: 'AI', complementRec: 'แนะนำคู่', popularRec: 'ยอดนิยม',
+    budgetRec: 'ประหยัด', upgradeRec: 'อัพเกรด'
   }
+};
+
+// 簡易菜品名翻譯字典（常見台灣餐飲用語）
+var FOOD_DICT = {
+  en: {
+    '燒肉': 'Braised Pork', '火腿': 'Ham', '雞肉': 'Chicken', '烤肉': 'Grilled Meat',
+    '雙層': 'Double', '綜合': 'Mixed', '麵包': 'Sandwich', '套餐': 'Set Meal',
+    '飲料': 'Drink', '小': 'Small', '大': 'Large', '加料': 'Extra', '紅茶': 'Black Tea',
+    '綠茶': 'Green Tea', '奶茶': 'Milk Tea', '咖啡': 'Coffee', '越南': 'Vietnamese',
+    '牛肉': 'Beef', '豬肉': 'Pork', '魚': 'Fish', '蝦': 'Shrimp', '湯': 'Soup',
+    '飯': 'Rice', '麵': 'Noodles', '炒': 'Stir-fried', '炸': 'Fried', '蒸': 'Steamed',
+    '涼拌': 'Cold', '沙拉': 'Salad', '甜點': 'Dessert', '冰': 'Iced', '熱': 'Hot',
+    '珍珠': 'Boba', '豆花': 'Tofu Pudding', '紅豆': 'Red Bean', '芒果': 'Mango'
+  },
+  ja: {
+    '燒肉': '焼肉', '火腿': 'ハム', '雞肉': 'チキン', '烤肉': 'グリル肉',
+    '雙層': 'ダブル', '綜合': 'ミックス', '麵包': 'サンドイッチ', '套餐': 'セット',
+    '飲料': 'ドリンク', '小': '小', '大': '大', '加料': 'トッピング', '紅茶': '紅茶',
+    '綠茶': '緑茶', '奶茶': 'ミルクティー', '咖啡': 'コーヒー', '越南': 'ベトナム',
+    '牛肉': '牛肉', '豬肉': '豚肉', '魚': '魚', '蝦': 'エビ', '湯': 'スープ',
+    '飯': 'ご飯', '麵': '麺', '炒': '炒め', '炸': '揚げ', '蒸': '蒸し'
+  },
+  ko: {
+    '燒肉': '숯불고기', '火腿': '햄', '雞肉': '치킨', '烤肉': '구운고기',
+    '雙層': '더블', '綜合': '모듬', '麵包': '샌드위치', '套餐': '세트',
+    '飲料': '음료', '小': '소', '大': '대', '加料': '토핑', '紅茶': '홍차',
+    '綠茶': '녹차', '奶茶': '밀크티', '咖啡': '커피', '越南': '베트남'
+  },
+  vi: {
+    '燒肉': 'Thịt nguội', '火腿': 'Chả', '雞肉': 'Thịt gà', '烤肉': 'Thịt nướng',
+    '雙層': 'Đôi', '綜合': 'Thập cẩm', '麵包': 'Bánh mì', '套餐': 'Combo',
+    '飲料': 'Nước', '小': 'Nhỏ', '大': 'Lớn', '加料': 'Thêm', '咖啡': 'Cà phê',
+    '越南': 'Việt Nam'
+  },
+  th: {
+    '燒肉': 'หมูย่าง', '火腿': 'แฮม', '雞肉': 'ไก่', '烤肉': 'เนื้อย่าง',
+    '雙層': 'ดับเบิ้ล', '綜合': 'รวม', '麵包': 'แซนด์วิช', '套餐': 'เซ็ต',
+    '飲料': 'เครื่องดื่ม', '小': 'เล็ก', '大': 'ใหญ่', '咖啡': 'กาแฟ'
+  }
+};
+
+function t(key) {
+  var strings = UI_STRINGS[currentLang] || UI_STRINGS.zh;
+  return strings[key] || (UI_STRINGS.zh[key] || key);
+}
+
+function translateFoodName(name, lang) {
+  if (!lang || lang === 'zh') return '';
+  var cacheKey = 'zh_' + lang + '_' + name;
+  if (translationCache[cacheKey]) return translationCache[cacheKey];
+
+  var dict = FOOD_DICT[lang] || FOOD_DICT.en;
+  var result = name;
+  // 替換字典中的關鍵字
+  Object.keys(dict).forEach(function(zh) {
+    result = result.replace(new RegExp(zh, 'g'), dict[zh]);
+  });
+
+  // 如果有 desc 包含英文/越南文，優先用那個
+  translationCache[cacheKey] = result;
+  return result !== name ? result : '';
+}
+
+function getTranslatedName(item) {
+  if (currentLang === 'zh') return '';
+  // 如果 desc 中有目標語言，解析出來
+  if (item.desc) {
+    var parts = item.desc.split('/').map(function(s) { return s.trim(); });
+    if (currentLang === 'en' && parts.length >= 1 && /[a-zA-Z]/.test(parts[0])) return parts[0];
+    if (currentLang === 'vi' && parts.length >= 2) return parts[parts.length - 1];
+  }
+  return translateFoodName(item.name, currentLang);
+}
+
+function toggleLangMenu() {
+  document.getElementById('langMenu').classList.toggle('show');
+  // 延遲加外部點擊關閉
+  setTimeout(function() {
+    document.addEventListener('click', closeLangMenuOutside, { once: true });
+  }, 10);
+}
+function closeLangMenuOutside(e) {
+  var menu = document.getElementById('langMenu');
+  var btn = document.getElementById('langBtn');
+  if (menu && !menu.contains(e.target) && btn && !btn.contains(e.target)) {
+    menu.classList.remove('show');
+  }
+}
+
+function setLanguage(lang) {
+  currentLang = lang;
+  document.getElementById('langMenu').classList.remove('show');
+
+  // 更新按鈕文字
+  var labels = { zh: '中', en: 'EN', ja: '日', ko: '한', vi: 'VN', th: 'TH' };
+  document.getElementById('langBtn').textContent = '🌐 ' + (labels[lang] || lang);
+
+  // 更新 active 狀態
+  document.querySelectorAll('.lang-menu-item').forEach(function(el) {
+    el.classList.toggle('active', el.dataset.lang === lang);
+  });
+
+  // 翻譯 UI
+  applyLanguage();
+
+  // 重新渲染菜單
+  renderMenuContent();
+  renderSidebar();
+
+  showToast(labels[lang] + ' ✓');
+}
+
+function applyLanguage() {
+  // Header
+  var headerTitle = document.getElementById('headerTitle');
+  if (headerTitle) headerTitle.textContent = t('scanOrder');
+  var shopStatus = document.getElementById('shopStatus');
+  if (shopStatus) shopStatus.textContent = t(shopStatus.classList.contains('open') ? 'open' : 'closed');
+
+  // Table selector
+  var tableH3 = document.querySelector('#tableSelector h3');
+  if (tableH3) tableH3.textContent = t('selectTable');
+  var tableLabel = document.querySelector('#tableSelector .table-label');
+  if (tableLabel) tableLabel.textContent = t('tableLabel');
+  var tableInput = document.getElementById('tableNumber');
+  if (tableInput) tableInput.placeholder = t('tablePlaceholder');
+  var guestLabel = document.querySelectorAll('#tableSelector .table-label');
+  if (guestLabel.length > 1) guestLabel[1].textContent = t('guestLabel');
+
+  // Cart bar
+  var submitBtn = document.getElementById('cartSubmit');
+  if (submitBtn) submitBtn.innerHTML = t('submitOrder') + ' &#8594;';
+
+  // Search
+  var searchInput = document.querySelector('.search-input');
+  if (searchInput) searchInput.placeholder = t('searchPlaceholder');
+
+  // Group order
+  var groupBtn = document.getElementById('groupStartBtn');
+  if (groupBtn && !groupBtn.disabled) groupBtn.textContent = t('groupOrder');
+}
+
+function initLanguage() {
+  // 偵測瀏覽器語言
+  var browserLang = (navigator.language || navigator.userLanguage || 'zh').substring(0, 2).toLowerCase();
+  // 也檢查 URL 參數
+  var urlLang = new URLSearchParams(window.location.search).get('lang');
+  var targetLang = urlLang || (UI_STRINGS[browserLang] ? browserLang : 'zh');
+
+  if (targetLang !== 'zh') {
+    setLanguage(targetLang);
+  }
+}
+
+// ===== AI SMART RECOMMENDATIONS (智慧推薦) =====
+var smartRecContext = { hour: new Date().getHours(), dayType: 'weekday', cartTotal: 0 };
+
+function initSmartRecommendations() {
+  var now = new Date();
+  smartRecContext.hour = now.getHours();
+  smartRecContext.dayType = (now.getDay() === 0 || now.getDay() === 6) ? 'weekend' : 'weekday';
+
+  renderSmartRecBar();
+  renderSmartRecSection();
+}
+
+function getTimeContext() {
+  var h = smartRecContext.hour;
+  if (h >= 6 && h < 11) return { period: 'morning', label: '早安', emoji: '🌅', suggest: '來份元氣早餐' };
+  if (h >= 11 && h < 14) return { period: 'lunch', label: '午餐', emoji: '☀️', suggest: '午間套餐最划算' };
+  if (h >= 14 && h < 17) return { period: 'afternoon', label: '下午', emoji: '🍵', suggest: '下午茶時光' };
+  if (h >= 17 && h < 21) return { period: 'dinner', label: '晚餐', emoji: '🌙', suggest: '今晚想吃什麼？' };
+  return { period: 'late', label: '宵夜', emoji: '🌃', suggest: '深夜食堂' };
+}
+
+function getSmartCategories() {
+  // 根據購物車分析互補分類
+  var cartCats = {};
+  cart.forEach(function(c) {
+    var item = menuItems.find(function(i) { return i.id === c.id; });
+    if (item) cartCats[item.category] = (cartCats[item.category] || 0) + 1;
+  });
+
+  var allCats = {};
+  menuItems.forEach(function(i) { if (i.available !== false) allCats[i.category] = true; });
+  var catList = Object.keys(allCats);
+
+  // 找出未購買的分類作為推薦
+  var missingCats = catList.filter(function(c) { return !cartCats[c]; });
+  return { cartCats: cartCats, missingCats: missingCats, allCats: catList };
+}
+
+function getSmartRecommendations(type) {
+  var cartIds = cart.map(function(c) { return c.id; });
+  var available = menuItems.filter(function(i) { return i.available !== false && cartIds.indexOf(i.id) === -1; });
+  var timeCtx = getTimeContext();
+  var catInfo = getSmartCategories();
+
+  switch(type) {
+    case 'complement':
+      // 互補推薦：推薦不同分類的熱門品項
+      return {
+        title: '搭配推薦',
+        reason: '根據你的購物車',
+        emoji: '🧩',
+        items: available
+          .filter(function(i) { return catInfo.missingCats.indexOf(i.category) !== -1; })
+          .sort(function(a, b) {
+            var as = (a.featured ? 10 : 0) + ((a.tags || []).indexOf('hot') >= 0 ? 5 : 0) + (a.image ? 3 : 0);
+            var bs = (b.featured ? 10 : 0) + ((b.tags || []).indexOf('hot') >= 0 ? 5 : 0) + (b.image ? 3 : 0);
+            return bs - as;
+          })
+          .slice(0, 5)
+      };
+
+    case 'popular':
+      // 人氣推薦：featured + hot 標籤
+      return {
+        title: '大家都在點',
+        reason: '人氣排行',
+        emoji: '🔥',
+        items: available
+          .filter(function(i) { return i.featured || (i.tags || []).indexOf('hot') >= 0 || (i.tags || []).indexOf('推薦') >= 0; })
+          .slice(0, 5)
+      };
+
+    case 'budget':
+      // 小資推薦：價格最優惠的
+      var cartTotal = cart.reduce(function(s, c) { return s + c.price * c.qty; }, 0);
+      return {
+        title: '銅板美食',
+        reason: '小資首選',
+        emoji: '💰',
+        items: available
+          .filter(function(i) { return i.price <= 60; })
+          .sort(function(a, b) {
+            var as = (a.image ? 5 : 0) + (a.featured ? 3 : 0);
+            var bs = (b.image ? 5 : 0) + (b.featured ? 3 : 0);
+            return bs - as;
+          })
+          .slice(0, 5)
+      };
+
+    case 'time':
+      // 時段推薦
+      var drinkCats = ['drink', 'drinks', '飲料', '飲品'];
+      var setCats = ['setL', 'setS', 'set', '套餐', '大套餐', '小套餐'];
+      var targetCats = [];
+      if (timeCtx.period === 'afternoon') targetCats = drinkCats;
+      else if (timeCtx.period === 'lunch' || timeCtx.period === 'dinner') targetCats = setCats;
+
+      var filtered = targetCats.length > 0
+        ? available.filter(function(i) { return targetCats.indexOf(i.category) >= 0; })
+        : available.filter(function(i) { return i.featured; });
+
+      return {
+        title: timeCtx.suggest,
+        reason: timeCtx.label + '時段',
+        emoji: timeCtx.emoji,
+        items: filtered.sort(function(a, b) {
+          return (b.featured ? 1 : 0) - (a.featured ? 1 : 0);
+        }).slice(0, 5)
+      };
+
+    case 'upgrade':
+      // 升級推薦：購物車裡的品項有更高價的同分類選擇
+      var upgrades = [];
+      cart.forEach(function(c) {
+        var item = menuItems.find(function(i) { return i.id === c.id; });
+        if (!item) return;
+        var better = available.filter(function(i) {
+          return i.category === item.category && i.price > item.price;
+        }).sort(function(a, b) { return a.price - b.price; });
+        if (better.length > 0 && upgrades.length < 5) upgrades.push(better[0]);
+      });
+      return {
+        title: '升級享受',
+        reason: '加一點更滿足',
+        emoji: '⬆️',
+        items: upgrades
+      };
+
+    default:
+      return { title: '', reason: '', emoji: '', items: [] };
+  }
+}
+
+function renderSmartRecBar() {
+  var menuArea = document.getElementById('menuContent');
+  if (!menuArea) return;
+
+  // 在菜單內容頂部加入智慧推薦列
+  var existing = document.getElementById('smartRecBar');
+  if (existing) existing.remove();
+
+  var timeCtx = getTimeContext();
+  var chips = [
+    { type: 'time', emoji: timeCtx.emoji, label: timeCtx.suggest },
+    { type: 'popular', emoji: '🔥', label: '人氣必點' },
+    { type: 'budget', emoji: '💰', label: '銅板美食' }
+  ];
+  if (cart.length > 0) {
+    chips.unshift({ type: 'complement', emoji: '🧩', label: '搭配推薦', highlight: true });
+    chips.push({ type: 'upgrade', emoji: '⬆️', label: '升級享受' });
+  }
+
+  var html = '<div class="smart-rec-bar" id="smartRecBar">';
+  html += '<span style="font-size:13px;font-weight:700;white-space:nowrap;color:var(--text-secondary);">🤖 AI</span>';
+  chips.forEach(function(c) {
+    html += '<div class="smart-rec-chip' + (c.highlight ? ' highlight' : '') + '" onclick="showSmartRec(\'' + c.type + '\')">' +
+      '<span class="rec-emoji">' + c.emoji + '</span>' + c.label + '</div>';
+  });
+  html += '</div>';
+
+  // 插入到菜單區域頂部
+  var contentArea = document.querySelector('.content-area');
+  if (contentArea) {
+    var recDiv = document.createElement('div');
+    recDiv.id = 'smartRecBar';
+    recDiv.innerHTML = html;
+    var first = contentArea.firstChild;
+    if (first) contentArea.insertBefore(recDiv, first);
+    else contentArea.appendChild(recDiv);
+  }
+}
+
+function renderSmartRecSection() {
+  // 自動顯示一個時段推薦
+  var existing = document.getElementById('smartRecSection');
+  if (existing) existing.remove();
+
+  var timeRec = getSmartRecommendations('time');
+  if (timeRec.items.length === 0) {
+    timeRec = getSmartRecommendations('popular');
+  }
+  if (timeRec.items.length === 0) return;
+
+  insertSmartRecSection(timeRec);
+}
+
+function showSmartRec(type) {
+  var rec = getSmartRecommendations(type);
+  if (rec.items.length === 0) { showToast('暫無相關推薦'); return; }
+
+  var existing = document.getElementById('smartRecSection');
+  if (existing) existing.remove();
+
+  insertSmartRecSection(rec);
+
+  // 滾動到推薦區
+  setTimeout(function() {
+    var el = document.getElementById('smartRecSection');
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 100);
+}
+
+function insertSmartRecSection(rec) {
+  var itemsHtml = '';
+  rec.items.forEach(function(item) {
+    var imgSrc = item.image || generatePlaceholder(item.name);
+    itemsHtml += '<div class="smart-rec-item" onclick="openItemModal(\'' + item.id + '\')">' +
+      '<img class="smart-rec-item-img" src="' + imgSrc + '" onerror="this.src=\'' + generatePlaceholder(item.name) + '\'">' +
+      '<div class="smart-rec-item-name">' + escHtml(item.name) + '</div>' +
+      '<div class="smart-rec-item-price">$' + item.price + '</div>' +
+    '</div>';
+  });
+
+  var html = '<div class="smart-rec-section" id="smartRecSection">' +
+    '<div class="smart-rec-title">' +
+      '<span class="rec-ai-badge">AI</span>' +
+      '<h4>' + rec.emoji + ' ' + rec.title + '</h4>' +
+      '<span class="rec-reason">' + rec.reason + '</span>' +
+    '</div>' +
+    '<div class="smart-rec-items">' + itemsHtml + '</div>' +
+  '</div>';
+
+  var contentArea = document.querySelector('.content-area');
+  if (contentArea) {
+    var recBar = document.getElementById('smartRecBar');
+    var insertAfter = recBar || contentArea.firstChild;
+    var div = document.createElement('div');
+    div.id = 'smartRecSection';
+    div.innerHTML = html;
+    if (insertAfter && insertAfter.nextSibling) {
+      contentArea.insertBefore(div, insertAfter.nextSibling);
+    } else {
+      contentArea.appendChild(div);
+    }
+  }
+}
+
+// 購物車變動時刷新推薦
+function refreshSmartRec() {
+  renderSmartRecBar();
+}
+
+// ===== GROUP ORDER (團體點餐) =====
+var groupSession = null;  // { sessionId, tableNum, storeId, createdAt }
+var groupMe = null;       // { memberId, nickname, avatar }
+var groupMembers = [];    // [{ memberId, nickname, avatar, items, total, status }]
+var groupPollTimer = null;
+var GROUP_AVATARS = ['🐱','🐶','🐰','🐻','🐼','🦊','🐸','🐵','🐧','🦁','🐯','🐮'];
+
+function initGroupOrder() {
+  // 內用模式 2人以上才顯示團體點餐入口
+  if (window._orderMode === 'takeout') return;
+  document.getElementById('groupOrderEntry').style.display = '';
+
+  // 檢查 URL 是否有 group 參數（被邀請加入）
+  var params = new URLSearchParams(window.location.search);
+  var groupId = params.get('group');
+  if (groupId) {
+    document.getElementById('groupJoinBtn').style.display = '';
+    document.getElementById('groupJoinBtn').setAttribute('data-group', groupId);
+    // 自動彈出加入對話框
+    setTimeout(function() { showJoinGroup(groupId); }, 500);
+  }
+}
+
+function generateSessionId() {
+  return 'grp_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2, 6);
+}
+function generateMemberId() {
+  return 'mem_' + Math.random().toString(36).substr(2, 8);
+}
+
+// 開啟團體點餐（發起人）
+function startGroupOrder() {
+  var tableNum = document.getElementById('tableNumber').value.trim();
+  if (!tableNum) { showToast('請先輸入桌號'); document.getElementById('tableNumber').focus(); return; }
+
+  groupSession = {
+    sessionId: generateSessionId(),
+    tableNum: tableNum,
+    storeId: currentStoreId,
+    createdAt: new Date().toISOString()
+  };
+
+  // 選頭像和暱稱
+  showAvatarPicker(true);
+}
+
+// 加入團體點餐（被邀請者）
+function showJoinGroup(groupId) {
+  if (!groupId) {
+    var btn = document.getElementById('groupJoinBtn');
+    groupId = btn ? btn.getAttribute('data-group') : null;
+  }
+  if (!groupId) { showToast('無效的團體點餐連結'); return; }
+
+  // 設定 session（簡化版：用 sessionId 加入）
+  var tableNum = document.getElementById('tableNumber').value.trim();
+  groupSession = {
+    sessionId: groupId,
+    tableNum: tableNum || '?',
+    storeId: currentStoreId,
+    createdAt: null
+  };
+
+  showAvatarPicker(false);
+}
+
+function showAvatarPicker(isHost) {
+  var avatarHtml = GROUP_AVATARS.map(function(a, i) {
+    return '<div class="group-avatar-opt' + (i === 0 ? ' active' : '') + '" onclick="pickGroupAvatar(this)" data-avatar="' + a + '">' + a + '</div>';
+  }).join('');
+
+  var overlay = document.getElementById('itemModalOverlay');
+  overlay.innerHTML = '<div class="item-modal group-join-modal" onclick="event.stopPropagation()" style="padding:24px 20px;">' +
+    '<h2 style="font-size:20px;font-weight:800;margin:0 0 4px;">' + (isHost ? '👥 開啟團體點餐' : '👥 加入團體點餐') + '</h2>' +
+    '<div style="font-size:13px;color:#888;margin-bottom:12px;">' + (isHost ? '選擇你的頭像和暱稱，朋友可掃碼加入' : '選擇頭像讓大家認識你') + '</div>' +
+    '<div class="group-avatar-picker">' + avatarHtml + '</div>' +
+    '<input type="text" id="groupNickname" placeholder="輸入暱稱（例：小明）" maxlength="10" ' +
+      'style="width:100%;padding:12px 16px;border:1.5px solid var(--border);border-radius:var(--radius-sm);font-size:15px;font-family:inherit;text-align:center;margin-bottom:16px;background:var(--bg);">' +
+    '<button onclick="confirmJoinGroup(' + (isHost ? 'true' : 'false') + ')" ' +
+      'style="width:100%;padding:14px;border:none;border-radius:var(--radius-md);background:var(--primary);color:#FFF;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;">' +
+      (isHost ? '開始團體點餐' : '加入點餐') +
+    '</button>' +
+  '</div>';
+  overlay.classList.add('show');
+}
+
+function pickGroupAvatar(el) {
+  el.parentElement.querySelectorAll('.group-avatar-opt').forEach(function(a) { a.classList.remove('active'); });
+  el.classList.add('active');
+}
+
+function confirmJoinGroup(isHost) {
+  var nickname = document.getElementById('groupNickname').value.trim();
+  if (!nickname) { showToast('請輸入暱稱'); document.getElementById('groupNickname').focus(); return; }
+  var avatarEl = document.querySelector('.group-avatar-opt.active');
+  var avatar = avatarEl ? avatarEl.dataset.avatar : '🐱';
+
+  groupMe = {
+    memberId: generateMemberId(),
+    nickname: nickname,
+    avatar: avatar,
+    isHost: isHost
+  };
+
+  // 關閉 modal
+  document.getElementById('itemModalOverlay').classList.remove('show');
+
+  // 儲存 session
+  saveGroupMember();
+
+  // 顯示團體面板
+  showGroupPanel();
+
+  // 開始定時同步
+  startGroupSync();
+
+  // 更新 UI
+  document.getElementById('groupStartBtn').textContent = '👥 團體點餐中';
+  document.getElementById('groupStartBtn').disabled = true;
+  document.getElementById('groupStartBtn').style.opacity = '0.5';
+
+  showToast(avatar + ' ' + nickname + ' 已加入團體點餐！');
+
+  // 清除 URL 中的 group 參數
+  var url = new URL(window.location);
+  url.searchParams.delete('group');
+  window.history.replaceState({}, '', url);
+}
+
+function showGroupPanel() {
+  document.getElementById('groupPanel').style.display = '';
+  document.getElementById('groupSessionInfo').textContent = groupSession.tableNum + ' 桌';
+  renderGroupMembers();
+}
+
+function renderGroupMembers() {
+  var container = document.getElementById('groupMembers');
+  if (!container) return;
+
+  // 合併自己的即時購物車資料
+  var myData = {
+    memberId: groupMe.memberId,
+    nickname: groupMe.nickname,
+    avatar: groupMe.avatar,
+    items: cart.map(function(c) {
+      var item = menuItems.find(function(i) { return i.id === c.id; });
+      return { name: item ? item.name : '???', qty: c.qty, price: c.price };
+    }),
+    total: cart.reduce(function(s, c) { return s + c.price * c.qty; }, 0),
+    count: cart.reduce(function(s, c) { return s + c.qty; }, 0),
+    status: cart.length > 0 ? 'ordering' : 'browsing'
+  };
+
+  // 合併所有成員（自己 + 其他人）
+  var allMembers = [myData];
+  groupMembers.forEach(function(m) {
+    if (m.memberId !== groupMe.memberId) allMembers.push(m);
+  });
+
+  var html = '';
+  var grandTotal = 0;
+  allMembers.forEach(function(m) {
+    var isMe = m.memberId === groupMe.memberId;
+    var statusText = '';
+    if (m.count > 0) {
+      statusText = m.count + ' 項';
+      var itemNames = (m.items || []).slice(0, 3).map(function(i) { return i.name; }).join('、');
+      if (itemNames) statusText += '：' + itemNames;
+      if ((m.items || []).length > 3) statusText += '…';
+    } else {
+      statusText = m.status === 'browsing' ? '瀏覽菜單中…' : '尚未開始';
+    }
+    grandTotal += (m.total || 0);
+
+    html += '<div class="group-member' + (isMe ? ' me' : '') + '">' +
+      '<div class="group-member-avatar">' + m.avatar + '</div>' +
+      '<div class="group-member-info">' +
+        '<div class="group-member-name">' + m.nickname + (isMe ? '（你）' : '') + '</div>' +
+        '<div class="group-member-status">' + statusText + '</div>' +
+      '</div>' +
+      (m.total > 0 ? '<div class="group-member-total">$' + m.total + '</div>' : '') +
+    '</div>';
+  });
+
+  // 合計列
+  if (allMembers.length > 1) {
+    html += '<div style="display:flex;justify-content:space-between;padding:8px 10px 2px;border-top:1px solid var(--border-light);margin-top:4px;">' +
+      '<span style="font-size:13px;font-weight:700;color:var(--text-secondary);">團體合計</span>' +
+      '<span style="font-size:16px;font-weight:800;color:var(--primary);">$' + grandTotal + '</span>' +
+    '</div>';
+  }
+
+  container.innerHTML = html;
+}
+
+// 同步購物車到 Supabase（使用 orders 表作為即時通訊通道）
+async function saveGroupMember() {
+  if (!groupSession || !groupMe || !currentStoreId) return;
+  try {
+    var myItems = cart.map(function(c) {
+      var item = menuItems.find(function(i) { return i.id === c.id; });
+      return { name: item ? item.name : '???', qty: c.qty, price: c.price };
+    });
+
+    var payload = {
+      store_id: currentStoreId,
+      table_number: groupSession.tableNum,
+      order_type: 'group_sync',
+      status: 'active',
+      notes: JSON.stringify({
+        sessionId: groupSession.sessionId,
+        memberId: groupMe.memberId,
+        nickname: groupMe.nickname,
+        avatar: groupMe.avatar,
+        isHost: groupMe.isHost || false,
+        timestamp: new Date().toISOString()
+      }),
+      items: myItems,
+      total: cart.reduce(function(s, c) { return s + c.price * c.qty; }, 0)
+    };
+
+    await fetch(SUPABASE_URL + '/rest/v1/orders', {
+      method: 'POST',
+      headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json', 'Prefer': 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify(payload)
+    });
+  } catch(e) { /* 靜默處理 */ }
+}
+
+// 定時同步
+function startGroupSync() {
+  if (groupPollTimer) clearInterval(groupPollTimer);
+
+  // 每 3 秒同步一次
+  groupPollTimer = setInterval(function() {
+    syncGroupData();
+    saveGroupMember(); // 同時上傳自己的最新狀態
+  }, 3000);
+
+  // 立即同步一次
+  syncGroupData();
+}
+
+async function syncGroupData() {
+  if (!groupSession || !currentStoreId) return;
+  try {
+    // 查詢同 session 的所有成員最新資料
+    var res = await fetch(SUPABASE_URL + '/rest/v1/orders?store_id=eq.' + currentStoreId +
+      '&order_type=eq.group_sync&status=eq.active' +
+      '&table_number=eq.' + encodeURIComponent(groupSession.tableNum) +
+      '&notes=like.*' + encodeURIComponent(groupSession.sessionId) + '*' +
+      '&order=created_at.desc&limit=20', {
+      headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' }
+    });
+    var data = await res.json();
+    if (!Array.isArray(data)) return;
+
+    // 只保留每個 memberId 的最新一筆
+    var latest = {};
+    data.forEach(function(row) {
+      try {
+        var meta = JSON.parse(row.notes);
+        if (!meta.memberId) return;
+        if (!latest[meta.memberId] || new Date(meta.timestamp) > new Date(latest[meta.memberId]._ts)) {
+          latest[meta.memberId] = {
+            memberId: meta.memberId,
+            nickname: meta.nickname,
+            avatar: meta.avatar,
+            items: row.items || [],
+            total: row.total || 0,
+            count: (row.items || []).reduce(function(s, i) { return s + (i.qty || 1); }, 0),
+            status: (row.items || []).length > 0 ? 'ordering' : 'browsing',
+            _ts: meta.timestamp
+          };
+        }
+      } catch(e) {}
+    });
+
+    groupMembers = Object.values(latest);
+    renderGroupMembers();
+  } catch(e) { /* 靜默處理 */ }
+}
+
+function shareGroupLink() {
+  if (!groupSession) return;
+  var name = document.getElementById('shopName').textContent;
+  var baseUrl = window.location.origin + window.location.pathname;
+  var params = '?store=' + currentStoreId + '&table=' + encodeURIComponent(groupSession.tableNum) + '&group=' + groupSession.sessionId;
+  var url = baseUrl + params;
+
+  if (navigator.share) {
+    navigator.share({
+      title: name + ' 團體點餐',
+      text: '加入 ' + name + ' ' + groupSession.tableNum + ' 桌的團體點餐！',
+      url: url
+    }).catch(function() {});
+  } else {
+    copyToClipboard(url);
+  }
+}
+
+function leaveGroupOrder() {
+  if (groupPollTimer) { clearInterval(groupPollTimer); groupPollTimer = null; }
+  groupSession = null;
+  groupMe = null;
+  groupMembers = [];
+  document.getElementById('groupPanel').style.display = 'none';
+  document.getElementById('groupStartBtn').textContent = '👥 開啟團體點餐';
+  document.getElementById('groupStartBtn').disabled = false;
+  document.getElementById('groupStartBtn').style.opacity = '';
+  showToast('已離開團體點餐');
+}
+
+// 攔截 updateCartUI 以同步團體面板
+var _originalUpdateCartUI = null;
+function hookGroupOrderToCart() {
+  if (_originalUpdateCartUI) return;
+  _originalUpdateCartUI = updateCartUI;
+  updateCartUI = function() {
+    _originalUpdateCartUI();
+    if (groupSession && groupMe) {
+      renderGroupMembers();
+    }
+    // 購物車變動時刷新 AI 推薦列
+    refreshSmartRec();
+  };
+}
+
+// ===== SERVICE CALL (服務呼叫) =====
+function initServiceCall() {
+  // 內用模式才顯示服務呼叫按鈕
+  if (window._orderMode !== 'takeout') {
+    var fab = document.getElementById('serviceCallFab');
+    if (fab) fab.style.display = '';
+  }
+}
+function toggleServiceMenu() {
+  var menu = document.getElementById('serviceMenu');
+  menu.classList.toggle('show');
+  // 點擊外部關閉
+  if (menu.classList.contains('show')) {
+    setTimeout(function() {
+      document.addEventListener('click', closeServiceMenuOutside, { once: true });
+    }, 10);
+  }
+}
+function closeServiceMenuOutside(e) {
+  var fab = document.getElementById('serviceCallFab');
+  if (fab && !fab.contains(e.target)) {
+    document.getElementById('serviceMenu').classList.remove('show');
+  }
+}
+async function sendServiceCall(type) {
+  document.getElementById('serviceMenu').classList.remove('show');
+  var labels = { water: '💧 加水', utensils: '🍴 加餐具', napkin: '🧻 加紙巾', staff: '🙋 呼叫服務員' };
+  var tableNum = document.getElementById('tableNumber') ? document.getElementById('tableNumber').value.trim() : '';
+  // 嘗試寫入 Supabase orders 表（type: service_call）
+  if (currentStoreId && window.SUPABASE_URL) {
+    try {
+      await fetch(window.SUPABASE_URL + '/rest/v1/orders', {
+        method: 'POST', headers: { 'apikey': window.SUPABASE_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+        body: JSON.stringify({ store_id: currentStoreId, table_number: tableNum || '未知', order_type: 'service_call', status: 'pending', items: [{ type: type, label: labels[type] }], total: 0, notes: labels[type] })
+      });
+    } catch(e) { /* 失敗不影響提示 */ }
+  }
+  showToast(labels[type] + ' 已通知店員！');
 }
 
 function shareOrder() {
   var name = document.getElementById('shopName').textContent;
-  navigator.share({
-    title: name + ' — 線上點餐',
-    text: '一起來 ' + name + ' 點餐吧！',
-    url: window.location.href
-  }).catch(function() {});
+  // 如果購物車有東西，分享購物車連結
+  if (cart.length > 0) {
+    showShareOptions(name);
+  } else {
+    // 空購物車，分享店面連結
+    shareStoreLink(name);
+  }
+}
+
+function shareStoreLink(name) {
+  var baseUrl = window.location.origin + window.location.pathname + '?store=' + currentStoreId;
+  if (navigator.share) {
+    navigator.share({ title: name + ' — 線上點餐', text: '一起來 ' + name + ' 點餐吧！', url: baseUrl }).catch(function() {});
+  } else {
+    copyToClipboard(baseUrl);
+  }
+}
+
+function showShareOptions(name) {
+  var cartSummary = cart.map(function(c) {
+    var item = menuItems.find(function(i) { return i.id === c.id; });
+    return (item ? item.name : '???') + ' x' + c.qty;
+  }).join('、');
+  var totalPrice = cart.reduce(function(s, c) { return s + c.price * c.qty; }, 0);
+  var totalQty = cart.reduce(function(s, c) { return s + c.qty; }, 0);
+
+  // 編碼購物車到 URL
+  var cartData = cart.map(function(c) {
+    return { i: c.id, q: c.qty, p: c.price, s: c.sizeName || '', o: (c.selectedOpts || []).map(function(op) { return typeof op === 'string' ? op : (op.name || ''); }) };
+  });
+  var encoded = btoa(unescape(encodeURIComponent(JSON.stringify(cartData))));
+  var baseUrl = window.location.origin + window.location.pathname + '?store=' + currentStoreId;
+  var cartUrl = baseUrl + '&cart=' + encoded;
+
+  var overlay = document.getElementById('itemModalOverlay');
+  overlay.innerHTML = '<div class="item-modal" onclick="event.stopPropagation()" style="padding:24px 20px;max-height:80vh;">' +
+    '<h2 style="text-align:center;font-size:18px;font-weight:800;margin:0 0 4px;">📤 分享點餐</h2>' +
+    '<div style="text-align:center;font-size:13px;color:#888;margin-bottom:18px;">選擇分享方式</div>' +
+
+    '<div style="background:var(--bg);border-radius:var(--radius-md);padding:14px 16px;margin-bottom:16px;">' +
+      '<div style="font-size:13px;font-weight:700;margin-bottom:6px;">購物車內容（' + totalQty + ' 件 · $' + totalPrice + '）</div>' +
+      '<div style="font-size:12px;color:#888;line-height:1.6;max-height:60px;overflow:hidden;">' + cartSummary + '</div>' +
+    '</div>' +
+
+    '<button onclick="shareCartNative()" style="width:100%;padding:14px;border:none;border-radius:var(--radius-md);background:var(--primary);color:#FFF;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:8px;font-family:inherit;">' +
+      '📱 分享購物車連結' +
+    '</button>' +
+    '<button onclick="shareTextSummary()" style="width:100%;padding:14px;border:none;border-radius:var(--radius-md);background:var(--bg);color:var(--text-primary);font-size:15px;font-weight:700;cursor:pointer;margin-bottom:8px;font-family:inherit;border:1.5px solid var(--border);">' +
+      '📋 複製文字清單' +
+    '</button>' +
+    '<button onclick="shareStoreOnly()" style="width:100%;padding:14px;border:none;border-radius:var(--radius-md);background:transparent;color:var(--text-muted);font-size:13px;cursor:pointer;font-family:inherit;">' +
+      '只分享店面連結' +
+    '</button>' +
+  '</div>';
+  overlay.classList.add('show');
+
+  // 暫存分享資料
+  window._shareData = { name: name, cartUrl: cartUrl, baseUrl: baseUrl, cartSummary: cartSummary, totalPrice: totalPrice, totalQty: totalQty };
+}
+
+function shareCartNative() {
+  var d = window._shareData;
+  document.getElementById('itemModalOverlay').classList.remove('show');
+  if (navigator.share) {
+    navigator.share({
+      title: d.name + ' — 我的點餐清單',
+      text: '我在 ' + d.name + ' 點了 ' + d.totalQty + ' 樣（$' + d.totalPrice + '），一起看看：',
+      url: d.cartUrl
+    }).catch(function() {});
+  } else {
+    copyToClipboard(d.cartUrl);
+  }
+}
+
+function shareTextSummary() {
+  var d = window._shareData;
+  var text = '📋 ' + d.name + ' 點餐清單\n';
+  cart.forEach(function(c) {
+    var item = menuItems.find(function(i) { return i.id === c.id; });
+    var name = item ? item.name : '???';
+    var detail = '';
+    if (c.sizeName) detail += c.sizeName;
+    if (c.selectedOpts && c.selectedOpts.length > 0) {
+      var optNames = c.selectedOpts.map(function(o) { return typeof o === 'string' ? o : (o.name || ''); }).filter(Boolean).join(', ');
+      detail += (detail ? ' / ' : '') + optNames;
+    }
+    text += '• ' + name + (detail ? '（' + detail + '）' : '') + ' x' + c.qty + '  $' + (c.price * c.qty) + '\n';
+  });
+  text += '──────────\n合計 ' + d.totalQty + ' 件  $' + d.totalPrice + '\n';
+  text += '👉 ' + d.baseUrl;
+
+  copyToClipboard(text);
+  document.getElementById('itemModalOverlay').classList.remove('show');
+}
+
+function shareStoreOnly() {
+  var d = window._shareData;
+  document.getElementById('itemModalOverlay').classList.remove('show');
+  shareStoreLink(d.name);
+}
+
+function copyToClipboard(text) {
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(text).then(function() {
+      showToast('已複製到剪貼簿！');
+    }).catch(function() { fallbackCopy(text); });
+  } else {
+    fallbackCopy(text);
+  }
+}
+function fallbackCopy(text) {
+  var ta = document.createElement('textarea');
+  ta.value = text; ta.style.cssText = 'position:fixed;left:-9999px';
+  document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); showToast('已複製到剪貼簿！'); } catch(e) { showToast('複製失敗，請手動複製'); }
+  document.body.removeChild(ta);
+}
+
+// ===== 接收分享購物車連結 =====
+function loadSharedCart() {
+  var params = new URLSearchParams(window.location.search);
+  var cartParam = params.get('cart');
+  if (!cartParam) return;
+  try {
+    var decoded = JSON.parse(decodeURIComponent(escape(atob(cartParam))));
+    if (!Array.isArray(decoded) || decoded.length === 0) return;
+    // 等菜單載入後才匯入
+    var checkMenu = setInterval(function() {
+      if (menuItems.length > 0) {
+        clearInterval(checkMenu);
+        var imported = 0;
+        decoded.forEach(function(c) {
+          var item = menuItems.find(function(i) { return i.id === c.i; });
+          if (item && item.available) {
+            cart.push({ id: c.i, qty: c.q || 1, price: c.p || item.price, sizeName: c.s || null, selectedOpts: (c.o || []).map(function(n) { return { name: n }; }) });
+            imported++;
+          }
+        });
+        if (imported > 0) {
+          updateCartUI();
+          showToast('已匯入 ' + imported + ' 項共享點餐！');
+          // 清除 URL 中的 cart 參數
+          var url = new URL(window.location);
+          url.searchParams.delete('cart');
+          window.history.replaceState({}, '', url);
+        }
+      }
+    }, 200);
+  } catch(e) { /* 解析失敗靜默忽略 */ }
 }
 
 // ===== RENDER SIDEBAR =====
@@ -1377,7 +2961,9 @@ function renderMenuContent(filter) {
     if (items.length === 0 && filter) return;
 
     html += '<div class="category-section" id="catSection_' + cat.id + '" data-cat="' + cat.id + '">' +
-      '<div class="category-header"><span class="cat-emoji">' + cat.icon + '</span><h3>' + cat.name + '</h3><span class="count">' + items.length + ' 道</span></div>' +
+      '<div class="category-header"><span class="cat-emoji">' + cat.icon + '</span><h3>' + cat.name + '</h3><span class="count">' + items.length + ' 道</span>' +
+      '<div class="view-toggle"><button class="view-toggle-btn active" onclick="setViewMode(\'list\', this)" title="列表"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="0" y="1" width="14" height="2.5" rx="1" fill="currentColor"/><rect x="0" y="5.75" width="14" height="2.5" rx="1" fill="currentColor"/><rect x="0" y="10.5" width="14" height="2.5" rx="1" fill="currentColor"/></svg></button><button class="view-toggle-btn" onclick="setViewMode(\'grid\', this)" title="大圖"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="0" y="0" width="6" height="6" rx="1.5" fill="currentColor"/><rect x="8" y="0" width="6" height="6" rx="1.5" fill="currentColor"/><rect x="0" y="8" width="6" height="6" rx="1.5" fill="currentColor"/><rect x="8" y="8" width="6" height="6" rx="1.5" fill="currentColor"/></svg></button></div>' +
+      '</div>' +
       (items.length === 0
         ? '<div class="empty-state"><div class="empty-icon">' + ICONS.empty + '</div><div class="empty-title">即將推出</div><div class="empty-desc">此類別暫無菜品</div></div>'
         : items.map((item, idx) => renderMenuItem(item, idx)).join('')) +
@@ -1393,10 +2979,14 @@ function qid(id) { return "'" + id + "'"; }
 
 function renderFeaturedCard(item) {
   const imgSrc = item.image || generatePlaceholder(item.name);
+  const desc = item.description ? '<div class="featured-desc">' + escHtml(item.description) + '</div>' : '';
+  var transName = getTranslatedName(item);
+  var transHtml = transName ? '<div class="item-name-translated">' + escHtml(transName) + '</div>' : '';
   return '<div class="featured-card" onclick="openItemModal(' + qid(item.id) + ')">' +
     '<img class="featured-img" src="' + imgSrc + '" alt="' + escHtml(item.name) + '" onerror="this.src=\'' + generatePlaceholder(item.name) + '\'">' +
-    '<span class="featured-badge">必點</span>' +
+    '<span class="featured-badge">' + (currentLang === 'zh' ? '必點' : '★') + '</span>' +
     '<div class="featured-info"><div class="featured-name">' + escHtml(item.name) + '</div>' +
+    transHtml + desc +
     '<div class="featured-price"><span class="currency">$</span>' + item.price + '</div></div>' +
     '<button class="featured-add" aria-label="加入 ' + escHtml(item.name) + '" onclick="event.stopPropagation(); addToCart(' + qid(item.id) + ', event)">+</button></div>';
 }
@@ -1406,20 +2996,21 @@ function renderMenuItem(item) {
   const cartQty = getCartQty(item.id);
   const tagHtml = (item.tags || []).map(t => {
     const labels = { hot: '熱銷', new: '新品', chef: '主廚推薦', '推薦': '推薦', '套餐': '套餐' };
-    return '<span class="item-tag ' + t + '">' + escHtml(labels[t] || t) + '</span>';
+    return '<span class="item-tag ' + t + '">' + (labels[t] || t) + '</span>';
   }).join('');
   const spicyIcons = item.spicy > 0 ? ICONS.chili.repeat(Math.min(item.spicy, 3)) : '';
   let sizeHtml = '';
   if (item.sizes && item.sizes.length > 0) {
     sizeHtml = '<div class="item-sizes">' + item.sizes.map((s, i) =>
-      '<span class="size-option ' + (i === item.sizes.length - 1 ? 'active' : '') + '" onclick="event.stopPropagation(); selectSize(' + qid(item.id) + ', ' + i + ')">' + escHtml(s.name) + ' $' + s.price + '</span>'
+      '<span class="size-option ' + (i === item.sizes.length - 1 ? 'active' : '') + '" onclick="event.stopPropagation(); selectSize(' + qid(item.id) + ', ' + i + ')">' + s.name + ' $' + s.price + '</span>'
     ).join('') + '</div>';
   }
   return '<div class="menu-item" data-id="' + item.id + '" onclick="openItemModal(' + qid(item.id) + ')">' +
     '<div class="item-img-wrap"><img class="item-img" src="' + imgSrc + '" alt="' + escHtml(item.name) + '" loading="lazy" onerror="this.src=\'' + generatePlaceholder(item.name) + '\'">' +
     (spicyIcons ? '<span class="item-spicy">' + spicyIcons + '</span>' : '') + '</div>' +
     '<div class="item-info"><div class="item-name">' + escHtml(item.name) + '</div>' +
-    '<div class="item-desc">' + escHtml(item.desc) + '</div>' +
+    (currentLang !== 'zh' ? '<div class="item-name-translated">' + escHtml(getTranslatedName(item)) + '</div>' : '') +
+    '<div class="item-desc">' + escHtml(item.desc || '') + '</div>' +
     (tagHtml ? '<div class="item-tags">' + tagHtml + '</div>' : '') +
     '<div class="item-bottom"><div class="item-price-area">' +
     '<div class="item-price"><span class="currency">$</span>' + getItemDisplayPrice(item) + '</div>' + sizeHtml + '</div>' +
@@ -1533,9 +3124,6 @@ function addToCart(itemId, event) {
 
 function changeQty(itemId, delta, event) {
   if (event) event.stopPropagation();
-  // 同品項可能有多筆（不同規格/選項），若多筆則打開 drawer 讓用戶選
-  const matches = cart.filter(c => c.id === itemId);
-  if (matches.length > 1) { toggleCartDrawer(); return; }
   const idx = cart.findIndex(c => c.id === itemId);
   if (idx === -1) return;
   cart[idx].qty += delta;
@@ -1643,20 +3231,50 @@ function openItemModal(itemId) {
   document.getElementById('modalQty').textContent = modalQtyVal;
   let optHtml = '';
   if (item.sizes && item.sizes.length > 0) {
-    optHtml += '<div class="modal-option-group"><div class="modal-option-title">份量 <span class="required">必選</span></div><div class="modal-options">' +
-      item.sizes.map((s, i) => '<button class="modal-opt-btn ' + (i === modalSelectedSize ? 'active' : '') + '" onclick="selectModalSize(' + i + ')">' + s.name + ' - $' + s.price + '</button>').join('') +
-    '</div></div>';
+    var hasImgs = item.sizes.some(function(s) { return s.image; });
+    if (hasImgs) {
+      optHtml += '<div class="modal-option-group"><div class="modal-option-title">份量 <span class="required">必選</span></div><div class="modal-options has-images">' +
+        item.sizes.map(function(s, i) {
+          var sImg = s.image || generatePlaceholder(s.name);
+          return '<div class="modal-opt-card ' + (i === modalSelectedSize ? 'active' : '') + '" onclick="selectModalSize(' + i + ')">' +
+            '<img class="opt-card-img" src="' + sImg + '" onerror="this.src=\'' + generatePlaceholder(s.name) + '\'">' +
+            '<div class="opt-card-check">✓</div>' +
+            '<div class="opt-card-info"><div class="opt-card-name">' + s.name + '</div>' +
+            '<div class="opt-card-price">$' + s.price + '</div></div></div>';
+        }).join('') +
+      '</div></div>';
+    } else {
+      optHtml += '<div class="modal-option-group"><div class="modal-option-title">份量 <span class="required">必選</span></div><div class="modal-options">' +
+        item.sizes.map((s, i) => '<button class="modal-opt-btn ' + (i === modalSelectedSize ? 'active' : '') + '" onclick="selectModalSize(' + i + ')">' + s.name + ' - $' + s.price + '</button>').join('') +
+      '</div></div>';
+    }
   }
   // 顯示非尺寸的 options（如飲料選擇、可樂/雪碧）
   if (item.options && Array.isArray(item.options)) {
     item.options.forEach(function(grp, gi) {
       if (grp.group === '尺寸') return; // 已處理為 sizes
       var reqHtml = grp.required ? ' <span class="required">必選</span>' : '';
-      optHtml += '<div class="modal-option-group" data-optgrp="' + gi + '"><div class="modal-option-title">' + grp.group + reqHtml + '</div><div class="modal-options">' +
-        (grp.items || []).map(function(opt, oi) {
-          return '<button class="modal-opt-btn' + (oi === 0 ? ' active' : '') + '" onclick="selectOption(this, ' + gi + ', ' + oi + ')">' + opt.name + (opt.price ? ' +$' + opt.price : '') + '</button>';
-        }).join('') +
-      '</div></div>';
+      var grpItems = grp.items || [];
+      var grpHasImgs = grpItems.some(function(o) { return o.image; });
+      if (grpHasImgs) {
+        optHtml += '<div class="modal-option-group" data-optgrp="' + gi + '"><div class="modal-option-title">' + grp.group + reqHtml + '</div><div class="modal-options has-images">' +
+          grpItems.map(function(opt, oi) {
+            var oImg = opt.image || generatePlaceholder(opt.name);
+            var priceText = opt.price ? '+$' + opt.price : '免費';
+            return '<div class="modal-opt-card' + (oi === 0 ? ' active' : '') + '" onclick="selectOption(this, ' + gi + ', ' + oi + ')">' +
+              '<img class="opt-card-img" src="' + oImg + '" onerror="this.src=\'' + generatePlaceholder(opt.name) + '\'">' +
+              '<div class="opt-card-check">✓</div>' +
+              '<div class="opt-card-info"><div class="opt-card-name">' + opt.name + '</div>' +
+              '<div class="opt-card-price">' + priceText + '</div></div></div>';
+          }).join('') +
+        '</div></div>';
+      } else {
+        optHtml += '<div class="modal-option-group" data-optgrp="' + gi + '"><div class="modal-option-title">' + grp.group + reqHtml + '</div><div class="modal-options">' +
+          grpItems.map(function(opt, oi) {
+            return '<button class="modal-opt-btn' + (oi === 0 ? ' active' : '') + '" onclick="selectOption(this, ' + gi + ', ' + oi + ')">' + opt.name + (opt.price ? ' +$' + opt.price : '') + '</button>';
+          }).join('') +
+        '</div></div>';
+      }
     });
   }
   if (item.spicy > 0) {
@@ -1679,7 +3297,12 @@ function closeItemModal(event) {
 
 function selectModalSize(idx) {
   modalSelectedSize = idx;
-  document.querySelectorAll('#modalOptions .modal-option-group:first-child .modal-opt-btn').forEach((btn, i) => { btn.classList.toggle('active', i === idx); });
+  // 支援 button 模式和 card 模式
+  var grp = document.querySelector('#modalOptions .modal-option-group:first-child');
+  if (grp) {
+    grp.querySelectorAll('.modal-opt-btn').forEach(function(btn, i) { btn.classList.toggle('active', i === idx); });
+    grp.querySelectorAll('.modal-opt-card').forEach(function(card, i) { card.classList.toggle('active', i === idx); });
+  }
   updateModalPrice();
 }
 
@@ -1688,9 +3311,12 @@ function selectSpicy(btn, level) {
   btn.classList.add('active');
 }
 
-function selectOption(btn, grpIdx, optIdx) {
-  btn.closest('.modal-options').querySelectorAll('.modal-opt-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
+function selectOption(el, grpIdx, optIdx) {
+  // el 可能是 button 或 card div
+  var container = el.closest('.modal-options');
+  container.querySelectorAll('.modal-opt-btn').forEach(b => b.classList.remove('active'));
+  container.querySelectorAll('.modal-opt-card').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
 }
 
 function updateModalPrice() {
@@ -1797,6 +3423,7 @@ function submitOrder() {
       (isTakeout ? '外帶點餐' : '內用 — 桌號 ' + tableNum + '・' + guestCount + ' 人') +
     '</div>' +
     '<div style="margin-bottom:16px;">' + listHtml + '</div>' +
+    renderUpsellSection() +
     '<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 0;border-top:2px solid #E5E5E5;">' +
       '<span style="font-size:15px;font-weight:700;">合計 (' + totalQty + ' 件)</span>' +
       '<span style="font-size:22px;font-weight:900;color:var(--primary);">$' + totalPrice + '</span>' +
@@ -1811,6 +3438,94 @@ function submitOrder() {
 
 function closeConfirmOrder() {
   document.getElementById('itemModalOverlay').classList.remove('show');
+}
+
+// ===== VIEW MODE TOGGLE =====
+function setViewMode(mode, btn) {
+  var section = btn.closest('.category-section');
+  var items = section.querySelector('.menu-items');
+  if (!items) return;
+  if (mode === 'grid') {
+    items.classList.add('grid-view');
+  } else {
+    items.classList.remove('grid-view');
+  }
+  // Toggle button active state
+  var btns = btn.parentElement.querySelectorAll('.view-toggle-btn');
+  btns.forEach(function(b) { b.classList.remove('active'); });
+  btn.classList.add('active');
+}
+
+// ===== UPSELL RECOMMENDATIONS (結帳前加購推薦) =====
+function getUpsellItems() {
+  // 從購物車中找出未點的同分類或推薦品項
+  var cartIds = cart.map(function(c) { return c.id; });
+  var cartCats = [];
+  cart.forEach(function(c) {
+    var item = menuItems.find(function(i) { return i.id === c.id; });
+    if (item && item.category_id) cartCats.push(item.category_id);
+  });
+
+  // 優先推薦：有圖片的 + 不在購物車裡的 + 價格較低（配菜/飲料類）
+  var candidates = menuItems.filter(function(item) {
+    if (cartIds.indexOf(item.id) !== -1) return false;
+    if (!item.available) return false;
+    return true;
+  });
+
+  // 排序策略：有圖片優先、推薦標籤優先、低價優先（加購通常是小品項）
+  candidates.sort(function(a, b) {
+    var aScore = 0, bScore = 0;
+    if (a.image) aScore += 10;
+    if (b.image) bScore += 10;
+    if (a.is_featured) aScore += 5;
+    if (b.is_featured) bScore += 5;
+    if ((a.tags || []).indexOf('hot') !== -1) aScore += 3;
+    if ((b.tags || []).indexOf('hot') !== -1) bScore += 3;
+    // 同分類的不優先（避免推薦同類型）
+    if (cartCats.indexOf(a.category_id) === -1) aScore += 2;
+    if (cartCats.indexOf(b.category_id) === -1) bScore += 2;
+    return bScore - aScore;
+  });
+
+  return candidates.slice(0, 6);
+}
+
+function renderUpsellSection() {
+  var items = getUpsellItems();
+  if (items.length === 0) return '';
+
+  var cardsHtml = '';
+  items.forEach(function(item) {
+    var imgSrc = item.image || generatePlaceholder(item.name);
+    cardsHtml += '<div class="upsell-card" onclick="addUpsellItem(\'' + item.id + '\')">' +
+      '<img class="upsell-card-img" src="' + imgSrc + '" alt="' + item.name + '" onerror="this.src=\'' + generatePlaceholder(item.name) + '\'">' +
+      '<div class="upsell-card-info">' +
+        '<div class="upsell-card-name">' + escHtml(item.name) + '</div>' +
+        '<div class="upsell-card-price">$' + item.price + '</div>' +
+      '</div>' +
+      '<button class="upsell-card-add" onclick="event.stopPropagation()">+</button>' +
+    '</div>';
+  });
+
+  return '<div class="upsell-section">' +
+    '<div class="upsell-header"><span class="upsell-icon">🤤</span><h4>別人也加了這些</h4><span class="upsell-hint">點擊加入</span></div>' +
+    '<div class="upsell-scroll">' + cardsHtml + '</div>' +
+  '</div>';
+}
+
+function addUpsellItem(itemId) {
+  var item = menuItems.find(function(i) { return i.id === itemId; });
+  if (!item) return;
+
+  // 直接加入購物車
+  var cartItem = { id: item.id, qty: 1, price: item.price, sizeName: null, selectedOpts: [] };
+  cart.push(cartItem);
+  updateCartUI();
+
+  // 重新渲染確認訂單頁（包含更新後的清單）
+  closeConfirmOrder();
+  setTimeout(function() { submitOrder(); }, 150);
 }
 
 async function confirmAndSubmitOrder() {
@@ -1905,13 +3620,12 @@ function resetOrder() {
   }, 400);
 }
 
-let _toastTimer = null;
 function showToast(msg) {
   const toast = document.getElementById('toast');
   toast.textContent = msg;
   toast.classList.add('show');
   if (_toastTimer) clearTimeout(_toastTimer);
-  _toastTimer = setTimeout(function() { toast.classList.remove('show'); _toastTimer = null; }, 2000);
+  _toastTimer = setTimeout(function() { toast.classList.remove('show'); _toastTimer = null; }, 2200);
 }
 
 // ===== 會員集點 =====
