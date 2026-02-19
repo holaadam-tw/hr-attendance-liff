@@ -200,13 +200,13 @@ BEGIN
         CASE 
             WHEN es.months_worked < 6 THEN '未符合 - 年資不足'
             WHEN (es.total_attendance_days::NUMERIC / wd.total_work_days::NUMERIC) * 100 < 85 THEN '未符合 - 出勤率過低'
-            WHEN (es.late_count::NUMERIC / es.total_attendance_days::NUMERIC) * 100 > 5 THEN '未符合 - 遲到率過高'
+            WHEN es.total_attendance_days > 0 AND (es.late_count::NUMERIC / es.total_attendance_days::NUMERIC) * 100 > 5 THEN '未符合 - 遲到率過高'
             ELSE '符合資格'
         END as bonus_status,
-        CASE 
+        CASE
             WHEN es.months_worked < 6 THEN 0
             WHEN (es.total_attendance_days::NUMERIC / wd.total_work_days::NUMERIC) * 100 < 85 THEN 0
-            WHEN (es.late_count::NUMERIC / es.total_attendance_days::NUMERIC) * 100 > 5 THEN 
+            WHEN es.total_attendance_days > 0 AND (es.late_count::NUMERIC / es.total_attendance_days::NUMERIC) * 100 > 5 THEN
                 ROUND(10000 * (es.months_worked / 12) * 0.5)  -- 遲到扣一半
             ELSE 
                 ROUND(10000 * (es.months_worked / 12))  -- 全勤獎金

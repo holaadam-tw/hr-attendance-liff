@@ -13,8 +13,12 @@ UPDATE employees
 SET hire_date = '2026-01-01' 
 WHERE hire_date IS NULL AND is_active = true;
 
+-- 清理不在允許列表中的 role 值
+UPDATE employees SET role = 'user' WHERE role IS NOT NULL AND role NOT IN ('admin', 'user', 'manager');
+
 -- 確保 role 欄位有正確的約束
-ALTER TABLE employees ADD CONSTRAINT check_role 
+ALTER TABLE employees DROP CONSTRAINT IF EXISTS check_role;
+ALTER TABLE employees ADD CONSTRAINT check_role
 CHECK (role IN ('admin', 'user', 'manager'));
 
 -- 建立索引以提高查詢效能
