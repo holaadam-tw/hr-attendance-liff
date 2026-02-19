@@ -372,7 +372,7 @@
                     if (currentEmployee.role === 'admin' || currentEmployee.role === 'manager') {
                         tasks.push(loadActiveOrders());
                     }
-                    Promise.all(tasks.map(p => Promise.resolve(p).catch(e => console.error(e))));
+                    await Promise.all(tasks.map(p => Promise.resolve(p).catch(e => console.error(e))));
                     applyFeatureVisibility();
                     preloadGPS();
                 } else {

@@ -99,7 +99,7 @@ export async function loadEmployeeList() {
                 <div class="attendance-item">
                     <div class="date">
                         <div style="display:flex; align-items:center; flex-wrap:wrap; gap:4px;">
-                            <span>${emp.name} - ${emp.employee_number}</span>
+                            <span>${escapeHTML(emp.name)} - ${escapeHTML(emp.employee_number)}</span>
                             <span class="role-${emp.role || 'user'}" style="
                                 padding: 3px 10px; border-radius: 15px; font-size: 11px;
                                 display: inline-block; font-weight: bold;">
@@ -108,8 +108,8 @@ export async function loadEmployeeList() {
                         </div>
                     </div>
                     <div class="details">
-                        <span>${emp.department || '-'} · ${emp.position || '-'}</span>
-                        <span style="font-size:12px;">驗證碼: ${emp.id_card_last_4 || '未設定'}</span>
+                        <span>${escapeHTML(emp.department || '-')} · ${escapeHTML(emp.position || '-')}</span>
+                        <span style="font-size:12px;">驗證碼: ${escapeHTML(emp.id_card_last_4 || '未設定')}</span>
                     </div>
                     <div style="font-size:12px;color:#666;margin-top:5px;">
                         到職: ${emp.hire_date || '未設定'} · ${emp.employment_type === 'parttime' ? '兼職' : '正職'} · ${emp.line_user_id ? '✅ 已綁定' : '⏳ 未綁定'}

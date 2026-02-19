@@ -18,10 +18,10 @@ export async function loadAuditLogs(more = false) {
         el.innerHTML += data.map(r => `
             <div style="padding:8px 0;border-bottom:1px solid #F1F5F9;font-size:13px;">
                 <div style="display:flex;justify-content:space-between;">
-                    <span>${ai[r.action] || '📝'} <b>${r.actor_name || '?'}</b> ${al[r.action] || r.action} <span style="color:#7C3AED;">${r.target_table || ''}</span></span>
+                    <span>${ai[r.action] || '📝'} <b>${escapeHTML(r.actor_name || '?')}</b> ${al[r.action] || r.action} <span style="color:#7C3AED;">${escapeHTML(r.target_table || '')}</span></span>
                     <span style="font-size:10px;color:#94A3B8;">${r.created_at ? new Date(r.created_at).toLocaleString('zh-TW') : ''}</span>
                 </div>
-                ${r.target_name ? `<div style="font-size:11px;color:#64748B;margin-top:2px;">對象：${r.target_name}</div>` : ''}
+                ${r.target_name ? `<div style="font-size:11px;color:#64748B;margin-top:2px;">對象：${escapeHTML(r.target_name)}</div>` : ''}
             </div>
         `).join('');
         auditOffset += data.length;
