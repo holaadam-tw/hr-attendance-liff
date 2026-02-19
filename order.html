@@ -1446,9 +1446,9 @@ function applyTheme(name) {
   r.setProperty('--shadow-md', '0 4px 16px rgba(0,0,0,0.07)');
   r.setProperty('--shadow-lg', '0 8px 30px rgba(0,0,0,0.10)');
   r.setProperty('--shadow-xl', '0 16px 48px rgba(0,0,0,0.14)');
-  // Menu cards use theme bg
+  // Menu cards — 清除 inline style，讓 CSS var(--bg-card) 接管
   document.querySelectorAll('.menu-card, .featured-card').forEach(function(el) {
-    el.style.background = t.bgCard;
+    el.style.background = '';
   });
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', t.primary);
   currentTheme = name;
@@ -1489,32 +1489,61 @@ function setThemeIntensity(level) {
   var r = document.documentElement.style;
   var map = { lightest: 0.6, light: 0.3, standard: 0, rich: -0.2, richest: -0.4 };
   var amt = map[level] || 0;
+  var newPrimary, newPrimaryDark;
   if (amt === 0) {
     // 標準：還原原色
     r.setProperty('--primary', t.primary);
     r.setProperty('--primary-light', t.primaryLight);
     r.setProperty('--primary-dark', t.primaryDark);
+    r.setProperty('--accent', t.accent);
+    r.setProperty('--accent-light', t.accentLight);
     r.setProperty('--bg', t.bg);
     r.setProperty('--bg-card', t.bgCard);
     r.setProperty('--bg-sidebar', t.bgSidebar);
+    r.setProperty('--text-primary', t.textPrimary);
+    r.setProperty('--text-secondary', t.textSecondary);
+    r.setProperty('--text-muted', t.textMuted);
+    r.setProperty('--border', t.border);
+    r.setProperty('--border-light', t.borderLight);
+    if (t.headerGrad) r.setProperty('--header-gradient', t.headerGrad);
+    newPrimary = t.primary; newPrimaryDark = t.primaryDark;
   } else if (amt > 0) {
     // 淡化：混白
-    r.setProperty('--primary', mixColor(t.primary, '#FFFFFF', amt));
+    newPrimary = mixColor(t.primary, '#FFFFFF', amt);
+    newPrimaryDark = mixColor(t.primaryDark, '#FFFFFF', amt);
+    r.setProperty('--primary', newPrimary);
     r.setProperty('--primary-light', mixColor(t.primaryLight, '#FFFFFF', amt));
-    r.setProperty('--primary-dark', mixColor(t.primaryDark, '#FFFFFF', amt));
+    r.setProperty('--primary-dark', newPrimaryDark);
+    r.setProperty('--accent', mixColor(t.accent, '#FFFFFF', amt * 0.5));
+    r.setProperty('--accent-light', mixColor(t.accentLight, '#FFFFFF', amt * 0.3));
     r.setProperty('--bg', mixColor(t.bg, '#FFFFFF', amt * 0.5));
     r.setProperty('--bg-card', mixColor(t.bgCard, '#FFFFFF', amt * 0.5));
     r.setProperty('--bg-sidebar', mixColor(t.bgSidebar, '#FFFFFF', amt * 0.5));
+    r.setProperty('--border', mixColor(t.border, '#FFFFFF', amt * 0.4));
+    r.setProperty('--border-light', mixColor(t.borderLight, '#FFFFFF', amt * 0.3));
   } else {
     // 加濃：混黑
     var a = Math.abs(amt);
-    r.setProperty('--primary', mixColor(t.primary, '#000000', a));
+    newPrimary = mixColor(t.primary, '#000000', a);
+    newPrimaryDark = mixColor(t.primaryDark, '#000000', a);
+    r.setProperty('--primary', newPrimary);
     r.setProperty('--primary-light', mixColor(t.primaryLight, '#000000', a * 0.5));
-    r.setProperty('--primary-dark', mixColor(t.primaryDark, '#000000', a));
+    r.setProperty('--primary-dark', newPrimaryDark);
+    r.setProperty('--accent', mixColor(t.accent, '#000000', a * 0.3));
+    r.setProperty('--accent-light', mixColor(t.accentLight, '#000000', a * 0.2));
     r.setProperty('--bg', mixColor(t.bg, '#000000', a * 0.08));
     r.setProperty('--bg-card', mixColor(t.bgCard, '#000000', a * 0.05));
     r.setProperty('--bg-sidebar', mixColor(t.bgSidebar, '#000000', a * 0.05));
+    r.setProperty('--border', mixColor(t.border, '#000000', a * 0.15));
+    r.setProperty('--border-light', mixColor(t.borderLight, '#000000', a * 0.1));
   }
+  // 非標準時：用混合後的顏色重建 header gradient
+  if (amt !== 0 && newPrimary && newPrimaryDark) {
+    var midColor = mixColor(newPrimary, newPrimaryDark, 0.5);
+    r.setProperty('--header-gradient', 'linear-gradient(160deg,' + newPrimary + ' 0%,' + midColor + ' 50%,' + newPrimaryDark + ' 100%)');
+  }
+  // 更新 meta theme-color
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', newPrimary || t.primary);
   // 更新面板按鈕狀態
   renderThemePanel();
 }
