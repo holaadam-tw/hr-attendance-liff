@@ -1226,6 +1226,7 @@ body {
   <div class="header-status-bar">
     <span id="headerTitle">掃碼點餐</span>
     <div style="display:flex;align-items:center;gap:8px;">
+      <button id="headerOrderBtn" onclick="showMyOrdersPanel()" style="position:relative;background:none;border:none;font-size:20px;cursor:pointer;padding:4px;display:none;">📋<span id="headerOrderBadge" style="display:none;position:absolute;top:-4px;right:-6px;min-width:16px;height:16px;border-radius:8px;background:#EF4444;color:#fff;font-size:10px;font-weight:700;text-align:center;line-height:16px;padding:0 3px;"></span></button>
       <button class="lang-btn" id="langBtn" onclick="toggleLangMenu()">🌐 中</button>
       <span class="badge open" id="shopStatus">營業中</span>
       <a class="share-btn" id="shareBtn" onclick="shareOrder()" style="display:none;">&#x1F4E4; 分享訂單</a>
@@ -2050,6 +2051,9 @@ async function loadStoreFromSupabase(slug) {
       descTranslations: i.desc_translations || {}
     };
   });
+
+  // 載入完成後檢查是否有歷史訂單
+  checkMyOrdersOnLoad();
 }
 
 function loadDemoData() {
@@ -3647,9 +3651,9 @@ function submitOrder() {
     '</div>' +
     '<div style="padding:12px 0;border-top:1px solid #EEE;">' +
       '<div style="font-size:13px;font-weight:700;margin-bottom:8px;">📱 取餐資訊</div>' +
-      '<div style="display:flex;gap:8px;margin-bottom:8px;">' +
-        '<input type="tel" id="confirmPhone" placeholder="手機號碼（必填）" maxlength="10" oninput="onConfirmPhoneInput()" style="flex:1;padding:12px;border:2px solid #E2E8F0;border-radius:10px;font-size:14px;font-family:inherit;" value="' + (document.getElementById('memberPhone')?.value || (typeof localStorage !== 'undefined' && currentStoreId ? (localStorage.getItem('member_phone_' + currentStoreId) || '') : '')) + '">' +
-        '<input type="text" id="confirmName" placeholder="姓名（選填）" maxlength="20" style="width:100px;padding:12px;border:2px solid #E2E8F0;border-radius:10px;font-size:14px;font-family:inherit;" value="' + (document.getElementById('customerNameInput')?.value || '') + '">' +
+      '<div style="margin-bottom:8px;">' +
+        '<input type="tel" id="confirmPhone" placeholder="📱 手機號碼（必填）" maxlength="10" oninput="onConfirmPhoneInput()" style="width:100%;padding:12px;border:2px solid #E2E8F0;border-radius:10px;font-size:14px;font-family:inherit;box-sizing:border-box;margin-bottom:8px;" value="' + (document.getElementById('memberPhone')?.value || (typeof localStorage !== 'undefined' && currentStoreId ? (localStorage.getItem('member_phone_' + currentStoreId) || '') : '')) + '">' +
+        '<input type="text" id="confirmName" placeholder="👤 取餐姓名（選填，方便叫號）" maxlength="20" style="width:100%;padding:12px;border:2px solid #E2E8F0;border-radius:10px;font-size:14px;font-family:inherit;box-sizing:border-box;" value="' + (document.getElementById('customerNameInput')?.value || '') + '">' +
       '</div>' +
       '<div id="confirmPhoneError" style="display:none;color:#EF4444;font-size:12px;margin-top:-4px;margin-bottom:8px;font-weight:600;">📱 請填寫手機號碼才能點餐</div>' +
       '<div id="confirmMemberCard" style="display:none;background:#F8FAFC;border-radius:10px;padding:10px 12px;font-size:12px;"></div>' +
@@ -3858,6 +3862,10 @@ async function confirmAndSubmitOrder() {
   if (loyaltyConfig) {
     earnedPts = await awardLoyaltyPoints(totalPrice) || 0;
   }
+
+  // 儲存手機號給「我的訂單」面板用
+  window._myOrderPhone = memberPhone;
+
   showOrderSuccess(totalQty, totalPrice, tableNum, orderNum, earnedPts);
 }
 
@@ -3881,9 +3889,9 @@ function showOrderSuccess(qty, price, table, orderNum, earnedPts) {
     '<p style="color:#666; font-size:14px; margin-bottom:20px;">' + (isTakeout ? '外帶' : '桌號 ' + table) + '&#12288;' + qty + ' 道菜品&#12288;合計 $' + price + '</p>' +
     pointsHtml +
     '<p style="color:#999; font-size:12px; margin-bottom:24px;">' + (isTakeout ? '請至櫃檯等候叫號取餐' : '廚房正在準備您的餐點，請稍候') + '</p>' +
-    '<div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">' +
-    '<button onclick="showMyOrdersPanel()" style="background:#fff; color:var(--primary); border:2px solid var(--primary); padding:14px 24px; border-radius:12px; font-size:14px; font-weight:700; cursor:pointer; font-family:inherit;">📋 查看訂單</button>' +
-    '<button onclick="resetOrder()" style="background:var(--primary); color:white; border:none; padding:14px 24px; border-radius:12px; font-size:14px; font-weight:700; cursor:pointer; font-family:inherit;">🍽️ 繼續點餐</button>' +
+    '<div style="display:flex;flex-direction:column;gap:10px;padding:0 10px;">' +
+    '<button onclick="showMyOrdersPanel()" style="width:100%;padding:16px;border:2px solid var(--primary);border-radius:14px;background:#fff;color:var(--primary);font-size:16px;font-weight:800;cursor:pointer;font-family:inherit;">📋 查看我的訂單</button>' +
+    '<button onclick="resetOrder()" style="width:100%;padding:16px;border:none;border-radius:14px;background:var(--primary);color:#fff;font-size:16px;font-weight:800;cursor:pointer;font-family:inherit;">🍽️ 繼續點餐</button>' +
     '</div></div>';
   overlay.classList.add('show');
   document.getElementById('cartOverlay').classList.remove('show');
@@ -3941,6 +3949,57 @@ function closeMyOrdersPanel() {
     overlay.style.display = 'none';
   }, 350);
   if (window._orderPollTimer) { clearInterval(window._orderPollTimer); window._orderPollTimer = null; }
+}
+
+// ===== 頁面載入：自動偵測是否有歷史訂單 =====
+async function checkMyOrdersOnLoad() {
+  if (!currentStoreId) return;
+  var phone = localStorage.getItem('member_phone_' + currentStoreId);
+  if (!phone || phone.length < 9) return;
+
+  // 儲存供面板使用
+  window._myOrderPhone = phone;
+
+  try {
+    // 查有沒有 active 訂單（7天內）
+    var sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    var res = await fetch(SUPABASE_URL + '/rest/v1/orders?store_id=eq.' + currentStoreId +
+      '&customer_phone=eq.' + encodeURIComponent(phone) +
+      '&created_at=gte.' + sevenDaysAgo.toISOString() +
+      '&select=id,status&limit=20', {
+      headers: { 'apikey': SUPABASE_KEY }
+    });
+    var orders = await res.json() || [];
+
+    var activeCount = orders.filter(function(o) {
+      return ['pending','confirmed','preparing','ready'].includes(o.status);
+    }).length;
+    var totalCount = orders.length;
+
+    // 顯示 header 按鈕
+    if (totalCount > 0) {
+      showHeaderOrderBtn(activeCount);
+    }
+  } catch(e) {
+    // 靜默失敗，不影響點餐
+  }
+}
+
+function showHeaderOrderBtn(activeCount) {
+  var btn = document.getElementById('headerOrderBtn');
+  if (!btn) return;
+  btn.style.display = '';
+  var badge = document.getElementById('headerOrderBadge');
+  if (badge) {
+    if (activeCount > 0) {
+      badge.style.display = '';
+      badge.textContent = String(activeCount);
+    } else {
+      badge.style.display = 'none';
+    }
+  }
 }
 
 var ORDER_STATUS_MAP = {
@@ -4266,23 +4325,73 @@ var myOrdersExpanded = {};
 async function loadMyOrdersForPanel() {
   var phone = window._myOrderPhone || document.getElementById('confirmPhone')?.value?.trim() || document.getElementById('memberPhone')?.value?.trim();
   var list = document.getElementById('myOrdersList');
-  if (!phone || !currentStoreId) {
+  if (!phone || phone.length < 9 || !currentStoreId) {
     list.innerHTML = '<div style="text-align:center;padding:24px;color:#94A3B8;">請先輸入手機號碼</div>';
     return;
   }
 
+  // 儲存供後續使用
+  window._myOrderPhone = phone;
+
   try {
+    // 同時查訂單和點數
     var sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-    var res = await fetch(SUPABASE_URL + '/rest/v1/orders?store_id=eq.' + currentStoreId +
-      '&customer_phone=eq.' + encodeURIComponent(phone) +
-      '&created_at=gte.' + sevenDaysAgo.toISOString() +
-      '&order=created_at.desc&limit=30', {
-      headers: { 'apikey': SUPABASE_KEY }
-    });
-    var orders = (await res.json()) || [];
+    var [ordersRes, ptsRes, custRes] = await Promise.all([
+      fetch(SUPABASE_URL + '/rest/v1/orders?store_id=eq.' + currentStoreId +
+        '&customer_phone=eq.' + encodeURIComponent(phone) +
+        '&created_at=gte.' + sevenDaysAgo.toISOString() +
+        '&order=created_at.desc&limit=30', { headers: { 'apikey': SUPABASE_KEY } }),
+      loyaltyConfig ? fetch(SUPABASE_URL + '/rest/v1/loyalty_points?store_id=eq.' + currentStoreId +
+        '&customer_line_id=eq.' + encodeURIComponent(phone) + '&limit=1', { headers: { 'apikey': SUPABASE_KEY } }) : Promise.resolve(null),
+      fetch(SUPABASE_URL + '/rest/v1/store_customers?store_id=eq.' + currentStoreId +
+        '&phone=eq.' + encodeURIComponent(phone) + '&limit=1', { headers: { 'apikey': SUPABASE_KEY } })
+    ]);
 
+    var orders = await ordersRes.json() || [];
+    var points = 0;
+    if (ptsRes) {
+      var ptsData = await ptsRes.json();
+      if (ptsData && ptsData[0]) points = ptsData[0].points || 0;
+    }
+    var custData = await custRes.json();
+    var customer = (custData && custData[0]) || null;
+
+    // === 點數卡 ===
+    var pointsCard = document.getElementById('myOrdersPointsCard');
+    if (pointsCard && loyaltyConfig && window._loyaltyEnabled !== false) {
+      var cfg = loyaltyConfig;
+      var needed = cfg.points_to_redeem || cfg.points_per_reward || 10;
+      var discount = cfg.discount_amount || cfg.reward_discount || 50;
+      var progress = Math.min(100, Math.round(points / needed * 100));
+
+      var phtml = '<div style="background:linear-gradient(135deg, var(--primary), #6366F1);border-radius:16px;padding:16px;margin-bottom:16px;color:#fff;">';
+      phtml += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">';
+      phtml += '<div><div style="font-size:12px;opacity:0.85;">我的點數</div>';
+      phtml += '<div style="font-size:28px;font-weight:900;">' + points + ' <span style="font-size:14px;font-weight:600;">點</span></div></div>';
+      if (customer) {
+        phtml += '<div style="text-align:right;font-size:11px;opacity:0.8;">';
+        phtml += '👋 ' + (customer.name || '會員') + '<br>累計 ' + (customer.total_orders || 0) + ' 筆訂單';
+        phtml += '</div>';
+      }
+      phtml += '</div>';
+      // 進度條
+      phtml += '<div style="background:rgba(255,255,255,0.25);border-radius:4px;height:6px;margin-bottom:6px;">';
+      phtml += '<div style="background:#fff;border-radius:4px;height:6px;width:' + progress + '%;transition:width 0.5s;"></div></div>';
+      if (points >= needed) {
+        phtml += '<div style="font-size:12px;font-weight:700;">🎉 可折抵 $' + discount + '！結帳時自動折扣</div>';
+      } else {
+        phtml += '<div style="font-size:12px;opacity:0.85;">再 ' + (needed - points) + ' 點可折 $' + discount + '</div>';
+      }
+      phtml += '</div>';
+      pointsCard.innerHTML = phtml;
+      pointsCard.style.display = '';
+    } else if (pointsCard) {
+      pointsCard.style.display = 'none';
+    }
+
+    // === 訂單列表 ===
     if (orders.length === 0) {
       list.innerHTML = '<div style="text-align:center;padding:24px;color:#94A3B8;">還沒有訂單紀錄</div>';
       return;
@@ -4307,7 +4416,8 @@ async function loadMyOrdersForPanel() {
 
     list.innerHTML = html;
   } catch(e) {
-    list.innerHTML = '<div style="text-align:center;padding:24px;color:#94A3B8;">查詢失敗</div>';
+    console.warn('Load my orders error:', e);
+    list.innerHTML = '<div style="text-align:center;padding:24px;color:#94A3B8;">查詢失敗，請重試</div>';
   }
 }
 
@@ -4393,6 +4503,8 @@ function toggleMyOrder(id) {
 <div id="myOrdersOverlay" style="display:none;position:fixed;inset:0;z-index:300;background:rgba(0,0,0,0.45);backdrop-filter:blur(4px);" onclick="closeMyOrdersPanel()">
   <div onclick="event.stopPropagation()" style="position:absolute;bottom:0;left:0;right:0;max-width:480px;margin:0 auto;background:var(--bg-card,#fff);border-radius:24px 24px 0 0;max-height:80vh;overflow-y:auto;box-shadow:0 -8px 40px rgba(0,0,0,0.15);padding:20px 16px calc(24px + env(safe-area-inset-bottom,0px));transform:translateY(100%);transition:transform 0.35s cubic-bezier(0.32,0.72,0,1);">
     <div style="width:40px;height:4px;border-radius:2px;background:#DDD;margin:0 auto 16px;"></div>
+    <!-- 點數卡（在訂單上方） -->
+    <div id="myOrdersPointsCard" style="display:none;"></div>
     <h4 style="font-size:18px;font-weight:800;text-align:center;margin-bottom:4px;">📋 我的訂單</h4>
     <div style="font-size:12px;color:var(--text-muted,#94A3B8);text-align:center;margin-bottom:16px;">最近 7 天的訂單紀錄</div>
     <div id="myOrdersList"></div>
