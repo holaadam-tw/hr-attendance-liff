@@ -1701,13 +1701,21 @@ async function loadLoyaltyToggle() {
 }
 
 function updateToggleStyle(toggle) {
+    // 支援兩種 toggle 結構：
+    // 1. 舊版：使用 left 定位
+    // 2. 新版：使用 transform 定位
     const slider = toggle.parentElement.querySelectorAll('span');
-    if (toggle.checked) {
-        slider[0].style.background = '#4F46E5';
-        slider[1].style.left = '25px';
-    } else {
-        slider[0].style.background = '#CBD5E1';
-        slider[1].style.left = '3px';
+    if (slider.length >= 2) {
+        if (toggle.checked) {
+            slider[0].style.background = '#4F46E5';
+            // 嘗試兩種定位方式
+            slider[1].style.left = '25px';
+            slider[1].style.transform = 'translateX(22px)';
+        } else {
+            slider[0].style.background = '#CBD5E1';
+            slider[1].style.left = '3px';
+            slider[1].style.transform = 'translateX(0)';
+        }
     }
 }
 
@@ -2227,18 +2235,6 @@ export function searchMemberByPhone() {
     }, 400);
 }
 
-// 通用 toggle 樣式更新函數
-function updateToggleStyle(toggle) {
-    const slider = toggle.nextElementSibling;
-    const thumb = slider?.nextElementSibling;
-    if (toggle.checked) {
-        if (slider) slider.style.background = '#4F46E5';
-        if (thumb) thumb.style.transform = 'translateX(22px)';
-    } else {
-        if (slider) slider.style.background = '#CBD5E1';
-        if (thumb) thumb.style.transform = 'translateX(0)';
-    }
-}
 
 // 載入商店列表（用於預約管理和會員管理頁面）
 export async function loadBookingStoreList() {
