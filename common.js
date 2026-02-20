@@ -1257,41 +1257,21 @@ const DEFAULT_FEATURES = {
     salary: true,          // 薪資查詢
     qr_order: false,       // 客人掃碼點餐
     kds: false,            // 廚房出單
-    booking: false         // 客戶預約/訂位
+    booking: false,        // 客戶預約/訂位
+    member: false          // 會員集點
 };
 
 function getFeatureVisibility() {
-    // 雙層 AND 邏輯：平台允許 AND 管理員開啟 → 才顯示
+    // 三層 AND 邏輯：產業預設 × 平台允許 × 管理員開啟 → 才顯示
     let result = { ...DEFAULT_FEATURES };
 
-    // 第 0 層：產業別預設覆蓋（僅影響預設值，管理員可在後台自訂覆蓋）
-    if (currentCompanyIndustry === 'restaurant') {
-        result.qr_order = true;
-        result.kds = true;
-        result.store_ordering = true;
-        result.booking = true;      // 餐廳訂位
-        result.lunch = false;       // 餐飲業不需要便當訂購
-        result.fieldwork = false;   // 餐飲業不需要外勤
-        result.sales_target = false;
-    } else if (currentCompanyIndustry === 'manufacturing') {
-        result.lunch = true;
-        result.fieldwork = true;    // 製造業需要外勤/業務
-        result.sales_target = true;
-        result.qr_order = false;
-        result.kds = false;
-        result.store_ordering = false;
-        result.booking = false;
-    } else if (currentCompanyIndustry === 'service') {
-        result.booking = true;      // 服務業需要客戶預約
-        result.fieldwork = true;
-        result.qr_order = false;
-        result.kds = false;
-    } else if (currentCompanyIndustry === 'clinic') {
-        result.booking = true;      // 診所需要看診預約
-        result.lunch = false;
-        result.fieldwork = false;
-        result.qr_order = false;
-        result.kds = false;
+    // 第 0 層：產業別預設（使用 INDUSTRY_TEMPLATES）
+    const industry = currentCompanyIndustry || 'general';
+    const template = window.INDUSTRY_TEMPLATES?.[industry];
+    if (template && template.features) {
+        Object.keys(template.features).forEach(k => {
+            result[k] = template.features[k];
+        });
     }
 
     // 第一層：平台管理員設定（companies.features）

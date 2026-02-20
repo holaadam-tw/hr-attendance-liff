@@ -79,9 +79,9 @@ import {
 } from './store.js';
 
 import {
-    ADMIN_FEATURE_LIST, featureState,
+    ADMIN_FEATURE_LIST, FEATURE_CATEGORIES, INDUSTRY_TEMPLATES, featureState,
     loadNotifyToken, saveNotifyToken, testNotify,
-    loadFeatureSettings, updateToggleCard, toggleFeature,
+    loadFeatureSettings, updateToggleCard, toggleFeature, applyIndustryTemplate,
     toggleAnnCheck, publishAnnouncement, loadAnnouncementList,
     deleteAnnouncement, loadClientList, filterClients,
     showClientModal, closeClientModal, editClient, getClientGPS,
@@ -289,12 +289,15 @@ window.loadMemberStoreList = loadMemberStoreList;
 
 // settings
 window.ADMIN_FEATURE_LIST = ADMIN_FEATURE_LIST;
+window.FEATURE_CATEGORIES = FEATURE_CATEGORIES;
+window.INDUSTRY_TEMPLATES = INDUSTRY_TEMPLATES;
 window.loadNotifyToken = loadNotifyToken;
 window.saveNotifyToken = saveNotifyToken;
 window.testNotify = testNotify;
 window.loadFeatureSettings = loadFeatureSettings;
 window.updateToggleCard = updateToggleCard;
 window.toggleFeature = toggleFeature;
+window.applyIndustryTemplate = applyIndustryTemplate;
 window.toggleAnnCheck = toggleAnnCheck;
 window.publishAnnouncement = publishAnnouncement;
 window.loadAnnouncementList = loadAnnouncementList;

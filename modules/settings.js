@@ -6,15 +6,53 @@
 // ============================================================
 
 // ===== 功能管理 =====
-export const ADMIN_FEATURE_LIST = [
-    { key: 'leave',          label: '我要請假',      desc: '請假申請與記錄查詢',   icon: '📝' },
-    { key: 'lunch',          label: '便當訂購',      desc: '每日午餐訂購管理',     icon: '🍱' },
-    { key: 'attendance',     label: '考勤查詢',      desc: '出勤月曆與記錄查詢',   icon: '📊' },
-    { key: 'fieldwork,sales_target', label: '外勤/業務', desc: '外勤打卡、業務目標與週報', icon: '📍' },
-    { key: 'store_ordering', label: '查看訂單',        desc: '線上預約與點餐服務',   icon: '🛍️' }
+
+// 功能分類
+export const FEATURE_CATEGORIES = [
+    { key: 'hr',        label: '👥 人事管理',   desc: '請假、考勤、排班、薪資' },
+    { key: 'ops',       label: '🏭 營運管理',   desc: '便當、外勤、業務' },
+    { key: 'store',     label: '🍽️ 門市/餐飲',  desc: '點餐、訂單、廚房' },
+    { key: 'crm',       label: '💼 客戶經營',   desc: '預約、會員、集點' }
 ];
 
-export let featureState = { leave: true, lunch: true, attendance: true, fieldwork: true, sales_target: true, store_ordering: false };
+// 完整功能清單
+export const ADMIN_FEATURE_LIST = [
+    // 人事管理
+    { key: 'leave',         label: '我要請假',    desc: '請假申請與記錄查詢',       icon: '📝', category: 'hr' },
+    { key: 'attendance',    label: '考勤查詢',    desc: '出勤月曆與記錄查詢',       icon: '📊', category: 'hr' },
+    { key: 'schedule',      label: '我的排班',    desc: '查看個人排班表',           icon: '📅', category: 'hr' },
+    { key: 'salary',        label: '薪資查詢',    desc: '查看薪資明細',            icon: '💰', category: 'hr' },
+
+    // 營運管理
+    { key: 'lunch',         label: '便當訂購',    desc: '每日午餐訂購管理',         icon: '🍱', category: 'ops' },
+    { key: 'fieldwork,sales_target', label: '外勤/業務', desc: '外勤打卡、業務目標與週報', icon: '📍', category: 'ops' },
+
+    // 門市/餐飲
+    { key: 'store_ordering', label: '訂單管理',   desc: '查看線上訂單',            icon: '📋', category: 'store' },
+    { key: 'qr_order',      label: '掃碼點餐',   desc: '員工協助客人掃碼點餐',     icon: '🍞', category: 'store' },
+    { key: 'kds',           label: '廚房出單',    desc: 'KDS 廚房螢幕',           icon: '🍳', category: 'store' },
+
+    // 客戶經營
+    { key: 'booking',       label: '線上預約',    desc: '客戶線上預約服務或訂位',    icon: '📅', category: 'crm' },
+    { key: 'member',        label: '會員集點',    desc: '消費集點與會員管理',        icon: '👥', category: 'crm' }
+];
+
+export let featureState = {
+    leave: true, attendance: true, schedule: true, salary: true,
+    lunch: true, fieldwork: true, sales_target: true,
+    store_ordering: false, qr_order: false, kds: false,
+    booking: false, member: false
+};
+
+// 產業別模板
+export const INDUSTRY_TEMPLATES = {
+    general:       { label: '🏢 一般公司', features: { leave: true, attendance: true, schedule: true, salary: true, lunch: false, fieldwork: false, sales_target: false, store_ordering: false, qr_order: false, kds: false, booking: false, member: false } },
+    manufacturing: { label: '🏭 製造業',   features: { leave: true, attendance: true, schedule: true, salary: true, lunch: true, fieldwork: true, sales_target: true, store_ordering: false, qr_order: false, kds: false, booking: false, member: false } },
+    restaurant:    { label: '🍽️ 餐飲業',   features: { leave: true, attendance: true, schedule: true, salary: true, lunch: false, fieldwork: false, sales_target: false, store_ordering: true, qr_order: true, kds: true, booking: true, member: true } },
+    service:       { label: '💅 服務業',   features: { leave: true, attendance: true, schedule: true, salary: true, lunch: false, fieldwork: false, sales_target: false, store_ordering: false, qr_order: false, kds: false, booking: true, member: true } },
+    clinic:        { label: '🏥 診所/醫療', features: { leave: true, attendance: true, schedule: true, salary: true, lunch: false, fieldwork: false, sales_target: false, store_ordering: false, qr_order: false, kds: false, booking: true, member: true } },
+    retail:        { label: '🛒 零售業',   features: { leave: true, attendance: true, schedule: true, salary: true, lunch: false, fieldwork: false, sales_target: false, store_ordering: true, qr_order: true, kds: false, booking: false, member: true } }
+};
 
 // ===== Tab 切換 =====
 export function switchSysTab(tab, btn) {
@@ -93,37 +131,65 @@ export async function loadFeatureSettings() {
         }
     } catch(e) {}
 
+    // 產業別 — 取得目前公司 industry
+    const industry = window.currentCompanyIndustry || 'general';
+
+    // 平台允許的功能
     const allowed = window.companyAllowedFeatures || {};
-    const defaultAllowed = { leave: true, lunch: true, attendance: true, fieldwork: true, sales_target: true, store_ordering: false };
-    const visibleFeatures = ADMIN_FEATURE_LIST.filter(f => {
-        const keys = f.key.split(',');
-        if (window.companyAllowedFeatures) {
-            return keys.some(k => allowed[k.trim()] === true);
-        }
-        return keys.some(k => defaultAllowed[k.trim()] !== false);
-    });
+    const hasAllowed = !!window.companyAllowedFeatures;
 
     const container = document.getElementById('featureToggles');
-    if (visibleFeatures.length === 0) {
-        container.innerHTML = '<p style="text-align:center;color:#94A3B8;font-size:13px;">目前無可管理的功能，請聯繫平台管理員開通。</p>';
-        return;
-    }
+    if (!container) return;
 
-    container.innerHTML = visibleFeatures.map(f => {
-        const keys = f.key.split(',');
-        const on = keys.some(k => featureState[k.trim()] !== false);
-        const cardId = f.key.replace(',', '_');
-        return `
-        <div class="feature-toggle-card" id="ftCard_${cardId}" onclick="toggleFeature('${f.key}')"
-             style="display:flex;align-items:center;gap:14px;padding:16px;background:${on ? '#F5F3FF' : '#F8FAFC'};border:2px solid ${on ? '#4F46E5' : '#E5E7EB'};border-radius:14px;cursor:pointer;transition:all 0.2s;">
-            <div class="ft-indicator" style="width:26px;height:26px;border:2px solid ${on ? '#4F46E5' : '#CBD5E1'};border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:${on ? '#4F46E5' : '#fff'};color:#fff;font-size:16px;transition:all 0.2s;">${on ? '✓' : ''}</div>
-            <span style="font-size:28px;">${f.icon}</span>
-            <div style="flex:1;">
-                <div style="font-weight:800;font-size:14px;color:#0F172A;">${f.label}</div>
-                <div style="font-size:12px;color:#94A3B8;margin-top:2px;">${f.desc}</div>
-            </div>
-        </div>`;
-    }).join('');
+    let html = '';
+
+    // === 產業別模板快選 ===
+    html += '<div style="background:#F0F9FF;border:1px solid #BAE6FD;border-radius:12px;padding:14px;margin-bottom:16px;">';
+    html += '<div style="font-weight:700;font-size:13px;margin-bottom:8px;">🏢 產業別模板</div>';
+    html += '<div style="font-size:11px;color:#64748B;margin-bottom:10px;">選擇產業自動配好功能，之後可以再微調</div>';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:6px;">';
+    Object.keys(INDUSTRY_TEMPLATES).forEach(key => {
+        const t = INDUSTRY_TEMPLATES[key];
+        const isActive = key === industry;
+        html += `<button onclick="applyIndustryTemplate('${key}')" style="padding:6px 12px;border:2px solid ${isActive ? '#4F46E5' : '#E2E8F0'};border-radius:8px;background:${isActive ? '#EEF2FF' : '#fff'};font-size:12px;font-weight:${isActive ? '700' : '500'};color:${isActive ? '#4F46E5' : '#64748B'};cursor:pointer;">${t.label}</button>`;
+    });
+    html += '</div></div>';
+
+    // === 按分類顯示功能開關 ===
+    FEATURE_CATEGORIES.forEach(cat => {
+        const features = ADMIN_FEATURE_LIST.filter(f => f.category === cat.key);
+
+        // 過濾平台不允許的
+        const visible = features.filter(f => {
+            if (!hasAllowed) return true;
+            const keys = f.key.split(',');
+            return keys.some(k => allowed[k.trim()] !== false);
+        });
+
+        if (visible.length === 0) return;
+
+        html += '<div style="margin-bottom:16px;">';
+        html += `<div style="font-size:13px;font-weight:700;color:#475569;margin-bottom:8px;">${cat.label}</div>`;
+
+        visible.forEach(f => {
+            const keys = f.key.split(',');
+            const on = keys.some(k => featureState[k.trim()] !== false);
+            const cardId = f.key.replace(',', '_');
+            html += `<div class="feature-toggle-card" id="ftCard_${cardId}" onclick="toggleFeature('${f.key}')"` +
+                ` style="display:flex;align-items:center;gap:14px;padding:14px;background:${on ? '#F5F3FF' : '#F8FAFC'};` +
+                `border:2px solid ${on ? '#4F46E5' : '#E5E7EB'};border-radius:14px;cursor:pointer;transition:all 0.2s;margin-bottom:8px;">` +
+                `<div class="ft-indicator" style="width:26px;height:26px;border:2px solid ${on ? '#4F46E5' : '#CBD5E1'};` +
+                `border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:${on ? '#4F46E5' : '#fff'};` +
+                `color:#fff;font-size:16px;transition:all 0.2s;">${on ? '✓' : ''}</div>` +
+                `<span style="font-size:24px;">${f.icon}</span>` +
+                `<div style="flex:1;"><div style="font-weight:700;font-size:13px;color:#0F172A;">${f.label}</div>` +
+                `<div style="font-size:11px;color:#94A3B8;margin-top:1px;">${f.desc}</div></div></div>`;
+        });
+
+        html += '</div>';
+    });
+
+    container.innerHTML = html;
 }
 
 export function updateToggleCard(key) {
@@ -181,6 +247,49 @@ export async function toggleFeature(key) {
         console.error('儲存失敗', e);
         showToast('❌ 儲存失敗');
     }
+}
+
+export async function applyIndustryTemplate(industryKey) {
+    const template = INDUSTRY_TEMPLATES[industryKey];
+    if (!template) return;
+
+    if (!confirm(`套用「${template.label}」模板？\n將自動開關功能，套用後可以再微調。`)) return;
+
+    // 套用模板到 featureState
+    Object.keys(template.features).forEach(key => {
+        featureState[key] = template.features[key];
+    });
+
+    // 儲存到 DB
+    try {
+        const { data: existing } = await sb.from('system_settings')
+            .select('id').eq('key', 'feature_visibility').maybeSingle();
+        if (existing) {
+            await sb.from('system_settings')
+                .update({ value: featureState, updated_at: new Date().toISOString() })
+                .eq('key', 'feature_visibility');
+        } else {
+            await sb.from('system_settings')
+                .insert({ key: 'feature_visibility', value: featureState, description: '員工可見功能設定' });
+        }
+        invalidateSettingsCache();
+    } catch(e) {
+        console.error(e);
+        showToast('❌ 儲存失敗');
+        return;
+    }
+
+    // 更新公司 industry（如果有權限）
+    try {
+        if (window.currentCompanyId) {
+            await sb.from('companies').update({ industry: industryKey }).eq('id', window.currentCompanyId);
+            window.currentCompanyIndustry = industryKey;
+        }
+    } catch(e) {}
+
+    // 重新渲染
+    loadFeatureSettings();
+    showToast(`✅ 已套用「${template.label}」模板`);
 }
 
 // ===== 公告管理 =====
