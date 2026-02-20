@@ -733,31 +733,32 @@
             <button class="btn btn-secondary" onclick="showPage('adminHomePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
             <div class="checkin-page">
                 <h2>📊 報表匯出</h2>
+                <p style="color:#6b7280;font-size:13px;margin-bottom:16px;">選擇要匯出的報表類型</p>
                 <div class="menu-grid">
-                    <div class="menu-item" onclick="exportReport('attendance')">
+                    <button class="report-action-btn" onclick="exportReport('attendance')">
                         <div class="icon">📈</div><div class="label">出勤報表</div>
-                    </div>
-                    <div class="menu-item" onclick="exportReport('leave')">
+                    </button>
+                    <button class="report-action-btn" onclick="exportReport('leave')">
                         <div class="icon">📝</div><div class="label">請假報表</div>
-                    </div>
-                    <div class="menu-item" onclick="exportReport('bonus')">
+                    </button>
+                    <button class="report-action-btn" onclick="exportReport('bonus')">
                         <div class="icon">🎁</div><div class="label">獎金報表</div>
-                    </div>
-                    <div class="menu-item" onclick="exportReport('lunch')">
+                    </button>
+                    <button class="report-action-btn" onclick="exportReport('lunch')">
                         <div class="icon">🍱</div><div class="label">便當報表</div>
-                    </div>
-                    <div class="menu-item" onclick="exportReport('overtime')">
+                    </button>
+                    <button class="report-action-btn" onclick="exportReport('overtime')">
                         <div class="icon">⏰</div><div class="label">加班報表</div>
-                    </div>
-                    <div class="menu-item" onclick="exportReport('payroll')">
+                    </button>
+                    <button class="report-action-btn" onclick="exportReport('payroll')">
                         <div class="icon">💰</div><div class="label">薪資報表</div>
-                    </div>
-                    <div class="menu-item" onclick="showPage('fieldSalesAdminPage')">
+                    </button>
+                    <button class="report-action-btn" onclick="showPage('fieldSalesAdminPage')">
                         <div class="icon">📍</div><div class="label">外勤報表</div>
-                    </div>
-                    <div class="menu-item" data-feature="store_ordering" onclick="exportReport('orders')">
+                    </button>
+                    <button class="report-action-btn" data-feature="store_ordering" onclick="exportReport('orders')">
                         <div class="icon">🍽️</div><div class="label">訂單報表</div>
-                    </div>
+                    </button>
                 </div>
             </div>
         </div>
