@@ -115,6 +115,17 @@
                             <option value="suspended">暫停</option>
                         </select>
                     </div>
+                    <div class="form-group">
+                        <label>產業別</label>
+                        <select id="pCompanyIndustry" style="width:100%;padding:12px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;">
+                            <option value="general">通用</option>
+                            <option value="manufacturing">製造業</option>
+                            <option value="restaurant">餐飲業</option>
+                            <option value="service">服務業</option>
+                            <option value="retail">零售業</option>
+                            <option value="clinic">診所/醫療</option>
+                        </select>
+                    </div>
 
                     <!-- 功能開關 -->
                     <div style="margin-top:16px;padding:14px;background:#F8FAFC;border-radius:12px;">
@@ -345,6 +356,7 @@
             document.getElementById('pPlanType').value = editData?.plan_type || 'basic';
             document.getElementById('pMaxEmployees').value = editData?.max_employees || 50;
             document.getElementById('pStatus').value = editData?.status || 'active';
+            document.getElementById('pCompanyIndustry').value = editData?.industry || 'general';
 
             // 功能開關
             const features = editData?.features || { leave: true, lunch: true, attendance: true, fieldwork: true, sales_target: true, store_ordering: false };
@@ -387,6 +399,7 @@
                 plan_type: document.getElementById('pPlanType').value,
                 max_employees: parseInt(document.getElementById('pMaxEmployees').value) || 50,
                 status: document.getElementById('pStatus').value,
+                industry: document.getElementById('pCompanyIndustry')?.value || 'general',
                 features
             };
 

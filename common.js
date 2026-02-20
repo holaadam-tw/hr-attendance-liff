@@ -14,6 +14,7 @@ let currentEmployee = null;
 let currentCompanyId = null;    // 多租戶：當前公司 ID
 let currentCompanyFeatures = null; // 多租戶：當前公司功能設定
 let currentCompanyName = null;     // 多租戶：當前公司名稱
+let currentCompanyIndustry = null; // 多租戶：當前公司產業別
 let isPlatformAdmin = false;       // 是否為平台管理員
 let currentPlatformAdmin = null;   // 平台管理員資料
 let managedCompanies = [];         // 可管理的公司列表
@@ -190,13 +191,14 @@ async function checkUserStatus() {
             currentPlatformAdmin = padmin;
             // 載入可管理公司列表（含 role）
             const { data: pac } = await sb.from('platform_admin_companies')
-                .select('company_id, role, companies(id, name, features, status)')
+                .select('company_id, role, companies(id, name, features, status, industry)')
                 .eq('platform_admin_id', padmin.id);
             managedCompanies = (pac || []).map(r => ({
                 id: r.company_id,
                 name: r.companies?.name || '未命名',
                 features: r.companies?.features || null,
                 status: r.companies?.status || 'active',
+                industry: r.companies?.industry || 'general',
                 role: r.role
             }));
 
@@ -215,6 +217,7 @@ async function checkUserStatus() {
                 currentCompanyId = selected.id;
                 currentCompanyFeatures = selected.features;
                 currentCompanyName = selected.name;
+                currentCompanyIndustry = selected.industry || 'general';
                 sessionStorage.setItem('selectedCompanyId', selected.id);
             }
 
@@ -263,11 +266,12 @@ async function checkUserStatus() {
             if (currentCompanyId) {
                 try {
                     const { data: company } = await sb.from('companies')
-                        .select('name, features, status')
+                        .select('name, features, status, industry')
                         .eq('id', currentCompanyId)
                         .maybeSingle();
                     currentCompanyFeatures = company?.features || null;
                     currentCompanyName = company?.name || null;
+                    currentCompanyIndustry = company?.industry || 'general';
                 } catch(e) { console.log('載入公司功能設定失敗', e); }
             }
             updateUserInfo(data);
@@ -1208,13 +1212,24 @@ function initBottomNav() {
 
     // 判斷當前頁面以標記 active
     const page = window.location.pathname.split('/').pop() || 'index.html';
-    const items = [
+    var items = [
         { href: 'index.html',          icon: '🏠', label: '首頁' },
         { href: 'schedule.html',       icon: '📅', label: '班表' },
         { href: 'checkin.html?type=in', icon: '📍', label: '打卡' },
         { href: 'salary.html',         icon: '💰', label: '薪資' },
         { href: 'admin.html',          icon: '⚙️', label: '管理' }
     ];
+
+    // 餐飲業：把薪資換成訂單管理
+    if (currentCompanyIndustry === 'restaurant') {
+        items = [
+            { href: 'index.html',          icon: '🏠', label: '首頁' },
+            { href: 'schedule.html',       icon: '📅', label: '班表' },
+            { href: 'checkin.html?type=in', icon: '📍', label: '打卡' },
+            { href: 'admin.html#restaurant',icon: '🍽️', label: '訂單' },
+            { href: 'admin.html',          icon: '⚙️', label: '管理' }
+        ];
+    }
 
     const nav = document.createElement('nav');
     nav.className = 'bottom-nav';
@@ -1232,17 +1247,52 @@ function initBottomNav() {
 // ===== 功能顯示設定 =====
 // 優先從 companies.features 讀取（多租戶），fallback 到 system_settings
 const DEFAULT_FEATURES = {
-    leave: true,        // 我要請假
-    lunch: true,        // 便當訂購
-    attendance: true,   // 考勤查詢
-    fieldwork: true,    // 外勤打卡
-    sales_target: true, // 業務目標
-    store_ordering: false // 線上點餐
+    leave: true,           // 我要請假
+    lunch: true,           // 便當訂購
+    attendance: true,      // 考勤查詢
+    fieldwork: true,       // 外勤打卡
+    sales_target: true,    // 業務目標
+    store_ordering: false, // 線上點餐/查訂單
+    schedule: true,        // 我的排班
+    salary: true,          // 薪資查詢
+    qr_order: false,       // 客人掃碼點餐
+    kds: false,            // 廚房出單
+    booking: false         // 客戶預約/訂位
 };
 
 function getFeatureVisibility() {
     // 雙層 AND 邏輯：平台允許 AND 管理員開啟 → 才顯示
     let result = { ...DEFAULT_FEATURES };
+
+    // 第 0 層：產業別預設覆蓋（僅影響預設值，管理員可在後台自訂覆蓋）
+    if (currentCompanyIndustry === 'restaurant') {
+        result.qr_order = true;
+        result.kds = true;
+        result.store_ordering = true;
+        result.booking = true;      // 餐廳訂位
+        result.lunch = false;       // 餐飲業不需要便當訂購
+        result.fieldwork = false;   // 餐飲業不需要外勤
+        result.sales_target = false;
+    } else if (currentCompanyIndustry === 'manufacturing') {
+        result.lunch = true;
+        result.fieldwork = true;    // 製造業需要外勤/業務
+        result.sales_target = true;
+        result.qr_order = false;
+        result.kds = false;
+        result.store_ordering = false;
+        result.booking = false;
+    } else if (currentCompanyIndustry === 'service') {
+        result.booking = true;      // 服務業需要客戶預約
+        result.fieldwork = true;
+        result.qr_order = false;
+        result.kds = false;
+    } else if (currentCompanyIndustry === 'clinic') {
+        result.booking = true;      // 診所需要看診預約
+        result.lunch = false;
+        result.fieldwork = false;
+        result.qr_order = false;
+        result.kds = false;
+    }
 
     // 第一層：平台管理員設定（companies.features）
     if (currentCompanyFeatures) {

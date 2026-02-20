@@ -113,24 +113,47 @@
                 </div>
             </div>
 
-            <!-- 精簡選單（移除與底部導航重複的項目）-->
-            <div class="menu-grid">
+            <!-- 智慧分流選單：根據產業別和角色動態顯示 -->
+            <div class="menu-grid" id="smartMenuGrid">
+                <!-- 通用功能 -->
                 <div class="menu-item" data-feature="leave" onclick="window.location.href='records.html'">
                     <div class="icon">📝</div><div class="label">我要請假</div>
-                </div>
-                <div class="menu-item" data-feature="lunch" onclick="window.location.href='services.html'">
-                    <div class="icon">🍱</div><div class="label">便當訂購</div>
                 </div>
                 <div class="menu-item" data-feature="attendance" onclick="window.location.href='records.html#attendance'">
                     <div class="icon">📊</div><div class="label">考勤查詢</div>
                 </div>
+                <div class="menu-item" data-feature="schedule" onclick="window.location.href='schedule.html'">
+                    <div class="icon">📅</div><div class="label">我的排班</div>
+                </div>
+                <div class="menu-item" data-feature="salary" onclick="window.location.href='salary.html'">
+                    <div class="icon">💰</div><div class="label">薪資查詢</div>
+                </div>
+
+                <!-- 製造業功能 -->
+                <div class="menu-item" data-feature="lunch" onclick="window.location.href='services.html'">
+                    <div class="icon">🍱</div><div class="label">便當訂購</div>
+                </div>
                 <div class="menu-item" data-feature="fieldwork,sales_target" onclick="window.location.href='services.html#fieldwork'">
                     <div class="icon">📍</div><div class="label">外勤/業務</div>
                 </div>
+
+                <!-- 餐飲業功能 -->
+                <div class="menu-item" data-feature="qr_order" onclick="openQrOrder()">
+                    <div class="icon">🍞</div><div class="label">掃碼點餐</div>
+                </div>
+                <div class="menu-item" data-feature="kds" onclick="openKds()">
+                    <div class="icon">🍳</div><div class="label">廚房出單</div>
+                </div>
                 <div class="menu-item" data-feature="store_ordering" id="activeOrdersItem" style="position:relative;" onclick="window.location.href='admin.html#restaurant'">
                     <span id="activeOrdersBadge" style="display:none;position:absolute;top:6px;right:6px;min-width:18px;height:18px;border-radius:9px;background:#EF4444;color:#fff;font-size:11px;font-weight:700;text-align:center;line-height:18px;padding:0 5px;"></span>
-                    <div class="icon">📋</div><div class="label">查訂單</div>
+                    <div class="icon">📋</div><div class="label">訂單管理</div>
                 </div>
+
+                <!-- 服務業/餐飲/診所功能 -->
+                <div class="menu-item" data-feature="booking" onclick="window.location.href='booking.html'">
+                    <div class="icon">📅</div><div class="label">客戶預約</div>
+                </div>
+
                 <!-- 管理員專用 -->
                 <div class="menu-item admin-only" id="adminEntry" style="display:none;" onclick="window.location.href='admin.html'">
                     <span class="menu-badge"></span>
@@ -161,12 +184,66 @@
             setTimeout(() => isProcessing = false, 1000);
         }
 
-        function startCheckOut() { 
+        function startCheckOut() {
             if (document.getElementById('checkOutBtn')?.classList.contains('disabled')) return;
             if (isProcessing) return;
             isProcessing = true;
             window.location.href = 'checkin.html?type=out';
             setTimeout(() => isProcessing = false, 1000);
+        }
+
+        // 餐飲業快捷功能
+        async function openQrOrder() {
+            // 找到該公司關聯的商店，導向點餐頁
+            if (!currentCompanyId) return;
+            try {
+                const { data } = await sb.from('store_profiles')
+                    .select('store_slug')
+                    .eq('company_id', currentCompanyId)
+                    .eq('is_active', true)
+                    .limit(1)
+                    .single();
+                if (data?.store_slug) {
+                    window.location.href = 'order.html?store=' + data.store_slug;
+                } else {
+                    showToast('尚未建立商店，請至管理後台設定');
+                }
+            } catch(e) {
+                showToast('無法取得商店資訊');
+            }
+        }
+
+        async function openKds() {
+            if (!currentCompanyId) return;
+            try {
+                const { data } = await sb.from('store_profiles')
+                    .select('store_slug')
+                    .eq('company_id', currentCompanyId)
+                    .eq('is_active', true)
+                    .limit(1)
+                    .single();
+                if (data?.store_slug) {
+                    window.location.href = 'kds.html?store=' + data.store_slug;
+                } else {
+                    showToast('尚未建立商店，請至管理後台設定');
+                }
+            } catch(e) {
+                showToast('無法取得商店資訊');
+            }
+        }
+
+        // 根據產業別調整頁面標題
+        function updatePageTitle() {
+            var titleMap = {
+                restaurant: '🍽️ 餐飲服務中心',
+                manufacturing: '🏭 員工服務中心',
+                service: '🔧 服務管理中心',
+                retail: '🛒 門市服務中心',
+                clinic: '🏥 診所服務中心',
+                general: '🏢 員工服務中心'
+            };
+            var title = titleMap[currentCompanyIndustry] || titleMap.general;
+            document.title = title;
         }
 
         // 更新今日資訊
@@ -374,6 +451,7 @@
                     }
                     await Promise.all(tasks.map(p => Promise.resolve(p).catch(e => console.error(e))));
                     applyFeatureVisibility();
+                    if (typeof updatePageTitle === 'function') updatePageTitle();
                     preloadGPS();
                 } else {
                     showPage('bindPage');
