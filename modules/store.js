@@ -162,12 +162,10 @@ export function switchRestaurantTab(tab, el) {
     document.getElementById('rdMenuTab').style.display = tab === 'menu' ? '' : 'none';
     document.getElementById('rdReportTab').style.display = tab === 'report' ? '' : 'none';
     document.getElementById('rdSettingsTab').style.display = tab === 'settings' ? '' : 'none';
-    document.getElementById('rdMembersTab').style.display = tab === 'members' ? '' : 'none';
     if (tab === 'orders') loadStoreOrders();
     if (tab === 'menu') { loadMenuCategories(); loadMenuItems(); }
     if (tab === 'report') loadSalesReport();
     if (tab === 'settings') loadStoreSettings();
-    if (tab === 'members') loadMembersTab();
 }
 
 // ===== 訂單即時通知 =====
@@ -2051,4 +2049,226 @@ function renderTxRow(tx) {
             '<div style="color:#94A3B8;font-size:10px;">' + dateStr + '</div>' +
         '</div>' +
     '</div>';
+}
+
+// ============================================================
+// 預約管理（獨立頁面）
+// ============================================================
+let bookingCurrentStoreId = null;
+
+export async function loadBookingForStore() {
+    const sel = document.getElementById('bookingStoreSelect');
+    bookingCurrentStoreId = sel.value;
+    const content = document.getElementById('bookingContent');
+    if (!bookingCurrentStoreId) {
+        content.style.display = 'none';
+        return;
+    }
+    content.style.display = 'block';
+
+    try {
+        // 載入預約統計
+        const today = new Date();
+        const weekStart = new Date(today);
+        weekStart.setDate(today.getDate() - today.getDay());
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekStart.getDate() + 6);
+
+        const { data: bookings } = await sb.from('bookings')
+            .select('*')
+            .eq('store_id', bookingCurrentStoreId)
+            .gte('booking_date', weekStart.toISOString().split('T')[0])
+            .lte('booking_date', weekEnd.toISOString().split('T')[0]);
+
+        const weekCount = bookings?.length || 0;
+        const pendingCount = bookings?.filter(b => b.status === 'pending').length || 0;
+
+        document.getElementById('bookingWeekCount').textContent = weekCount;
+        document.getElementById('bookingPendingCount').textContent = pendingCount;
+
+        // 載入開關狀態（從 booking_settings 表）
+        const { data: settings } = await sb.from('booking_settings')
+            .select('*')
+            .eq('store_id', bookingCurrentStoreId)
+            .maybeSingle();
+
+        const enabled = settings?.is_active !== false;
+        const toggle = document.getElementById('bookingEnabled');
+        toggle.checked = enabled;
+        updateToggleStyle(toggle);
+    } catch(e) {
+        showToast('載入失敗');
+    }
+}
+
+export async function toggleBookingEnabled() {
+    const toggle = document.getElementById('bookingEnabled');
+    const enabled = toggle.checked;
+    updateToggleStyle(toggle);
+
+    if (!bookingCurrentStoreId) return;
+
+    try {
+        // 更新 booking_settings
+        await sb.from('booking_settings')
+            .upsert({
+                store_id: bookingCurrentStoreId,
+                is_active: enabled
+            }, { onConflict: 'store_id' });
+
+        showToast(enabled ? '✅ 已開啟預約功能' : '✅ 已關閉預約功能');
+    } catch(e) {
+        showToast('更新失敗');
+        toggle.checked = !enabled;
+        updateToggleStyle(toggle);
+    }
+}
+
+// ============================================================
+// 會員管理（獨立頁面）
+// ============================================================
+let memberCurrentStoreId = null;
+
+export async function loadMembersForStore() {
+    const sel = document.getElementById('memberStoreSelect');
+    memberCurrentStoreId = sel.value;
+    const content = document.getElementById('memberContent');
+    if (!memberCurrentStoreId) {
+        content.style.display = 'none';
+        return;
+    }
+    content.style.display = 'block';
+
+    try {
+        // 載入會員統計
+        const { data: customers } = await sb.from('store_customers')
+            .select('*')
+            .eq('store_id', memberCurrentStoreId);
+
+        const totalCount = customers?.length || 0;
+        const vipCount = customers?.filter(c => c.is_vip).length || 0;
+
+        document.getElementById('memberTotalCount').textContent = totalCount;
+        document.getElementById('memberVipCount').textContent = vipCount;
+
+        // 載入集點開關
+        const { data: store } = await sb.from('store_profiles')
+            .select('loyalty_enabled')
+            .eq('id', memberCurrentStoreId)
+            .single();
+
+        const enabled = store?.loyalty_enabled !== false;
+        const toggle = document.getElementById('memberLoyaltyEnabled');
+        toggle.checked = enabled;
+        updateToggleStyle(toggle);
+    } catch(e) {
+        showToast('載入失敗');
+    }
+}
+
+export async function toggleMemberLoyalty() {
+    const toggle = document.getElementById('memberLoyaltyEnabled');
+    const enabled = toggle.checked;
+    updateToggleStyle(toggle);
+
+    if (!memberCurrentStoreId) return;
+
+    try {
+        await sb.from('store_profiles')
+            .update({ loyalty_enabled: enabled })
+            .eq('id', memberCurrentStoreId);
+
+        showToast(enabled ? '✅ 已開啟集點功能' : '✅ 已關閉集點功能');
+    } catch(e) {
+        showToast('更新失敗');
+        toggle.checked = !enabled;
+        updateToggleStyle(toggle);
+    }
+}
+
+let memberSearchTimer = null;
+export function searchMemberByPhone() {
+    clearTimeout(memberSearchTimer);
+    const phone = document.getElementById('memberSearchPhone').value.trim();
+
+    if (phone.length < 4) {
+        document.getElementById('memberSearchResult').innerHTML = '';
+        return;
+    }
+
+    memberSearchTimer = setTimeout(async () => {
+        if (!memberCurrentStoreId) return;
+
+        try {
+            const { data: customer } = await sb.from('store_customers')
+                .select('*, loyalty_points(points)')
+                .eq('store_id', memberCurrentStoreId)
+                .eq('phone', phone)
+                .maybeSingle();
+
+            const resultEl = document.getElementById('memberSearchResult');
+            if (!customer) {
+                resultEl.innerHTML = '<div style="text-align:center;padding:20px;color:#94A3B8;">查無此會員</div>';
+                return;
+            }
+
+            const pts = customer.loyalty_points?.[0]?.points || 0;
+            const vipTag = customer.is_vip ? '<span style="background:#FCD34D;color:#78350F;padding:2px 6px;border-radius:4px;font-size:11px;font-weight:700;margin-left:4px;">⭐VIP</span>' : '';
+            const blackTag = customer.is_blacklisted ? '<span style="background:#FEE2E2;color:#DC2626;padding:2px 6px;border-radius:4px;font-size:11px;font-weight:700;margin-left:4px;">🚫黑名單</span>' : '';
+
+            resultEl.innerHTML = '<div style="background:#fff;border:2px solid #4F46E5;border-radius:12px;padding:16px;">' +
+                '<div style="font-size:16px;font-weight:700;margin-bottom:8px;">' + esc(customer.name || '未命名') + vipTag + blackTag + '</div>' +
+                '<div style="font-size:13px;color:#64748B;">📱 ' + esc(customer.phone) + '</div>' +
+                '<div style="font-size:13px;color:#64748B;margin-top:4px;">💰 集點：<b>' + pts + '</b> 點</div>' +
+            '</div>';
+        } catch(e) {
+            document.getElementById('memberSearchResult').innerHTML = '';
+        }
+    }, 400);
+}
+
+// 通用 toggle 樣式更新函數
+function updateToggleStyle(toggle) {
+    const slider = toggle.nextElementSibling;
+    const thumb = slider?.nextElementSibling;
+    if (toggle.checked) {
+        if (slider) slider.style.background = '#4F46E5';
+        if (thumb) thumb.style.transform = 'translateX(22px)';
+    } else {
+        if (slider) slider.style.background = '#CBD5E1';
+        if (thumb) thumb.style.transform = 'translateX(0)';
+    }
+}
+
+// 載入商店列表（用於預約管理和會員管理頁面）
+export async function loadBookingStoreList() {
+    try {
+        const { data: stores } = await sb.from('store_profiles')
+            .select('*')
+            .order('name');
+
+        const sel = document.getElementById('bookingStoreSelect');
+        if (!sel) return;
+
+        sel.innerHTML = '<option value="">-- 請選擇商店 --</option>' +
+            (stores || []).map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join('');
+    } catch(e) {
+        showToast('載入商店列表失敗');
+    }
+}
+
+export async function loadMemberStoreList() {
+    try {
+        const { data: stores } = await sb.from('store_profiles')
+            .select('*')
+            .order('name');
+
+        const sel = document.getElementById('memberStoreSelect');
+        if (!sel) return;
+
+        sel.innerHTML = '<option value="">-- 請選擇商店 --</option>' +
+            (stores || []).map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join('');
+    } catch(e) {
+        showToast('載入商店列表失敗');
+    }
 }

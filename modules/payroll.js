@@ -27,6 +27,30 @@ let payrollAdjustments = {};   // { empId: { amount: 0, note: '' } }
 let payrollBrackets = [];
 let payrollIsPublished = false;
 
+// ===== Tab 切換 =====
+export function switchPayTab(tab, btn) {
+    // 隱藏所有 tab 內容
+    document.querySelectorAll('.payTabContent').forEach(el => el.style.display = 'none');
+    // 重設所有按鈕樣式
+    document.querySelectorAll('.payTab').forEach(b => {
+        b.style.background = 'transparent';
+        b.style.color = '#94A3B8';
+        b.style.boxShadow = 'none';
+    });
+    // 顯示選中的 tab
+    document.getElementById(`payTab${tab.charAt(0).toUpperCase() + tab.slice(1)}`).style.display = 'block';
+    // 高亮按鈕
+    if (btn) {
+        btn.style.background = '#fff';
+        btn.style.color = '#4F46E5';
+        btn.style.boxShadow = '0 1px 4px rgba(0,0,0,0.08)';
+    }
+    // 載入對應資料
+    if (tab === 'payroll') initPayrollPage();
+    if (tab === 'bonus') loadHybridBonusData();
+    if (tab === 'insurance') loadInsuranceBrackets();
+}
+
 // ===== 保險模組狀態 =====
 let insBrackets = [];
 

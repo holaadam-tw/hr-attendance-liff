@@ -111,11 +111,8 @@
             </div>
 
             <div class="menu-grid">
-                <div class="menu-item" data-require="admin" onclick="showPage('bonusPage')">
-                    <div class="icon">🎁</div><div class="label">年終獎金試算</div>
-                </div>
                 <div class="menu-item" data-require="admin" onclick="showPage('payrollPage')">
-                    <div class="icon">💰</div><div class="label">薪資發放</div>
+                    <div class="icon">💰</div><div class="label">薪酬管理</div>
                 </div>
                 <div class="menu-item" data-require="admin" onclick="showPage('locationPage')">
                     <div class="icon">📍</div><div class="label">地點管理</div>
@@ -147,14 +144,14 @@
                 <div class="menu-item" data-require="admin" data-feature="store_ordering" onclick="showPage('restaurantPage')">
                     <div class="icon">🍽️</div><div class="label">餐飲業管理</div>
                 </div>
-                <div class="menu-item" data-require="admin" onclick="showPage('insurancePage')">
-                    <div class="icon">🏥</div><div class="label">勞健保級距</div>
+                <div class="menu-item" data-require="admin" onclick="showPage('bookingMgrPage')">
+                    <div class="icon">📅</div><div class="label">預約管理</div>
+                </div>
+                <div class="menu-item" data-require="admin" onclick="showPage('memberMgrPage')">
+                    <div class="icon">👥</div><div class="label">會員管理</div>
                 </div>
                 <div class="menu-item" data-require="admin" onclick="showPage('featurePage')">
-                    <div class="icon">🎛️</div><div class="label">功能管理</div>
-                </div>
-                <div class="menu-item" data-require="admin" onclick="showPage('auditLogPage')">
-                    <div class="icon">📜</div><div class="label">操作日誌</div>
+                    <div class="icon">🎛️</div><div class="label">系統設定</div>
                 </div>
                 <div class="menu-item" onclick="window.location.href='index.html'">
                     <div class="icon">🏠</div><div class="label">返回首頁</div>
@@ -163,48 +160,6 @@
         </div>
 
         <!-- 年終獎金試算頁面 (混合精算) -->
-        <div id="bonusPage" class="page">
-            <button class="btn btn-secondary" onclick="showPage('adminHomePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
-            <div class="checkin-page">
-                <h2>🎁 年終獎金試算</h2>
-                <div class="form-group">
-                    <label>試算年度</label>
-                    <select id="bonusYear" onchange="loadHybridBonusData()"></select>
-                </div>
-
-                <div id="bonusLoading" style="text-align:center;color:#666;padding:30px;display:none;">⏳ 載入中...</div>
-
-                <div class="lunch-summary" id="bonusSummary" style="display:none;">
-                    <h3 style="margin-bottom:15px;">📈 試算摘要</h3>
-                    <div class="stat-row"><span>符合資格人數</span><span id="eligibleCount">0</span></div>
-                    <div class="stat-row"><span>總預算</span><span id="totalBudget">$0</span></div>
-                    <div class="stat-row"><span>平均獎金</span><span id="avgBonus">$0</span></div>
-                </div>
-
-                <div id="matrixRef" style="display:none;">
-                    <div onclick="toggleMatrixRef()" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#F5F3FF;border-radius:12px;margin-bottom:10px;">
-                        <span style="font-weight:700;font-size:13px;color:#4F46E5;">📊 獎金矩陣參考表</span>
-                        <span id="matrixRefArrow" style="font-size:12px;color:#4F46E5;">▼</span>
-                    </div>
-                    <div id="matrixRefBody" style="display:none;overflow-x:auto;margin-bottom:16px;"></div>
-                </div>
-
-                <div class="form-group" id="bonusEmpSelect" style="display:none;">
-                    <label>選擇員工</label>
-                    <select id="bonusEmpDropdown" onchange="renderSelectedBonusCard()">
-                        <option value="_all">📋 全部員工總覽</option>
-                    </select>
-                </div>
-
-                <div id="bonusList" style="margin-top:10px;"></div>
-
-                <div id="bonusActions" style="display:none;margin-top:20px;">
-                    <button class="btn btn-success" onclick="saveAllBonuses()" id="saveAllBonusBtn">💾 儲存全部獎金</button>
-                    <button class="btn btn-secondary" onclick="exportBonusCSV()" style="margin-top:8px;">📊 匯出 CSV</button>
-                </div>
-            </div>
-        </div>
-
         <!-- 地點管理頁面 -->
         <div id="locationPage" class="page">
             <button class="btn btn-secondary" onclick="showPage('adminHomePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
@@ -563,16 +518,6 @@
 
 
         <!-- ====== 操作日誌 ====== -->
-        <div id="auditLogPage" class="page">
-            <button class="btn btn-secondary" onclick="showPage('adminHomePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
-            <div class="checkin-page">
-                <h2>📜 操作日誌</h2>
-                <p style="color:#94A3B8;font-size:12px;margin-bottom:12px;">系統自動記錄所有管理操作</p>
-                <div id="auditLogList"><p style="text-align:center;color:#666;">載入中...</p></div>
-                <button class="btn btn-secondary" id="loadMoreAudit" onclick="loadAuditLogs(true)" style="margin-top:12px;">載入更多...</button>
-            </div>
-        </div>
-
         <!-- 便當管理頁面 -->
         <div id="lunchMgrPage" class="page">
             <button class="btn btn-secondary" onclick="showPage('adminHomePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
@@ -611,8 +556,17 @@
         <div id="payrollPage" class="page">
             <button class="btn btn-secondary" onclick="showPage('adminHomePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
             <div class="checkin-page">
-                <h2>💰 薪資發放</h2>
+                <h2>💰 薪酬管理</h2>
 
+                <!-- 三頁籤 -->
+                <div style="display:flex;gap:4px;margin-bottom:16px;background:#F1F5F9;border-radius:10px;padding:3px;">
+                    <button class="payTab" onclick="switchPayTab('payroll',this)" style="flex:1;padding:10px;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;background:#fff;color:#4F46E5;box-shadow:0 1px 4px rgba(0,0,0,0.08);">💰 薪資發放</button>
+                    <button class="payTab" onclick="switchPayTab('bonus',this)" style="flex:1;padding:10px;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;background:transparent;color:#94A3B8;">🎁 年終獎金</button>
+                    <button class="payTab" onclick="switchPayTab('insurance',this)" style="flex:1;padding:10px;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;background:transparent;color:#94A3B8;">🏥 勞健保級距</button>
+                </div>
+
+                <!-- === 薪資發放 TAB === -->
+                <div id="payTabPayroll" class="payTabContent">
                 <!-- 薪資設定快捷入口 -->
                 <div style="margin-bottom:14px;">
                     <div onclick="toggleSalarySettingPanel()" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:12px;">
@@ -682,6 +636,95 @@
                     <button id="publishPayrollBtn" onclick="publishPayroll()" style="width:100%;padding:14px;border:none;border-radius:12px;background:linear-gradient(135deg,#DC2626,#EF4444);color:#fff;font-weight:700;font-size:14px;cursor:pointer;">📢 發布薪資（員工可見）</button>
                     <button onclick="exportPayrollCSV()" style="width:100%;padding:14px;border:none;border-radius:12px;background:linear-gradient(135deg,#0EA5E9,#38BDF8);color:#fff;font-weight:700;font-size:14px;cursor:pointer;">📥 匯出 CSV</button>
                 </div>
+                </div>
+
+                <!-- === 年終獎金 TAB === -->
+                <div id="payTabBonus" class="payTabContent" style="display:none;">
+                <div class="form-group">
+                    <label>試算年度</label>
+                    <select id="bonusYear" onchange="loadHybridBonusData()"></select>
+                </div>
+
+                <div id="bonusLoading" style="text-align:center;color:#666;padding:30px;display:none;">⏳ 載入中...</div>
+
+                <div class="lunch-summary" id="bonusSummary" style="display:none;">
+                    <h3 style="margin-bottom:15px;">📈 試算摘要</h3>
+                    <div class="stat-row"><span>符合資格人數</span><span id="eligibleCount">0</span></div>
+                    <div class="stat-row"><span>總預算</span><span id="totalBudget">$0</span></div>
+                    <div class="stat-row"><span>平均獎金</span><span id="avgBonus">$0</span></div>
+                </div>
+
+                <div id="matrixRef" style="display:none;">
+                    <div onclick="toggleMatrixRef()" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#F5F3FF;border-radius:12px;margin-bottom:10px;">
+                        <span style="font-weight:700;font-size:13px;color:#4F46E5;">📊 獎金矩陣參考表</span>
+                        <span id="matrixRefArrow" style="font-size:12px;color:#4F46E5;">▼</span>
+                    </div>
+                    <div id="matrixRefBody" style="display:none;overflow-x:auto;margin-bottom:16px;"></div>
+                </div>
+
+                <div class="form-group" id="bonusEmpSelect" style="display:none;">
+                    <label>選擇員工</label>
+                    <select id="bonusEmpDropdown" onchange="renderSelectedBonusCard()">
+                        <option value="_all">📋 全部員工總覽</option>
+                    </select>
+                </div>
+
+                <div id="bonusList" style="margin-top:10px;"></div>
+
+                <div id="bonusActions" style="display:none;margin-top:20px;">
+                    <button class="btn btn-success" onclick="saveAllBonuses()" id="saveAllBonusBtn">💾 儲存全部獎金</button>
+                    <button class="btn btn-secondary" onclick="exportBonusCSV()" style="margin-top:8px;">📊 匯出 CSV</button>
+                </div>
+                </div>
+
+                <!-- === 勞健保級距 TAB === -->
+                <div id="payTabInsurance" class="payTabContent" style="display:none;">
+                <div class="lunch-summary" id="insRateSummary">
+                    <h3 style="margin-bottom:10px;">⚙️ 費率設定</h3>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                        <div class="form-group" style="margin:0;"><label style="font-size:12px;">勞保費率 %</label><input type="number" id="insLaborRate" step="0.01" value="12.50" style="padding:8px;font-size:13px;"></div>
+                        <div class="form-group" style="margin:0;"><label style="font-size:12px;">勞保員工負擔比 %</label><input type="number" id="insLaborShare" step="0.01" value="20.00" style="padding:8px;font-size:13px;"></div>
+                        <div class="form-group" style="margin:0;"><label style="font-size:12px;">健保費率 %</label><input type="number" id="insHealthRate" step="0.01" value="5.17" style="padding:8px;font-size:13px;"></div>
+                        <div class="form-group" style="margin:0;"><label style="font-size:12px;">健保員工負擔比 %</label><input type="number" id="insHealthShare" step="0.01" value="30.00" style="padding:8px;font-size:13px;"></div>
+                    </div>
+                    <button class="btn btn-primary" onclick="updateAllInsRates()" style="margin-top:10px;font-size:13px;">📝 套用費率到所有級距</button>
+                </div>
+
+                <div style="display:flex;justify-content:space-between;align-items:center;margin:16px 0 8px;">
+                    <span style="font-size:14px;font-weight:700;">📋 級距表（共 <span id="insCount">0</span> 筆）</span>
+                    <button class="btn btn-success" onclick="showInsModal()" style="font-size:12px;padding:8px 14px;width:auto;">+ 新增</button>
+                </div>
+
+                <div style="overflow-x:auto;border-radius:12px;border:1px solid #E2E8F0;">
+                    <table style="width:100%;border-collapse:collapse;font-size:12px;" id="insTable">
+                        <thead>
+                            <tr style="background:#F8FAFC;">
+                                <th style="padding:8px 6px;text-align:right;white-space:nowrap;">薪資下限</th>
+                                <th style="padding:8px 6px;text-align:right;white-space:nowrap;">薪資上限</th>
+                                <th style="padding:8px 6px;text-align:right;white-space:nowrap;">投保金額</th>
+                                <th style="padding:8px 6px;text-align:center;">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="insTableBody"></tbody>
+                    </table>
+                </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- 新增/編輯級距 Modal (moved outside payrollPage) -->
+        <div id="insModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:999;overflow-y:auto;">
+            <div style="background:#fff;margin:60px auto;max-width:400px;border-radius:16px;padding:24px;">
+                <h3 id="insModalTitle" style="margin-bottom:16px;">新增級距</h3>
+                <input type="hidden" id="insEditId">
+                <div class="form-group"><label>薪資下限 *</label><input type="number" id="insSalaryMin" placeholder="0"></div>
+                <div class="form-group"><label>薪資上限 *</label><input type="number" id="insSalaryMax" placeholder="27470"></div>
+                <div class="form-group"><label>投保金額 *</label><input type="number" id="insAmount" placeholder="27470"></div>
+                <div style="display:flex;gap:8px;">
+                    <button class="btn btn-success" onclick="saveInsBracket()" style="flex:1;">💾 儲存</button>
+                    <button class="btn btn-secondary" onclick="closeInsModal()" style="flex:1;">取消</button>
+                </div>
             </div>
         </div>
 
@@ -723,9 +766,18 @@
         <div id="featurePage" class="page">
             <button class="btn btn-secondary" onclick="showPage('adminHomePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
             <div class="checkin-page">
-                <h2>🎛️ 功能管理</h2>
+                <h2>⚙️ 系統設定</h2>
+
+                <!-- 兩頁籤 -->
+                <div style="display:flex;gap:4px;margin-bottom:16px;background:#F1F5F9;border-radius:10px;padding:3px;">
+                    <button class="sysTab" onclick="switchSysTab('feature',this)" style="flex:1;padding:10px;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;background:#fff;color:#4F46E5;box-shadow:0 1px 4px rgba(0,0,0,0.08);">🎛️ 功能管理</button>
+                    <button class="sysTab" onclick="switchSysTab('audit',this)" style="flex:1;padding:10px;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;background:transparent;color:#94A3B8;">📜 操作日誌</button>
+                </div>
+
+                <!-- === 功能管理 TAB === -->
+                <div id="sysTabFeature" class="sysTabContent">
                 <p style="color:#6b7280;font-size:13px;margin-bottom:16px;">控制員工首頁<b>中間選單</b>顯示哪些功能</p>
-                
+
                 <div id="featureToggles" style="display:flex;flex-direction:column;gap:12px;">
                     <p id="featureLoadingHint" style="text-align:center;color:#94A3B8;font-size:13px;">載入中...</p>
                 </div>
@@ -753,6 +805,15 @@
                         4. 複製 Token 貼到上方
                     </div>
                 </div>
+                </div>
+
+                <!-- === 操作日誌 TAB === -->
+                <div id="sysTabAudit" class="sysTabContent" style="display:none;">
+                <p style="color:#94A3B8;font-size:12px;margin-bottom:12px;">系統自動記錄所有管理操作</p>
+                <div id="auditLogList"><p style="text-align:center;color:#666;">載入中...</p></div>
+                <button class="btn btn-secondary" id="loadMoreAudit" onclick="loadAuditLogs(true)" style="margin-top:12px;">載入更多...</button>
+                </div>
+
             </div>
         </div>
 
@@ -971,59 +1032,6 @@
             </div>
         </div>
 
-        <!-- 勞健保級距管理頁面 -->
-        <div id="insurancePage" class="page">
-            <button class="btn btn-secondary" onclick="showPage('adminHomePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
-            <div class="checkin-page">
-                <h2>🏥 勞健保級距管理</h2>
-
-                <div class="lunch-summary" id="insRateSummary">
-                    <h3 style="margin-bottom:10px;">⚙️ 費率設定</h3>
-                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-                        <div class="form-group" style="margin:0;"><label style="font-size:12px;">勞保費率 %</label><input type="number" id="insLaborRate" step="0.01" value="12.50" style="padding:8px;font-size:13px;"></div>
-                        <div class="form-group" style="margin:0;"><label style="font-size:12px;">勞保員工負擔比 %</label><input type="number" id="insLaborShare" step="0.01" value="20.00" style="padding:8px;font-size:13px;"></div>
-                        <div class="form-group" style="margin:0;"><label style="font-size:12px;">健保費率 %</label><input type="number" id="insHealthRate" step="0.01" value="5.17" style="padding:8px;font-size:13px;"></div>
-                        <div class="form-group" style="margin:0;"><label style="font-size:12px;">健保員工負擔比 %</label><input type="number" id="insHealthShare" step="0.01" value="30.00" style="padding:8px;font-size:13px;"></div>
-                    </div>
-                    <button class="btn btn-primary" onclick="updateAllInsRates()" style="margin-top:10px;font-size:13px;">📝 套用費率到所有級距</button>
-                </div>
-
-                <div style="display:flex;justify-content:space-between;align-items:center;margin:16px 0 8px;">
-                    <span style="font-size:14px;font-weight:700;">📋 級距表（共 <span id="insCount">0</span> 筆）</span>
-                    <button class="btn btn-success" onclick="showInsModal()" style="font-size:12px;padding:8px 14px;width:auto;">+ 新增</button>
-                </div>
-
-                <div style="overflow-x:auto;border-radius:12px;border:1px solid #E2E8F0;">
-                    <table style="width:100%;border-collapse:collapse;font-size:12px;" id="insTable">
-                        <thead>
-                            <tr style="background:#F8FAFC;">
-                                <th style="padding:8px 6px;text-align:right;white-space:nowrap;">薪資下限</th>
-                                <th style="padding:8px 6px;text-align:right;white-space:nowrap;">薪資上限</th>
-                                <th style="padding:8px 6px;text-align:right;white-space:nowrap;">投保金額</th>
-                                <th style="padding:8px 6px;text-align:center;">操作</th>
-                            </tr>
-                        </thead>
-                        <tbody id="insTableBody"></tbody>
-                    </table>
-                </div>
-            </div>
-
-            <!-- 新增/編輯級距 Modal -->
-            <div id="insModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:999;overflow-y:auto;">
-                <div style="background:#fff;margin:60px auto;max-width:400px;border-radius:16px;padding:24px;">
-                    <h3 id="insModalTitle" style="margin-bottom:16px;">新增級距</h3>
-                    <input type="hidden" id="insEditId">
-                    <div class="form-group"><label>薪資下限 *</label><input type="number" id="insSalaryMin" placeholder="0"></div>
-                    <div class="form-group"><label>薪資上限 *</label><input type="number" id="insSalaryMax" placeholder="27470"></div>
-                    <div class="form-group"><label>投保金額 *</label><input type="number" id="insAmount" placeholder="27470"></div>
-                    <div style="display:flex;gap:8px;">
-                        <button class="btn btn-success" onclick="saveInsBracket()" style="flex:1;">💾 儲存</button>
-                        <button class="btn btn-secondary" onclick="closeInsModal()" style="flex:1;">取消</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
         <!-- ====== 外勤/業務 合併管理頁 ====== -->
         <div id="fieldSalesAdminPage" class="page">
             <button class="btn btn-secondary" onclick="showPage('adminHomePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
@@ -1147,7 +1155,6 @@
                     <div class="rdTab" onclick="switchRestaurantTab('menu',this)" style="flex:1;text-align:center;padding:10px 0;font-size:13px;font-weight:600;cursor:pointer;color:#94A3B8;">🍽️ 菜單</div>
                     <div class="rdTab" onclick="switchRestaurantTab('report',this)" style="flex:1;text-align:center;padding:10px 0;font-size:13px;font-weight:600;cursor:pointer;color:#94A3B8;">📊 報表</div>
                     <div class="rdTab" onclick="switchRestaurantTab('settings',this)" style="flex:1;text-align:center;padding:10px 0;font-size:13px;font-weight:600;cursor:pointer;color:#94A3B8;">⚙️ 設定</div>
-                    <div class="rdTab" onclick="switchRestaurantTab('members',this)" style="flex:1;text-align:center;padding:10px 0;font-size:13px;font-weight:600;cursor:pointer;color:#94A3B8;">👥 會員</div>
                 </div>
 
                 <!-- 訂單 Tab -->
@@ -1432,73 +1439,6 @@
                     </div>
                 </div>
 
-                <div id="rdMembersTab" style="display:none;">
-
-                    <!-- 集點開關 -->
-                    <div style="background:#F8FAFC;border-radius:12px;padding:14px;margin-bottom:14px;">
-                        <div style="display:flex;justify-content:space-between;align-items:center;">
-                            <div>
-                                <div style="font-weight:700;font-size:14px;">🎯 集點功能</div>
-                                <div style="font-size:11px;color:#94A3B8;margin-top:2px;">關閉後消費者不會看到集點區</div>
-                            </div>
-                            <label style="position:relative;display:inline-block;width:48px;height:26px;cursor:pointer;">
-                                <input type="checkbox" id="loyaltyToggle" onchange="toggleLoyalty()" style="opacity:0;width:0;height:0;">
-                                <span style="position:absolute;inset:0;background:#CBD5E1;border-radius:13px;transition:0.3s;"></span>
-                                <span style="position:absolute;top:3px;left:3px;width:20px;height:20px;background:#fff;border-radius:50%;transition:0.3s;box-shadow:0 1px 3px rgba(0,0,0,0.2);"></span>
-                            </label>
-                        </div>
-                    </div>
-
-                    <!-- 集點規則 -->
-                    <div style="background:#F8FAFC;border-radius:12px;padding:14px;margin-bottom:14px;">
-                        <div style="font-weight:700;font-size:14px;margin-bottom:10px;">📐 集點規則</div>
-                        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
-                            <div>
-                                <label style="font-size:11px;color:#64748B;">消費 $ 得 1 點</label>
-                                <input type="number" id="rdLoyaltySpend2" min="1" placeholder="50" style="width:100%;padding:8px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;box-sizing:border-box;">
-                            </div>
-                            <div>
-                                <label style="font-size:11px;color:#64748B;">兌換門檻</label>
-                                <input type="number" id="rdLoyaltyPoints2" min="1" placeholder="10" style="width:100%;padding:8px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;box-sizing:border-box;">
-                            </div>
-                            <div>
-                                <label style="font-size:11px;color:#64748B;">折扣金額</label>
-                                <input type="number" id="rdLoyaltyDiscount2" min="1" placeholder="50" style="width:100%;padding:8px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;box-sizing:border-box;">
-                            </div>
-                        </div>
-                        <button onclick="saveLoyaltyConfig()" class="btn btn-success" style="margin-top:10px;font-size:12px;padding:8px 16px;">💾 儲存規則</button>
-                    </div>
-
-                    <!-- 搜尋 + 統計 -->
-                    <div style="background:#F8FAFC;border-radius:12px;padding:14px;margin-bottom:14px;">
-                        <div style="display:flex;gap:8px;margin-bottom:12px;">
-                            <input type="text" id="memberSearchInput" placeholder="🔍 搜尋手機或姓名" style="flex:1;padding:10px;border:1px solid #E2E8F0;border-radius:10px;font-size:13px;">
-                            <button onclick="searchMembers()" style="padding:8px 14px;border:none;border-radius:10px;background:#4F46E5;color:#fff;font-size:12px;font-weight:600;cursor:pointer;">搜尋</button>
-                        </div>
-                        <div id="memberStats" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;"></div>
-                    </div>
-
-                    <!-- 客戶列表 -->
-                    <div style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,0.05);">
-                        <!-- 篩選 tabs -->
-                        <div style="display:flex;border-bottom:1px solid #E2E8F0;">
-                            <button class="memberFilterBtn memberFilterActive" onclick="filterMembers('all',this)" style="flex:1;padding:10px;border:none;background:transparent;font-size:12px;font-weight:600;cursor:pointer;border-bottom:2px solid #4F46E5;color:#4F46E5;">全部</button>
-                            <button class="memberFilterBtn" onclick="filterMembers('vip',this)" style="flex:1;padding:10px;border:none;background:transparent;font-size:12px;font-weight:600;cursor:pointer;color:#94A3B8;">常客 ⭐</button>
-                            <button class="memberFilterBtn" onclick="filterMembers('blacklist',this)" style="flex:1;padding:10px;border:none;background:transparent;font-size:12px;font-weight:600;cursor:pointer;color:#94A3B8;">黑名單 🚫</button>
-                        </div>
-                        <div id="memberList" style="max-height:400px;overflow-y:auto;"></div>
-                    </div>
-
-                    <!-- 兌換紀錄 -->
-                    <div style="margin-top:14px;background:#F8FAFC;border-radius:12px;padding:14px;">
-                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-                            <div style="font-weight:700;font-size:14px;">📒 最近異動紀錄</div>
-                            <button onclick="loadTransactions()" style="padding:4px 10px;border:1px solid #E2E8F0;border-radius:6px;background:#fff;font-size:11px;cursor:pointer;">🔄 重新整理</button>
-                        </div>
-                        <div id="transactionList" style="max-height:300px;overflow-y:auto;"></div>
-                    </div>
-                </div>
-
             </div>
         </div>
 
@@ -1648,6 +1588,113 @@
                 </div>
                 <div id="odContent"></div>
                 <div id="odActions" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;"></div>
+            </div>
+        </div>
+
+        <!-- ====== 預約管理 ====== -->
+        <div id="bookingMgrPage" class="page">
+            <button class="btn btn-secondary" onclick="showPage('adminHomePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
+            <div class="checkin-page">
+                <h2>📅 預約管理</h2>
+                <p style="color:#94A3B8;font-size:13px;margin-bottom:16px;">管理預約服務、人員與訂單（美容/美甲/診所等）</p>
+
+                <!-- 商店選擇器 -->
+                <div class="form-group">
+                    <label>選擇商店</label>
+                    <select id="bookingStoreSelect" onchange="loadBookingForStore()" style="font-size:14px;font-weight:700;padding:12px;">
+                        <option value="">-- 請選擇商店 --</option>
+                    </select>
+                </div>
+
+                <!-- 內容區 -->
+                <div id="bookingContent" style="display:none;">
+                    <div style="background:#F8FAFC;border-radius:12px;padding:14px;margin-bottom:16px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                            <div>
+                                <div style="font-size:13px;color:#64748B;">預約開關</div>
+                                <div style="font-size:11px;color:#94A3B8;margin-top:2px;">關閉後客戶無法新增預約</div>
+                            </div>
+                            <label style="position:relative;display:inline-block;width:48px;height:26px;margin:0;">
+                                <input type="checkbox" id="bookingEnabled" onchange="toggleBookingEnabled()" style="opacity:0;width:0;height:0;">
+                                <span style="position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#CBD5E1;border-radius:26px;transition:0.3s;"></span>
+                                <span style="position:absolute;content:'';height:20px;width:20px;left:3px;bottom:3px;background:white;border-radius:50%;transition:0.3s;"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div style="display:flex;gap:8px;margin-bottom:16px;">
+                        <div style="flex:1;background:#EFF6FF;border-radius:12px;padding:12px;text-align:center;">
+                            <div style="font-size:11px;color:#3B82F6;">本週預約</div>
+                            <div id="bookingWeekCount" style="font-size:24px;font-weight:900;color:#1E40AF;margin-top:4px;">0</div>
+                        </div>
+                        <div style="flex:1;background:#FEF3C7;border-radius:12px;padding:12px;text-align:center;">
+                            <div style="font-size:11px;color:#F59E0B;">待確認</div>
+                            <div id="bookingPendingCount" style="font-size:24px;font-weight:900;color:#92400E;margin-top:4px;">0</div>
+                        </div>
+                    </div>
+
+                    <p style="text-align:center;color:#94A3B8;font-size:13px;margin-top:20px;">
+                        💡 完整預約設定（服務項目/人員/時段）請至 booking.html 進行管理
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ====== 會員管理 ====== -->
+        <div id="memberMgrPage" class="page">
+            <button class="btn btn-secondary" onclick="showPage('adminHomePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
+            <div class="checkin-page">
+                <h2>👥 會員管理</h2>
+                <p style="color:#94A3B8;font-size:13px;margin-bottom:16px;">管理會員資料、集點規則與交易記錄</p>
+
+                <!-- 商店選擇器 -->
+                <div class="form-group">
+                    <label>選擇商店</label>
+                    <select id="memberStoreSelect" onchange="loadMembersForStore()" style="font-size:14px;font-weight:700;padding:12px;">
+                        <option value="">-- 請選擇商店 --</option>
+                    </select>
+                </div>
+
+                <!-- 內容區 -->
+                <div id="memberContent" style="display:none;">
+                    <!-- 集點開關 -->
+                    <div style="background:#F8FAFC;border-radius:12px;padding:14px;margin-bottom:16px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                            <div>
+                                <div style="font-size:13px;color:#64748B;">集點功能</div>
+                                <div style="font-size:11px;color:#94A3B8;margin-top:2px;">關閉後消費者看不到集點區</div>
+                            </div>
+                            <label style="position:relative;display:inline-block;width:48px;height:26px;margin:0;">
+                                <input type="checkbox" id="memberLoyaltyEnabled" onchange="toggleMemberLoyalty()" style="opacity:0;width:0;height:0;">
+                                <span style="position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#CBD5E1;border-radius:26px;transition:0.3s;"></span>
+                                <span style="position:absolute;content:'';height:20px;width:20px;left:3px;bottom:3px;background:white;border-radius:50%;transition:0.3s;"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- 統計卡片 -->
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
+                        <div style="background:#FFF7ED;border-radius:12px;padding:12px;text-align:center;">
+                            <div style="font-size:11px;color:#EA580C;">總會員數</div>
+                            <div id="memberTotalCount" style="font-size:24px;font-weight:900;color:#C2410C;margin-top:4px;">0</div>
+                        </div>
+                        <div style="background:#F0FDF4;border-radius:12px;padding:12px;text-align:center;">
+                            <div style="font-size:11px;color:#059669;">VIP 會員</div>
+                            <div id="memberVipCount" style="font-size:24px;font-weight:900;color:#047857;margin-top:4px;">0</div>
+                        </div>
+                    </div>
+
+                    <!-- 搜尋會員 -->
+                    <div class="form-group">
+                        <input type="tel" id="memberSearchPhone" placeholder="🔍 輸入手機號碼搜尋會員" oninput="searchMemberByPhone()" maxlength="10" style="font-size:14px;">
+                    </div>
+
+                    <div id="memberSearchResult" style="margin-top:12px;"></div>
+
+                    <p style="text-align:center;color:#94A3B8;font-size:13px;margin-top:20px;">
+                        💡 完整會員列表與集點規則設定請至「🍽️ 餐飲業管理 → 👥 會員」查看
+                    </p>
+                </div>
             </div>
         </div>
 

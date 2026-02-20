@@ -27,21 +27,20 @@ export function showPage(id) {
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.getElementById(id).classList.add('active');
 
-    if (id === 'bonusPage') window.loadHybridBonusData?.();
     if (id === 'locationPage') window.renderLocationList?.();
     if (id === 'employeePage') window.loadEmployeeList?.();
     if (id === 'approvalCenterPage') { window.switchApprovalType?.('leave', document.querySelector('.aprTab')); }
     if (id === 'announcementPage') window.loadAnnouncementList?.();
-    if (id === 'auditLogPage') window.loadAuditLogs?.();
-    if (id === 'featurePage') { window.loadFeatureSettings?.(); window.loadNotifyToken?.(); }
+    if (id === 'featurePage') { window.switchSysTab?.('feature', document.querySelector('.sysTab')); }
     if (id === 'staffMgrPage') { window.loadShiftMgr?.(); window.loadMaxLeaveSetting?.(); window.loadStaffOverview?.(); window.loadSchedulingMode?.(); }
     if (id === 'lunchMgrPage') { window.loadLunchManagers?.(); window.loadAdminLunchStats?.(); }
-    if (id === 'payrollPage') { window.initPayrollPage?.(); }
+    if (id === 'payrollPage') { window.switchPayTab?.('payroll', document.querySelector('.payTab')); }
     if (id === 'clientPage') { window.loadClientList?.(); window.loadServiceItemList?.(); }
     if (id === 'fieldSalesAdminPage') { window.switchFieldSalesAdmin?.('approval', document.querySelector('.fsaTab')); }
-    if (id === 'insurancePage') { window.loadInsuranceBrackets?.(); }
     if (id === 'restaurantPage') { window.loadRestaurantList?.(); }
     if (id === 'restaurantDetailPage') { /* loaded via openRestaurantDetail */ }
+    if (id === 'bookingMgrPage') { window.loadBookingStoreList?.(); }
+    if (id === 'memberMgrPage') { window.loadMemberStoreList?.(); }
 }
 
 // ===== 檢查管理員權限 =====

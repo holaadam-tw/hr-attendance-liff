@@ -48,7 +48,8 @@ import {
     loadPayrollData, renderPayrollView, updatePayrollAdjustment,
     saveAllPayroll, publishPayroll, exportPayrollCSV,
     loadInsuranceBrackets, showInsModal, closeInsModal,
-    editInsBracket, saveInsBracket, deleteInsBracket, updateAllInsRates
+    editInsBracket, saveInsBracket, deleteInsBracket, updateAllInsRates,
+    switchPayTab
 } from './payroll.js';
 
 import {
@@ -72,7 +73,9 @@ import {
     loadSalesReport, exportSalesCSV,
     loadMembersTab, searchMembers, filterMembers, openMemberDetail,
     closeMemberDetail, setAdjustType, submitAdjustPoints, toggleBlacklist,
-    loadTransactions, toggleLoyalty, loadMemberList
+    loadTransactions, toggleLoyalty, loadMemberList,
+    loadBookingForStore, toggleBookingEnabled, loadBookingStoreList,
+    loadMembersForStore, toggleMemberLoyalty, searchMemberByPhone, loadMemberStoreList
 } from './store.js';
 
 import {
@@ -88,7 +91,8 @@ import {
     approveFieldWork, rejectFieldWork, exportFieldWorkCSV,
     loadCompanyList, filterCompanies, showCompanyModal,
     closeCompanyModal, editCompany, saveCompany,
-    initSalesTargetPage, stChangeWeek, saveDefaultTarget
+    initSalesTargetPage, stChangeWeek, saveDefaultTarget,
+    switchSysTab
 } from './settings.js';
 
 // ===== 綁定 window（供 HTML onclick 使用）=====
@@ -193,6 +197,7 @@ window.editInsBracket = editInsBracket;
 window.saveInsBracket = saveInsBracket;
 window.deleteInsBracket = deleteInsBracket;
 window.updateAllInsRates = updateAllInsRates;
+window.switchPayTab = switchPayTab;
 
 // store
 window.loadRestaurantList = loadRestaurantList;
@@ -271,6 +276,17 @@ window.toggleBlacklist = toggleBlacklist;
 window.loadTransactions = loadTransactions;
 window.toggleLoyalty = toggleLoyalty;
 
+// booking management (independent page)
+window.loadBookingForStore = loadBookingForStore;
+window.toggleBookingEnabled = toggleBookingEnabled;
+window.loadBookingStoreList = loadBookingStoreList;
+
+// member management (independent page)
+window.loadMembersForStore = loadMembersForStore;
+window.toggleMemberLoyalty = toggleMemberLoyalty;
+window.searchMemberByPhone = searchMemberByPhone;
+window.loadMemberStoreList = loadMemberStoreList;
+
 // settings
 window.ADMIN_FEATURE_LIST = ADMIN_FEATURE_LIST;
 window.loadNotifyToken = loadNotifyToken;
@@ -310,6 +326,7 @@ window.saveCompany = saveCompany;
 window.initSalesTargetPage = initSalesTargetPage;
 window.stChangeWeek = stChangeWeek;
 window.saveDefaultTarget = saveDefaultTarget;
+window.switchSysTab = switchSysTab;
 
 // ===== 全域事件 =====
 
