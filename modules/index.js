@@ -69,7 +69,10 @@ import {
     generateTableQRCodes, printTableQRCodes,
     handleMenuPhotoUpload, analyzeMenuPhoto, confirmAIMenu, cancelAIMenu,
     showCopyMenuModal, closeCopyMenuModal, executeCopyMenu,
-    loadSalesReport, exportSalesCSV
+    loadSalesReport, exportSalesCSV,
+    loadMembersTab, searchMembers, filterMembers, openMemberDetail,
+    closeMemberDetail, setAdjustType, submitAdjustPoints, toggleBlacklist,
+    loadTransactions, toggleLoyalty, loadMemberList
 } from './store.js';
 
 import {
@@ -255,6 +258,18 @@ window.closeCopyMenuModal = closeCopyMenuModal;
 window.executeCopyMenu = executeCopyMenu;
 window.loadSalesReport = loadSalesReport;
 window.exportSalesCSV = exportSalesCSV;
+
+// members
+window.loadMembersTab = loadMembersTab;
+window.searchMembers = searchMembers;
+window.filterMembers = filterMembers;
+window.openMemberDetail = openMemberDetail;
+window.closeMemberDetail = closeMemberDetail;
+window.setAdjustType = setAdjustType;
+window.submitAdjustPoints = submitAdjustPoints;
+window.toggleBlacklist = toggleBlacklist;
+window.loadTransactions = loadTransactions;
+window.toggleLoyalty = toggleLoyalty;
 
 // settings
 window.ADMIN_FEATURE_LIST = ADMIN_FEATURE_LIST;

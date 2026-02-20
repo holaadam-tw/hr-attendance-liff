@@ -162,10 +162,12 @@ export function switchRestaurantTab(tab, el) {
     document.getElementById('rdMenuTab').style.display = tab === 'menu' ? '' : 'none';
     document.getElementById('rdReportTab').style.display = tab === 'report' ? '' : 'none';
     document.getElementById('rdSettingsTab').style.display = tab === 'settings' ? '' : 'none';
+    document.getElementById('rdMembersTab').style.display = tab === 'members' ? '' : 'none';
     if (tab === 'orders') loadStoreOrders();
     if (tab === 'menu') { loadMenuCategories(); loadMenuItems(); }
     if (tab === 'report') loadSalesReport();
     if (tab === 'settings') loadStoreSettings();
+    if (tab === 'members') loadMembersTab();
 }
 
 // ===== 訂單即時通知 =====
@@ -1674,4 +1676,378 @@ export function exportSalesCSV() {
     a.download = 'sales_report_' + fmtDate(new Date()) + '.csv';
     a.click();
     showToast('✅ 已匯出 CSV');
+}
+
+// ===== 會員管理 =====
+let membersList = [];
+let memberFilter = 'all';
+let currentMemberPhone = null;
+let adjustType = 'add';
+
+export async function loadMembersTab() {
+    await loadMemberStats();
+    await loadMemberList();
+    await loadTransactions();
+    loadLoyaltyToggle();
+    syncLoyaltyFields();
+}
+
+async function loadLoyaltyToggle() {
+    const s = smStores.find(x => x.id === rdCurrentStoreId);
+    const toggle = document.getElementById('loyaltyToggle');
+    if (toggle && s) {
+        toggle.checked = s.loyalty_enabled !== false;
+        updateToggleStyle(toggle);
+    }
+}
+
+function updateToggleStyle(toggle) {
+    const slider = toggle.parentElement.querySelectorAll('span');
+    if (toggle.checked) {
+        slider[0].style.background = '#4F46E5';
+        slider[1].style.left = '25px';
+    } else {
+        slider[0].style.background = '#CBD5E1';
+        slider[1].style.left = '3px';
+    }
+}
+
+export async function toggleLoyalty() {
+    const toggle = document.getElementById('loyaltyToggle');
+    updateToggleStyle(toggle);
+    try {
+        await sb.from('store_profiles')
+            .update({ loyalty_enabled: toggle.checked, updated_at: new Date().toISOString() })
+            .eq('id', rdCurrentStoreId);
+        const s = smStores.find(x => x.id === rdCurrentStoreId);
+        if (s) s.loyalty_enabled = toggle.checked;
+        showToast(toggle.checked ? '✅ 集點功能已開啟' : '⏸️ 集點功能已暫停');
+    } catch(e) { showToast('❌ 操作失敗'); }
+}
+
+function syncLoyaltyFields() {
+    const s = smStores.find(x => x.id === rdCurrentStoreId);
+    const cfg = s?.loyalty_config || {};
+    const spend2 = document.getElementById('rdLoyaltySpend2');
+    const points2 = document.getElementById('rdLoyaltyPoints2');
+    const discount2 = document.getElementById('rdLoyaltyDiscount2');
+    if (spend2) spend2.value = cfg.spend_per_point || '';
+    if (points2) points2.value = cfg.points_to_redeem || '';
+    if (discount2) discount2.value = cfg.discount_amount || '';
+}
+
+async function loadMemberStats() {
+    const el = document.getElementById('memberStats');
+    try {
+        const { data, count } = await sb.from('store_customers')
+            .select('*', { count: 'exact' })
+            .eq('store_id', rdCurrentStoreId);
+
+        const total = count || 0;
+        const blacklisted = (data || []).filter(c => c.is_blacklisted).length;
+        const totalSpent = (data || []).reduce((sum, c) => sum + parseFloat(c.total_spent || 0), 0);
+        const vip = (data || []).filter(c => (c.total_orders || 0) >= 5).length;
+
+        el.innerHTML = [
+            { label: '總會員', value: total, color: '#4F46E5', bg: '#EEF2FF' },
+            { label: '常客 ⭐', value: vip, color: '#059669', bg: '#D1FAE5' },
+            { label: '黑名單', value: blacklisted, color: '#DC2626', bg: '#FEE2E2' },
+            { label: '總營收', value: '$' + Math.round(totalSpent).toLocaleString(), color: '#D97706', bg: '#FEF3C7' }
+        ].map(s =>
+            '<div style="background:' + s.bg + ';border-radius:10px;padding:10px;text-align:center;">' +
+            '<div style="font-size:18px;font-weight:800;color:' + s.color + ';">' + s.value + '</div>' +
+            '<div style="font-size:10px;color:' + s.color + ';opacity:0.7;">' + s.label + '</div></div>'
+        ).join('');
+    } catch(e) { el.innerHTML = ''; }
+}
+
+export async function loadMemberList() {
+    try {
+        let query = sb.from('store_customers')
+            .select('*')
+            .eq('store_id', rdCurrentStoreId)
+            .order('last_order_at', { ascending: false, nullsFirst: false })
+            .limit(100);
+
+        const { data } = await query;
+        membersList = data || [];
+        renderMemberList();
+    } catch(e) { console.warn('Load members error:', e); }
+}
+
+export function searchMembers() {
+    const q = document.getElementById('memberSearchInput').value.trim().toLowerCase();
+    renderMemberList(q);
+}
+
+export function filterMembers(filter, el) {
+    memberFilter = filter;
+    document.querySelectorAll('.memberFilterBtn').forEach(b => {
+        b.style.borderBottom = 'none'; b.style.color = '#94A3B8'; b.classList.remove('memberFilterActive');
+    });
+    if (el) { el.style.borderBottom = '2px solid #4F46E5'; el.style.color = '#4F46E5'; }
+    renderMemberList();
+}
+
+function renderMemberList(searchQuery) {
+    let filtered = membersList;
+    if (memberFilter === 'vip') filtered = filtered.filter(c => (c.total_orders || 0) >= 5);
+    if (memberFilter === 'blacklist') filtered = filtered.filter(c => c.is_blacklisted);
+    if (searchQuery) {
+        filtered = filtered.filter(c =>
+            (c.phone || '').includes(searchQuery) ||
+            (c.name || '').toLowerCase().includes(searchQuery)
+        );
+    }
+
+    const el = document.getElementById('memberList');
+    if (filtered.length === 0) {
+        el.innerHTML = '<div style="text-align:center;padding:24px;color:#94A3B8;font-size:13px;">沒有符合的會員</div>';
+        return;
+    }
+
+    el.innerHTML = filtered.map(c => {
+        const isBlack = c.is_blacklisted;
+        const isVip = (c.total_orders || 0) >= 5;
+        const tags = [];
+        if (isVip) tags.push('<span style="background:#D1FAE5;color:#065F46;padding:2px 6px;border-radius:4px;font-size:10px;">⭐ 常客</span>');
+        if (isBlack) tags.push('<span style="background:#FEE2E2;color:#991B1B;padding:2px 6px;border-radius:4px;font-size:10px;">🚫 黑名單</span>');
+        if (c.no_show_count > 0 && !isBlack) tags.push('<span style="background:#FEF3C7;color:#92400E;padding:2px 6px;border-radius:4px;font-size:10px;">⚠️ 未取餐x' + c.no_show_count + '</span>');
+
+        const lastDate = c.last_order_at ? new Date(c.last_order_at).toLocaleDateString('zh-TW') : '-';
+
+        return '<div onclick="openMemberDetail(\'' + esc(c.phone).replace(/'/g, "\\'") + '\')" style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid #F1F5F9;cursor:pointer;transition:background 0.15s;' + (isBlack ? 'opacity:0.6;' : '') + '" onmouseover="this.style.background=\'#F8FAFC\'" onmouseout="this.style.background=\'\'">' +
+            '<div style="width:40px;height:40px;border-radius:50%;background:#EEF2FF;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">' + (isBlack ? '🚫' : (isVip ? '⭐' : '👤')) + '</div>' +
+            '<div style="flex:1;min-width:0;">' +
+                '<div style="display:flex;align-items:center;gap:6px;">' +
+                    '<span style="font-weight:700;font-size:14px;">' + esc(c.name || '未命名') + '</span>' +
+                    tags.join('') +
+                '</div>' +
+                '<div style="font-size:12px;color:#94A3B8;">' + esc(c.phone || '') + '</div>' +
+            '</div>' +
+            '<div style="text-align:right;flex-shrink:0;">' +
+                '<div style="font-size:13px;font-weight:700;">' + (c.total_orders || 0) + ' 單</div>' +
+                '<div style="font-size:11px;color:#94A3B8;">' + lastDate + '</div>' +
+            '</div>' +
+        '</div>';
+    }).join('');
+}
+
+export async function openMemberDetail(phone) {
+    currentMemberPhone = phone;
+    const c = membersList.find(m => m.phone === phone);
+    if (!c) return;
+
+    document.getElementById('memberDetailTitle').textContent = (c.name || '未命名') + ' 的會員資料';
+
+    // 基本資訊
+    let ptsText = '-';
+    try {
+        const { data } = await sb.from('loyalty_points')
+            .select('points')
+            .eq('store_id', rdCurrentStoreId)
+            .eq('customer_line_id', phone)
+            .limit(1);
+        if (data && data[0]) ptsText = data[0].points + ' 點';
+    } catch(e) {}
+
+    document.getElementById('memberDetailInfo').innerHTML =
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">' +
+            '<div>📱 <b>' + esc(c.phone || '') + '</b></div>' +
+            '<div>🎯 <b>' + ptsText + '</b></div>' +
+            '<div>📦 累計 <b>' + (c.total_orders || 0) + '</b> 筆</div>' +
+            '<div>💰 消費 <b>$' + Math.round(c.total_spent || 0).toLocaleString() + '</b></div>' +
+            (c.no_show_count > 0 ? '<div style="grid-column:1/-1;color:#DC2626;">⚠️ 未取餐 <b>' + c.no_show_count + '</b> 次</div>' : '') +
+        '</div>' +
+        (c.favorite_items && c.favorite_items.length > 0 ?
+            '<div style="margin-top:8px;padding-top:8px;border-top:1px solid #E2E8F0;font-size:12px;">⭐ 常點：' +
+            c.favorite_items.slice(0, 5).map(f => esc(f.name) + '(' + f.count + ')').join('、') + '</div>' : '');
+
+    // 黑名單
+    const bSection = document.getElementById('memberBlacklistSection');
+    const bStatus = document.getElementById('memberBlacklistStatus');
+    const bBtn = document.getElementById('blacklistToggleBtn');
+    if (c.is_blacklisted) {
+        bSection.style.background = '#FEF2F2';
+        bStatus.innerHTML = '🚫 已列入黑名單<br><span style="font-size:11px;color:#94A3B8;">' + esc(c.blacklist_reason || '') + '</span>';
+        bBtn.textContent = '✅ 解除黑名單';
+        bBtn.style.background = '#10B981'; bBtn.style.color = '#fff';
+    } else {
+        bSection.style.background = '#F0FDF4';
+        bStatus.innerHTML = '✅ 正常狀態（未取餐 ' + (c.no_show_count || 0) + ' 次）';
+        bBtn.textContent = '🚫 加入黑名單';
+        bBtn.style.background = '#EF4444'; bBtn.style.color = '#fff';
+    }
+
+    // 異動紀錄
+    await loadMemberTransactions(phone);
+
+    // Reset adjust form
+    adjustType = 'add';
+    setAdjustType('add');
+    document.getElementById('adjPoints').value = '';
+    document.getElementById('adjNote').value = '';
+
+    // Show modal
+    document.getElementById('memberDetailModal').style.display = 'flex';
+}
+
+export function closeMemberDetail() {
+    document.getElementById('memberDetailModal').style.display = 'none';
+    currentMemberPhone = null;
+}
+
+export function setAdjustType(type) {
+    adjustType = type;
+    const addBtn = document.getElementById('adjAddBtn');
+    const dedBtn = document.getElementById('adjDeductBtn');
+    if (type === 'add') {
+        addBtn.style.borderColor = '#10B981'; addBtn.style.background = '#D1FAE5'; addBtn.style.color = '#065F46';
+        dedBtn.style.borderColor = '#E2E8F0'; dedBtn.style.background = '#fff'; dedBtn.style.color = '#64748B';
+    } else {
+        dedBtn.style.borderColor = '#EF4444'; dedBtn.style.background = '#FEE2E2'; dedBtn.style.color = '#991B1B';
+        addBtn.style.borderColor = '#E2E8F0'; addBtn.style.background = '#fff'; addBtn.style.color = '#64748B';
+    }
+}
+
+export async function submitAdjustPoints() {
+    const pts = parseInt(document.getElementById('adjPoints').value);
+    const note = document.getElementById('adjNote').value.trim();
+    if (!pts || pts <= 0) { showToast('請輸入正整數'); return; }
+    if (!note) { showToast('請填寫原因備註'); return; }
+    if (!currentMemberPhone) return;
+
+    const actualPts = adjustType === 'deduct' ? -pts : pts;
+
+    try {
+        // 1. 更新 loyalty_points
+        const { data: existing } = await sb.from('loyalty_points')
+            .select('*')
+            .eq('store_id', rdCurrentStoreId)
+            .eq('customer_line_id', currentMemberPhone)
+            .limit(1);
+
+        let newBalance = 0;
+        if (existing && existing[0]) {
+            newBalance = Math.max(0, (existing[0].points || 0) + actualPts);
+            await sb.from('loyalty_points')
+                .update({ points: newBalance, updated_at: new Date().toISOString() })
+                .eq('id', existing[0].id);
+        } else if (adjustType === 'add') {
+            newBalance = pts;
+            await sb.from('loyalty_points').insert({
+                store_id: rdCurrentStoreId,
+                customer_line_id: currentMemberPhone,
+                points: pts,
+                total_earned: pts
+            });
+        }
+
+        // 2. 寫異動紀錄
+        await sb.from('loyalty_transactions').insert({
+            store_id: rdCurrentStoreId,
+            customer_phone: currentMemberPhone,
+            type: adjustType === 'add' ? 'manual_add' : 'manual_deduct',
+            points: actualPts,
+            balance_after: newBalance,
+            note: note,
+            operator_name: window.currentEmployee?.name || '管理員'
+        });
+
+        showToast('✅ ' + (adjustType === 'add' ? '加' : '扣') + ' ' + pts + ' 點成功，餘額 ' + newBalance + ' 點');
+        openMemberDetail(currentMemberPhone);
+        loadMemberStats();
+
+    } catch(e) { showToast('❌ 操作失敗：' + (e.message || e)); }
+}
+
+export async function toggleBlacklist() {
+    if (!currentMemberPhone) return;
+    const c = membersList.find(m => m.phone === currentMemberPhone);
+    if (!c) return;
+
+    const newStatus = !c.is_blacklisted;
+    const reason = newStatus ? prompt('請輸入黑名單原因：', '多次未取餐') : null;
+    if (newStatus && !reason) return;
+
+    try {
+        await sb.from('store_customers')
+            .update({
+                is_blacklisted: newStatus,
+                blacklisted_at: newStatus ? new Date().toISOString() : null,
+                blacklist_reason: newStatus ? reason : null,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', c.id);
+
+        c.is_blacklisted = newStatus;
+        c.blacklist_reason = newStatus ? reason : null;
+        showToast(newStatus ? '🚫 已加入黑名單' : '✅ 已解除黑名單');
+        openMemberDetail(currentMemberPhone);
+        loadMemberStats();
+        renderMemberList();
+    } catch(e) { showToast('❌ 操作失敗'); }
+}
+
+export async function loadTransactions() {
+    const el = document.getElementById('transactionList');
+    try {
+        const { data } = await sb.from('loyalty_transactions')
+            .select('*')
+            .eq('store_id', rdCurrentStoreId)
+            .order('created_at', { ascending: false })
+            .limit(30);
+
+        if (!data || data.length === 0) {
+            el.innerHTML = '<div style="text-align:center;padding:16px;color:#94A3B8;font-size:12px;">尚無異動紀錄</div>';
+            return;
+        }
+
+        el.innerHTML = data.map(tx => renderTxRow(tx)).join('');
+    } catch(e) { el.innerHTML = ''; }
+}
+
+async function loadMemberTransactions(phone) {
+    const el = document.getElementById('memberTxList');
+    try {
+        const { data } = await sb.from('loyalty_transactions')
+            .select('*')
+            .eq('store_id', rdCurrentStoreId)
+            .eq('customer_phone', phone)
+            .order('created_at', { ascending: false })
+            .limit(20);
+
+        if (!data || data.length === 0) {
+            el.innerHTML = '<div style="text-align:center;padding:12px;color:#94A3B8;">尚無紀錄</div>';
+            return;
+        }
+        el.innerHTML = data.map(tx => renderTxRow(tx)).join('');
+    } catch(e) { el.innerHTML = ''; }
+}
+
+const TX_TYPE_MAP = {
+    earn: { label: '消費集點', icon: '🛒', color: '#059669' },
+    manual_add: { label: '手動加點', icon: '➕', color: '#4F46E5' },
+    manual_deduct: { label: '手動扣點', icon: '➖', color: '#DC2626' },
+    redeem: { label: '兌換折扣', icon: '🎁', color: '#D97706' },
+    expire: { label: '點數過期', icon: '⏰', color: '#94A3B8' }
+};
+
+function renderTxRow(tx) {
+    const t = TX_TYPE_MAP[tx.type] || { label: tx.type, icon: '📝', color: '#64748B' };
+    const d = new Date(tx.created_at);
+    const dateStr = (d.getMonth()+1) + '/' + d.getDate() + ' ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+    const ptsStr = tx.points > 0 ? '+' + tx.points : String(tx.points);
+
+    return '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #F1F5F9;font-size:12px;">' +
+        '<span>' + t.icon + '</span>' +
+        '<div style="flex:1;">' +
+            '<div style="font-weight:600;">' + t.label + (tx.customer_phone ? ' · ' + esc(tx.customer_phone) : '') + '</div>' +
+            (tx.note ? '<div style="color:#94A3B8;font-size:11px;">' + esc(tx.note) + '</div>' : '') +
+        '</div>' +
+        '<div style="text-align:right;">' +
+            '<div style="font-weight:700;color:' + t.color + ';">' + ptsStr + ' 點</div>' +
+            '<div style="color:#94A3B8;font-size:10px;">' + dateStr + '</div>' +
+        '</div>' +
+    '</div>';
 }
