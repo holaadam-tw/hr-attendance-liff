@@ -211,6 +211,15 @@ body {
   background:rgba(245,158,11,0.15);border-radius:6px;
   animation:pulse 1.5s infinite;
 }
+/* 顧客資訊 */
+.kds-customer-info {
+  padding:4px 12px;font-size:12px;color:var(--text-secondary);
+  border-bottom:1px solid var(--border);
+  display:flex;gap:12px;align-items:center;
+}
+.kds-customer-name {
+  font-size:11px;color:var(--text-muted);margin-left:6px;
+}
 </style>
 </head>
 <body>
@@ -432,6 +441,7 @@ function renderOrders() {
                     <span class="kds-order-num">${esc(pickup)}</span>
                     <span class="kds-order-type ${typeClass}">${typeLabel}</span>
                     ${isRushed ? '<span class="kds-rush-tag">🔥 催x' + o.rush_count + '</span>' : ''}
+                    ${o.customer_name ? '<span class="kds-customer-name">' + esc(o.customer_name) + '</span>' : ''}
                     ${orderTotal ? '<span class="kds-order-price">$' + orderTotal + '</span>' : ''}
                 </div>
                 <div style="display:flex;align-items:center;gap:6px;">
@@ -439,6 +449,10 @@ function renderOrders() {
                     <span class="kds-timer ${urgentLevel === 'critical' ? 'critical' : urgentLevel === 'warning' ? 'warning' : ''}">${elapsed.text}</span>
                 </div>
             </div>
+            ${o.customer_name || o.customer_phone ? '<div class="kds-customer-info">' +
+                (o.customer_name ? '👤 ' + esc(o.customer_name) : '') +
+                (o.customer_phone ? (o.customer_name ? ' · ' : '') + '📞 ' + esc(o.customer_phone) : '') +
+            '</div>' : ''}
             <div class="kds-card-body">
                 ${items.map(i => {
                     const opts = formatOpts(i.options || i.selectedOpts);

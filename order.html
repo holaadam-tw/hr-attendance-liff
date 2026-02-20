@@ -1457,9 +1457,9 @@ function applyTheme(name) {
   if (window._themeIntensity && window._themeIntensity !== 'standard') {
     setTimeout(function() { setThemeIntensity(window._themeIntensity); }, 10);
   }
-  // 重新套用花紋
+  // 重新套用花紋（因為主題色改了，花紋顏色也要跟著變）
   if (window._themePattern && window._themePattern !== 'none') {
-    setTimeout(function() { setThemePattern(window._themePattern); }, 10);
+    setTimeout(function() { setThemePattern(window._themePattern); }, 50);
   }
   // Update theme panel active state if open
   document.querySelectorAll('.theme-card').forEach(function(c) {
@@ -1552,33 +1552,61 @@ function setThemeIntensity(level) {
 function setThemePattern(patternKey) {
   window._themePattern = patternKey;
   try { localStorage.setItem('themePattern', patternKey); } catch(e) {}
-  var body = document.body;
-  // 移除舊花紋
-  body.style.backgroundImage = '';
-  body.style.backgroundSize = '';
-  body.style.backgroundRepeat = '';
-  if (patternKey === 'none' || !patternKey) return;
-  var t = THEMES[currentTheme];
-  var c = t ? t.primary : 'var(--primary)';
-  var opacity = '0.06';
-  // 用 rgba 取代直接色碼，確保花紋不會太搶眼
-  var rgb = hexToRgb(t ? t.primary : '#E8430A');
-  var co = 'rgba(' + rgb[0] + ',' + rgb[1] + ',' + rgb[2] + ',' + opacity + ')';
-  var patternMap = {
-    dots:    { bg: 'radial-gradient(circle,' + co + ' 1px,transparent 1px)', size: '16px 16px' },
-    stripes: { bg: 'repeating-linear-gradient(45deg,' + co + ' 0,' + co + ' 1px,transparent 1px,transparent 8px)', size: 'auto' },
-    grid:    { bg: 'linear-gradient(' + co + ' 1px,transparent 1px),linear-gradient(90deg,' + co + ' 1px,transparent 1px)', size: '20px 20px' },
-    wave:    { bg: 'repeating-linear-gradient(135deg,' + co + ' 0,' + co + ' 2px,transparent 2px,transparent 10px)', size: 'auto' },
-    diamond: { bg: 'repeating-conic-gradient(' + co + ' 0% 25%,transparent 0% 50%) 0 0/16px 16px', size: '16px 16px' },
-    zigzag:  { bg: 'linear-gradient(135deg,' + co + ' 25%,transparent 25%) -7px 0/14px 14px,linear-gradient(225deg,' + co + ' 25%,transparent 25%) -7px 0/14px 14px', size: '14px 14px' }
-  };
-  var pat = patternMap[patternKey];
-  if (pat) {
-    body.style.backgroundImage = pat.bg;
-    if (pat.size !== 'auto') body.style.backgroundSize = pat.size;
-    body.style.backgroundRepeat = 'repeat';
+
+  var overlay = document.getElementById('patternOverlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'patternOverlay';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:0;pointer-events:none;transition:opacity 0.3s;';
+    document.body.insertBefore(overlay, document.body.firstChild);
   }
-  renderThemePanel();
+
+  // 取得當前主題色
+  var primary = getComputedStyle(document.documentElement).getPropertyValue('--primary').trim();
+
+  var patterns = {
+    none: { css: '', size: '' },
+    dots: {
+      css: 'radial-gradient(circle, ' + primary + ' 1.5px, transparent 1.5px)',
+      size: '20px 20px'
+    },
+    diamond: {
+      css: 'url("data:image/svg+xml,' + encodeURIComponent('<svg width="24" height="24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L22 12L12 22L2 12Z" fill="none" stroke="' + primary + '" stroke-width="0.8" opacity="0.5"/></svg>') + '")',
+      size: '24px 24px'
+    },
+    zigzag: {
+      css: 'url("data:image/svg+xml,' + encodeURIComponent('<svg width="40" height="12" xmlns="http://www.w3.org/2000/svg"><path d="M0 6L10 0L20 6L30 0L40 6L30 12L20 6L10 12Z" fill="none" stroke="' + primary + '" stroke-width="0.8" opacity="0.5"/></svg>') + '")',
+      size: '40px 12px'
+    },
+    stripes: {
+      css: 'repeating-linear-gradient(45deg, transparent, transparent 8px, ' + primary + ' 8px, ' + primary + ' 9px)',
+      size: ''
+    },
+    grid: {
+      css: 'linear-gradient(' + primary + ' 1px, transparent 1px), linear-gradient(90deg, ' + primary + ' 1px, transparent 1px)',
+      size: '24px 24px'
+    },
+    waves: {
+      css: 'url("data:image/svg+xml,' + encodeURIComponent('<svg width="60" height="20" xmlns="http://www.w3.org/2000/svg"><path d="M0 10 Q15 0 30 10 Q45 20 60 10" fill="none" stroke="' + primary + '" stroke-width="1" opacity="0.5"/></svg>') + '")',
+      size: '60px 20px'
+    }
+  };
+
+  var p = patterns[patternKey] || patterns.none;
+
+  if (patternKey === 'none' || !p.css) {
+    overlay.style.opacity = '0';
+    overlay.style.background = 'none';
+  } else {
+    overlay.style.background = p.css;
+    if (p.size) overlay.style.backgroundSize = p.size;
+    overlay.style.opacity = '0.08';
+  }
+
+  // 更新面板選中狀態（如果面板開著）
+  if (typeof renderThemePanel === 'function') {
+    try { renderThemePanel(); } catch(e) {}
+  }
 }
 
 function toggleThemePanel() {
@@ -1637,22 +1665,21 @@ function renderThemePanel() {
   // ── 花紋背景 ──
   var curPattern = window._themePattern || 'none';
   var patterns = [
-    { key: 'none',     label: '\u274C \u7121',     preview: '' },
-    { key: 'dots',     label: '\u25CF \u5713\u9EDE',     preview: 'radial-gradient(circle,var(--primary) 1px,transparent 1px)' },
-    { key: 'stripes',  label: '\u2571 \u659C\u7DDA',  preview: 'repeating-linear-gradient(45deg,var(--primary) 0,var(--primary) 1px,transparent 1px,transparent 6px)' },
-    { key: 'grid',     label: '\u25A6 \u683C\u7D0B',     preview: 'linear-gradient(var(--primary) 1px,transparent 1px),linear-gradient(90deg,var(--primary) 1px,transparent 1px)' },
-    { key: 'wave',     label: '\u223F \u6CE2\u6D6A',     preview: 'repeating-linear-gradient(135deg,var(--primary) 0,var(--primary) 2px,transparent 2px,transparent 8px)' },
-    { key: 'diamond',  label: '\u25C7 \u83F1\u5F62',  preview: 'repeating-conic-gradient(var(--primary) 0% 25%,transparent 0% 50%) 0 0/14px 14px' },
-    { key: 'zigzag',   label: '\u2A3E \u92F8\u9F52',   preview: 'linear-gradient(135deg,var(--primary) 25%,transparent 25%) -7px 0/14px 14px,linear-gradient(225deg,var(--primary) 25%,transparent 25%) -7px 0/14px 14px' }
+    { key: 'none',     label: '\u7D14\u8272',   preview: '' },
+    { key: 'dots',     label: '\u2B24 \u5713\u9EDE', preview: 'background:radial-gradient(circle,var(--primary) 2px,transparent 2px);background-size:10px 10px;' },
+    { key: 'stripes',  label: '\u27CB \u659C\u7DDA', preview: 'background:repeating-linear-gradient(45deg,transparent,transparent 3px,var(--primary) 3px,var(--primary) 4px);' },
+    { key: 'grid',     label: '\u229E \u65B9\u683C', preview: 'background:linear-gradient(var(--primary) 1px,transparent 1px),linear-gradient(90deg,var(--primary) 1px,transparent 1px);background-size:8px 8px;' },
+    { key: 'diamond',  label: '\u25C7 \u83F1\u5F62', preview: 'background:repeating-linear-gradient(45deg,transparent,transparent 5px,var(--primary) 5px,var(--primary) 6px),repeating-linear-gradient(-45deg,transparent,transparent 5px,var(--primary) 5px,var(--primary) 6px);background-size:12px 12px;' },
+    { key: 'waves',    label: '\u3030 \u6CE2\u6D6A', preview: 'background:repeating-linear-gradient(0deg,transparent,transparent 4px,var(--primary) 4px,var(--primary) 5px);border-radius:50%;' },
+    { key: 'zigzag',   label: '\u26A1 \u92F8\u9F52', preview: 'background:linear-gradient(135deg,var(--primary) 25%,transparent 25%),linear-gradient(225deg,var(--primary) 25%,transparent 25%);background-size:8px 8px;background-position:0 0,4px 0;' }
   ];
   html += '<div style="font-size:12px;font-weight:700;color:var(--text-secondary);margin:16px 0 8px;padding-left:4px;">\u{1F48E} \u82B1\u7D0B\u80CC\u666F</div>';
   html += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">';
   patterns.forEach(function(p) {
     var isActive = p.key === curPattern;
     var border = isActive ? '2px solid var(--primary)' : '2px solid var(--border)';
-    var bg = p.preview ? p.preview : 'var(--bg-card)';
-    html += '<div onclick="setThemePattern(\'' + p.key + '\')" style="cursor:pointer;border-radius:10px;border:' + border + ';padding:6px;text-align:center;background-size:10px 10px;' + (p.preview ? 'background:' + bg + ';background-size:10px 10px;' : '') + '">' +
-      '<div style="font-size:11px;font-weight:' + (isActive ? '700' : '500') + ';color:' + (isActive ? 'var(--primary)' : 'var(--text-secondary)') + ';">' + p.label + '</div></div>';
+    html += '<div onclick="setThemePattern(\'' + p.key + '\')" style="cursor:pointer;border-radius:10px;border:' + border + ';padding:20px 6px;text-align:center;opacity:' + (isActive ? '1' : '0.7') + ';' + (p.preview || 'background:var(--bg-card);') + '">' +
+      '<div style="font-size:11px;font-weight:' + (isActive ? '700' : '500') + ';color:' + (isActive ? 'var(--primary)' : 'var(--text-secondary)') + ';background:rgba(255,255,255,0.9);padding:2px 4px;border-radius:4px;display:inline-block;">' + p.label + '</div></div>';
   });
   html += '</div>';
 
@@ -3605,6 +3632,10 @@ function submitOrder() {
       '<span style="font-size:15px;font-weight:700;">合計 (' + totalQty + ' 件)</span>' +
       '<span style="font-size:22px;font-weight:900;color:var(--primary);">$' + totalPrice + '</span>' +
     '</div>' +
+    '<div style="margin-top:16px;display:flex;flex-direction:column;gap:8px;">' +
+      '<input type="text" id="customerNameInput" placeholder="取餐姓名（選填' + (isTakeout ? '，建議填寫' : '') + '）" maxlength="20" style="padding:10px 14px;border:1px solid var(--border);border-radius:10px;font-size:14px;">' +
+      (loyaltyConfig ? '<input type="tel" id="memberPhoneInput" placeholder="手機號碼（集點用）" maxlength="10" style="padding:10px 14px;border:1px solid var(--border);border-radius:10px;font-size:14px;">' : '') +
+    '</div>' +
     '<div style="display:flex;gap:10px;margin-top:16px;">' +
       '<button onclick="closeConfirmOrder()" style="flex:1;padding:14px;border:2px solid #DDD;border-radius:12px;background:#FFF;font-size:15px;font-weight:700;color:#666;cursor:pointer;">返回修改</button>' +
       '<button onclick="confirmAndSubmitOrder()" id="confirmSubmitBtn" style="flex:2;padding:14px;border:none;border-radius:12px;background:var(--primary);color:#FFF;font-size:15px;font-weight:700;cursor:pointer;">確認送出</button>' +
@@ -3720,7 +3751,18 @@ async function confirmAndSubmitOrder() {
   });
 
   var orderNum = '';
-  const memberPhone = document.getElementById('memberPhone')?.value?.trim() || '';
+  const customerName = document.getElementById('customerNameInput')?.value?.trim() || '';
+  const memberPhone = (document.getElementById('memberPhoneInput') || document.getElementById('memberPhone'))?.value?.trim() || '';
+
+  // 外帶沒填姓名提示（不強制）
+  if (isTakeout && !customerName && !window._skipNameWarning) {
+    window._skipNameWarning = true;
+    showToast('💡 填寫姓名方便取餐叫號喔');
+    btn.disabled = false;
+    btn.textContent = '確認送出';
+    return;
+  }
+
   const order = {
     store_id: currentStoreId,
     table_number: tableNum,
@@ -3729,6 +3771,7 @@ async function confirmAndSubmitOrder() {
     status: 'pending',
     order_type: isTakeout ? 'takeout' : 'dine_in',
     customer_phone: memberPhone || null,
+    customer_name: customerName || null,
     notes: isTakeout ? '' : '用餐人數: ' + guestCount
   };
   try {
