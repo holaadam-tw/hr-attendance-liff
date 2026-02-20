@@ -3645,16 +3645,32 @@ function submitOrder() {
       '<span style="font-size:15px;font-weight:700;">合計 (' + totalQty + ' 件)</span>' +
       '<span style="font-size:22px;font-weight:900;color:var(--primary);">$' + totalPrice + '</span>' +
     '</div>' +
-    '<div style="margin-top:16px;display:flex;flex-direction:column;gap:8px;">' +
-      '<input type="text" id="customerNameInput" placeholder="取餐姓名（選填' + (isTakeout ? '，建議填寫' : '') + '）" maxlength="20" style="padding:10px 14px;border:1px solid var(--border);border-radius:10px;font-size:14px;">' +
-      (loyaltyConfig ? '<input type="tel" id="memberPhoneInput" placeholder="手機號碼（集點用）" maxlength="10" style="padding:10px 14px;border:1px solid var(--border);border-radius:10px;font-size:14px;">' : '') +
+    '<div style="padding:12px 0;border-top:1px solid #EEE;">' +
+      '<div style="font-size:13px;font-weight:700;margin-bottom:8px;">📱 取餐資訊</div>' +
+      '<div style="display:flex;gap:8px;margin-bottom:8px;">' +
+        '<input type="tel" id="confirmPhone" placeholder="手機號碼（必填）" maxlength="10" oninput="onConfirmPhoneInput()" style="flex:1;padding:12px;border:2px solid #E2E8F0;border-radius:10px;font-size:14px;font-family:inherit;" value="' + (document.getElementById('memberPhone')?.value || (typeof localStorage !== 'undefined' && currentStoreId ? (localStorage.getItem('member_phone_' + currentStoreId) || '') : '')) + '">' +
+        '<input type="text" id="confirmName" placeholder="姓名（選填）" maxlength="20" style="width:100px;padding:12px;border:2px solid #E2E8F0;border-radius:10px;font-size:14px;font-family:inherit;" value="' + (document.getElementById('customerNameInput')?.value || '') + '">' +
+      '</div>' +
+      '<div id="confirmPhoneError" style="display:none;color:#EF4444;font-size:12px;margin-top:-4px;margin-bottom:8px;font-weight:600;">📱 請填寫手機號碼才能點餐</div>' +
+      '<div id="confirmMemberCard" style="display:none;background:#F8FAFC;border-radius:10px;padding:10px 12px;font-size:12px;"></div>' +
     '</div>' +
-    '<div style="display:flex;gap:10px;margin-top:16px;">' +
+    '<div style="display:flex;gap:10px;margin-top:12px;">' +
       '<button onclick="closeConfirmOrder()" style="flex:1;padding:14px;border:2px solid #DDD;border-radius:12px;background:#FFF;font-size:15px;font-weight:700;color:#666;cursor:pointer;">返回修改</button>' +
       '<button onclick="confirmAndSubmitOrder()" id="confirmSubmitBtn" style="flex:2;padding:14px;border:none;border-radius:12px;background:var(--primary);color:#FFF;font-size:15px;font-weight:700;cursor:pointer;">確認送出</button>' +
     '</div>' +
+    '<div id="confirmMyOrdersLink" style="display:none;text-align:center;margin-top:12px;">' +
+      '<span onclick="showMyOrdersPanel()" style="font-size:13px;color:var(--primary);cursor:pointer;text-decoration:underline;">📋 查看我的訂單 (<span id="confirmOrderCount">0</span>)</span>' +
+    '</div>' +
   '</div>';
   overlay.classList.add('show');
+
+  // 如果已有手機號碼，自動查詢會員資訊
+  setTimeout(function() {
+    var phone = document.getElementById('confirmPhone')?.value?.trim();
+    if (phone && phone.length >= 9) {
+      loadConfirmMemberInfo(phone);
+    }
+  }, 200);
 }
 
 function closeConfirmOrder() {
@@ -3764,16 +3780,42 @@ async function confirmAndSubmitOrder() {
   });
 
   var orderNum = '';
-  const customerName = document.getElementById('customerNameInput')?.value?.trim() || '';
-  const memberPhone = (document.getElementById('memberPhoneInput') || document.getElementById('memberPhone'))?.value?.trim() || '';
+  // 從確認頁讀取手機和姓名
+  const memberPhone = (document.getElementById('confirmPhone')?.value?.trim()) || (document.getElementById('memberPhone')?.value?.trim()) || '';
+  const customerName = (document.getElementById('confirmName')?.value?.trim()) || (document.getElementById('customerNameInput')?.value?.trim()) || '';
 
-  // 外帶沒填姓名提示（不強制）
-  if (isTakeout && !customerName && !window._skipNameWarning) {
-    window._skipNameWarning = true;
-    showToast('💡 填寫姓名方便取餐叫號喔');
+  // 手機必填驗證
+  if (!memberPhone || memberPhone.length < 9) {
+    var errEl = document.getElementById('confirmPhoneError');
+    if (errEl) errEl.style.display = '';
+    var phoneInput = document.getElementById('confirmPhone');
+    if (phoneInput) {
+      phoneInput.style.borderColor = '#EF4444';
+      phoneInput.focus();
+      phoneInput.addEventListener('input', function() {
+        phoneInput.style.borderColor = '#E2E8F0';
+        if (errEl) errEl.style.display = 'none';
+      }, { once: true });
+    }
+    showToast('📱 請填寫手機號碼才能點餐');
     btn.disabled = false;
     btn.textContent = '確認送出';
     return;
+  }
+
+  // 黑名單檢查
+  if (window._isBlacklisted) {
+    showToast('🚫 此號碼已被限制線上點餐，請至櫃檯點餐');
+    btn.disabled = false;
+    btn.textContent = '確認送出';
+    return;
+  }
+
+  // 同步回會員區 + localStorage
+  if (document.getElementById('memberPhone')) document.getElementById('memberPhone').value = memberPhone;
+  if (document.getElementById('customerNameInput')) document.getElementById('customerNameInput').value = customerName;
+  if (currentStoreId) {
+    try { localStorage.setItem('member_phone_' + currentStoreId, memberPhone); } catch(e) {}
   }
 
   const order = {
@@ -3879,22 +3921,24 @@ function showMyOrdersBtn() {
 function showMyOrdersPanel() {
   document.getElementById('itemModalOverlay').classList.remove('show');
   var overlay = document.getElementById('myOrdersOverlay');
-  var panel = document.getElementById('myOrdersPanel');
   overlay.style.display = 'block';
-  panel.style.display = 'block';
-  requestAnimationFrame(function() { panel.style.transform = 'translateY(0)'; });
-  renderMyOrders();
+  var innerPanel = overlay.querySelector('div[onclick*="stopPropagation"]');
+  if (innerPanel) {
+    requestAnimationFrame(function() { innerPanel.style.transform = 'translateY(0)'; });
+  }
+  loadMyOrdersForPanel();
   if (window._orderPollTimer) clearInterval(window._orderPollTimer);
-  window._orderPollTimer = setInterval(pollMyOrders, 8000);
-  pollMyOrders();
+  window._orderPollTimer = setInterval(function() { loadMyOrdersForPanel(); }, 8000);
 }
 
 function closeMyOrdersPanel() {
-  var panel = document.getElementById('myOrdersPanel');
-  panel.style.transform = 'translateY(100%)';
+  var overlay = document.getElementById('myOrdersOverlay');
+  var innerPanel = overlay.querySelector('div[onclick*="stopPropagation"]');
+  if (innerPanel) {
+    innerPanel.style.transform = 'translateY(100%)';
+  }
   setTimeout(function() {
-    document.getElementById('myOrdersOverlay').style.display = 'none';
-    panel.style.display = 'none';
+    overlay.style.display = 'none';
   }, 350);
   if (window._orderPollTimer) { clearInterval(window._orderPollTimer); window._orderPollTimer = null; }
 }
@@ -4073,6 +4117,271 @@ async function awardLoyaltyPoints(orderTotal) {
     return earnedPoints;
   } catch(e) { console.warn('Award points error:', e); return 0; }
 }
+
+// ===== 確認頁手機輸入 =====
+var _confirmPhoneTimer = null;
+
+function onConfirmPhoneInput() {
+  var phone = document.getElementById('confirmPhone').value.trim();
+  var errEl = document.getElementById('confirmPhoneError');
+  if (errEl) errEl.style.display = 'none';
+  document.getElementById('confirmPhone').style.borderColor = '#E2E8F0';
+
+  clearTimeout(_confirmPhoneTimer);
+  if (phone.length >= 9) {
+    _confirmPhoneTimer = setTimeout(function() { loadConfirmMemberInfo(phone); }, 400);
+  } else {
+    document.getElementById('confirmMemberCard').style.display = 'none';
+    document.getElementById('confirmMyOrdersLink').style.display = 'none';
+  }
+}
+
+async function loadConfirmMemberInfo(phone) {
+  var card = document.getElementById('confirmMemberCard');
+  if (!card) return;
+
+  try {
+    // 1. 查客戶資料
+    var custRes = await fetch(SUPABASE_URL + '/rest/v1/store_customers?store_id=eq.' + currentStoreId + '&phone=eq.' + encodeURIComponent(phone) + '&limit=1', {
+      headers: { 'apikey': SUPABASE_KEY }
+    });
+    var custData = await custRes.json();
+    var customer = (custData && custData[0]) || null;
+
+    // 2. 查點數
+    var points = 0;
+    if (loyaltyConfig) {
+      var ptsRes = await fetch(SUPABASE_URL + '/rest/v1/loyalty_points?store_id=eq.' + currentStoreId + '&customer_line_id=eq.' + encodeURIComponent(phone) + '&limit=1', {
+        headers: { 'apikey': SUPABASE_KEY }
+      });
+      var ptsData = await ptsRes.json();
+      if (ptsData && ptsData[0]) points = ptsData[0].points || 0;
+    }
+
+    // 3. 黑名單
+    if (customer && customer.is_blacklisted) {
+      window._isBlacklisted = true;
+      card.style.display = '';
+      card.style.background = '#FEF2F2';
+      card.innerHTML = '<div style="color:#991B1B;font-weight:700;">🚫 此號碼已被限制線上點餐，請至櫃檯點餐</div>';
+      document.getElementById('confirmMyOrdersLink').style.display = 'none';
+      return;
+    }
+    window._isBlacklisted = false;
+
+    // 4. 會員卡（精簡一行）
+    card.style.display = '';
+    card.style.background = '#F8FAFC';
+
+    if (customer) {
+      var html = '<div style="display:flex;justify-content:space-between;align-items:center;">';
+      html += '<div>';
+      html += '<span style="font-weight:700;">👋 ' + esc(customer.name || '會員') + '</span>';
+      if ((customer.total_orders || 0) >= 5) html += ' <span style="background:#D1FAE5;color:#065F46;padding:1px 6px;border-radius:4px;font-size:10px;">⭐常客</span>';
+      html += ' <span style="color:#94A3B8;font-size:11px;">累計' + (customer.total_orders || 0) + '筆</span>';
+      html += '</div>';
+
+      // 點數（如果集點有開）
+      if (loyaltyConfig && window._loyaltyEnabled !== false) {
+        var cfg = loyaltyConfig;
+        var needed = cfg.points_to_redeem || cfg.points_per_reward || 10;
+        var discount = cfg.discount_amount || cfg.reward_discount || 50;
+        html += '<div style="text-align:right;">';
+        html += '<span style="font-size:16px;font-weight:900;color:var(--primary);">' + points + '</span>';
+        html += '<span style="font-size:11px;color:var(--primary);font-weight:600;"> 點</span>';
+        if (points >= needed) {
+          html += '<div style="font-size:10px;color:#059669;font-weight:600;">🎉 可折$' + discount + '</div>';
+        } else {
+          html += '<div style="font-size:10px;color:#94A3B8;">再' + (needed - points) + '點可折$' + discount + '</div>';
+        }
+        html += '</div>';
+      }
+      html += '</div>';
+
+      // no_show 警告
+      if (customer.no_show_count > 0) {
+        html += '<div style="margin-top:6px;padding:4px 8px;background:#FEF3C7;border-radius:6px;color:#92400E;font-size:11px;">⚠️ 有' + customer.no_show_count + '次未取餐紀錄，再次未取餐將無法線上點餐</div>';
+      }
+
+      card.innerHTML = html;
+
+      // 自動帶入姓名
+      var nameInput = document.getElementById('confirmName');
+      if (customer.name && nameInput && !nameInput.value) nameInput.value = customer.name;
+
+    } else {
+      // 新客戶
+      var newHtml = '<div style="display:flex;justify-content:space-between;align-items:center;">';
+      newHtml += '<span style="font-weight:600;">🎉 新客戶！首筆訂單即建立會員</span>';
+      if (loyaltyConfig && window._loyaltyEnabled !== false) {
+        newHtml += '<span style="color:var(--primary);font-weight:700;">0 點</span>';
+      }
+      newHtml += '</div>';
+      card.innerHTML = newHtml;
+    }
+
+    // 5. 查訂單數量（顯示連結）
+    loadConfirmOrderCount(phone);
+
+  } catch(e) {
+    console.warn('Load confirm member info error:', e);
+    card.style.display = 'none';
+  }
+}
+
+async function loadConfirmOrderCount(phone) {
+  var linkEl = document.getElementById('confirmMyOrdersLink');
+  var countEl = document.getElementById('confirmOrderCount');
+  if (!linkEl || !countEl) return;
+
+  try {
+    var sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    var res = await fetch(SUPABASE_URL + '/rest/v1/orders?store_id=eq.' + currentStoreId +
+      '&customer_phone=eq.' + encodeURIComponent(phone) +
+      '&created_at=gte.' + sevenDaysAgo.toISOString() +
+      '&select=id&limit=50', {
+      headers: { 'apikey': SUPABASE_KEY }
+    });
+    var data = await res.json();
+    var count = (data || []).length;
+
+    if (count > 0) {
+      countEl.textContent = count;
+      linkEl.style.display = '';
+      // 把手機號存起來，給訂單面板用
+      window._myOrderPhone = phone;
+    } else {
+      linkEl.style.display = 'none';
+    }
+  } catch(e) {
+    linkEl.style.display = 'none';
+  }
+}
+
+// ===== 我的訂單面板擴展 =====
+var myOrdersExpanded = {};
+
+async function loadMyOrdersForPanel() {
+  var phone = window._myOrderPhone || document.getElementById('confirmPhone')?.value?.trim() || document.getElementById('memberPhone')?.value?.trim();
+  var list = document.getElementById('myOrdersList');
+  if (!phone || !currentStoreId) {
+    list.innerHTML = '<div style="text-align:center;padding:24px;color:#94A3B8;">請先輸入手機號碼</div>';
+    return;
+  }
+
+  try {
+    var sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    var res = await fetch(SUPABASE_URL + '/rest/v1/orders?store_id=eq.' + currentStoreId +
+      '&customer_phone=eq.' + encodeURIComponent(phone) +
+      '&created_at=gte.' + sevenDaysAgo.toISOString() +
+      '&order=created_at.desc&limit=30', {
+      headers: { 'apikey': SUPABASE_KEY }
+    });
+    var orders = (await res.json()) || [];
+
+    if (orders.length === 0) {
+      list.innerHTML = '<div style="text-align:center;padding:24px;color:#94A3B8;">還沒有訂單紀錄</div>';
+      return;
+    }
+
+    var active = orders.filter(function(o) { return ['pending','confirmed','preparing','ready'].includes(o.status); });
+    var history = orders.filter(function(o) { return ['completed','cancelled'].includes(o.status); });
+
+    var html = '';
+
+    // 進行中
+    if (active.length > 0) {
+      html += '<div style="font-size:13px;font-weight:700;color:#64748B;margin-bottom:8px;">⏳ 進行中</div>';
+      active.forEach(function(o) { html += renderMyOrderCard(o); });
+    }
+
+    // 歷史
+    if (history.length > 0) {
+      html += '<div style="font-size:13px;font-weight:700;color:#64748B;margin:16px 0 8px;">📜 歷史訂單</div>';
+      history.forEach(function(o) { html += renderMyOrderCard(o); });
+    }
+
+    list.innerHTML = html;
+  } catch(e) {
+    list.innerHTML = '<div style="text-align:center;padding:24px;color:#94A3B8;">查詢失敗</div>';
+  }
+}
+
+function renderMyOrderCard(o) {
+  var statusMap = {
+    pending:   { label: '🕐 等待確認', bg: '#FEF3C7', color: '#92400E' },
+    confirmed: { label: '✅ 已確認',   bg: '#D1FAE5', color: '#065F46' },
+    preparing: { label: '🍳 準備中',   bg: '#DBEAFE', color: '#1E40AF' },
+    ready:     { label: '🔔 可取餐',   bg: '#FEE2E2', color: '#991B1B' },
+    completed: { label: '✅ 已完成',   bg: '#F3F4F6', color: '#6B7280' },
+    cancelled: { label: '❌ 已取消',   bg: '#F9FAFB', color: '#9CA3AF' }
+  };
+  var st = statusMap[o.status] || statusMap.pending;
+  var num = o.order_number || o.pickup_number || '---';
+  var d = new Date(o.created_at);
+  var dateStr = (d.getMonth()+1) + '/' + d.getDate() + ' ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+  var items = o.items || [];
+  var isExpanded = !!myOrdersExpanded[o.id];
+  var typeLabel = o.order_type === 'takeout' ? '外帶' : (o.table_number ? '桌' + o.table_number : '內用');
+  var isActive = ['pending','confirmed','preparing','ready'].includes(o.status);
+
+  var summary = items.slice(0, 2).map(function(i) { return esc(i.name) + ' x' + i.qty; }).join('、');
+  if (items.length > 2) summary += '⋯ 還有' + (items.length - 2) + '項';
+
+  var html = '<div style="background:#fff;border:1px solid #F1F5F9;border-radius:14px;padding:14px;margin-bottom:10px;' + (isActive ? 'border-left:4px solid ' + st.color + ';' : '') + '">';
+
+  // Header
+  html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">' +
+    '<div><span style="font-size:16px;font-weight:800;">#' + num + '</span><span style="font-size:11px;color:#94A3B8;margin-left:6px;">' + typeLabel + '</span></div>' +
+    '<span style="font-size:11px;padding:3px 8px;border-radius:6px;font-weight:600;background:' + st.bg + ';color:' + st.color + ';">' + st.label + '</span>' +
+  '</div>';
+
+  // Ready 提示
+  if (o.status === 'ready') {
+    html += '<div style="padding:6px 8px;background:#FEE2E2;border-radius:8px;text-align:center;font-size:13px;font-weight:700;color:#DC2626;margin-bottom:6px;">🔔 您的餐點已準備好，請取餐！</div>';
+  }
+
+  // 品項（展開/收合）
+  html += '<div onclick="toggleMyOrder(\'' + o.id + '\')" style="cursor:pointer;">';
+  if (isExpanded) {
+    items.forEach(function(i) {
+      var opts = '';
+      if (i.options && Array.isArray(i.options)) {
+        opts = i.options.map(function(g) {
+          if (typeof g === 'string') return g;
+          if (g.group && g.choices) return g.group + ': ' + g.choices.join(', ');
+          return '';
+        }).filter(Boolean).join(' / ');
+      }
+      html += '<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px dashed #F1F5F9;font-size:13px;">' +
+        '<div><span style="font-weight:600;">' + esc(i.name || '') + '</span> <span style="color:#94A3B8;">x' + i.qty + '</span>' +
+        (opts ? '<div style="font-size:11px;color:#94A3B8;">' + esc(opts) + '</div>' : '') + '</div>' +
+        '<span style="font-weight:600;">$' + (i.subtotal || i.unit_price * i.qty) + '</span></div>';
+    });
+    html += '<div style="text-align:center;font-size:11px;color:var(--primary);margin-top:4px;">▲ 收合</div>';
+  } else {
+    html += '<div style="font-size:13px;color:#64748B;">' + summary + '</div>';
+    html += '<div style="text-align:center;font-size:11px;color:var(--primary);margin-top:4px;">▼ 展開明細</div>';
+  }
+  html += '</div>';
+
+  // Footer
+  html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;padding-top:6px;border-top:1px solid #F1F5F9;">' +
+    '<span style="font-size:12px;color:#94A3B8;">' + dateStr + '</span>' +
+    '<span style="font-size:15px;font-weight:800;">$' + (o.total || 0) + '</span></div>';
+
+  html += '</div>';
+  return html;
+}
+
+function toggleMyOrder(id) {
+  myOrdersExpanded[id] = !myOrdersExpanded[id];
+  loadMyOrdersForPanel();
+}
 </script>
 
 <!-- ===== MY ORDERS FLOATING BTN + PANEL ===== -->
@@ -4081,12 +4390,21 @@ async function awardLoyaltyPoints(orderTotal) {
   <span id="myOrdersBadge" style="position:absolute;top:-4px;right:-4px;background:#EF4444;color:#fff;font-size:11px;font-weight:700;min-width:18px;height:18px;border-radius:9px;line-height:18px;text-align:center;padding:0 4px;display:none;"></span>
 </div>
 
-<div id="myOrdersOverlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:900;" onclick="closeMyOrdersPanel()"></div>
-<div id="myOrdersPanel" style="display:none; position:fixed; bottom:0; left:0; right:0; z-index:901; background:#fff; border-radius:20px 20px 0 0; max-height:70vh; overflow-y:auto; box-shadow:0 -8px 30px rgba(0,0,0,0.15); padding:20px; transform:translateY(100%); transition:transform 0.35s cubic-bezier(0.32,0.72,0,1);">
-  <div style="width:40px;height:4px;background:#DDD;border-radius:2px;margin:0 auto 16px;"></div>
-  <h3 style="font-size:18px;font-weight:800;margin:0 0 16px;">📋 我的訂單</h3>
-  <div id="myOrdersList"></div>
+<div id="myOrdersOverlay" style="display:none;position:fixed;inset:0;z-index:300;background:rgba(0,0,0,0.45);backdrop-filter:blur(4px);" onclick="closeMyOrdersPanel()">
+  <div onclick="event.stopPropagation()" style="position:absolute;bottom:0;left:0;right:0;max-width:480px;margin:0 auto;background:var(--bg-card,#fff);border-radius:24px 24px 0 0;max-height:80vh;overflow-y:auto;box-shadow:0 -8px 40px rgba(0,0,0,0.15);padding:20px 16px calc(24px + env(safe-area-inset-bottom,0px));transform:translateY(100%);transition:transform 0.35s cubic-bezier(0.32,0.72,0,1);">
+    <div style="width:40px;height:4px;border-radius:2px;background:#DDD;margin:0 auto 16px;"></div>
+    <h4 style="font-size:18px;font-weight:800;text-align:center;margin-bottom:4px;">📋 我的訂單</h4>
+    <div style="font-size:12px;color:var(--text-muted,#94A3B8);text-align:center;margin-bottom:16px;">最近 7 天的訂單紀錄</div>
+    <div id="myOrdersList"></div>
+  </div>
 </div>
+
+<div id="myOrdersPanel" style="display:none;"></div>
+
+<style>
+@keyframes slideUpPanel { from { transform:translateY(100%); } to { transform:translateY(0); } }
+@keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.5; } }
+</style>
 
 </body>
 </html>
