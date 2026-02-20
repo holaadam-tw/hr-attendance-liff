@@ -3866,6 +3866,45 @@ async function confirmAndSubmitOrder() {
   // 儲存手機號給「我的訂單」面板用
   window._myOrderPhone = memberPhone;
 
+  // 自動建立/更新客戶資料（優雅降級：失敗不影響送單）
+  try {
+    var custCheck = await fetch(SUPABASE_URL + '/rest/v1/store_customers?store_id=eq.' + currentStoreId +
+      '&phone=eq.' + encodeURIComponent(memberPhone) + '&limit=1', {
+      headers: { 'apikey': SUPABASE_KEY }
+    });
+    if (custCheck.ok) {
+      var custData = await custCheck.json();
+      if (custData && custData[0]) {
+        // 更新：累加訂單數和消費金額
+        await fetch(SUPABASE_URL + '/rest/v1/store_customers?id=eq.' + custData[0].id, {
+          method: 'PATCH',
+          headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+          body: JSON.stringify({
+            total_orders: (custData[0].total_orders || 0) + 1,
+            total_spent: parseFloat(custData[0].total_spent || 0) + totalPrice,
+            name: customerName || custData[0].name,
+            updated_at: new Date().toISOString()
+          })
+        });
+      } else {
+        // 新建客戶
+        await fetch(SUPABASE_URL + '/rest/v1/store_customers', {
+          method: 'POST',
+          headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+          body: JSON.stringify({
+            store_id: currentStoreId,
+            phone: memberPhone,
+            name: customerName || null,
+            total_orders: 1,
+            total_spent: totalPrice
+          })
+        });
+      }
+    }
+  } catch(e) {
+    console.warn('客戶資料更新跳過:', e.message);
+  }
+
   showOrderSuccess(totalQty, totalPrice, tableNum, orderNum, earnedPts);
 }
 
@@ -4200,12 +4239,19 @@ async function loadConfirmMemberInfo(phone) {
   if (!card) return;
 
   try {
-    // 1. 查客戶資料
-    var custRes = await fetch(SUPABASE_URL + '/rest/v1/store_customers?store_id=eq.' + currentStoreId + '&phone=eq.' + encodeURIComponent(phone) + '&limit=1', {
-      headers: { 'apikey': SUPABASE_KEY }
-    });
-    var custData = await custRes.json();
-    var customer = (custData && custData[0]) || null;
+    // 1. 查客戶資料（優雅降級：表不存在時跳過）
+    var customer = null;
+    try {
+      var custRes = await fetch(SUPABASE_URL + '/rest/v1/store_customers?store_id=eq.' + currentStoreId + '&phone=eq.' + encodeURIComponent(phone) + '&limit=1', {
+        headers: { 'apikey': SUPABASE_KEY }
+      });
+      if (custRes.ok) {
+        var custData = await custRes.json();
+        customer = (custData && custData[0]) || null;
+      }
+    } catch(e) {
+      console.warn('store_customers 查詢跳過:', e.message);
+    }
 
     // 2. 查點數
     var points = 0;
@@ -4338,15 +4384,13 @@ async function loadMyOrdersForPanel() {
     var sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-    var [ordersRes, ptsRes, custRes] = await Promise.all([
+    var [ordersRes, ptsRes] = await Promise.all([
       fetch(SUPABASE_URL + '/rest/v1/orders?store_id=eq.' + currentStoreId +
         '&customer_phone=eq.' + encodeURIComponent(phone) +
         '&created_at=gte.' + sevenDaysAgo.toISOString() +
         '&order=created_at.desc&limit=30', { headers: { 'apikey': SUPABASE_KEY } }),
       loyaltyConfig ? fetch(SUPABASE_URL + '/rest/v1/loyalty_points?store_id=eq.' + currentStoreId +
-        '&customer_line_id=eq.' + encodeURIComponent(phone) + '&limit=1', { headers: { 'apikey': SUPABASE_KEY } }) : Promise.resolve(null),
-      fetch(SUPABASE_URL + '/rest/v1/store_customers?store_id=eq.' + currentStoreId +
-        '&phone=eq.' + encodeURIComponent(phone) + '&limit=1', { headers: { 'apikey': SUPABASE_KEY } })
+        '&customer_line_id=eq.' + encodeURIComponent(phone) + '&limit=1', { headers: { 'apikey': SUPABASE_KEY } }) : Promise.resolve(null)
     ]);
 
     var orders = await ordersRes.json() || [];
@@ -4355,8 +4399,19 @@ async function loadMyOrdersForPanel() {
       var ptsData = await ptsRes.json();
       if (ptsData && ptsData[0]) points = ptsData[0].points || 0;
     }
-    var custData = await custRes.json();
-    var customer = (custData && custData[0]) || null;
+
+    // 查客戶資料（優雅降級：表不存在時跳過）
+    var customer = null;
+    try {
+      var custRes = await fetch(SUPABASE_URL + '/rest/v1/store_customers?store_id=eq.' + currentStoreId +
+        '&phone=eq.' + encodeURIComponent(phone) + '&limit=1', { headers: { 'apikey': SUPABASE_KEY } });
+      if (custRes.ok) {
+        var custData = await custRes.json();
+        customer = (custData && custData[0]) || null;
+      }
+    } catch(e) {
+      console.warn('store_customers 查詢跳過:', e.message);
+    }
 
     // === 點數卡 ===
     var pointsCard = document.getElementById('myOrdersPointsCard');
