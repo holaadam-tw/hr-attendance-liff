@@ -1973,8 +1973,21 @@ async function loadStoreFromSupabase(slug) {
 
   // 會員集點設定
   loyaltyConfig = store.loyalty_config || null;
-  if (loyaltyConfig && loyaltyConfig.spend_per_point) {
-    document.getElementById('memberSection').style.display = '';
+  // 集點功能開關
+  const loyaltyEnabled = store.loyalty_enabled !== false;
+  window._loyaltyEnabled = loyaltyEnabled;
+
+  // 會員區永遠顯示（手機必填）
+  document.getElementById('memberSection').style.display = '';
+
+  // 集點關閉時：隱藏集點相關元素
+  if (!loyaltyEnabled) {
+    const pointsEl = document.getElementById('memberPoints');
+    if (pointsEl) pointsEl.style.display = 'none';
+  }
+
+  // 集點開啟時：正常顯示
+  if (loyaltyEnabled && loyaltyConfig && loyaltyConfig.spend_per_point) {
     // 從 localStorage 回填手機
     const savedPhone = localStorage.getItem('member_phone_' + currentStoreId);
     if (savedPhone) {
@@ -3992,8 +4005,8 @@ async function checkMemberPoints() {
       memberPointsData = data[0];
       const pts = memberPointsData.points || 0;
       const cfg = loyaltyConfig || {};
-      const needed = cfg.points_per_reward || 10;
-      const discount = cfg.reward_discount || 50;
+      const needed = cfg.points_to_redeem || 10;
+      const discount = cfg.discount_amount || 50;
       document.getElementById('memberPoints').textContent = '🎯 ' + pts + ' 點';
       info.style.display = '';
       if (pts >= needed) {
@@ -4001,18 +4014,34 @@ async function checkMemberPoints() {
       } else {
         info.innerHTML = '目前 <b>' + pts + '</b> 點，再集 <b>' + (needed - pts) + '</b> 點可兌換 $' + discount + ' 折扣';
       }
+      // 加上集點規則說明
+      if (loyaltyConfig && window._loyaltyEnabled) {
+        const ruleText = '<br><span style="font-size:11px;color:#94A3B8;">集點規則：每消費 $' +
+          (loyaltyConfig.spend_per_point || 50) + ' 得 1 點，' +
+          (loyaltyConfig.points_to_redeem || 10) + ' 點可折 $' +
+          (loyaltyConfig.discount_amount || 50) + '</span>';
+        info.innerHTML += ruleText;
+      }
     } else {
       memberPointsData = null;
       document.getElementById('memberPoints').textContent = '新會員';
       info.style.display = '';
       info.innerHTML = '歡迎加入！消費即可開始集點';
+      // 加上集點規則說明
+      if (loyaltyConfig && window._loyaltyEnabled) {
+        const ruleText = '<br><span style="font-size:11px;color:#94A3B8;">集點規則：每消費 $' +
+          (loyaltyConfig.spend_per_point || 50) + ' 得 1 點，' +
+          (loyaltyConfig.points_to_redeem || 10) + ' 點可折 $' +
+          (loyaltyConfig.discount_amount || 50) + '</span>';
+        info.innerHTML += ruleText;
+      }
     }
   } catch(e) { console.warn('Check points error:', e); }
 }
 
 async function awardLoyaltyPoints(orderTotal) {
   const phone = document.getElementById('memberPhone')?.value?.trim();
-  if (!phone || phone.length < 9 || !loyaltyConfig) return;
+  if (!phone || phone.length < 9 || !loyaltyConfig || !window._loyaltyEnabled) return;
   const spendPer = loyaltyConfig.spend_per_point || 50;
   const earnedPoints = Math.floor(orderTotal / spendPer);
   if (earnedPoints <= 0) return;

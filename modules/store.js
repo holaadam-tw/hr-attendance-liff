@@ -1187,10 +1187,11 @@ export async function saveLineGroupId() {
 }
 
 export async function saveLoyaltyConfig() {
+    // 優先讀取會員 tab 的欄位（rdLoyaltySpend2），如果沒有就 fallback 到舊版 id
     const config = {
-        spend_per_point: parseInt(document.getElementById('rdLoyaltySpend').value) || 50,
-        points_to_redeem: parseInt(document.getElementById('rdLoyaltyPoints').value) || 10,
-        discount_amount: parseInt(document.getElementById('rdLoyaltyDiscount').value) || 50
+        spend_per_point: parseInt(document.getElementById('rdLoyaltySpend2')?.value || document.getElementById('rdLoyaltySpend')?.value) || 50,
+        points_to_redeem: parseInt(document.getElementById('rdLoyaltyPoints2')?.value || document.getElementById('rdLoyaltyPoints')?.value) || 10,
+        discount_amount: parseInt(document.getElementById('rdLoyaltyDiscount2')?.value || document.getElementById('rdLoyaltyDiscount')?.value) || 50
     };
     try {
         await sb.from('store_profiles').update({ loyalty_config: config, updated_at: new Date().toISOString() }).eq('id', rdCurrentStoreId);
