@@ -1311,7 +1311,7 @@ function applyFeatureVisibility() {
     // 支援逗號分隔多 key（OR 邏輯：任一為 true 就顯示）
     document.querySelectorAll('.menu-grid .menu-item[data-feature]').forEach(item => {
         const keys = item.getAttribute('data-feature').split(',').map(k => k.trim());
-        const visible = keys.some(k => features[k] !== false);
+        const visible = keys.some(k => features[k] === true);
         if (!visible) {
             item.style.display = 'none';
         }
