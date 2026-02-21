@@ -3331,11 +3331,27 @@ function promptGuestCount() {
 function addToCart(itemId, event) {
   const item = menuItems.find(i => i.id === itemId);
   if (!item) return;
-  const existing = cart.find(c => c.id === itemId && !c.optKey);
-  if (existing) { existing.qty += 1; }
-  else {
-    const price = item.sizes ? item.sizes[item.sizes.length - 1].price : item.price;
-    const sizeName = item.sizes ? item.sizes[item.sizes.length - 1].name : null;
+  let selectedSizeIdx = item.sizes ? item.sizes.length - 1 : -1;
+  if (item.sizes) {
+    const itemEl = document.querySelector('.menu-item[data-id="' + itemId + '"]');
+    if (itemEl) {
+      const activeSize = itemEl.querySelector('.size-option.active');
+      if (activeSize) {
+        const allSizes = itemEl.querySelectorAll('.size-option');
+        allSizes.forEach((el, i) => { if (el === activeSize) selectedSizeIdx = i; });
+      }
+    }
+  }
+  const existing = cart.find(c => c.id === itemId);
+  if (existing) {
+    existing.qty += 1;
+    if (item.sizes && selectedSizeIdx >= 0) {
+      existing.price = item.sizes[selectedSizeIdx].price;
+      existing.sizeName = item.sizes[selectedSizeIdx].name;
+    }
+  } else {
+    const price = item.sizes ? item.sizes[selectedSizeIdx].price : item.price;
+    const sizeName = item.sizes ? item.sizes[selectedSizeIdx].name : null;
     cart.push({ id: itemId, qty: 1, price: price, sizeName: sizeName });
   }
   updateCartUI();
@@ -3580,9 +3596,19 @@ function modalAddToCart() {
 }
 
 function selectSize(itemId, sizeIdx) {
+  const item = menuItems.find(i => i.id === itemId);
+  if (!item || !item.sizes) return;
   const itemEl = document.querySelector('.menu-item[data-id="' + itemId + '"]');
   if (!itemEl) return;
   itemEl.querySelectorAll('.size-option').forEach((el, i) => { el.classList.toggle('active', i === sizeIdx); });
+  const priceEl = itemEl.querySelector('.item-price');
+  if (priceEl) priceEl.innerHTML = '<span class="currency">$</span>' + item.sizes[sizeIdx].price;
+  const cartItem = cart.find(c => c.id === itemId);
+  if (cartItem) {
+    cartItem.price = item.sizes[sizeIdx].price;
+    cartItem.sizeName = item.sizes[sizeIdx].name;
+    updateCartUI();
+  }
 }
 
 function animateAddToCart(event) {
