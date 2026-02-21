@@ -2149,14 +2149,24 @@ export async function loadMembersForStore(storeId) {
     content.innerHTML = '<p style="text-align:center;color:#999;padding:20px;">載入中...</p>';
 
     try {
-        // 同時查詢會員和集點設定
-        const [custResult, loyaltyResult] = await Promise.all([
+        // 同時查詢會員、集點設定、交易紀錄
+        const [custResult, loyaltyResult, txResult] = await Promise.all([
             sb.from('store_customers').select('*').eq('store_id', storeId).order('updated_at', { ascending: false }),
-            sb.from('loyalty_config').select('*').eq('store_id', storeId).maybeSingle()
+            sb.from('loyalty_config').select('*').eq('store_id', storeId).maybeSingle(),
+            sb.from('loyalty_transactions').select('customer_phone, type, points').eq('store_id', storeId)
         ]);
 
         let customers = custResult.data || [];
         const loyalty = loyaltyResult.data; // 可能是 null
+        const txList = txResult.data || [];
+
+        // 計算每個手機號碼的點數（從 loyalty_transactions）
+        const pointsMap = {};
+        txList.forEach(function(t) {
+            if (!pointsMap[t.customer_phone]) pointsMap[t.customer_phone] = 0;
+            if (t.type === 'earn') pointsMap[t.customer_phone] += (t.points || 0);
+            else if (t.type === 'redeem') pointsMap[t.customer_phone] -= (t.points || 0);
+        });
 
         // 過濾測試資料
         customers = customers.filter(function(c) { return !c.name?.startsWith('_'); });
@@ -2241,10 +2251,10 @@ export async function loadMembersForStore(storeId) {
 
         // 最低消費
         html += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:14px;">';
-        html += '<span style="font-size:12px;color:#64748B;">最低消費</span>';
-        html += '<span style="color:#64748B;">$</span>';
-        html += '<input type="number" id="loyaltyMinInput" value="' + minPurchase + '" min="0" style="width:80px;min-width:80px;padding:8px;border:2px solid #E2E8F0;border-radius:8px;text-align:center;font-size:13px;">';
-        html += '<span style="font-size:12px;color:#94A3B8;">才給點（0=不限）</span>';
+        html += '<span style="font-size:13px;color:#64748B;">最低消費</span>';
+        html += '<span style="font-size:14px;color:#64748B;">$</span>';
+        html += '<input type="number" id="loyaltyMinInput" value="' + minPurchase + '" min="0" style="width:80px;min-width:80px;padding:8px;border:2px solid #E2E8F0;border-radius:8px;text-align:center;font-size:18px;font-weight:700;color:#F97316;">';
+        html += '<span style="font-size:13px;color:#94A3B8;">才給點（0=不限）</span>';
         html += '</div>';
 
         // 儲存按鈕
@@ -2314,7 +2324,10 @@ export async function loadMembersForStore(storeId) {
                 const lastDate = c.updated_at ? new Date(c.updated_at).toLocaleDateString('zh-TW') : '-';
                 const isVip = (c.total_orders || 0) >= vipThreshold;
 
-                html += '<div class="member-card" data-name="' + esc(c.name || '') + '" data-phone="' + esc(c.phone || '') + '" style="display:flex;justify-content:space-between;align-items:center;padding:14px;background:#fff;border:1px solid ' + (isVip ? '#F97316' : '#E2E8F0') + ';border-radius:12px;margin-bottom:8px;' + (isVip ? 'box-shadow:0 0 0 1px #FED7AA;' : '') + '">';
+                html += '<div class="member-card" data-name="' + esc(c.name || '') + '" data-phone="' + esc(c.phone || '') + '" onclick="toggleMemberOrders(\'' + esc(c.phone) + '\', \'' + storeId + '\', this)" style="cursor:pointer;padding:14px;background:#fff;border:1px solid ' + (isVip ? '#F97316' : '#E2E8F0') + ';border-radius:12px;margin-bottom:8px;' + (isVip ? 'box-shadow:0 0 0 1px #FED7AA;' : '') + '">';
+
+                // 主要內容區（flex layout）
+                html += '<div style="display:flex;justify-content:space-between;align-items:center;">';
                 // 左
                 html += '<div style="display:flex;align-items:center;gap:12px;flex:1;min-width:0;">';
                 html += '<div style="width:44px;height:44px;border-radius:22px;background:' + (isVip ? 'linear-gradient(135deg,#F97316,#FBBF24)' : 'linear-gradient(135deg,#6366F1,#8B5CF6)') + ';display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:16px;flex-shrink:0;">';
@@ -2330,7 +2343,12 @@ export async function loadMembersForStore(storeId) {
                 html += '<div style="font-size:18px;font-weight:800;color:#059669;">$' + (c.total_spent || 0).toLocaleString() + '</div>';
                 html += '<div style="font-size:12px;color:#64748B;">' + (c.total_orders || 0) + ' 筆訂單</div>';
                 html += '</div>';
-                html += '</div>';
+                html += '</div>'; // 結束 flex layout
+
+                // 訂單展開區
+                html += '<div class="member-orders-area" data-phone="' + esc(c.phone) + '" style="display:none;margin-top:10px;padding-top:10px;border-top:1px solid #E2E8F0;"></div>';
+
+                html += '</div>'; // 結束 member-card
             });
             html += '</div>';
         }
@@ -2349,12 +2367,8 @@ export async function loadMembersForStore(storeId) {
 
             html += '<div id="pointListContainer">';
             customers.forEach(function(c) {
-                let pts = c.points || c.loyalty_points || 0;
-                // 如果 store_customers 沒有 points 欄位，用消費金額估算
-                // 估算點數 = total_spent * points_per_dollar
-                if (!pts && loyalty && c.total_spent) {
-                    pts = Math.floor((c.total_spent || 0) * (loyalty.points_per_dollar || 0));
-                }
+                // 從 pointsMap 取得點數（已從 loyalty_transactions 計算）
+                const pts = pointsMap[c.phone] || 0;
 
                 html += '<div class="point-card" data-name="' + esc(c.name || '') + '" data-phone="' + esc(c.phone || '') + '" style="display:flex;justify-content:space-between;align-items:center;padding:14px;background:#fff;border:1px solid #E2E8F0;border-radius:12px;margin-bottom:8px;">';
                 // 左
@@ -2369,9 +2383,9 @@ export async function loadMembersForStore(storeId) {
                 html += '<div style="font-size:22px;font-weight:800;color:#6366F1;">' + pts + '</div>';
                 html += '<div style="font-size:11px;color:#94A3B8;margin-bottom:6px;">點</div>';
                 html += '<div style="display:flex;gap:4px;justify-content:center;">';
-                html += '<button onclick="adjustPoints(\'' + c.id + '\', -1, \'' + storeId + '\')" style="width:28px;height:28px;border:1px solid #E2E8F0;border-radius:6px;background:#fff;color:#EF4444;font-size:16px;font-weight:700;cursor:pointer;">−</button>';
-                html += '<button onclick="adjustPoints(\'' + c.id + '\', 1, \'' + storeId + '\')" style="width:28px;height:28px;border:1px solid #E2E8F0;border-radius:6px;background:#fff;color:#059669;font-size:16px;font-weight:700;cursor:pointer;">+</button>';
-                html += '<button onclick="adjustPointsCustom(\'' + c.id + '\', \'' + esc(c.name || '匿名') + '\', ' + pts + ', \'' + storeId + '\')" style="padding:4px 8px;border:1px solid #E2E8F0;border-radius:6px;background:#fff;color:#64748B;font-size:11px;cursor:pointer;">✏️</button>';
+                html += '<button onclick="adjustPoints(\'' + esc(c.phone) + '\', -1, \'' + storeId + '\')" style="width:28px;height:28px;border:1px solid #E2E8F0;border-radius:6px;background:#fff;color:#EF4444;font-size:16px;font-weight:700;cursor:pointer;">−</button>';
+                html += '<button onclick="adjustPoints(\'' + esc(c.phone) + '\', 1, \'' + storeId + '\')" style="width:28px;height:28px;border:1px solid #E2E8F0;border-radius:6px;background:#fff;color:#059669;font-size:16px;font-weight:700;cursor:pointer;">+</button>';
+                html += '<button onclick="adjustPointsCustom(\'' + esc(c.phone) + '\', \'' + esc(c.name || '匿名') + '\', ' + pts + ', \'' + storeId + '\')" style="padding:4px 8px;border:1px solid #E2E8F0;border-radius:6px;background:#fff;color:#64748B;font-size:11px;cursor:pointer;">✏️</button>';
                 html += '</div>';
                 html += '</div>';
                 html += '</div>';
@@ -2398,7 +2412,8 @@ export async function loadMembersForStore(storeId) {
                         html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid #F1F5F9;">';
                         html += '<div>';
                         html += '<div style="font-size:13px;font-weight:600;">' + esc(t.note || (t.type === 'earn' ? '消費得點' : '兌換扣點')) + '</div>';
-                        html += '<div style="font-size:11px;color:#94A3B8;">' + dateStr + '</div>';
+                        html += '<div style="font-size:11px;color:#94A3B8;">' + esc(t.customer_phone || '') + ' · ' + dateStr + '</div>';
+                        if (t.operator_name) html += '<div style="font-size:10px;color:#CBD5E1;">操作人: ' + esc(t.operator_name) + '</div>';
                         html += '</div>';
                         html += '<div style="font-size:15px;font-weight:700;color:' + color + ';">' + icon + t.points + ' 點</div>';
                         html += '</div>';
@@ -2555,64 +2570,103 @@ window.toggleVipSection = function() {
 };
 
 // 調整點數（+1 或 -1）
-window.adjustPoints = async function(customerId, delta, storeId) {
+window.adjustPoints = async function(customerPhone, delta, storeId) {
     try {
-        // 先查現有點數
-        const { data: cust } = await sb.from('store_customers').select('loyalty_points').eq('id', customerId).maybeSingle();
-        const currentPts = cust?.loyalty_points || 0;
-        const newPts = Math.max(0, currentPts + delta);
-
-        await sb.from('store_customers').update({ loyalty_points: newPts }).eq('id', customerId);
-
-        // 記錄交易（如果 loyalty_transactions 表存在）
-        try {
-            await sb.from('loyalty_transactions').insert({
-                store_id: storeId,
-                customer_id: customerId,
-                type: delta > 0 ? 'earn' : 'redeem',
-                points: Math.abs(delta),
-                balance_after: newPts,
-                note: '手動調整'
-            });
-        } catch(e) {
-            // 忽略 loyalty_transactions 表不存在的錯誤
-        }
+        await sb.from('loyalty_transactions').insert({
+            store_id: storeId,
+            customer_phone: customerPhone,
+            type: delta > 0 ? 'earn' : 'redeem',
+            points: Math.abs(delta),
+            note: '手動調整 ' + (delta > 0 ? '+' : '') + delta,
+            operator_name: window.currentEmployee?.name || 'admin'
+        });
 
         loadMembersForStore(storeId);
     } catch(e) {
-        console.error('Adjust points error:', e);
+        console.error('adjustPoints error:', e);
         alert('操作失敗: ' + (e.message || ''));
     }
 };
 
 // 自訂點數調整
-window.adjustPointsCustom = async function(customerId, name, currentPts, storeId) {
-    const input = prompt(name + ' 目前 ' + currentPts + ' 點\n輸入新的點數：', currentPts);
+window.adjustPointsCustom = async function(customerPhone, customerName, currentPts, storeId) {
+    const input = prompt(customerName + ' 目前 ' + currentPts + ' 點\n輸入要調整的點數（正數=加點，負數=扣點）：', '0');
     if (input === null) return;
-    const newPts = parseInt(input);
-    if (isNaN(newPts) || newPts < 0) { alert('請輸入有效數字'); return; }
+    const delta = parseInt(input);
+    if (isNaN(delta) || delta === 0) { alert('請輸入有效數字'); return; }
 
     try {
-        await sb.from('store_customers').update({ loyalty_points: newPts }).eq('id', customerId);
-
-        const delta = newPts - currentPts;
-        try {
-            await sb.from('loyalty_transactions').insert({
-                store_id: storeId,
-                customer_id: customerId,
-                type: delta >= 0 ? 'earn' : 'redeem',
-                points: Math.abs(delta),
-                balance_after: newPts,
-                note: '手動設定為 ' + newPts + ' 點'
-            });
-        } catch(e) {
-            // 忽略 loyalty_transactions 表不存在的錯誤
-        }
+        await sb.from('loyalty_transactions').insert({
+            store_id: storeId,
+            customer_phone: customerPhone,
+            type: delta > 0 ? 'earn' : 'redeem',
+            points: Math.abs(delta),
+            note: '手動設定 ' + (delta > 0 ? '+' : '') + delta + ' 點',
+            operator_name: window.currentEmployee?.name || 'admin'
+        });
 
         loadMembersForStore(storeId);
     } catch(e) {
         console.error(e);
-        alert('操作失敗: ' + (e.message || ''));
+        alert('操作失敗');
+    }
+};
+
+// 展開/收合會員歷史訂單
+window.toggleMemberOrders = async function(phone, storeId, cardEl) {
+    const area = cardEl.querySelector('.member-orders-area');
+    if (!area) return;
+
+    // toggle 顯示
+    if (area.style.display !== 'none') {
+        area.style.display = 'none';
+        return;
+    }
+
+    area.style.display = '';
+    area.innerHTML = '<div style="text-align:center;color:#94A3B8;font-size:12px;padding:8px;">載入中...</div>';
+
+    try {
+        const { data: orders } = await sb.from('orders')
+            .select('id, total, status, order_type, created_at, items')
+            .eq('store_id', storeId)
+            .eq('customer_phone', phone)
+            .order('created_at', { ascending: false })
+            .limit(10);
+
+        if (!orders || orders.length === 0) {
+            area.innerHTML = '<div style="text-align:center;color:#94A3B8;font-size:12px;padding:8px;">無訂單紀錄</div>';
+            return;
+        }
+
+        let ohtml = '<div style="font-size:12px;font-weight:700;color:#64748B;margin-bottom:6px;">📦 最近訂單</div>';
+        orders.forEach(function(o) {
+            const dateStr = new Date(o.created_at).toLocaleString('zh-TW', {month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit'});
+            const statusMap = {pending:'⏳待處理', confirmed:'✅已確認', preparing:'🔥製作中', ready:'📦可取餐', completed:'✅已完成', cancelled:'❌已取消'};
+            const statusText = statusMap[o.status] || o.status;
+            const typeText = o.order_type === 'takeout' ? '外帶' : '內用';
+
+            // 解析品項
+            let itemsText = '';
+            try {
+                const items = typeof o.items === 'string' ? JSON.parse(o.items) : (o.items || []);
+                itemsText = items.map(function(it) { return it.name + ' x' + it.qty; }).join('、');
+            } catch(e) { itemsText = '-'; }
+
+            ohtml += '<div style="padding:8px;background:#F8FAFC;border-radius:8px;margin-bottom:6px;font-size:12px;">';
+            ohtml += '<div style="display:flex;justify-content:space-between;">';
+            ohtml += '<span style="color:#64748B;">' + dateStr + ' · ' + typeText + '</span>';
+            ohtml += '<span style="font-weight:700;">$' + (o.total || 0) + '</span>';
+            ohtml += '</div>';
+            ohtml += '<div style="color:#94A3B8;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(itemsText) + '</div>';
+            ohtml += '<div style="margin-top:2px;">' + statusText + '</div>';
+            ohtml += '</div>';
+        });
+
+        area.innerHTML = ohtml;
+    } catch(e) {
+        console.error('Load member orders error:', e);
+        area.innerHTML = '<div style="text-align:center;color:#EF4444;font-size:12px;padding:8px;">載入失敗</div>';
     }
 };
 
