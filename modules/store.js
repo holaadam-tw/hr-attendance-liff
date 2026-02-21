@@ -2258,7 +2258,7 @@ export async function loadMemberStoreList() {
     if (!sel) return;
 
     // 防禦檢查：確保有當前公司 ID
-    if (!currentCompanyId) {
+    if (!window.currentCompanyId) {
         sel.innerHTML = '<option value="">請先選擇公司</option>';
         document.getElementById('memberContent').style.display = 'none';
         return;
@@ -2267,7 +2267,7 @@ export async function loadMemberStoreList() {
     try {
         const { data: stores } = await sb.from('store_profiles')
             .select('*')
-            .eq('company_id', currentCompanyId) // 只載入當前公司的商店
+            .eq('company_id', window.currentCompanyId) // 只載入當前公司的商店
             .order('name');
 
         if (!stores || stores.length === 0) {
