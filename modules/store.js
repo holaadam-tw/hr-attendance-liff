@@ -2152,10 +2152,13 @@ export async function loadMembersForStore() {
         const { data: customers } = await sb.from('store_customers')
             .select('*')
             .eq('store_id', memberCurrentStoreId)
-            .order('last_order_at', { ascending: false, nullsFirst: false });
+            .order('updated_at', { ascending: false });
 
-        const totalCount = customers?.length || 0;
-        const vipCount = customers?.filter(c => c.is_vip || (c.total_orders || 0) >= 5).length || 0;
+        // 過濾掉測試資料（name 開頭是 _）
+        const realCustomers = customers?.filter(c => !c.name?.startsWith('_')) || [];
+
+        const totalCount = realCustomers.length;
+        const vipCount = realCustomers.filter(c => (c.total_orders || 0) >= 10).length;
 
         document.getElementById('memberTotalCount').textContent = totalCount;
         document.getElementById('memberVipCount').textContent = vipCount;
@@ -2171,8 +2174,8 @@ export async function loadMembersForStore() {
         toggle.checked = enabled;
         updateToggleStyle(toggle);
 
-        // 渲染會員列表
-        renderMemberListForAdmin(customers || []);
+        // 渲染會員列表（使用過濾後的真實會員）
+        renderMemberListForAdmin(realCustomers);
     } catch(e) {
         console.error('loadMembersForStore error:', e);
         showToast('載入失敗');
@@ -2201,8 +2204,8 @@ function renderMemberListForAdmin(customers) {
     html += '<div id="memberListAdminContainer">';
     customers.forEach(function(c) {
         const joinDate = c.created_at ? new Date(c.created_at).toLocaleDateString('zh-TW') : '-';
-        const lastOrder = c.last_order_at ? new Date(c.last_order_at).toLocaleDateString('zh-TW') : '-';
-        const isVip = c.is_vip || (c.total_orders || 0) >= 5;
+        const lastActivity = c.updated_at ? new Date(c.updated_at).toLocaleDateString('zh-TW') : '-';
+        const isVip = (c.total_orders || 0) >= 10;
 
         html += '<div class="member-card-admin" data-name="' + esc(c.name || '') + '" data-phone="' + esc(c.phone || '') + '" style="display:flex;justify-content:space-between;align-items:center;padding:14px;background:#fff;border:1px solid #E2E8F0;border-radius:12px;margin-bottom:8px;">';
 
@@ -2219,18 +2222,16 @@ function renderMemberListForAdmin(customers) {
         if (isVip) html += '<span style="background:#D1FAE5;color:#065F46;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:600;">⭐ VIP</span>';
         html += '</div>';
         html += '<div style="font-size:12px;color:#64748B;">📱 ' + esc(c.phone || '-') + '</div>';
-        html += '<div style="font-size:11px;color:#94A3B8;margin-top:2px;">加入: ' + joinDate + ' · 最後消費: ' + lastOrder + '</div>';
+        html += '<div style="font-size:11px;color:#94A3B8;margin-top:2px;">加入: ' + joinDate + ' · 最後活動: ' + lastActivity + '</div>';
         html += '</div>';
         html += '</div>';
 
-        // 右側：點數 + 訂單數
+        // 右側：消費金額 + 訂單數
         html += '<div style="text-align:right;flex-shrink:0;margin-left:12px;">';
-        html += '<div style="font-size:20px;font-weight:800;color:#6366F1;">' + (c.points || 0) + ' <span style="font-size:11px;font-weight:600;">點</span></div>';
-        html += '<div style="font-size:12px;color:#64748B;">' + (c.total_orders || 0) + ' 筆訂單</div>';
         const totalSpent = c.total_spent || c.total_amount || 0;
-        if (totalSpent > 0) {
-            html += '<div style="font-size:11px;color:#94A3B8;">$' + totalSpent.toLocaleString() + '</div>';
-        }
+        html += '<div style="font-size:20px;font-weight:800;color:#6366F1;">$' + totalSpent.toLocaleString() + '</div>';
+        html += '<div style="font-size:11px;color:#94A3B8;margin-top:-2px;">消費總額</div>';
+        html += '<div style="font-size:12px;color:#64748B;margin-top:4px;">' + (c.total_orders || 0) + ' 筆訂單</div>';
         html += '</div>';
 
         html += '</div>';
