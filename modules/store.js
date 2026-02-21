@@ -2137,7 +2137,7 @@ export async function toggleBookingEnabled() {
 // ============================================================
 let memberCurrentStoreId = null;
 
-export async function loadMembersForStore(storeId) {
+export async function loadMembersForStore(storeId, skipLoading) {
     if (!storeId) {
         storeId = document.getElementById('memberStoreSelect')?.value;
     }
@@ -2146,7 +2146,9 @@ export async function loadMembersForStore(storeId) {
     if (!storeId || !content) return;
 
     content.style.display = '';
-    content.innerHTML = '<p style="text-align:center;color:#999;padding:20px;">載入中...</p>';
+    if (!skipLoading) {
+        content.innerHTML = '<p style="text-align:center;color:#999;padding:20px;">載入中...</p>';
+    }
 
     try {
         // 同時查詢會員、集點設定、交易紀錄
@@ -2581,7 +2583,7 @@ window.adjustPoints = async function(customerPhone, delta, storeId) {
             operator_name: window.currentEmployee?.name || 'admin'
         });
 
-        await loadMembersForStore(storeId);
+        await loadMembersForStore(storeId, true);
         if (typeof window.switchMemberTab === 'function') window.switchMemberTab('points');
     } catch(e) {
         console.error('adjustPoints error:', e);
@@ -2606,7 +2608,7 @@ window.adjustPointsCustom = async function(customerPhone, customerName, currentP
             operator_name: window.currentEmployee?.name || 'admin'
         });
 
-        await loadMembersForStore(storeId);
+        await loadMembersForStore(storeId, true);
         if (typeof window.switchMemberTab === 'function') window.switchMemberTab('points');
     } catch(e) {
         console.error(e);
