@@ -2268,7 +2268,7 @@ export async function loadMemberStoreList() {
         const { data: stores } = await sb.from('store_profiles')
             .select('*')
             .eq('company_id', window.currentCompanyId) // 只載入當前公司的商店
-            .order('name');
+            .order('store_name');
 
         if (!stores || stores.length === 0) {
             sel.innerHTML = '<option value="">目前沒有商店</option>';
@@ -2277,7 +2277,7 @@ export async function loadMemberStoreList() {
         }
 
         // 填充下拉選單
-        sel.innerHTML = stores.map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join('');
+        sel.innerHTML = stores.map(s => `<option value="${s.id}">${esc(s.store_name)}</option>`).join('');
 
         // 自動選第一家商店並載入會員資料
         sel.value = stores[0].id;
