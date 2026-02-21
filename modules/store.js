@@ -2254,14 +2254,21 @@ export async function loadBookingStoreList() {
 }
 
 export async function loadMemberStoreList() {
+    const sel = document.getElementById('memberStoreSelect');
+    if (!sel) return;
+
+    // 防禦檢查：確保有當前公司 ID
+    if (!currentCompanyId) {
+        sel.innerHTML = '<option value="">請先選擇公司</option>';
+        document.getElementById('memberContent').style.display = 'none';
+        return;
+    }
+
     try {
         const { data: stores } = await sb.from('store_profiles')
             .select('*')
             .eq('company_id', currentCompanyId) // 只載入當前公司的商店
             .order('name');
-
-        const sel = document.getElementById('memberStoreSelect');
-        if (!sel) return;
 
         if (!stores || stores.length === 0) {
             sel.innerHTML = '<option value="">目前沒有商店</option>';
