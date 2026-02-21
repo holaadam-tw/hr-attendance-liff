@@ -2174,6 +2174,14 @@ export async function loadMembersForStore() {
         toggle.checked = enabled;
         updateToggleStyle(toggle);
 
+        // 載入集點規則設定
+        const { data: loyaltyConfig } = await sb.from('loyalty_config')
+            .select('*')
+            .eq('store_id', memberCurrentStoreId)
+            .maybeSingle();
+
+        renderLoyaltyConfigSection(memberCurrentStoreId, loyaltyConfig);
+
         // 渲染會員列表（使用過濾後的真實會員）
         renderMemberListForAdmin(realCustomers);
     } catch(e) {
@@ -2181,6 +2189,76 @@ export async function loadMembersForStore() {
         showToast('載入失敗');
     }
 }
+
+function renderLoyaltyConfigSection(storeId, loyalty) {
+    const section = document.getElementById('loyaltyConfigSection');
+    if (!section) return;
+
+    let html = '<div style="margin-top:12px;padding:14px;background:#F8FAFC;border-radius:10px;">';
+    html += '<div style="font-size:14px;font-weight:700;margin-bottom:10px;">📋 集點規則</div>';
+
+    if (loyalty) {
+        html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">';
+        html += '<div style="background:#fff;padding:10px;border-radius:8px;border:1px solid #E2E8F0;">';
+        html += '<div style="font-size:11px;color:#94A3B8;">每消費金額</div>';
+        html += '<div style="font-size:18px;font-weight:800;color:#2563EB;">$' + (loyalty.dollars_per_point || 50) + '</div>';
+        html += '<div style="font-size:11px;color:#94A3B8;">獲得 1 點</div></div>';
+        html += '<div style="background:#fff;padding:10px;border-radius:8px;border:1px solid #E2E8F0;">';
+        html += '<div style="font-size:11px;color:#94A3B8;">兌換門檻</div>';
+        html += '<div style="font-size:18px;font-weight:800;color:#6366F1;">' + (loyalty.points_to_redeem || 10) + ' 點</div>';
+        html += '<div style="font-size:11px;color:#94A3B8;">折抵 $' + (loyalty.discount_amount || 50) + '</div></div>';
+        html += '</div>';
+        html += '<button onclick="editLoyaltyConfig(\'' + storeId + '\')" style="margin-top:10px;width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;color:#64748B;font-size:13px;cursor:pointer;font-family:inherit;">✏️ 編輯集點規則</button>';
+    } else {
+        html += '<div style="text-align:center;padding:16px;color:#94A3B8;">';
+        html += '<div style="font-size:13px;">尚未設定集點規則</div>';
+        html += '<button onclick="createDefaultLoyaltyConfig(\'' + storeId + '\')" style="margin-top:8px;padding:10px 20px;border:none;border-radius:8px;background:#6366F1;color:#fff;font-size:13px;cursor:pointer;font-family:inherit;">+ 建立集點規則</button>';
+        html += '</div>';
+    }
+    html += '</div>';
+
+    section.innerHTML = html;
+}
+
+window.createDefaultLoyaltyConfig = async function(storeId) {
+    try {
+        await sb.from('loyalty_config').insert({
+            store_id: storeId,
+            is_active: true,
+            dollars_per_point: 50,
+            points_to_redeem: 10,
+            discount_amount: 50
+        });
+        loadMembersForStore();
+    } catch(e) {
+        console.error(e);
+        alert('建立失敗: ' + (e.message || ''));
+    }
+};
+
+window.editLoyaltyConfig = async function(storeId) {
+    try {
+        const { data } = await sb.from('loyalty_config').select('*').eq('store_id', storeId).maybeSingle();
+        if (!data) return;
+
+        const newDollars = prompt('每消費多少元得 1 點？', data.dollars_per_point || 50);
+        if (newDollars === null) return;
+        const newPoints = prompt('幾點可兌換折扣？', data.points_to_redeem || 10);
+        if (newPoints === null) return;
+        const newDiscount = prompt('兌換折抵金額？', data.discount_amount || 50);
+        if (newDiscount === null) return;
+
+        await sb.from('loyalty_config').update({
+            dollars_per_point: parseInt(newDollars),
+            points_to_redeem: parseInt(newPoints),
+            discount_amount: parseInt(newDiscount)
+        }).eq('store_id', storeId);
+        loadMembersForStore();
+    } catch(e) {
+        console.error(e);
+        alert('更新失敗: ' + (e.message || ''));
+    }
+};
 
 function renderMemberListForAdmin(customers) {
     const resultEl = document.getElementById('memberSearchResult');

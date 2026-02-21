@@ -858,7 +858,7 @@
             `).join('');
         }
 
-        async function goNext() {
+        window.goNext = async function() {
             if (currentStep === 5) {
                 window.location.href = 'index.html';
                 return;
@@ -895,9 +895,9 @@
             if (bookingType === 'restaurant' && currentStep === 1) currentStep = 2;
             updateUI();
             renderCurrentStep();
-        }
+        };
 
-        function goBack() {
+        window.goBack = function() {
             currentStep--;
             if (bookingType === 'restaurant' && currentStep === 1) currentStep = 2;
             updateUI();
