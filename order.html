@@ -3467,8 +3467,28 @@ function openItemModal(itemId) {
   modalQtyVal = 1;
   modalSelectedSize = item.sizes ? item.sizes.length - 1 : null;
   const imgSrc = item.image || generatePlaceholder(item.name);
-  document.getElementById('modalImg').src = imgSrc;
-  document.getElementById('modalImg').onerror = function() { this.src = generatePlaceholder(item.name); };
+
+  // null 防禦：檢查 modal 元素是否存在
+  var modalImgEl = document.getElementById('modalImg');
+  if (!modalImgEl) {
+    // modal 還沒重建完，手動重建
+    var overlay = document.getElementById('itemModalOverlay');
+    if (overlay && !overlay.querySelector('#modalImg')) {
+      overlay.innerHTML =
+        '<div class="item-modal" onclick="event.stopPropagation()">' +
+        '<img class="modal-img" id="modalImg" src="" alt="">' +
+        '<button class="modal-close" onclick="closeItemModal()">&#10005;</button>' +
+        '<div class="modal-body"><div class="modal-name" id="modalName"></div><div class="modal-desc" id="modalDesc"></div><div id="modalOptions"></div></div>' +
+        '<div class="modal-footer"><div class="modal-price"><span class="currency">$</span><span id="modalPrice">0</span></div>' +
+        '<div class="modal-qty-area"><div class="qty-control"><button class="qty-btn minus" onclick="modalQtyChange(-1)">&#8722;</button><span class="qty-num" id="modalQty">1</span><button class="qty-btn" onclick="modalQtyChange(1)">+</button></div></div>' +
+        '<button class="modal-add-cart" onclick="modalAddToCart()">加入購物車</button></div></div>';
+      modalImgEl = document.getElementById('modalImg');
+    }
+    if (!modalImgEl) return; // 真的找不到就 bail out
+  }
+
+  modalImgEl.src = imgSrc;
+  modalImgEl.onerror = function() { this.src = generatePlaceholder(item.name); };
   document.getElementById('modalName').textContent = item.name;
   document.getElementById('modalDesc').textContent = item.desc || '暫無描述';
   document.getElementById('modalQty').textContent = modalQtyVal;
@@ -3971,25 +3991,21 @@ function showOrderSuccess(qty, price, table, orderNum, earnedPts) {
 }
 
 function resetOrder() {
+  // 1. 清空購物車
   cart = [];
   updateCartUI();
-  // 關閉所有 overlay
-  document.getElementById('itemModalOverlay').classList.remove('show');
+
+  // 2. 關閉所有 overlay 和 drawer
+  var overlay = document.getElementById('itemModalOverlay');
+  if (overlay) overlay.classList.remove('show');
   var cartOverlay = document.getElementById('cartOverlay');
-  var cartDrawer = document.getElementById('cartDrawer');
   if (cartOverlay) cartOverlay.classList.remove('show');
+  var cartDrawer = document.getElementById('cartDrawer');
   if (cartDrawer) cartDrawer.classList.remove('show');
-  // 強制重置所有品項的 action 按鈕
-  document.querySelectorAll('.menu-item').forEach(function(el) {
-    var id = parseInt(el.getAttribute('data-id'));
-    var actionsEl = el.querySelector('.item-actions');
-    if (actionsEl) {
-      actionsEl.innerHTML = '<button class="add-btn" onclick="addToCart(' + id + ', event)">+</button>';
-    }
-  });
-  // 重建 modal HTML
-  setTimeout(function() {
-    document.getElementById('itemModalOverlay').innerHTML =
+
+  // 3. 立刻重建 modal HTML（不用 setTimeout，避免 null 問題）
+  if (overlay) {
+    overlay.innerHTML =
       '<div class="item-modal" onclick="event.stopPropagation()">' +
       '<img class="modal-img" id="modalImg" src="" alt="">' +
       '<button class="modal-close" onclick="closeItemModal()">&#10005;</button>' +
@@ -3997,7 +4013,36 @@ function resetOrder() {
       '<div class="modal-footer"><div class="modal-price"><span class="currency">$</span><span id="modalPrice">0</span></div>' +
       '<div class="modal-qty-area"><div class="qty-control"><button class="qty-btn minus" onclick="modalQtyChange(-1)">&#8722;</button><span class="qty-num" id="modalQty">1</span><button class="qty-btn" onclick="modalQtyChange(1)">+</button></div></div>' +
       '<button class="modal-add-cart" onclick="modalAddToCart()">加入購物車</button></div></div>';
-  }, 400);
+  }
+
+  // 4. 強制重置所有品項的數量按鈕回到 "+"
+  document.querySelectorAll('.menu-item').forEach(function(el) {
+    var id = el.getAttribute('data-id');
+    if (!id) return;
+    var actionsEl = el.querySelector('.item-actions');
+    if (actionsEl) {
+      actionsEl.innerHTML = '<button class="add-btn" onclick="addToCart(' + id + ', event)">+</button>';
+    }
+  });
+
+  // 5. 重置所有 size 選擇回預設（最後一個/最大的）
+  document.querySelectorAll('.menu-item').forEach(function(el) {
+    var sizeOptions = el.querySelectorAll('.size-option');
+    if (sizeOptions.length > 0) {
+      sizeOptions.forEach(function(s, i) {
+        s.classList.toggle('active', i === sizeOptions.length - 1);
+      });
+      // 重置價格顯示
+      var id = el.getAttribute('data-id');
+      var item = menuItems.find(function(m) { return m.id == id; });
+      if (item && item.sizes) {
+        var priceEl = el.querySelector('.item-price');
+        if (priceEl) {
+          priceEl.innerHTML = '<span class="currency">$</span>' + item.sizes[item.sizes.length - 1].price;
+        }
+      }
+    }
+  });
 }
 
 // ===== MY ORDERS (訂單追蹤 + 催單) =====
