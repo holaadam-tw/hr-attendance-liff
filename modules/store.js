@@ -2313,17 +2313,29 @@ export function searchMemberByPhone() {
 
 // 載入商店列表（用於預約管理和會員管理頁面）
 export async function loadBookingStoreList() {
+    const sel = document.getElementById('bookingStoreSelect');
+    if (!sel) return;
+
+    // 防禦檢查：確保有當前公司 ID
+    if (!window.currentCompanyId) {
+        sel.innerHTML = '<option value="">請先選擇公司</option>';
+        return;
+    }
+
     try {
         const { data: stores } = await sb.from('store_profiles')
             .select('*')
-            .order('name');
+            .eq('company_id', window.currentCompanyId)
+            .order('store_name');
 
-        const sel = document.getElementById('bookingStoreSelect');
-        if (!sel) return;
+        if (!stores || stores.length === 0) {
+            sel.innerHTML = '<option value="">目前沒有商店</option>';
+            return;
+        }
 
-        sel.innerHTML = '<option value="">-- 請選擇商店 --</option>' +
-            (stores || []).map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join('');
+        sel.innerHTML = stores.map(s => `<option value="${s.id}">${esc(s.store_name)}</option>`).join('');
     } catch(e) {
+        console.error('loadBookingStoreList error:', e);
         showToast('載入商店列表失敗');
     }
 }
