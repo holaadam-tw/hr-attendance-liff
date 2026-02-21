@@ -4419,7 +4419,11 @@ async function loadMyOrdersForPanel() {
         '&customer_line_id=eq.' + encodeURIComponent(phone) + '&limit=1', { headers: { 'apikey': SUPABASE_KEY } }) : Promise.resolve(null)
     ]);
 
-    var orders = await ordersRes.json() || [];
+    var ordersData = await ordersRes.json();
+    var orders = Array.isArray(ordersData) ? ordersData : [];
+    if (!Array.isArray(ordersData)) {
+      console.warn('Orders API returned non-array:', ordersData);
+    }
     var points = 0;
     if (ptsRes) {
       var ptsData = await ptsRes.json();
