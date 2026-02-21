@@ -4626,7 +4626,33 @@ async function loadPointsHistory() {
       return;
     }
 
-    var html = '<div style="font-size:13px;font-weight:700;color:#64748B;margin-bottom:8px;">📜 點數紀錄</div>';
+    // 計算總點數
+    var totalPoints = 0;
+    data.forEach(function(t) {
+      if (t.type === 'earn') totalPoints += (t.points || 0);
+      else if (t.type === 'redeem') totalPoints -= (t.points || 0);
+    });
+
+    // 點數餘額卡片
+    var html = '<div style="background:linear-gradient(135deg,#6366F1,#8B5CF6);border-radius:16px;padding:24px;margin-bottom:20px;text-align:center;color:#fff;">';
+    html += '<div style="font-size:13px;opacity:.8;margin-bottom:4px;">我的點數</div>';
+    html += '<div style="font-size:48px;font-weight:800;line-height:1.1;">' + totalPoints + '</div>';
+    html += '<div style="font-size:13px;opacity:.8;margin-top:4px;">點</div>';
+    if (loyaltyConfig) {
+      var ptsNeeded = (loyaltyConfig.points_to_redeem || 10) - totalPoints;
+      if (ptsNeeded > 0) {
+        html += '<div style="margin-top:12px;padding:8px 16px;background:rgba(255,255,255,.15);border-radius:20px;font-size:12px;">';
+        html += '再集 ' + ptsNeeded + ' 點即可兌換 $' + (loyaltyConfig.discount_amount || 50) + ' 折扣';
+        html += '</div>';
+      } else {
+        html += '<div style="margin-top:12px;padding:8px 16px;background:rgba(255,255,255,.25);border-radius:20px;font-size:13px;font-weight:700;">';
+        html += '🎉 已達兌換門檻！下次消費可折 $' + (loyaltyConfig.discount_amount || 50);
+        html += '</div>';
+      }
+    }
+    html += '</div>';
+
+    html += '<div style="font-size:13px;font-weight:700;color:#64748B;margin-bottom:8px;">📜 點數紀錄</div>';
     data.forEach(function(t) {
       var isEarn = t.type === 'earn' || t.points > 0;
       var pts = Math.abs(t.points || 0);
