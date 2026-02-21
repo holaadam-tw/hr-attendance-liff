@@ -3960,8 +3960,9 @@ function showOrderSuccess(qty, price, table, orderNum, earnedPts) {
     '<p style="color:#666; font-size:14px; margin-bottom:20px;">' + (isTakeout ? '外帶' : '桌號 ' + table) + '&#12288;' + qty + ' 道菜品&#12288;合計 $' + price + '</p>' +
     pointsHtml +
     '<p style="color:#999; font-size:12px; margin-bottom:24px;">' + (isTakeout ? '請至櫃檯等候叫號取餐' : '廚房正在準備您的餐點，請稍候') + '</p>' +
-    '<div style="display:flex;flex-direction:column;gap:10px;padding:0 10px;">' +
+    '<div style="display:flex;flex-direction:column;gap:12px;margin-top:24px;padding:0 16px;">' +
     '<button onclick="showMyOrdersPanel()" style="width:100%;padding:16px;border:2px solid var(--primary);border-radius:14px;background:#fff;color:var(--primary);font-size:16px;font-weight:800;cursor:pointer;font-family:inherit;">📋 查看我的訂單</button>' +
+    '<button onclick="showMyOrdersPanel();setTimeout(function(){var el=document.getElementById(\'myOrdersPointsCard\');if(el)el.scrollIntoView({behavior:\'smooth\'});},500);" style="width:100%;padding:16px;border:2px solid #6366F1;border-radius:14px;background:#fff;color:#6366F1;font-size:16px;font-weight:800;cursor:pointer;font-family:inherit;">🎯 查看我的點數</button>' +
     '<button onclick="resetOrder()" style="width:100%;padding:16px;border:none;border-radius:14px;background:var(--primary);color:#fff;font-size:16px;font-weight:800;cursor:pointer;font-family:inherit;">🍽️ 繼續點餐</button>' +
     '</div></div>';
   overlay.classList.add('show');
