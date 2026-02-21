@@ -4004,11 +4004,17 @@ function resetOrder() {
 function showMyOrdersBtn() {
   var btn = document.getElementById('myOrdersBtn');
   if (!window._myOrders || window._myOrders.length === 0) { btn.style.display = 'none'; return; }
-  btn.style.display = 'block';
-  var activeCount = window._myOrders.filter(function(o) { return o.status !== 'completed' && o.status !== 'cancelled'; }).length;
-  var badge = document.getElementById('myOrdersBadge');
-  if (activeCount > 0) { badge.textContent = activeCount; badge.style.display = 'block'; }
-  else { badge.style.display = 'none'; }
+  var activeStatuses = ['pending', 'confirmed', 'preparing', 'ready'];
+  var activeCount = window._myOrders.filter(function(o) { return activeStatuses.includes(o.status); }).length;
+  // 只有有進行中訂單才顯示浮動按鈕
+  if (activeCount > 0) {
+    btn.style.display = 'block';
+    var badge = document.getElementById('myOrdersBadge');
+    badge.textContent = activeCount;
+    badge.style.display = 'block';
+  } else {
+    btn.style.display = 'none';
+  }
 }
 
 function showMyOrdersPanel() {
@@ -4058,14 +4064,18 @@ async function checkMyOrdersOnLoad() {
     });
     var orders = await res.json() || [];
 
+    var activeStatuses = ['pending', 'confirmed', 'preparing', 'ready'];
     var activeCount = orders.filter(function(o) {
-      return ['pending','confirmed','preparing','ready'].includes(o.status);
+      return activeStatuses.includes(o.status);
     }).length;
-    var totalCount = orders.length;
 
-    // 顯示 header 按鈕
-    if (totalCount > 0) {
+    // 只有進行中訂單才顯示 header 按鈕
+    if (activeCount > 0) {
       showHeaderOrderBtn(activeCount);
+    } else {
+      // 沒有進行中訂單，隱藏 header 按鈕
+      var btn = document.getElementById('headerOrderBtn');
+      if (btn) btn.style.display = 'none';
     }
   } catch(e) {
     // 靜默失敗，不影響點餐
