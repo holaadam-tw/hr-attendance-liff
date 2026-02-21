@@ -2137,191 +2137,251 @@ export async function toggleBookingEnabled() {
 // ============================================================
 let memberCurrentStoreId = null;
 
-export async function loadMembersForStore() {
-    const sel = document.getElementById('memberStoreSelect');
-    memberCurrentStoreId = sel.value;
-    const content = document.getElementById('memberContent');
-    if (!memberCurrentStoreId) {
-        content.style.display = 'none';
-        return;
+export async function loadMembersForStore(storeId) {
+    if (!storeId) {
+        storeId = document.getElementById('memberStoreSelect')?.value;
     }
-    content.style.display = 'block';
+    memberCurrentStoreId = storeId;
+    const content = document.getElementById('memberContent');
+    if (!storeId || !content) return;
+
+    content.style.display = '';
+    content.innerHTML = '<p style="text-align:center;color:#999;padding:20px;">載入中...</p>';
 
     try {
-        // 載入會員統計
-        const { data: customers } = await sb.from('store_customers')
-            .select('*')
-            .eq('store_id', memberCurrentStoreId)
-            .order('updated_at', { ascending: false });
+        // 同時查詢會員和集點設定
+        const [custResult, loyaltyResult] = await Promise.all([
+            sb.from('store_customers').select('*').eq('store_id', storeId).order('updated_at', { ascending: false }),
+            sb.from('loyalty_config').select('*').eq('store_id', storeId).maybeSingle()
+        ]);
 
-        // 過濾掉測試資料（name 開頭是 _）
-        const realCustomers = customers?.filter(c => !c.name?.startsWith('_')) || [];
+        let customers = custResult.data || [];
+        const loyalty = loyaltyResult.data; // 可能是 null
 
-        const totalCount = realCustomers.length;
-        const vipCount = realCustomers.filter(c => (c.total_orders || 0) >= 10).length;
+        // 過濾測試資料
+        customers = customers.filter(function(c) { return !c.name?.startsWith('_'); });
 
-        document.getElementById('memberTotalCount').textContent = totalCount;
-        document.getElementById('memberVipCount').textContent = vipCount;
+        // 取得VIP門檻（從loyalty_config或localStorage）
+        let vipThreshold = loyalty?.vip_threshold || parseInt(localStorage.getItem('vip_threshold_' + storeId)) || 10;
 
-        // 載入集點開關
-        const { data: store } = await sb.from('store_profiles')
-            .select('loyalty_enabled')
-            .eq('id', memberCurrentStoreId)
-            .single();
+        let html = '';
 
-        const enabled = store?.loyalty_enabled !== false;
-        const toggle = document.getElementById('memberLoyaltyEnabled');
-        toggle.checked = enabled;
-        updateToggleStyle(toggle);
+        // ===== 集點設定區 =====
+        html += '<div style="background:#F8FAFC;border-radius:14px;padding:16px;margin-bottom:16px;">';
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">';
+        html += '<div style="font-size:15px;font-weight:700;">🎯 集點設定</div>';
+        // toggle
+        html += '<label style="position:relative;display:inline-block;width:48px;height:26px;cursor:pointer;">';
+        html += '<input type="checkbox" ' + (loyalty?.enabled ? 'checked' : '') + ' onchange="toggleLoyalty(\'' + storeId + '\', this.checked)" style="opacity:0;width:0;height:0;">';
+        html += '<span style="position:absolute;top:0;left:0;right:0;bottom:0;background:' + (loyalty?.enabled ? '#6366F1' : '#CBD5E1') + ';border-radius:13px;transition:.3s;"></span>';
+        html += '<span style="position:absolute;top:3px;left:' + (loyalty?.enabled ? '25px' : '3px') + ';width:20px;height:20px;background:#fff;border-radius:50%;transition:.3s;box-shadow:0 1px 3px rgba(0,0,0,.2);"></span>';
+        html += '</label>';
+        html += '</div>';
 
-        // 載入集點規則設定
-        const { data: loyaltyConfig } = await sb.from('loyalty_config')
-            .select('*')
-            .eq('store_id', memberCurrentStoreId)
-            .maybeSingle();
+        if (loyalty) {
+            // 集點規則卡片
+            html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">';
+            // 得點規則
+            html += '<div style="background:#fff;padding:12px;border-radius:10px;border:1px solid #E2E8F0;text-align:center;">';
+            html += '<div style="font-size:11px;color:#94A3B8;">消費得點</div>';
+            const displayRate = loyalty.points_per_dollar >= 1
+                ? '每 $1 得 ' + loyalty.points_per_dollar + ' 點'
+                : '每 $' + Math.round(1 / loyalty.points_per_dollar) + ' 得 1 點';
+            html += '<div style="font-size:13px;font-weight:700;color:#2563EB;margin-top:4px;">' + displayRate + '</div>';
+            html += '</div>';
+            // 兌換規則
+            html += '<div style="background:#fff;padding:12px;border-radius:10px;border:1px solid #E2E8F0;text-align:center;">';
+            html += '<div style="font-size:11px;color:#94A3B8;">兌換折扣</div>';
+            html += '<div style="font-size:13px;font-weight:700;color:#6366F1;margin-top:4px;">' + (loyalty.points_to_redeem || 10) + ' 點折 $' + (loyalty.discount_amount || 50) + '</div>';
+            html += '</div>';
+            html += '</div>';
 
-        renderLoyaltyConfigSection(memberCurrentStoreId, loyaltyConfig);
+            // 附加設定
+            if (loyalty.min_purchase_for_points > 0 || loyalty.points_expiry_days) {
+                html += '<div style="font-size:11px;color:#94A3B8;margin-bottom:8px;">';
+                if (loyalty.min_purchase_for_points > 0) html += '最低消費 $' + loyalty.min_purchase_for_points + ' 才給點 · ';
+                if (loyalty.points_expiry_days) html += '點數 ' + loyalty.points_expiry_days + ' 天到期';
+                else html += '點數永不過期';
+                html += '</div>';
+            }
 
-        // 渲染會員列表（使用過濾後的真實會員）
-        renderMemberListForAdmin(realCustomers);
+            html += '<button onclick="editLoyaltyRules(\'' + storeId + '\')" style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;color:#64748B;font-size:13px;cursor:pointer;font-family:inherit;">✏️ 編輯集點規則</button>';
+        } else {
+            html += '<div style="text-align:center;padding:16px;color:#94A3B8;">';
+            html += '<p style="font-size:13px;">尚未設定集點規則</p>';
+            html += '<button onclick="createLoyaltyRules(\'' + storeId + '\')" style="padding:10px 24px;border:none;border-radius:8px;background:#6366F1;color:#fff;font-size:13px;cursor:pointer;font-family:inherit;">+ 建立集點規則</button>';
+            html += '</div>';
+        }
+        html += '</div>';
+
+        // ===== VIP 設定 =====
+        html += '<div style="background:#FFF7ED;border-radius:14px;padding:16px;margin-bottom:16px;">';
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;">';
+        html += '<div>';
+        html += '<div style="font-size:15px;font-weight:700;">👑 VIP 門檻</div>';
+        html += '<div style="font-size:12px;color:#94A3B8;margin-top:2px;">累計訂單達門檻自動升級 VIP</div>';
+        html += '</div>';
+        // VIP 門檻值（可編輯）
+        html += '<div style="display:flex;align-items:center;gap:6px;">';
+        html += '<span style="font-size:13px;color:#64748B;">≥</span>';
+        html += '<input type="number" id="vipThresholdInput" value="' + vipThreshold + '" min="1" max="999" style="width:50px;padding:6px;border:1px solid #E2E8F0;border-radius:6px;text-align:center;font-size:14px;font-weight:700;">';
+        html += '<span style="font-size:13px;color:#64748B;">筆</span>';
+        html += '<button onclick="saveVipThreshold(\'' + storeId + '\')" style="padding:6px 12px;border:none;border-radius:6px;background:#F97316;color:#fff;font-size:12px;cursor:pointer;">儲存</button>';
+        html += '</div>';
+        html += '</div></div>';
+
+        // ===== 統計卡片 =====
+        const vipCount = customers.filter(function(c) { return (c.total_orders || 0) >= vipThreshold; }).length;
+        const totalSpent = customers.reduce(function(s, c) { return s + (c.total_spent || 0); }, 0);
+        const totalOrders = customers.reduce(function(s, c) { return s + (c.total_orders || 0); }, 0);
+
+        html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">';
+        html += '<div style="background:#EFF6FF;border-radius:10px;padding:12px;text-align:center;">';
+        html += '<div style="font-size:11px;color:#64748B;">總會員數</div>';
+        html += '<div style="font-size:24px;font-weight:800;color:#2563EB;">' + customers.length + '</div></div>';
+        html += '<div style="background:#FFF7ED;border-radius:10px;padding:12px;text-align:center;">';
+        html += '<div style="font-size:11px;color:#64748B;">VIP 會員</div>';
+        html += '<div style="font-size:24px;font-weight:800;color:#F97316;">' + vipCount + '</div></div>';
+        html += '<div style="background:#F0FDF4;border-radius:10px;padding:12px;text-align:center;">';
+        html += '<div style="font-size:11px;color:#64748B;">總消費額</div>';
+        html += '<div style="font-size:24px;font-weight:800;color:#059669;">$' + totalSpent.toLocaleString() + '</div></div>';
+        html += '<div style="background:#F5F3FF;border-radius:10px;padding:12px;text-align:center;">';
+        html += '<div style="font-size:11px;color:#64748B;">總訂單數</div>';
+        html += '<div style="font-size:24px;font-weight:800;color:#6366F1;">' + totalOrders + '</div></div>';
+        html += '</div>';
+
+        // ===== 會員搜尋 =====
+        html += '<input type="text" id="memberSearchInput" oninput="filterMemberList()" placeholder="🔍 搜尋會員（姓名/電話）" style="width:100%;padding:12px 14px;border:2px solid #E2E8F0;border-radius:10px;font-size:14px;margin-bottom:12px;box-sizing:border-box;font-family:inherit;">';
+
+        // ===== 會員列表 =====
+        html += '<div style="font-size:15px;font-weight:700;margin-bottom:10px;">📋 會員列表 (' + customers.length + ')</div>';
+
+        if (customers.length === 0) {
+            html += '<div style="text-align:center;padding:40px 20px;color:#94A3B8;">';
+            html += '<div style="font-size:48px;margin-bottom:12px;">👥</div>';
+            html += '<div style="font-size:15px;font-weight:600;">尚無會員</div>';
+            html += '<div style="font-size:13px;margin-top:4px;">客人透過掃碼點餐後會自動建立</div>';
+            html += '</div>';
+        } else {
+            html += '<div id="memberListContainer">';
+            customers.forEach(function(c) {
+                const joinDate = c.created_at ? new Date(c.created_at).toLocaleDateString('zh-TW') : '-';
+                const lastDate = c.updated_at ? new Date(c.updated_at).toLocaleDateString('zh-TW') : '-';
+                const isVip = (c.total_orders || 0) >= vipThreshold;
+
+                html += '<div class="member-card" data-name="' + esc(c.name || '') + '" data-phone="' + esc(c.phone || '') + '" style="display:flex;justify-content:space-between;align-items:center;padding:14px;background:#fff;border:1px solid ' + (isVip ? '#F97316' : '#E2E8F0') + ';border-radius:12px;margin-bottom:8px;' + (isVip ? 'box-shadow:0 0 0 1px #FED7AA;' : '') + '">';
+                // 左
+                html += '<div style="display:flex;align-items:center;gap:12px;flex:1;min-width:0;">';
+                html += '<div style="width:44px;height:44px;border-radius:22px;background:' + (isVip ? 'linear-gradient(135deg,#F97316,#FBBF24)' : 'linear-gradient(135deg,#6366F1,#8B5CF6)') + ';display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:16px;flex-shrink:0;">';
+                html += esc((c.name || '?').substring(0, 1));
+                html += '</div>';
+                html += '<div style="min-width:0;">';
+                html += '<div style="font-weight:700;font-size:15px;">' + esc(c.name || '匿名') + (isVip ? ' <span style="background:#FFF7ED;color:#F97316;font-size:10px;padding:2px 6px;border-radius:4px;font-weight:700;">VIP</span>' : '') + '</div>';
+                html += '<div style="font-size:12px;color:#64748B;">📱 ' + esc(c.phone || '-') + '</div>';
+                html += '<div style="font-size:11px;color:#94A3B8;">加入: ' + joinDate + ' · 最後: ' + lastDate + '</div>';
+                html += '</div></div>';
+                // 右
+                html += '<div style="text-align:right;flex-shrink:0;margin-left:12px;">';
+                html += '<div style="font-size:18px;font-weight:800;color:#059669;">$' + (c.total_spent || 0).toLocaleString() + '</div>';
+                html += '<div style="font-size:12px;color:#64748B;">' + (c.total_orders || 0) + ' 筆訂單</div>';
+                html += '</div>';
+                html += '</div>';
+            });
+            html += '</div>';
+        }
+
+        content.innerHTML = html;
     } catch(e) {
         console.error('loadMembersForStore error:', e);
-        showToast('載入失敗');
+        content.innerHTML = '<p style="text-align:center;color:#EF4444;padding:20px;">載入失敗: ' + esc(e.message || '') + '</p>';
     }
 }
 
-function renderLoyaltyConfigSection(storeId, loyalty) {
-    const section = document.getElementById('loyaltyConfigSection');
-    if (!section) return;
+// toggle 集點開關
+window.toggleLoyalty = async function(storeId, enabled) {
+    try {
+        const { data: existing } = await sb.from('loyalty_config').select('id').eq('store_id', storeId).maybeSingle();
+        if (existing) {
+            await sb.from('loyalty_config').update({ enabled: enabled }).eq('store_id', storeId);
+        } else if (enabled) {
+            await sb.from('loyalty_config').insert({
+                store_id: storeId,
+                enabled: true,
+                points_per_dollar: 1,
+                points_to_redeem: 10,
+                discount_amount: 50,
+                min_purchase_for_points: 0
+            });
+        }
+        loadMembersForStore(storeId);
+    } catch(e) { console.error(e); alert('操作失敗'); }
+};
 
-    let html = '<div style="margin-top:12px;padding:14px;background:#F8FAFC;border-radius:10px;">';
-    html += '<div style="font-size:14px;font-weight:700;margin-bottom:10px;">📋 集點規則</div>';
-
-    if (loyalty) {
-        html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">';
-        html += '<div style="background:#fff;padding:10px;border-radius:8px;border:1px solid #E2E8F0;">';
-        html += '<div style="font-size:11px;color:#94A3B8;">每消費金額</div>';
-        html += '<div style="font-size:18px;font-weight:800;color:#2563EB;">$' + (loyalty.dollars_per_point || 50) + '</div>';
-        html += '<div style="font-size:11px;color:#94A3B8;">獲得 1 點</div></div>';
-        html += '<div style="background:#fff;padding:10px;border-radius:8px;border:1px solid #E2E8F0;">';
-        html += '<div style="font-size:11px;color:#94A3B8;">兌換門檻</div>';
-        html += '<div style="font-size:18px;font-weight:800;color:#6366F1;">' + (loyalty.points_to_redeem || 10) + ' 點</div>';
-        html += '<div style="font-size:11px;color:#94A3B8;">折抵 $' + (loyalty.discount_amount || 50) + '</div></div>';
-        html += '</div>';
-        html += '<button onclick="editLoyaltyConfig(\'' + storeId + '\')" style="margin-top:10px;width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;color:#64748B;font-size:13px;cursor:pointer;font-family:inherit;">✏️ 編輯集點規則</button>';
-    } else {
-        html += '<div style="text-align:center;padding:16px;color:#94A3B8;">';
-        html += '<div style="font-size:13px;">尚未設定集點規則</div>';
-        html += '<button onclick="createDefaultLoyaltyConfig(\'' + storeId + '\')" style="margin-top:8px;padding:10px 20px;border:none;border-radius:8px;background:#6366F1;color:#fff;font-size:13px;cursor:pointer;font-family:inherit;">+ 建立集點規則</button>';
-        html += '</div>';
-    }
-    html += '</div>';
-
-    section.innerHTML = html;
-}
-
-window.createDefaultLoyaltyConfig = async function(storeId) {
+// 建立預設集點規則
+window.createLoyaltyRules = async function(storeId) {
     try {
         await sb.from('loyalty_config').insert({
             store_id: storeId,
-            is_active: true,
-            dollars_per_point: 50,
+            enabled: true,
+            points_per_dollar: 1,
             points_to_redeem: 10,
-            discount_amount: 50
+            discount_amount: 50,
+            min_purchase_for_points: 0
         });
-        loadMembersForStore();
-    } catch(e) {
-        console.error(e);
-        alert('建立失敗: ' + (e.message || ''));
-    }
+        loadMembersForStore(storeId);
+    } catch(e) { console.error(e); alert('建立失敗'); }
 };
 
-window.editLoyaltyConfig = async function(storeId) {
+// 編輯集點規則
+window.editLoyaltyRules = async function(storeId) {
+    const { data } = await sb.from('loyalty_config').select('*').eq('store_id', storeId).maybeSingle();
+    if (!data) return;
+
+    const rate = prompt('每消費 $1 得幾點？（例：1 表示每$1得1點，0.1 表示每$10得1點）', data.points_per_dollar || 1);
+    if (rate === null) return;
+    const pts = prompt('幾點可兌換？', data.points_to_redeem || 10);
+    if (pts === null) return;
+    const disc = prompt('兌換折抵金額？', data.discount_amount || 50);
+    if (disc === null) return;
+    const minPurchase = prompt('最低消費多少才給點？（0=不限）', data.min_purchase_for_points || 0);
+    if (minPurchase === null) return;
+
     try {
-        const { data } = await sb.from('loyalty_config').select('*').eq('store_id', storeId).maybeSingle();
-        if (!data) return;
-
-        const newDollars = prompt('每消費多少元得 1 點？', data.dollars_per_point || 50);
-        if (newDollars === null) return;
-        const newPoints = prompt('幾點可兌換折扣？', data.points_to_redeem || 10);
-        if (newPoints === null) return;
-        const newDiscount = prompt('兌換折抵金額？', data.discount_amount || 50);
-        if (newDiscount === null) return;
-
         await sb.from('loyalty_config').update({
-            dollars_per_point: parseInt(newDollars),
-            points_to_redeem: parseInt(newPoints),
-            discount_amount: parseInt(newDiscount)
+            points_per_dollar: parseFloat(rate),
+            points_to_redeem: parseInt(pts),
+            discount_amount: parseInt(disc),
+            min_purchase_for_points: parseFloat(minPurchase)
         }).eq('store_id', storeId);
-        loadMembersForStore();
+        loadMembersForStore(storeId);
+    } catch(e) { console.error(e); alert('更新失敗'); }
+};
+
+// VIP 門檻儲存
+window.saveVipThreshold = async function(storeId) {
+    const val = parseInt(document.getElementById('vipThresholdInput')?.value);
+    if (!val || val < 1) { alert('請輸入有效數字'); return; }
+
+    try {
+        // 存在 loyalty_config 的自訂欄位或 localStorage
+        const { error } = await sb.from('loyalty_config').update({ vip_threshold: val }).eq('store_id', storeId);
+        if (error) {
+            // vip_threshold 欄位不存在，用 localStorage 暫存
+            localStorage.setItem('vip_threshold_' + storeId, val);
+        }
+        loadMembersForStore(storeId);
+        alert('VIP 門檻已更新為 ' + val + ' 筆');
     } catch(e) {
-        console.error(e);
-        alert('更新失敗: ' + (e.message || ''));
+        localStorage.setItem('vip_threshold_' + storeId, val);
+        loadMembersForStore(storeId);
+        alert('VIP 門檻已更新為 ' + val + ' 筆');
     }
 };
 
-function renderMemberListForAdmin(customers) {
-    const resultEl = document.getElementById('memberSearchResult');
-    if (!resultEl) return;
-
-    if (!customers || customers.length === 0) {
-        resultEl.innerHTML = '<div style="text-align:center;padding:40px 20px;color:#94A3B8;">' +
-            '<div style="font-size:48px;margin-bottom:12px;">👥</div>' +
-            '<div style="font-size:15px;font-weight:600;">尚無會員資料</div>' +
-            '<div style="font-size:13px;margin-top:4px;">客人透過掃碼點餐後會自動建立會員</div>' +
-            '</div>';
-        return;
-    }
-
-    let html = '<div style="margin-top:20px;">';
-    html += '<div style="font-size:15px;font-weight:700;margin-bottom:12px;">📋 會員列表 (' + customers.length + ')</div>';
-
-    // 搜尋框
-    html += '<input type="text" id="memberSearchFilterInput" oninput="filterMemberListAdmin()" placeholder="🔍 搜尋會員（姓名/電話）" style="width:100%;padding:10px 14px;border:2px solid #E2E8F0;border-radius:10px;font-size:14px;margin-bottom:12px;box-sizing:border-box;font-family:inherit;">';
-
-    html += '<div id="memberListAdminContainer">';
-    customers.forEach(function(c) {
-        const joinDate = c.created_at ? new Date(c.created_at).toLocaleDateString('zh-TW') : '-';
-        const lastActivity = c.updated_at ? new Date(c.updated_at).toLocaleDateString('zh-TW') : '-';
-        const isVip = (c.total_orders || 0) >= 10;
-
-        html += '<div class="member-card-admin" data-name="' + esc(c.name || '') + '" data-phone="' + esc(c.phone || '') + '" style="display:flex;justify-content:space-between;align-items:center;padding:14px;background:#fff;border:1px solid #E2E8F0;border-radius:12px;margin-bottom:8px;">';
-
-        // 左側：頭像 + 資訊
-        html += '<div style="display:flex;align-items:center;gap:12px;flex:1;">';
-        // 頭像
-        html += '<div style="width:44px;height:44px;border-radius:22px;background:linear-gradient(135deg,#6366F1,#8B5CF6);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:16px;flex-shrink:0;">';
-        html += (c.name || '?').substring(0, 1);
-        html += '</div>';
-        // 文字資訊
-        html += '<div style="min-width:0;">';
-        html += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">';
-        html += '<span style="font-weight:700;font-size:15px;">' + esc(c.name || '匿名會員') + '</span>';
-        if (isVip) html += '<span style="background:#D1FAE5;color:#065F46;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:600;">⭐ VIP</span>';
-        html += '</div>';
-        html += '<div style="font-size:12px;color:#64748B;">📱 ' + esc(c.phone || '-') + '</div>';
-        html += '<div style="font-size:11px;color:#94A3B8;margin-top:2px;">加入: ' + joinDate + ' · 最後活動: ' + lastActivity + '</div>';
-        html += '</div>';
-        html += '</div>';
-
-        // 右側：消費金額 + 訂單數
-        html += '<div style="text-align:right;flex-shrink:0;margin-left:12px;">';
-        const totalSpent = c.total_spent || c.total_amount || 0;
-        html += '<div style="font-size:20px;font-weight:800;color:#6366F1;">$' + totalSpent.toLocaleString() + '</div>';
-        html += '<div style="font-size:11px;color:#94A3B8;margin-top:-2px;">消費總額</div>';
-        html += '<div style="font-size:12px;color:#64748B;margin-top:4px;">' + (c.total_orders || 0) + ' 筆訂單</div>';
-        html += '</div>';
-
-        html += '</div>';
-    });
-    html += '</div></div>';
-
-    resultEl.innerHTML = html;
-}
-
-window.filterMemberListAdmin = function() {
-    const keyword = (document.getElementById('memberSearchFilterInput')?.value || '').toLowerCase();
-    document.querySelectorAll('.member-card-admin').forEach(function(card) {
+// 搜尋過濾
+window.filterMemberList = function() {
+    const keyword = (document.getElementById('memberSearchInput')?.value || '').toLowerCase();
+    document.querySelectorAll('.member-card').forEach(function(card) {
         const name = (card.getAttribute('data-name') || '').toLowerCase();
         const phone = (card.getAttribute('data-phone') || '').toLowerCase();
         card.style.display = (name.includes(keyword) || phone.includes(keyword)) ? '' : 'none';
