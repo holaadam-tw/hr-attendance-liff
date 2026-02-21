@@ -2191,46 +2191,59 @@ export async function loadMembersForStore(storeId) {
         const dollarsPerPoint = loyalty ? Math.round(1 / (loyalty.points_per_dollar || 0.02)) : 50;
         const pointsToRedeem = loyalty?.points_to_redeem || 10;
         const discountAmount = loyalty?.discount_amount || 50;
+        const redeemItemName = loyalty?.redeem_item_name || '';
         const minPurchase = loyalty?.min_purchase_for_points || 0;
 
         // 消費得點 + 兌換門檻
         html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">';
 
-        // 卡片1：消費金額得點
-        html += '<div style="background:#fff;padding:14px;border-radius:10px;border:1px solid #E2E8F0;">';
-        html += '<div style="font-size:11px;color:#94A3B8;margin-bottom:6px;">消費金額</div>';
-        html += '<div style="display:flex;align-items:center;gap:4px;">';
-        html += '<span style="color:#64748B;">每 $</span>';
-        html += '<input type="number" id="loyaltyDollarInput" value="' + dollarsPerPoint + '" min="1" style="width:50px;padding:6px;border:1px solid #E2E8F0;border-radius:6px;text-align:center;font-size:16px;font-weight:700;color:#2563EB;">';
+        // 卡片1：消費金額得點（上下佈局）
+        html += '<div style="background:#fff;padding:14px;border-radius:10px;border:1px solid #E2E8F0;text-align:center;">';
+        html += '<div style="font-size:12px;color:#94A3B8;margin-bottom:8px;">消費金額</div>';
+        html += '<div style="display:flex;align-items:center;justify-content:center;gap:6px;">';
+        html += '<span style="font-size:14px;color:#64748B;">每</span>';
+        html += '<span style="font-size:14px;color:#64748B;">$</span>';
+        html += '<input type="number" id="loyaltyDollarInput" value="' + dollarsPerPoint + '" min="1" style="width:80px;min-width:80px;padding:8px;border:2px solid #E2E8F0;border-radius:8px;text-align:center;font-size:18px;font-weight:700;color:#2563EB;">';
         html += '</div>';
-        html += '<div style="font-size:11px;color:#94A3B8;margin-top:4px;">得 1 點</div>';
-        html += '</div>';
-
-        // 卡片2：兌換門檻
-        html += '<div style="background:#fff;padding:14px;border-radius:10px;border:1px solid #E2E8F0;">';
-        html += '<div style="font-size:11px;color:#94A3B8;margin-bottom:6px;">兌換門檻</div>';
-        html += '<div style="display:flex;align-items:center;gap:4px;">';
-        html += '<input type="number" id="loyaltyPointsInput" value="' + pointsToRedeem + '" min="1" style="width:50px;padding:6px;border:1px solid #E2E8F0;border-radius:6px;text-align:center;font-size:16px;font-weight:700;color:#6366F1;">';
-        html += '<span style="color:#64748B;">點</span>';
-        html += '</div>';
-        html += '<div style="font-size:11px;color:#94A3B8;margin-top:4px;">可兌換</div>';
-        html += '</div>';
+        html += '<div style="font-size:12px;color:#94A3B8;margin-top:6px;">得 1 點</div>';
         html += '</div>';
 
-        // 兌換金額
+        // 卡片2：兌換門檻（上下佈局）
+        html += '<div style="background:#fff;padding:14px;border-radius:10px;border:1px solid #E2E8F0;text-align:center;">';
+        html += '<div style="font-size:12px;color:#94A3B8;margin-bottom:8px;">兌換門檻</div>';
+        html += '<div style="display:flex;align-items:center;justify-content:center;gap:6px;">';
+        html += '<input type="number" id="loyaltyPointsInput" value="' + pointsToRedeem + '" min="1" style="width:80px;min-width:80px;padding:8px;border:2px solid #E2E8F0;border-radius:8px;text-align:center;font-size:18px;font-weight:700;color:#6366F1;">';
+        html += '<span style="font-size:14px;color:#64748B;">點</span>';
+        html += '</div>';
+        html += '<div style="font-size:12px;color:#94A3B8;margin-top:6px;">可兌換</div>';
+        html += '</div>';
+        html += '</div>';
+
+        // 兌換方式（同時支援折扣金額和等值商品）
         html += '<div style="background:#fff;padding:14px;border-radius:10px;border:1px solid #E2E8F0;margin-bottom:12px;">';
-        html += '<div style="font-size:11px;color:#94A3B8;margin-bottom:6px;">兌換方式</div>';
-        html += '<div style="display:flex;align-items:center;gap:4px;">';
-        html += '<span style="color:#64748B;">折抵 $</span>';
-        html += '<input type="number" id="loyaltyDiscountInput" value="' + discountAmount + '" min="1" style="width:60px;padding:6px;border:1px solid #E2E8F0;border-radius:6px;text-align:center;font-size:16px;font-weight:700;color:#059669;">';
+        html += '<div style="font-size:12px;color:#94A3B8;margin-bottom:8px;">兌換方式</div>';
+
+        // 折抵金額
+        html += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;">';
+        html += '<span style="font-size:14px;color:#64748B;">折抵</span>';
+        html += '<span style="font-size:14px;color:#64748B;">$</span>';
+        html += '<input type="number" id="loyaltyDiscountInput" value="' + discountAmount + '" min="0" style="width:80px;min-width:80px;padding:8px;border:2px solid #E2E8F0;border-radius:8px;text-align:center;font-size:18px;font-weight:700;color:#059669;">';
         html += '</div>';
+
+        // 或等值商品
+        html += '<div style="display:flex;align-items:center;gap:6px;">';
+        html += '<span style="font-size:14px;color:#64748B;">或</span>';
+        html += '<input type="text" id="loyaltyItemInput" value="' + esc(redeemItemName) + '" placeholder="等值商品名稱（例：招牌麵包一個）" style="flex:1;padding:8px;border:2px solid #E2E8F0;border-radius:8px;font-size:14px;font-family:inherit;">';
+        html += '</div>';
+
+        html += '<div style="font-size:11px;color:#94A3B8;margin-top:6px;">可擇一或兩者皆設定，由店員操作時選擇</div>';
         html += '</div>';
 
         // 最低消費
         html += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:14px;">';
         html += '<span style="font-size:12px;color:#64748B;">最低消費</span>';
         html += '<span style="color:#64748B;">$</span>';
-        html += '<input type="number" id="loyaltyMinInput" value="' + minPurchase + '" min="0" style="width:50px;padding:4px;border:1px solid #E2E8F0;border-radius:6px;text-align:center;font-size:13px;">';
+        html += '<input type="number" id="loyaltyMinInput" value="' + minPurchase + '" min="0" style="width:80px;min-width:80px;padding:8px;border:2px solid #E2E8F0;border-radius:8px;text-align:center;font-size:13px;">';
         html += '<span style="font-size:12px;color:#94A3B8;">才給點（0=不限）</span>';
         html += '</div>';
 
@@ -2238,21 +2251,29 @@ export async function loadMembersForStore(storeId) {
         html += '<button onclick="saveLoyaltyRules(\'' + storeId + '\')" style="width:100%;padding:12px;border:none;border-radius:10px;background:#6366F1;color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;">💾 儲存集點設定</button>';
         html += '</div>';
 
-        // ===== VIP 設定 =====
+        // ===== VIP 設定（可開關）=====
+        const vipEnabled = localStorage.getItem('vip_enabled_' + storeId) !== 'false';
         html += '<div style="background:#FFF7ED;border-radius:14px;padding:16px;margin-bottom:16px;">';
         html += '<div style="display:flex;justify-content:space-between;align-items:center;">';
-        html += '<div>';
         html += '<div style="font-size:15px;font-weight:700;">👑 VIP 門檻</div>';
-        html += '<div style="font-size:12px;color:#94A3B8;margin-top:2px;">累計訂單達門檻自動升級 VIP</div>';
+        // toggle 開關
+        html += '<label style="position:relative;display:inline-block;width:48px;height:26px;cursor:pointer;">';
+        html += '<input type="checkbox" id="vipToggle" ' + (vipEnabled ? 'checked' : '') + ' onchange="toggleVipSection()" style="opacity:0;width:0;height:0;">';
+        html += '<span style="position:absolute;top:0;left:0;right:0;bottom:0;background:' + (vipEnabled ? '#F97316' : '#CBD5E1') + ';border-radius:13px;transition:.3s;"></span>';
+        html += '<span style="position:absolute;top:3px;left:' + (vipEnabled ? '25px' : '3px') + ';width:20px;height:20px;background:#fff;border-radius:50%;transition:.3s;box-shadow:0 1px 3px rgba(0,0,0,.2);"></span>';
+        html += '</label>';
         html += '</div>';
-        // VIP 門檻值（可編輯）
+
+        // VIP 設定內容（可收合）
+        html += '<div id="vipSettingsArea" style="margin-top:12px;' + (vipEnabled ? '' : 'display:none;') + '">';
+        html += '<div style="font-size:12px;color:#94A3B8;margin-bottom:8px;">累計訂單達門檻自動升級 VIP</div>';
         html += '<div style="display:flex;align-items:center;gap:6px;">';
-        html += '<span style="font-size:13px;color:#64748B;">≥</span>';
-        html += '<input type="number" id="vipThresholdInput" value="' + vipThreshold + '" min="1" max="999" style="width:50px;padding:6px;border:1px solid #E2E8F0;border-radius:6px;text-align:center;font-size:14px;font-weight:700;">';
-        html += '<span style="font-size:13px;color:#64748B;">筆</span>';
-        html += '<button onclick="saveVipThreshold(\'' + storeId + '\')" style="padding:6px 12px;border:none;border-radius:6px;background:#F97316;color:#fff;font-size:12px;cursor:pointer;">儲存</button>';
+        html += '<span style="font-size:14px;color:#64748B;">≥</span>';
+        html += '<input type="number" id="vipThresholdInput" value="' + vipThreshold + '" min="1" style="width:70px;padding:8px;border:2px solid #E2E8F0;border-radius:8px;text-align:center;font-size:16px;font-weight:700;">';
+        html += '<span style="font-size:14px;color:#64748B;">筆訂單</span>';
         html += '</div>';
-        html += '</div></div>';
+        html += '</div>';
+        html += '</div>';
 
         // ===== 統計卡片 =====
         const vipCount = customers.filter(function(c) { return (c.total_orders || 0) >= vipThreshold; }).length;
@@ -2343,13 +2364,52 @@ export async function loadMembersForStore(storeId) {
                 html += '<div style="font-weight:700;font-size:14px;">' + esc(c.name || '匿名') + '</div>';
                 html += '<div style="font-size:12px;color:#94A3B8;">' + esc(c.phone || '-') + '</div>';
                 html += '</div></div>';
-                // 右：點數
+                // 右：點數（可調整）
                 html += '<div style="text-align:center;">';
-                html += '<div style="font-size:24px;font-weight:800;color:#6366F1;">' + pts + '</div>';
-                html += '<div style="font-size:11px;color:#94A3B8;">點</div>';
+                html += '<div style="font-size:22px;font-weight:800;color:#6366F1;">' + pts + '</div>';
+                html += '<div style="font-size:11px;color:#94A3B8;margin-bottom:6px;">點</div>';
+                html += '<div style="display:flex;gap:4px;justify-content:center;">';
+                html += '<button onclick="adjustPoints(\'' + c.id + '\', -1, \'' + storeId + '\')" style="width:28px;height:28px;border:1px solid #E2E8F0;border-radius:6px;background:#fff;color:#EF4444;font-size:16px;font-weight:700;cursor:pointer;">−</button>';
+                html += '<button onclick="adjustPoints(\'' + c.id + '\', 1, \'' + storeId + '\')" style="width:28px;height:28px;border:1px solid #E2E8F0;border-radius:6px;background:#fff;color:#059669;font-size:16px;font-weight:700;cursor:pointer;">+</button>';
+                html += '<button onclick="adjustPointsCustom(\'' + c.id + '\', \'' + esc(c.name || '匿名') + '\', ' + pts + ', \'' + storeId + '\')" style="padding:4px 8px;border:1px solid #E2E8F0;border-radius:6px;background:#fff;color:#64748B;font-size:11px;cursor:pointer;">✏️</button>';
+                html += '</div>';
                 html += '</div>';
                 html += '</div>';
             });
+            html += '</div>';
+
+            // ===== 交易紀錄區域 =====
+            html += '<div style="margin-top:20px;">';
+            html += '<div style="font-size:14px;font-weight:700;margin-bottom:10px;">📜 近期交易紀錄</div>';
+
+            try {
+                const { data: transactions } = await sb.from('loyalty_transactions')
+                    .select('*')
+                    .eq('store_id', storeId)
+                    .order('created_at', { ascending: false })
+                    .limit(20);
+
+                if (transactions && transactions.length > 0) {
+                    transactions.forEach(function(t) {
+                        const dateStr = new Date(t.created_at).toLocaleString('zh-TW', {month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
+                        const icon = t.type === 'earn' ? '🟢 +' : '🔴 -';
+                        const color = t.type === 'earn' ? '#059669' : '#EF4444';
+
+                        html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid #F1F5F9;">';
+                        html += '<div>';
+                        html += '<div style="font-size:13px;font-weight:600;">' + esc(t.note || (t.type === 'earn' ? '消費得點' : '兌換扣點')) + '</div>';
+                        html += '<div style="font-size:11px;color:#94A3B8;">' + dateStr + '</div>';
+                        html += '</div>';
+                        html += '<div style="font-size:15px;font-weight:700;color:' + color + ';">' + icon + t.points + ' 點</div>';
+                        html += '</div>';
+                    });
+                } else {
+                    html += '<div style="text-align:center;padding:20px;color:#94A3B8;font-size:13px;">尚無交易紀錄</div>';
+                }
+            } catch(e) {
+                // loyalty_transactions 表可能不存在
+                html += '<div style="text-align:center;padding:20px;color:#94A3B8;font-size:13px;">交易紀錄功能準備中</div>';
+            }
             html += '</div>';
         }
         html += '</div>'; // 結束 membersPointsTab
@@ -2386,6 +2446,7 @@ window.saveLoyaltyRules = async function(storeId) {
     const dollarsPerPoint = parseInt(document.getElementById('loyaltyDollarInput')?.value) || 50;
     const pointsToRedeem = parseInt(document.getElementById('loyaltyPointsInput')?.value) || 10;
     const discountAmount = parseInt(document.getElementById('loyaltyDiscountInput')?.value) || 50;
+    const redeemItemName = document.getElementById('loyaltyItemInput')?.value || '';
     const minPurchase = parseFloat(document.getElementById('loyaltyMinInput')?.value) || 0;
 
     // points_per_dollar = 1/dollarsPerPoint（例：每$50得1點 → points_per_dollar = 0.02）
@@ -2398,6 +2459,11 @@ window.saveLoyaltyRules = async function(storeId) {
         min_purchase_for_points: minPurchase
     };
 
+    // 嘗試儲存 redeem_item_name（如果欄位存在）
+    if (redeemItemName) {
+        updateData.redeem_item_name = redeemItemName;
+    }
+
     try {
         const { data: existing } = await sb.from('loyalty_config').select('id').eq('store_id', storeId).maybeSingle();
         if (existing) {
@@ -2407,6 +2473,11 @@ window.saveLoyaltyRules = async function(storeId) {
             updateData.enabled = true;
             await sb.from('loyalty_config').insert(updateData);
         }
+
+        // 儲存 VIP 設定到 localStorage
+        localStorage.setItem('vip_enabled_' + storeId, document.getElementById('vipToggle')?.checked ? 'true' : 'false');
+        localStorage.setItem('vip_threshold_' + storeId, document.getElementById('vipThresholdInput')?.value || '10');
+
         alert('✅ 集點設定已儲存');
         loadMembersForStore(storeId);
     } catch(e) {
@@ -2474,6 +2545,75 @@ window.filterPointList = function() {
         const phone = (card.getAttribute('data-phone') || '').toLowerCase();
         card.style.display = (name.includes(keyword) || phone.includes(keyword)) ? '' : 'none';
     });
+};
+
+// VIP 門檻開關切換
+window.toggleVipSection = function() {
+    const checked = document.getElementById('vipToggle')?.checked;
+    const area = document.getElementById('vipSettingsArea');
+    if (area) area.style.display = checked ? '' : 'none';
+};
+
+// 調整點數（+1 或 -1）
+window.adjustPoints = async function(customerId, delta, storeId) {
+    try {
+        // 先查現有點數
+        const { data: cust } = await sb.from('store_customers').select('loyalty_points').eq('id', customerId).maybeSingle();
+        const currentPts = cust?.loyalty_points || 0;
+        const newPts = Math.max(0, currentPts + delta);
+
+        await sb.from('store_customers').update({ loyalty_points: newPts }).eq('id', customerId);
+
+        // 記錄交易（如果 loyalty_transactions 表存在）
+        try {
+            await sb.from('loyalty_transactions').insert({
+                store_id: storeId,
+                customer_id: customerId,
+                type: delta > 0 ? 'earn' : 'redeem',
+                points: Math.abs(delta),
+                balance_after: newPts,
+                note: '手動調整'
+            });
+        } catch(e) {
+            // 忽略 loyalty_transactions 表不存在的錯誤
+        }
+
+        loadMembersForStore(storeId);
+    } catch(e) {
+        console.error('Adjust points error:', e);
+        alert('操作失敗: ' + (e.message || ''));
+    }
+};
+
+// 自訂點數調整
+window.adjustPointsCustom = async function(customerId, name, currentPts, storeId) {
+    const input = prompt(name + ' 目前 ' + currentPts + ' 點\n輸入新的點數：', currentPts);
+    if (input === null) return;
+    const newPts = parseInt(input);
+    if (isNaN(newPts) || newPts < 0) { alert('請輸入有效數字'); return; }
+
+    try {
+        await sb.from('store_customers').update({ loyalty_points: newPts }).eq('id', customerId);
+
+        const delta = newPts - currentPts;
+        try {
+            await sb.from('loyalty_transactions').insert({
+                store_id: storeId,
+                customer_id: customerId,
+                type: delta >= 0 ? 'earn' : 'redeem',
+                points: Math.abs(delta),
+                balance_after: newPts,
+                note: '手動設定為 ' + newPts + ' 點'
+            });
+        } catch(e) {
+            // 忽略 loyalty_transactions 表不存在的錯誤
+        }
+
+        loadMembersForStore(storeId);
+    } catch(e) {
+        console.error(e);
+        alert('操作失敗: ' + (e.message || ''));
+    }
 };
 
 export async function toggleMemberLoyalty() {
