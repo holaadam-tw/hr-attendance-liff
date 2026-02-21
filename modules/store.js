@@ -2581,7 +2581,8 @@ window.adjustPoints = async function(customerPhone, delta, storeId) {
             operator_name: window.currentEmployee?.name || 'admin'
         });
 
-        loadMembersForStore(storeId);
+        await loadMembersForStore(storeId);
+        if (typeof window.switchMemberTab === 'function') window.switchMemberTab('points');
     } catch(e) {
         console.error('adjustPoints error:', e);
         alert('操作失敗: ' + (e.message || ''));
@@ -2605,7 +2606,8 @@ window.adjustPointsCustom = async function(customerPhone, customerName, currentP
             operator_name: window.currentEmployee?.name || 'admin'
         });
 
-        loadMembersForStore(storeId);
+        await loadMembersForStore(storeId);
+        if (typeof window.switchMemberTab === 'function') window.switchMemberTab('points');
     } catch(e) {
         console.error(e);
         alert('操作失敗');
