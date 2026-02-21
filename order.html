@@ -4626,6 +4626,19 @@ async function loadPointsHistory() {
       return;
     }
 
+    // 確保 loyaltyConfig 已載入
+    if (!loyaltyConfig && currentStoreId) {
+      try {
+        var lcRes = await fetch(SUPABASE_URL + '/rest/v1/loyalty_config?store_id=eq.' + currentStoreId + '&limit=1', {
+          headers: { 'apikey': SUPABASE_KEY }
+        });
+        var lcData = await lcRes.json();
+        if (Array.isArray(lcData) && lcData.length > 0) {
+          loyaltyConfig = lcData[0];
+        }
+      } catch(e) { console.warn('Load loyalty config:', e); }
+    }
+
     // 計算總點數
     var totalPoints = 0;
     data.forEach(function(t) {
@@ -4638,7 +4651,7 @@ async function loadPointsHistory() {
     html += '<div style="font-size:13px;opacity:.8;margin-bottom:4px;">我的點數</div>';
     html += '<div style="font-size:48px;font-weight:800;line-height:1.1;">' + totalPoints + '</div>';
     html += '<div style="font-size:13px;opacity:.8;margin-top:4px;">點</div>';
-    if (loyaltyConfig) {
+    if (loyaltyConfig && loyaltyConfig.enabled) {
       var ptsNeeded = (loyaltyConfig.points_to_redeem || 10) - totalPoints;
       if (ptsNeeded > 0) {
         html += '<div style="margin-top:12px;padding:8px 16px;background:rgba(255,255,255,.15);border-radius:20px;font-size:12px;">';
