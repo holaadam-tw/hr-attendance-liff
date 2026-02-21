@@ -2166,6 +2166,15 @@ export async function loadMembersForStore(storeId) {
 
         let html = '';
 
+        // ===== Tab 導航 =====
+        html += '<div style="display:flex;gap:0;margin-bottom:16px;border-bottom:2px solid #E2E8F0;">';
+        html += '<button id="tabMembers" onclick="switchMemberTab(\'members\')" style="flex:1;padding:12px;border:none;background:transparent;font-size:14px;font-weight:700;color:#6366F1;border-bottom:3px solid #6366F1;cursor:pointer;font-family:inherit;">👥 會員管理</button>';
+        html += '<button id="tabPoints" onclick="switchMemberTab(\'points\')" style="flex:1;padding:12px;border:none;background:transparent;font-size:14px;font-weight:600;color:#94A3B8;border-bottom:3px solid transparent;cursor:pointer;font-family:inherit;">🎯 會員集點</button>';
+        html += '</div>';
+
+        // ===== 會員管理 Tab =====
+        html += '<div id="membersMgrTab">';
+
         // ===== 集點設定區 =====
         html += '<div style="background:#F8FAFC;border-radius:14px;padding:16px;margin-bottom:16px;">';
         html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">';
@@ -2178,40 +2187,55 @@ export async function loadMembersForStore(storeId) {
         html += '</label>';
         html += '</div>';
 
-        if (loyalty) {
-            // 集點規則卡片
-            html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">';
-            // 得點規則
-            html += '<div style="background:#fff;padding:12px;border-radius:10px;border:1px solid #E2E8F0;text-align:center;">';
-            html += '<div style="font-size:11px;color:#94A3B8;">消費得點</div>';
-            const displayRate = loyalty.points_per_dollar >= 1
-                ? '每 $1 得 ' + loyalty.points_per_dollar + ' 點'
-                : '每 $' + Math.round(1 / loyalty.points_per_dollar) + ' 得 1 點';
-            html += '<div style="font-size:13px;font-weight:700;color:#2563EB;margin-top:4px;">' + displayRate + '</div>';
-            html += '</div>';
-            // 兌換規則
-            html += '<div style="background:#fff;padding:12px;border-radius:10px;border:1px solid #E2E8F0;text-align:center;">';
-            html += '<div style="font-size:11px;color:#94A3B8;">兌換折扣</div>';
-            html += '<div style="font-size:13px;font-weight:700;color:#6366F1;margin-top:4px;">' + (loyalty.points_to_redeem || 10) + ' 點折 $' + (loyalty.discount_amount || 50) + '</div>';
-            html += '</div>';
-            html += '</div>';
+        // 集點規則 - inline 可編輯
+        const dollarsPerPoint = loyalty ? Math.round(1 / (loyalty.points_per_dollar || 0.02)) : 50;
+        const pointsToRedeem = loyalty?.points_to_redeem || 10;
+        const discountAmount = loyalty?.discount_amount || 50;
+        const minPurchase = loyalty?.min_purchase_for_points || 0;
 
-            // 附加設定
-            if (loyalty.min_purchase_for_points > 0 || loyalty.points_expiry_days) {
-                html += '<div style="font-size:11px;color:#94A3B8;margin-bottom:8px;">';
-                if (loyalty.min_purchase_for_points > 0) html += '最低消費 $' + loyalty.min_purchase_for_points + ' 才給點 · ';
-                if (loyalty.points_expiry_days) html += '點數 ' + loyalty.points_expiry_days + ' 天到期';
-                else html += '點數永不過期';
-                html += '</div>';
-            }
+        // 消費得點 + 兌換門檻
+        html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">';
 
-            html += '<button onclick="editLoyaltyRules(\'' + storeId + '\')" style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;color:#64748B;font-size:13px;cursor:pointer;font-family:inherit;">✏️ 編輯集點規則</button>';
-        } else {
-            html += '<div style="text-align:center;padding:16px;color:#94A3B8;">';
-            html += '<p style="font-size:13px;">尚未設定集點規則</p>';
-            html += '<button onclick="createLoyaltyRules(\'' + storeId + '\')" style="padding:10px 24px;border:none;border-radius:8px;background:#6366F1;color:#fff;font-size:13px;cursor:pointer;font-family:inherit;">+ 建立集點規則</button>';
-            html += '</div>';
-        }
+        // 卡片1：消費金額得點
+        html += '<div style="background:#fff;padding:14px;border-radius:10px;border:1px solid #E2E8F0;">';
+        html += '<div style="font-size:11px;color:#94A3B8;margin-bottom:6px;">消費金額</div>';
+        html += '<div style="display:flex;align-items:center;gap:4px;">';
+        html += '<span style="color:#64748B;">每 $</span>';
+        html += '<input type="number" id="loyaltyDollarInput" value="' + dollarsPerPoint + '" min="1" style="width:50px;padding:6px;border:1px solid #E2E8F0;border-radius:6px;text-align:center;font-size:16px;font-weight:700;color:#2563EB;">';
+        html += '</div>';
+        html += '<div style="font-size:11px;color:#94A3B8;margin-top:4px;">得 1 點</div>';
+        html += '</div>';
+
+        // 卡片2：兌換門檻
+        html += '<div style="background:#fff;padding:14px;border-radius:10px;border:1px solid #E2E8F0;">';
+        html += '<div style="font-size:11px;color:#94A3B8;margin-bottom:6px;">兌換門檻</div>';
+        html += '<div style="display:flex;align-items:center;gap:4px;">';
+        html += '<input type="number" id="loyaltyPointsInput" value="' + pointsToRedeem + '" min="1" style="width:50px;padding:6px;border:1px solid #E2E8F0;border-radius:6px;text-align:center;font-size:16px;font-weight:700;color:#6366F1;">';
+        html += '<span style="color:#64748B;">點</span>';
+        html += '</div>';
+        html += '<div style="font-size:11px;color:#94A3B8;margin-top:4px;">可兌換</div>';
+        html += '</div>';
+        html += '</div>';
+
+        // 兌換金額
+        html += '<div style="background:#fff;padding:14px;border-radius:10px;border:1px solid #E2E8F0;margin-bottom:12px;">';
+        html += '<div style="font-size:11px;color:#94A3B8;margin-bottom:6px;">兌換方式</div>';
+        html += '<div style="display:flex;align-items:center;gap:4px;">';
+        html += '<span style="color:#64748B;">折抵 $</span>';
+        html += '<input type="number" id="loyaltyDiscountInput" value="' + discountAmount + '" min="1" style="width:60px;padding:6px;border:1px solid #E2E8F0;border-radius:6px;text-align:center;font-size:16px;font-weight:700;color:#059669;">';
+        html += '</div>';
+        html += '</div>';
+
+        // 最低消費
+        html += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:14px;">';
+        html += '<span style="font-size:12px;color:#64748B;">最低消費</span>';
+        html += '<span style="color:#64748B;">$</span>';
+        html += '<input type="number" id="loyaltyMinInput" value="' + minPurchase + '" min="0" style="width:50px;padding:4px;border:1px solid #E2E8F0;border-radius:6px;text-align:center;font-size:13px;">';
+        html += '<span style="font-size:12px;color:#94A3B8;">才給點（0=不限）</span>';
+        html += '</div>';
+
+        // 儲存按鈕
+        html += '<button onclick="saveLoyaltyRules(\'' + storeId + '\')" style="width:100%;padding:12px;border:none;border-radius:10px;background:#6366F1;color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;">💾 儲存集點設定</button>';
         html += '</div>';
 
         // ===== VIP 設定 =====
@@ -2290,6 +2314,46 @@ export async function loadMembersForStore(storeId) {
             html += '</div>';
         }
 
+        html += '</div>'; // 結束 membersMgrTab
+
+        // ===== 會員集點 Tab =====
+        html += '<div id="membersPointsTab" style="display:none;">';
+
+        if (customers.length === 0) {
+            html += '<div style="text-align:center;padding:40px;color:#94A3B8;">尚無會員</div>';
+        } else {
+            html += '<div style="font-size:14px;font-weight:700;margin-bottom:12px;">🎯 會員點數一覽</div>';
+            // 搜尋
+            html += '<input type="text" id="pointSearchInput" oninput="filterPointList()" placeholder="🔍 搜尋（姓名/電話）" style="width:100%;padding:10px;border:2px solid #E2E8F0;border-radius:10px;font-size:14px;margin-bottom:12px;box-sizing:border-box;font-family:inherit;">';
+
+            html += '<div id="pointListContainer">';
+            customers.forEach(function(c) {
+                let pts = c.points || c.loyalty_points || 0;
+                // 如果 store_customers 沒有 points 欄位，用消費金額估算
+                // 估算點數 = total_spent * points_per_dollar
+                if (!pts && loyalty && c.total_spent) {
+                    pts = Math.floor((c.total_spent || 0) * (loyalty.points_per_dollar || 0));
+                }
+
+                html += '<div class="point-card" data-name="' + esc(c.name || '') + '" data-phone="' + esc(c.phone || '') + '" style="display:flex;justify-content:space-between;align-items:center;padding:14px;background:#fff;border:1px solid #E2E8F0;border-radius:12px;margin-bottom:8px;">';
+                // 左
+                html += '<div style="display:flex;align-items:center;gap:10px;">';
+                html += '<div style="width:40px;height:40px;border-radius:20px;background:linear-gradient(135deg,#6366F1,#8B5CF6);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:15px;">' + esc((c.name||'?').substring(0,1)) + '</div>';
+                html += '<div>';
+                html += '<div style="font-weight:700;font-size:14px;">' + esc(c.name || '匿名') + '</div>';
+                html += '<div style="font-size:12px;color:#94A3B8;">' + esc(c.phone || '-') + '</div>';
+                html += '</div></div>';
+                // 右：點數
+                html += '<div style="text-align:center;">';
+                html += '<div style="font-size:24px;font-weight:800;color:#6366F1;">' + pts + '</div>';
+                html += '<div style="font-size:11px;color:#94A3B8;">點</div>';
+                html += '</div>';
+                html += '</div>';
+            });
+            html += '</div>';
+        }
+        html += '</div>'; // 結束 membersPointsTab
+
         content.innerHTML = html;
     } catch(e) {
         console.error('loadMembersForStore error:', e);
@@ -2317,44 +2381,38 @@ window.toggleLoyalty = async function(storeId, enabled) {
     } catch(e) { console.error(e); alert('操作失敗'); }
 };
 
-// 建立預設集點規則
-window.createLoyaltyRules = async function(storeId) {
-    try {
-        await sb.from('loyalty_config').insert({
-            store_id: storeId,
-            enabled: true,
-            points_per_dollar: 1,
-            points_to_redeem: 10,
-            discount_amount: 50,
-            min_purchase_for_points: 0
-        });
-        loadMembersForStore(storeId);
-    } catch(e) { console.error(e); alert('建立失敗'); }
-};
+// 儲存集點規則（從 input 讀取值）
+window.saveLoyaltyRules = async function(storeId) {
+    const dollarsPerPoint = parseInt(document.getElementById('loyaltyDollarInput')?.value) || 50;
+    const pointsToRedeem = parseInt(document.getElementById('loyaltyPointsInput')?.value) || 10;
+    const discountAmount = parseInt(document.getElementById('loyaltyDiscountInput')?.value) || 50;
+    const minPurchase = parseFloat(document.getElementById('loyaltyMinInput')?.value) || 0;
 
-// 編輯集點規則
-window.editLoyaltyRules = async function(storeId) {
-    const { data } = await sb.from('loyalty_config').select('*').eq('store_id', storeId).maybeSingle();
-    if (!data) return;
+    // points_per_dollar = 1/dollarsPerPoint（例：每$50得1點 → points_per_dollar = 0.02）
+    const pointsPerDollar = dollarsPerPoint > 0 ? (1 / dollarsPerPoint) : 0.02;
 
-    const rate = prompt('每消費 $1 得幾點？（例：1 表示每$1得1點，0.1 表示每$10得1點）', data.points_per_dollar || 1);
-    if (rate === null) return;
-    const pts = prompt('幾點可兌換？', data.points_to_redeem || 10);
-    if (pts === null) return;
-    const disc = prompt('兌換折抵金額？', data.discount_amount || 50);
-    if (disc === null) return;
-    const minPurchase = prompt('最低消費多少才給點？（0=不限）', data.min_purchase_for_points || 0);
-    if (minPurchase === null) return;
+    const updateData = {
+        points_per_dollar: pointsPerDollar,
+        points_to_redeem: pointsToRedeem,
+        discount_amount: discountAmount,
+        min_purchase_for_points: minPurchase
+    };
 
     try {
-        await sb.from('loyalty_config').update({
-            points_per_dollar: parseFloat(rate),
-            points_to_redeem: parseInt(pts),
-            discount_amount: parseInt(disc),
-            min_purchase_for_points: parseFloat(minPurchase)
-        }).eq('store_id', storeId);
+        const { data: existing } = await sb.from('loyalty_config').select('id').eq('store_id', storeId).maybeSingle();
+        if (existing) {
+            await sb.from('loyalty_config').update(updateData).eq('store_id', storeId);
+        } else {
+            updateData.store_id = storeId;
+            updateData.enabled = true;
+            await sb.from('loyalty_config').insert(updateData);
+        }
+        alert('✅ 集點設定已儲存');
         loadMembersForStore(storeId);
-    } catch(e) { console.error(e); alert('更新失敗'); }
+    } catch(e) {
+        console.error('Save loyalty error:', e);
+        alert('儲存失敗: ' + (e.message || ''));
+    }
 };
 
 // VIP 門檻儲存
@@ -2382,6 +2440,36 @@ window.saveVipThreshold = async function(storeId) {
 window.filterMemberList = function() {
     const keyword = (document.getElementById('memberSearchInput')?.value || '').toLowerCase();
     document.querySelectorAll('.member-card').forEach(function(card) {
+        const name = (card.getAttribute('data-name') || '').toLowerCase();
+        const phone = (card.getAttribute('data-phone') || '').toLowerCase();
+        card.style.display = (name.includes(keyword) || phone.includes(keyword)) ? '' : 'none';
+    });
+};
+
+// Tab 切換
+window.switchMemberTab = function(tab) {
+    const mgrTab = document.getElementById('membersMgrTab');
+    const ptsTab = document.getElementById('membersPointsTab');
+    const btnMembers = document.getElementById('tabMembers');
+    const btnPoints = document.getElementById('tabPoints');
+
+    if (tab === 'members') {
+        if (mgrTab) mgrTab.style.display = '';
+        if (ptsTab) ptsTab.style.display = 'none';
+        if (btnMembers) { btnMembers.style.color = '#6366F1'; btnMembers.style.borderBottom = '3px solid #6366F1'; }
+        if (btnPoints) { btnPoints.style.color = '#94A3B8'; btnPoints.style.borderBottom = '3px solid transparent'; }
+    } else {
+        if (mgrTab) mgrTab.style.display = 'none';
+        if (ptsTab) ptsTab.style.display = '';
+        if (btnPoints) { btnPoints.style.color = '#6366F1'; btnPoints.style.borderBottom = '3px solid #6366F1'; }
+        if (btnMembers) { btnMembers.style.color = '#94A3B8'; btnMembers.style.borderBottom = '3px solid transparent'; }
+    }
+};
+
+// 會員集點搜尋過濾
+window.filterPointList = function() {
+    const keyword = (document.getElementById('pointSearchInput')?.value || '').toLowerCase();
+    document.querySelectorAll('.point-card').forEach(function(card) {
         const name = (card.getAttribute('data-name') || '').toLowerCase();
         const phone = (card.getAttribute('data-phone') || '').toLowerCase();
         card.style.display = (name.includes(keyword) || phone.includes(keyword)) ? '' : 'none';

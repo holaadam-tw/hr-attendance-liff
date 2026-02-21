@@ -468,7 +468,10 @@
     <div class="toast" id="toast"></div>
 
     <script>
-        const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        // 使用 common.js 已定義的 sb，如果不存在才建立
+        if (typeof sb === 'undefined') {
+            var sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        }
         const urlParams = new URLSearchParams(window.location.search);
         const storeSlug = urlParams.get('store');
         const preSelectedStaffId = urlParams.get('staff');
