@@ -431,13 +431,14 @@ body {
 .item-price .currency { font-size: 12px; font-weight: 600; margin-right: 1px; }
 .item-sizes { display: flex; gap: 6px; margin-top: 4px; }
 .size-option {
-  font-size: 11px; color: var(--text-muted);
-  cursor: pointer; padding: 3px 10px; border-radius: 8px;
-  border: 1px solid var(--border); transition: all 0.2s; font-weight: 500;
+  font-size: 13px; color: var(--text-secondary);
+  cursor: pointer; padding: 4px 10px; border-radius: 6px;
+  border: 1.5px solid var(--border); transition: all 0.15s;
+  font-weight: 600;
 }
 .size-option:hover, .size-option.active {
   border-color: var(--primary); color: var(--primary);
-  background: rgba(232,67,10,0.04);
+  background: rgba(0,0,0,0.03); font-weight: 700;
 }
 .item-actions { display: flex; align-items: center; gap: 0; }
 .qty-control {
@@ -2072,7 +2073,61 @@ function updateShopHeader(shop) {
   if (shop.subtitle) document.getElementById('shopSubtitle').textContent = shop.subtitle;
   if (shop.address) document.getElementById('shopAddress').textContent = shop.address;
   if (shop.phone) document.getElementById('shopPhone').textContent = shop.phone;
-  if (shop.hours) document.getElementById('shopHours').textContent = shop.hours;
+  if (shop.hours) {
+    var hoursEl = document.getElementById('shopHours');
+    // 解析營業時間字串
+    var parts = shop.hours.split('/').map(function(s) { return s.trim(); });
+
+    if (parts.length <= 1) {
+      hoursEl.textContent = shop.hours;
+    } else {
+      // 合併相同時間的天
+      var groups = [];
+      var currentTime = '';
+      var currentDays = [];
+
+      parts.forEach(function(p) {
+        // 格式：「週一 11:00-21:00」
+        var match = p.match(/^(週.)[\s]*([\d:]+[-–][\d:]+)$/);
+        if (match) {
+          if (match[2] === currentTime) {
+            currentDays.push(match[1]);
+          } else {
+            if (currentDays.length > 0) {
+              groups.push({ days: currentDays, time: currentTime });
+            }
+            currentDays = [match[1]];
+            currentTime = match[2];
+          }
+        } else {
+          // 格式不符，直接加入
+          if (currentDays.length > 0) {
+            groups.push({ days: currentDays, time: currentTime });
+            currentDays = [];
+            currentTime = '';
+          }
+          groups.push({ days: [p], time: '' });
+        }
+      });
+      if (currentDays.length > 0) {
+        groups.push({ days: currentDays, time: currentTime });
+      }
+
+      // 渲染
+      hoursEl.innerHTML = groups.map(function(g) {
+        if (g.days.length > 2) {
+          // 連續的天：週一～週五
+          return '<div style="display:flex;justify-content:space-between;padding:1px 0;">' +
+            '<span style="color:#64748B;">' + g.days[0] + '～' + g.days[g.days.length - 1] + '</span>' +
+            '<span style="font-weight:600;">' + g.time + '</span></div>';
+        } else {
+          return '<div style="display:flex;justify-content:space-between;padding:1px 0;">' +
+            '<span style="color:#64748B;">' + g.days.join('、') + '</span>' +
+            '<span style="font-weight:600;">' + g.time + '</span></div>';
+        }
+      }).join('');
+    }
+  }
   if (shop.logo) {
     var logoEl = document.getElementById('shopLogo');
     logoEl.innerHTML = '<img src="' + escHtml(shop.logo) + '" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;">';
