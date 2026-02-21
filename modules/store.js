@@ -1773,7 +1773,7 @@ export async function loadMemberList() {
         let query = sb.from('store_customers')
             .select('*')
             .eq('store_id', rdCurrentStoreId)
-            .order('last_order_at', { ascending: false, nullsFirst: false })
+            .order('updated_at', { ascending: false })
             .limit(100);
 
         const { data } = await query;
@@ -1821,7 +1821,7 @@ function renderMemberList(searchQuery) {
         if (isBlack) tags.push('<span style="background:#FEE2E2;color:#991B1B;padding:2px 6px;border-radius:4px;font-size:10px;">🚫 黑名單</span>');
         if (c.no_show_count > 0 && !isBlack) tags.push('<span style="background:#FEF3C7;color:#92400E;padding:2px 6px;border-radius:4px;font-size:10px;">⚠️ 未取餐x' + c.no_show_count + '</span>');
 
-        const lastDate = c.last_order_at ? new Date(c.last_order_at).toLocaleDateString('zh-TW') : '-';
+        const lastDate = c.updated_at ? new Date(c.updated_at).toLocaleDateString('zh-TW') : '-';
 
         return '<div onclick="openMemberDetail(\'' + esc(c.phone).replace(/'/g, "\\'") + '\')" style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid #F1F5F9;cursor:pointer;transition:background 0.15s;' + (isBlack ? 'opacity:0.6;' : '') + '" onmouseover="this.style.background=\'#F8FAFC\'" onmouseout="this.style.background=\'\'">' +
             '<div style="width:40px;height:40px;border-radius:50%;background:#EEF2FF;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">' + (isBlack ? '🚫' : (isVip ? '⭐' : '👤')) + '</div>' +
@@ -2709,7 +2709,7 @@ export function searchMemberByPhone() {
 
         try {
             const { data: customer } = await sb.from('store_customers')
-                .select('*, loyalty_points(points)')
+                .select('*')
                 .eq('store_id', memberCurrentStoreId)
                 .eq('phone', phone)
                 .maybeSingle();
@@ -2720,14 +2720,14 @@ export function searchMemberByPhone() {
                 return;
             }
 
-            const pts = customer.loyalty_points?.[0]?.points || 0;
-            const vipTag = customer.is_vip ? '<span style="background:#FCD34D;color:#78350F;padding:2px 6px;border-radius:4px;font-size:11px;font-weight:700;margin-left:4px;">⭐VIP</span>' : '';
+            const isVip = (customer.total_orders || 0) >= 10;
+            const vipTag = isVip ? '<span style="background:#FCD34D;color:#78350F;padding:2px 6px;border-radius:4px;font-size:11px;font-weight:700;margin-left:4px;">⭐VIP</span>' : '';
             const blackTag = customer.is_blacklisted ? '<span style="background:#FEE2E2;color:#DC2626;padding:2px 6px;border-radius:4px;font-size:11px;font-weight:700;margin-left:4px;">🚫黑名單</span>' : '';
 
             resultEl.innerHTML = '<div style="background:#fff;border:2px solid #4F46E5;border-radius:12px;padding:16px;">' +
                 '<div style="font-size:16px;font-weight:700;margin-bottom:8px;">' + esc(customer.name || '未命名') + vipTag + blackTag + '</div>' +
                 '<div style="font-size:13px;color:#64748B;">📱 ' + esc(customer.phone) + '</div>' +
-                '<div style="font-size:13px;color:#64748B;margin-top:4px;">💰 集點：<b>' + pts + '</b> 點</div>' +
+                '<div style="font-size:13px;color:#64748B;margin-top:4px;">💰 消費：<b>$' + (customer.total_spent || 0).toLocaleString() + '</b> · ' + (customer.total_orders || 0) + ' 筆</div>' +
             '</div>';
         } catch(e) {
             document.getElementById('memberSearchResult').innerHTML = '';
