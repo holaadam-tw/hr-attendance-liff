@@ -2151,10 +2151,11 @@ export async function loadMembersForStore() {
         // 載入會員統計
         const { data: customers } = await sb.from('store_customers')
             .select('*')
-            .eq('store_id', memberCurrentStoreId);
+            .eq('store_id', memberCurrentStoreId)
+            .order('last_order_at', { ascending: false, nullsFirst: false });
 
         const totalCount = customers?.length || 0;
-        const vipCount = customers?.filter(c => c.is_vip).length || 0;
+        const vipCount = customers?.filter(c => c.is_vip || (c.total_orders || 0) >= 5).length || 0;
 
         document.getElementById('memberTotalCount').textContent = totalCount;
         document.getElementById('memberVipCount').textContent = vipCount;
@@ -2169,10 +2170,84 @@ export async function loadMembersForStore() {
         const toggle = document.getElementById('memberLoyaltyEnabled');
         toggle.checked = enabled;
         updateToggleStyle(toggle);
+
+        // 渲染會員列表
+        renderMemberListForAdmin(customers || []);
     } catch(e) {
+        console.error('loadMembersForStore error:', e);
         showToast('載入失敗');
     }
 }
+
+function renderMemberListForAdmin(customers) {
+    const resultEl = document.getElementById('memberSearchResult');
+    if (!resultEl) return;
+
+    if (!customers || customers.length === 0) {
+        resultEl.innerHTML = '<div style="text-align:center;padding:40px 20px;color:#94A3B8;">' +
+            '<div style="font-size:48px;margin-bottom:12px;">👥</div>' +
+            '<div style="font-size:15px;font-weight:600;">尚無會員資料</div>' +
+            '<div style="font-size:13px;margin-top:4px;">客人透過掃碼點餐後會自動建立會員</div>' +
+            '</div>';
+        return;
+    }
+
+    let html = '<div style="margin-top:20px;">';
+    html += '<div style="font-size:15px;font-weight:700;margin-bottom:12px;">📋 會員列表 (' + customers.length + ')</div>';
+
+    // 搜尋框
+    html += '<input type="text" id="memberSearchFilterInput" oninput="filterMemberListAdmin()" placeholder="🔍 搜尋會員（姓名/電話）" style="width:100%;padding:10px 14px;border:2px solid #E2E8F0;border-radius:10px;font-size:14px;margin-bottom:12px;box-sizing:border-box;font-family:inherit;">';
+
+    html += '<div id="memberListAdminContainer">';
+    customers.forEach(function(c) {
+        const joinDate = c.created_at ? new Date(c.created_at).toLocaleDateString('zh-TW') : '-';
+        const lastOrder = c.last_order_at ? new Date(c.last_order_at).toLocaleDateString('zh-TW') : '-';
+        const isVip = c.is_vip || (c.total_orders || 0) >= 5;
+
+        html += '<div class="member-card-admin" data-name="' + esc(c.name || '') + '" data-phone="' + esc(c.phone || '') + '" style="display:flex;justify-content:space-between;align-items:center;padding:14px;background:#fff;border:1px solid #E2E8F0;border-radius:12px;margin-bottom:8px;">';
+
+        // 左側：頭像 + 資訊
+        html += '<div style="display:flex;align-items:center;gap:12px;flex:1;">';
+        // 頭像
+        html += '<div style="width:44px;height:44px;border-radius:22px;background:linear-gradient(135deg,#6366F1,#8B5CF6);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:16px;flex-shrink:0;">';
+        html += (c.name || '?').substring(0, 1);
+        html += '</div>';
+        // 文字資訊
+        html += '<div style="min-width:0;">';
+        html += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">';
+        html += '<span style="font-weight:700;font-size:15px;">' + esc(c.name || '匿名會員') + '</span>';
+        if (isVip) html += '<span style="background:#D1FAE5;color:#065F46;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:600;">⭐ VIP</span>';
+        html += '</div>';
+        html += '<div style="font-size:12px;color:#64748B;">📱 ' + esc(c.phone || '-') + '</div>';
+        html += '<div style="font-size:11px;color:#94A3B8;margin-top:2px;">加入: ' + joinDate + ' · 最後消費: ' + lastOrder + '</div>';
+        html += '</div>';
+        html += '</div>';
+
+        // 右側：點數 + 訂單數
+        html += '<div style="text-align:right;flex-shrink:0;margin-left:12px;">';
+        html += '<div style="font-size:20px;font-weight:800;color:#6366F1;">' + (c.points || 0) + ' <span style="font-size:11px;font-weight:600;">點</span></div>';
+        html += '<div style="font-size:12px;color:#64748B;">' + (c.total_orders || 0) + ' 筆訂單</div>';
+        const totalSpent = c.total_spent || c.total_amount || 0;
+        if (totalSpent > 0) {
+            html += '<div style="font-size:11px;color:#94A3B8;">$' + totalSpent.toLocaleString() + '</div>';
+        }
+        html += '</div>';
+
+        html += '</div>';
+    });
+    html += '</div></div>';
+
+    resultEl.innerHTML = html;
+}
+
+window.filterMemberListAdmin = function() {
+    const keyword = (document.getElementById('memberSearchFilterInput')?.value || '').toLowerCase();
+    document.querySelectorAll('.member-card-admin').forEach(function(card) {
+        const name = (card.getAttribute('data-name') || '').toLowerCase();
+        const phone = (card.getAttribute('data-phone') || '').toLowerCase();
+        card.style.display = (name.includes(keyword) || phone.includes(keyword)) ? '' : 'none';
+    });
+};
 
 export async function toggleMemberLoyalty() {
     const toggle = document.getElementById('memberLoyaltyEnabled');
