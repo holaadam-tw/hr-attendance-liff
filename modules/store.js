@@ -2257,14 +2257,26 @@ export async function loadMemberStoreList() {
     try {
         const { data: stores } = await sb.from('store_profiles')
             .select('*')
+            .eq('company_id', currentCompanyId) // 只載入當前公司的商店
             .order('name');
 
         const sel = document.getElementById('memberStoreSelect');
         if (!sel) return;
 
-        sel.innerHTML = '<option value="">-- 請選擇商店 --</option>' +
-            (stores || []).map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join('');
+        if (!stores || stores.length === 0) {
+            sel.innerHTML = '<option value="">目前沒有商店</option>';
+            document.getElementById('memberContent').style.display = 'none';
+            return;
+        }
+
+        // 填充下拉選單
+        sel.innerHTML = stores.map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join('');
+
+        // 自動選第一家商店並載入會員資料
+        sel.value = stores[0].id;
+        await loadMembersForStore();
     } catch(e) {
+        console.error('loadMemberStoreList error:', e);
         showToast('載入商店列表失敗');
     }
 }

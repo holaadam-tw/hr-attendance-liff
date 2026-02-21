@@ -147,6 +147,13 @@ function escapeHTML(str) {
     return div.innerHTML;
 }
 
+// XSS 防護簡寫（供 HTML 模板使用）
+function esc(str) {
+    if (str == null) return '';
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+window.esc = esc; // 供全域使用
+
 // 動態填入年度選項（當年 + 前2年）
 function populateYearSelect(selectId) {
     const sel = document.getElementById(selectId);
