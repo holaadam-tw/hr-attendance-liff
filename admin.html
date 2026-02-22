@@ -1607,38 +1607,8 @@
                     </select>
                 </div>
 
-                <!-- 內容區 -->
-                <div id="bookingContent" style="display:none;">
-                    <!-- Tab 切換 -->
-                    <div style="display:flex;gap:4px;margin-bottom:16px;background:#F1F5F9;border-radius:10px;padding:4px;">
-                        <button onclick="switchBookingTab('list')" id="bTabList" style="flex:1;padding:8px 4px;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;background:#fff;color:#1E293B;box-shadow:0 1px 3px rgba(0,0,0,0.1);transition:all .2s;">📋 預約列表</button>
-                        <button onclick="switchBookingTab('services')" id="bTabServices" style="flex:1;padding:8px 4px;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;background:transparent;color:#64748B;transition:all .2s;">🔧 服務設定</button>
-                        <button onclick="switchBookingTab('staff')" id="bTabStaff" style="flex:1;padding:8px 4px;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;background:transparent;color:#64748B;transition:all .2s;">👤 人員設定</button>
-                    </div>
-
-                    <!-- Tab 1: 預約列表 -->
-                    <div id="bookingTabList">
-                        <div style="display:flex;gap:6px;margin-bottom:12px;overflow-x:auto;padding-bottom:2px;">
-                            <button onclick="loadBookingList('today')" id="bFilterToday" style="flex-shrink:0;padding:6px 14px;border:1.5px solid #3B82F6;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;background:#3B82F6;color:#fff;">今天</button>
-                            <button onclick="loadBookingList('tomorrow')" id="bFilterTomorrow" style="flex-shrink:0;padding:6px 14px;border:1.5px solid #E2E8F0;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;background:#fff;color:#64748B;">明天</button>
-                            <button onclick="loadBookingList('week')" id="bFilterWeek" style="flex-shrink:0;padding:6px 14px;border:1.5px solid #E2E8F0;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;background:#fff;color:#64748B;">本週</button>
-                            <button onclick="loadBookingList('all')" id="bFilterAll" style="flex-shrink:0;padding:6px 14px;border:1.5px solid #E2E8F0;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;background:#fff;color:#64748B;">全部</button>
-                        </div>
-                        <div id="bookingListContainer"><p style="text-align:center;color:#94A3B8;padding:20px;">載入中...</p></div>
-                    </div>
-
-                    <!-- Tab 2: 服務設定 -->
-                    <div id="bookingTabServices" style="display:none;">
-                        <button onclick="addBookingService()" style="width:100%;padding:12px;background:#3B82F6;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:12px;">+ 新增服務</button>
-                        <div id="bookingServiceList"><p style="text-align:center;color:#94A3B8;padding:20px;">載入中...</p></div>
-                    </div>
-
-                    <!-- Tab 3: 人員設定 -->
-                    <div id="bookingTabStaff" style="display:none;">
-                        <button onclick="addBookingStaff()" style="width:100%;padding:12px;background:#3B82F6;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:12px;">+ 新增人員</button>
-                        <div id="bookingStaffList"><p style="text-align:center;color:#94A3B8;padding:20px;">載入中...</p></div>
-                    </div>
-                </div>
+                <!-- 內容區（由 loadBookingForStore 動態渲染） -->
+                <div id="bookingContent" style="display:none;"></div>
             </div>
         </div>
 

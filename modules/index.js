@@ -75,9 +75,6 @@ import {
     closeMemberDetail, setAdjustType, submitAdjustPoints, toggleBlacklist,
     loadTransactions, toggleLoyalty, loadMemberList,
     loadBookingForStore, loadBookingStoreList,
-    switchBookingTab, loadBookingList, updateBookingStatus,
-    loadBookingServices, addBookingService, deleteBookingService,
-    loadBookingStaff, addBookingStaff, deleteBookingStaff,
     loadMembersForStore, toggleMemberLoyalty, searchMemberByPhone, loadMemberStoreList
 } from './store.js';
 
@@ -280,17 +277,9 @@ window.loadTransactions = loadTransactions;
 window.toggleLoyalty = toggleLoyalty;
 
 // booking management (independent page)
+// interactive callbacks (selectBookingDate, switchBookingView, etc.) are window.xxx in store.js
 window.loadBookingForStore = loadBookingForStore;
 window.loadBookingStoreList = loadBookingStoreList;
-window.switchBookingTab = switchBookingTab;
-window.loadBookingList = loadBookingList;
-window.updateBookingStatus = updateBookingStatus;
-window.loadBookingServices = loadBookingServices;
-window.addBookingService = addBookingService;
-window.deleteBookingService = deleteBookingService;
-window.loadBookingStaff = loadBookingStaff;
-window.addBookingStaff = addBookingStaff;
-window.deleteBookingStaff = deleteBookingStaff;
 
 // member management (independent page)
 window.loadMembersForStore = loadMembersForStore;
