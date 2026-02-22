@@ -1597,7 +1597,7 @@
             <button class="btn btn-secondary" onclick="showPage('adminHomePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
             <div class="checkin-page">
                 <h2>📅 預約管理</h2>
-                <p style="color:#94A3B8;font-size:13px;margin-bottom:16px;">管理預約服務、人員與訂單（美容/美甲/診所等）</p>
+                <p style="color:#94A3B8;font-size:13px;margin-bottom:16px;">管理預約服務、人員與訂單</p>
 
                 <!-- 商店選擇器 -->
                 <div class="form-group">
@@ -1609,34 +1609,35 @@
 
                 <!-- 內容區 -->
                 <div id="bookingContent" style="display:none;">
-                    <div style="background:#F8FAFC;border-radius:12px;padding:14px;margin-bottom:16px;">
-                        <div style="display:flex;justify-content:space-between;align-items:center;">
-                            <div>
-                                <div style="font-size:13px;color:#64748B;">預約開關</div>
-                                <div style="font-size:11px;color:#94A3B8;margin-top:2px;">關閉後客戶無法新增預約</div>
-                            </div>
-                            <label style="position:relative;display:inline-block;width:48px;height:26px;margin:0;">
-                                <input type="checkbox" id="bookingEnabled" onchange="toggleBookingEnabled()" style="opacity:0;width:0;height:0;">
-                                <span style="position:absolute;cursor:pointer;top:0;left:0;right:0;bottom:0;background:#CBD5E1;border-radius:26px;transition:0.3s;"></span>
-                                <span style="position:absolute;content:'';height:20px;width:20px;left:3px;bottom:3px;background:white;border-radius:50%;transition:0.3s;"></span>
-                            </label>
-                        </div>
+                    <!-- Tab 切換 -->
+                    <div style="display:flex;gap:4px;margin-bottom:16px;background:#F1F5F9;border-radius:10px;padding:4px;">
+                        <button onclick="switchBookingTab('list')" id="bTabList" style="flex:1;padding:8px 4px;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;background:#fff;color:#1E293B;box-shadow:0 1px 3px rgba(0,0,0,0.1);transition:all .2s;">📋 預約列表</button>
+                        <button onclick="switchBookingTab('services')" id="bTabServices" style="flex:1;padding:8px 4px;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;background:transparent;color:#64748B;transition:all .2s;">🔧 服務設定</button>
+                        <button onclick="switchBookingTab('staff')" id="bTabStaff" style="flex:1;padding:8px 4px;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;background:transparent;color:#64748B;transition:all .2s;">👤 人員設定</button>
                     </div>
 
-                    <div style="display:flex;gap:8px;margin-bottom:16px;">
-                        <div style="flex:1;background:#EFF6FF;border-radius:12px;padding:12px;text-align:center;">
-                            <div style="font-size:11px;color:#3B82F6;">本週預約</div>
-                            <div id="bookingWeekCount" style="font-size:24px;font-weight:900;color:#1E40AF;margin-top:4px;">0</div>
+                    <!-- Tab 1: 預約列表 -->
+                    <div id="bookingTabList">
+                        <div style="display:flex;gap:6px;margin-bottom:12px;overflow-x:auto;padding-bottom:2px;">
+                            <button onclick="loadBookingList('today')" id="bFilterToday" style="flex-shrink:0;padding:6px 14px;border:1.5px solid #3B82F6;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;background:#3B82F6;color:#fff;">今天</button>
+                            <button onclick="loadBookingList('tomorrow')" id="bFilterTomorrow" style="flex-shrink:0;padding:6px 14px;border:1.5px solid #E2E8F0;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;background:#fff;color:#64748B;">明天</button>
+                            <button onclick="loadBookingList('week')" id="bFilterWeek" style="flex-shrink:0;padding:6px 14px;border:1.5px solid #E2E8F0;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;background:#fff;color:#64748B;">本週</button>
+                            <button onclick="loadBookingList('all')" id="bFilterAll" style="flex-shrink:0;padding:6px 14px;border:1.5px solid #E2E8F0;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;background:#fff;color:#64748B;">全部</button>
                         </div>
-                        <div style="flex:1;background:#FEF3C7;border-radius:12px;padding:12px;text-align:center;">
-                            <div style="font-size:11px;color:#F59E0B;">待確認</div>
-                            <div id="bookingPendingCount" style="font-size:24px;font-weight:900;color:#92400E;margin-top:4px;">0</div>
-                        </div>
+                        <div id="bookingListContainer"><p style="text-align:center;color:#94A3B8;padding:20px;">載入中...</p></div>
                     </div>
 
-                    <p style="text-align:center;color:#94A3B8;font-size:13px;margin-top:20px;">
-                        💡 完整預約設定（服務項目/人員/時段）請至 booking.html 進行管理
-                    </p>
+                    <!-- Tab 2: 服務設定 -->
+                    <div id="bookingTabServices" style="display:none;">
+                        <button onclick="addBookingService()" style="width:100%;padding:12px;background:#3B82F6;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:12px;">+ 新增服務</button>
+                        <div id="bookingServiceList"><p style="text-align:center;color:#94A3B8;padding:20px;">載入中...</p></div>
+                    </div>
+
+                    <!-- Tab 3: 人員設定 -->
+                    <div id="bookingTabStaff" style="display:none;">
+                        <button onclick="addBookingStaff()" style="width:100%;padding:12px;background:#3B82F6;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:12px;">+ 新增人員</button>
+                        <div id="bookingStaffList"><p style="text-align:center;color:#94A3B8;padding:20px;">載入中...</p></div>
+                    </div>
                 </div>
             </div>
         </div>

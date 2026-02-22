@@ -74,7 +74,10 @@ import {
     loadMembersTab, searchMembers, filterMembers, openMemberDetail,
     closeMemberDetail, setAdjustType, submitAdjustPoints, toggleBlacklist,
     loadTransactions, toggleLoyalty, loadMemberList,
-    loadBookingForStore, toggleBookingEnabled, loadBookingStoreList,
+    loadBookingForStore, loadBookingStoreList,
+    switchBookingTab, loadBookingList, updateBookingStatus,
+    loadBookingServices, addBookingService, deleteBookingService,
+    loadBookingStaff, addBookingStaff, deleteBookingStaff,
     loadMembersForStore, toggleMemberLoyalty, searchMemberByPhone, loadMemberStoreList
 } from './store.js';
 
@@ -278,8 +281,16 @@ window.toggleLoyalty = toggleLoyalty;
 
 // booking management (independent page)
 window.loadBookingForStore = loadBookingForStore;
-window.toggleBookingEnabled = toggleBookingEnabled;
 window.loadBookingStoreList = loadBookingStoreList;
+window.switchBookingTab = switchBookingTab;
+window.loadBookingList = loadBookingList;
+window.updateBookingStatus = updateBookingStatus;
+window.loadBookingServices = loadBookingServices;
+window.addBookingService = addBookingService;
+window.deleteBookingService = deleteBookingService;
+window.loadBookingStaff = loadBookingStaff;
+window.addBookingStaff = addBookingStaff;
+window.deleteBookingStaff = deleteBookingStaff;
 
 // member management (independent page)
 window.loadMembersForStore = loadMembersForStore;

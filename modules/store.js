@@ -2063,6 +2063,7 @@ function renderTxRow(tx) {
 // 預約管理（獨立頁面）
 // ============================================================
 let bookingCurrentStoreId = null;
+let bookingCurrentFilter = 'today';
 
 export async function loadBookingForStore() {
     const sel = document.getElementById('bookingStoreSelect');
@@ -2073,62 +2074,261 @@ export async function loadBookingForStore() {
         return;
     }
     content.style.display = 'block';
+    // 預設顯示預約列表 tab
+    switchBookingTab('list');
+}
+
+export function switchBookingTab(tab) {
+    const tabs = ['list', 'services', 'staff'];
+    const tabBtns = { list: 'bTabList', services: 'bTabServices', staff: 'bTabStaff' };
+    const tabDivs = { list: 'bookingTabList', services: 'bookingTabServices', staff: 'bookingTabStaff' };
+
+    tabs.forEach(t => {
+        const btn = document.getElementById(tabBtns[t]);
+        const div = document.getElementById(tabDivs[t]);
+        if (!btn || !div) return;
+        const isActive = t === tab;
+        btn.style.background = isActive ? '#fff' : 'transparent';
+        btn.style.color = isActive ? '#1E293B' : '#64748B';
+        btn.style.boxShadow = isActive ? '0 1px 3px rgba(0,0,0,0.1)' : 'none';
+        div.style.display = isActive ? '' : 'none';
+    });
+
+    if (tab === 'list') loadBookingList(bookingCurrentFilter);
+    else if (tab === 'services') loadBookingServices(bookingCurrentStoreId);
+    else if (tab === 'staff') loadBookingStaff(bookingCurrentStoreId);
+}
+
+export async function loadBookingList(dateFilter) {
+    bookingCurrentFilter = dateFilter || 'today';
+    const storeId = bookingCurrentStoreId;
+    if (!storeId) return;
+
+    // 更新篩選按鈕樣式
+    ['today','tomorrow','week','all'].forEach(f => {
+        const btn = document.getElementById('bFilter' + f.charAt(0).toUpperCase() + f.slice(1));
+        if (!btn) return;
+        const active = f === bookingCurrentFilter;
+        btn.style.background = active ? '#3B82F6' : '#fff';
+        btn.style.color = active ? '#fff' : '#64748B';
+        btn.style.borderColor = active ? '#3B82F6' : '#E2E8F0';
+        btn.style.fontWeight = active ? '700' : '600';
+    });
+
+    const container = document.getElementById('bookingListContainer');
+    container.innerHTML = '<p style="text-align:center;color:#94A3B8;padding:20px;">載入中...</p>';
 
     try {
-        // 載入預約統計
-        const today = new Date();
-        const weekStart = new Date(today);
-        weekStart.setDate(today.getDate() - today.getDay());
-        const weekEnd = new Date(weekStart);
-        weekEnd.setDate(weekStart.getDate() + 6);
+        const today = new Date().toISOString().split('T')[0];
+        let query = sb.from('bookings')
+            .select('*, booking_services(name)')
+            .eq('store_id', storeId);
 
-        const { data: bookings } = await sb.from('bookings')
-            .select('*')
-            .eq('store_id', bookingCurrentStoreId)
-            .gte('booking_date', weekStart.toISOString().split('T')[0])
-            .lte('booking_date', weekEnd.toISOString().split('T')[0]);
+        if (bookingCurrentFilter === 'today') {
+            query = query.eq('booking_date', today);
+        } else if (bookingCurrentFilter === 'tomorrow') {
+            const tmr = new Date(); tmr.setDate(tmr.getDate() + 1);
+            query = query.eq('booking_date', tmr.toISOString().split('T')[0]);
+        } else if (bookingCurrentFilter === 'week') {
+            const weekEnd = new Date(); weekEnd.setDate(weekEnd.getDate() + 7);
+            query = query.gte('booking_date', today).lte('booking_date', weekEnd.toISOString().split('T')[0]);
+        } else {
+            query = query.gte('booking_date', today);
+        }
 
-        const weekCount = bookings?.length || 0;
-        const pendingCount = bookings?.filter(b => b.status === 'pending').length || 0;
+        const { data: bookings, error } = await query.order('booking_date').order('booking_time');
+        if (error) throw error;
 
-        document.getElementById('bookingWeekCount').textContent = weekCount;
-        document.getElementById('bookingPendingCount').textContent = pendingCount;
+        if (!bookings || bookings.length === 0) {
+            container.innerHTML = '<p style="text-align:center;color:#94A3B8;padding:30px;">此期間沒有預約</p>';
+            return;
+        }
 
-        // 載入開關狀態（從 booking_settings 表）
-        const { data: settings } = await sb.from('booking_settings')
-            .select('*')
-            .eq('store_id', bookingCurrentStoreId)
-            .maybeSingle();
+        const statusColors = { pending:'#F59E0B', confirmed:'#3B82F6', completed:'#10B981', cancelled:'#EF4444' };
+        const statusLabels = { pending:'待確認', confirmed:'已確認', completed:'已完成', cancelled:'已取消' };
 
-        const enabled = settings?.is_active !== false;
-        const toggle = document.getElementById('bookingEnabled');
-        toggle.checked = enabled;
-        updateToggleStyle(toggle);
+        let html = '';
+        bookings.forEach(b => {
+            const svcName = b.booking_services?.name || b.service_type || '';
+            const statusColor = statusColors[b.status] || '#94A3B8';
+            const statusLabel = statusLabels[b.status] || b.status;
+            html += `<div style="padding:14px;background:#fff;border:1px solid #E2E8F0;border-radius:12px;margin-bottom:8px;">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+    <div style="flex:1;">
+      <div style="font-weight:700;font-size:15px;">${esc(b.customer_name)}</div>
+      <div style="font-size:12px;color:#64748B;margin-top:2px;">📱 ${esc(b.customer_phone)}</div>
+      <div style="font-size:12px;color:#94A3B8;margin-top:2px;">🗓 ${b.booking_date} ${b.booking_time ? b.booking_time.substring(0,5) : ''}</div>
+      ${svcName ? `<div style="font-size:12px;color:#64748B;margin-top:2px;">🔧 ${esc(svcName)}</div>` : ''}
+      ${b.notes ? `<div style="font-size:12px;color:#94A3B8;margin-top:2px;">💬 ${esc(b.notes)}</div>` : ''}
+    </div>
+    <div style="text-align:right;flex-shrink:0;margin-left:8px;">
+      <div style="display:inline-block;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;color:#fff;background:${statusColor};">${statusLabel}</div>
+      ${b.status === 'pending' ? `
+      <div style="margin-top:6px;display:flex;gap:4px;justify-content:flex-end;">
+        <button onclick="updateBookingStatus('${b.id}','confirmed')" style="padding:4px 8px;border:none;border-radius:6px;background:#3B82F6;color:#fff;font-size:11px;font-weight:700;cursor:pointer;">✓ 確認</button>
+        <button onclick="updateBookingStatus('${b.id}','cancelled')" style="padding:4px 8px;border:none;border-radius:6px;background:#EF4444;color:#fff;font-size:11px;font-weight:700;cursor:pointer;">✕ 取消</button>
+      </div>` : ''}
+      ${b.status === 'confirmed' ? `
+      <div style="margin-top:6px;">
+        <button onclick="updateBookingStatus('${b.id}','completed')" style="padding:4px 8px;border:none;border-radius:6px;background:#10B981;color:#fff;font-size:11px;font-weight:700;cursor:pointer;">✓ 完成</button>
+      </div>` : ''}
+    </div>
+  </div>
+</div>`;
+        });
+        container.innerHTML = html;
     } catch(e) {
-        showToast('載入失敗');
+        console.error('loadBookingList error:', e);
+        container.innerHTML = '<p style="text-align:center;color:#EF4444;padding:20px;">載入失敗</p>';
     }
 }
 
-export async function toggleBookingEnabled() {
-    const toggle = document.getElementById('bookingEnabled');
-    const enabled = toggle.checked;
-    updateToggleStyle(toggle);
-
-    if (!bookingCurrentStoreId) return;
-
+export async function updateBookingStatus(id, status) {
     try {
-        // 更新 booking_settings
-        await sb.from('booking_settings')
-            .upsert({
-                store_id: bookingCurrentStoreId,
-                is_active: enabled
-            }, { onConflict: 'store_id' });
-
-        showToast(enabled ? '✅ 已開啟預約功能' : '✅ 已關閉預約功能');
+        const { error } = await sb.from('bookings').update({ status, updated_at: new Date().toISOString() }).eq('id', id);
+        if (error) throw error;
+        showToast('✅ 已更新狀態');
+        loadBookingList(bookingCurrentFilter);
     } catch(e) {
         showToast('更新失敗');
-        toggle.checked = !enabled;
-        updateToggleStyle(toggle);
+    }
+}
+
+export async function loadBookingServices(storeId) {
+    if (!storeId) return;
+    const el = document.getElementById('bookingServiceList');
+    el.innerHTML = '<p style="text-align:center;color:#94A3B8;padding:20px;">載入中...</p>';
+
+    try {
+        const { data: services, error } = await sb.from('booking_services')
+            .select('*').eq('store_id', storeId).order('sort_order');
+        if (error) throw error;
+
+        if (!services || services.length === 0) {
+            el.innerHTML = '<p style="text-align:center;color:#94A3B8;padding:20px;">尚無服務項目，請新增</p>';
+            return;
+        }
+
+        el.innerHTML = services.map(s => `
+<div style="padding:14px;background:#fff;border:1px solid #E2E8F0;border-radius:12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
+  <div>
+    <div style="font-weight:700;">${esc(s.name)}</div>
+    <div style="font-size:12px;color:#64748B;margin-top:3px;">⏱ ${s.duration_minutes} 分鐘${s.price ? ' · $' + s.price : ' · 免費'}</div>
+    ${s.description ? `<div style="font-size:11px;color:#94A3B8;margin-top:2px;">${esc(s.description)}</div>` : ''}
+  </div>
+  <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;margin-left:8px;">
+    <span style="font-size:12px;color:${s.is_active ? '#10B981' : '#94A3B8'};">${s.is_active ? '啟用' : '停用'}</span>
+    <button onclick="deleteBookingService('${s.id}')" style="padding:4px 8px;border:none;border-radius:6px;background:#FEE2E2;color:#EF4444;font-size:12px;font-weight:600;cursor:pointer;">刪除</button>
+  </div>
+</div>`).join('');
+    } catch(e) {
+        el.innerHTML = '<p style="text-align:center;color:#EF4444;padding:20px;">載入失敗</p>';
+    }
+}
+
+export async function addBookingService() {
+    const storeId = bookingCurrentStoreId;
+    if (!storeId) return;
+
+    const name = prompt('服務名稱：');
+    if (!name || !name.trim()) return;
+    const duration = prompt('服務時長（分鐘）：', '30');
+    const price = prompt('價格（留空=免費）：', '');
+    const description = prompt('說明（選填）：', '');
+
+    try {
+        const { error } = await sb.from('booking_services').insert({
+            store_id: storeId,
+            name: name.trim(),
+            duration_minutes: parseInt(duration) || 30,
+            price: price && price.trim() ? parseInt(price) : null,
+            description: description && description.trim() ? description.trim() : null,
+            is_active: true
+        });
+        if (error) throw error;
+        showToast('✅ 已新增服務');
+        loadBookingServices(storeId);
+    } catch(e) {
+        showToast('新增失敗：' + (e.message || ''));
+    }
+}
+
+export async function deleteBookingService(id) {
+    if (!confirm('確定刪除此服務？')) return;
+    try {
+        const { error } = await sb.from('booking_services').delete().eq('id', id);
+        if (error) throw error;
+        showToast('✅ 已刪除');
+        loadBookingServices(bookingCurrentStoreId);
+    } catch(e) {
+        showToast('刪除失敗');
+    }
+}
+
+export async function loadBookingStaff(storeId) {
+    if (!storeId) return;
+    const el = document.getElementById('bookingStaffList');
+    el.innerHTML = '<p style="text-align:center;color:#94A3B8;padding:20px;">載入中...</p>';
+
+    try {
+        const { data: staff, error } = await sb.from('booking_staff')
+            .select('*').eq('store_id', storeId).order('sort_order');
+        if (error) throw error;
+
+        if (!staff || staff.length === 0) {
+            el.innerHTML = '<p style="text-align:center;color:#94A3B8;padding:20px;">尚無服務人員，請新增</p>';
+            return;
+        }
+
+        el.innerHTML = staff.map(s => `
+<div style="padding:14px;background:#fff;border:1px solid #E2E8F0;border-radius:12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
+  <div style="display:flex;align-items:center;gap:12px;">
+    <div style="width:40px;height:40px;border-radius:20px;background:linear-gradient(135deg,#6366F1,#8B5CF6);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:16px;flex-shrink:0;">${esc((s.display_name||'?').substring(0,1))}</div>
+    <div>
+      <div style="font-weight:700;">${esc(s.display_name)}</div>
+      ${s.title ? `<div style="font-size:12px;color:#94A3B8;">${esc(s.title)}</div>` : ''}
+      <div style="font-size:11px;color:${s.is_active ? '#10B981' : '#94A3B8'};margin-top:2px;">${s.is_active ? '啟用中' : '停用'}</div>
+    </div>
+  </div>
+  <button onclick="deleteBookingStaff('${s.id}')" style="padding:4px 8px;border:none;border-radius:6px;background:#FEE2E2;color:#EF4444;font-size:12px;font-weight:600;cursor:pointer;flex-shrink:0;">刪除</button>
+</div>`).join('');
+    } catch(e) {
+        el.innerHTML = '<p style="text-align:center;color:#EF4444;padding:20px;">載入失敗</p>';
+    }
+}
+
+export async function addBookingStaff() {
+    const storeId = bookingCurrentStoreId;
+    if (!storeId) return;
+
+    const name = prompt('人員姓名：');
+    if (!name || !name.trim()) return;
+    const title = prompt('職稱（選填，如：設計師、美甲師）：', '');
+
+    try {
+        const { error } = await sb.from('booking_staff').insert({
+            store_id: storeId,
+            display_name: name.trim(),
+            title: title && title.trim() ? title.trim() : null,
+            is_active: true
+        });
+        if (error) throw error;
+        showToast('✅ 已新增人員');
+        loadBookingStaff(storeId);
+    } catch(e) {
+        showToast('新增失敗：' + (e.message || ''));
+    }
+}
+
+export async function deleteBookingStaff(id) {
+    if (!confirm('確定刪除此人員？')) return;
+    try {
+        const { error } = await sb.from('booking_staff').delete().eq('id', id);
+        if (error) throw error;
+        showToast('✅ 已刪除');
+        loadBookingStaff(bookingCurrentStoreId);
+    } catch(e) {
+        showToast('刪除失敗');
     }
 }
 
