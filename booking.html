@@ -5,6 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>線上預約</title>
 <style>
+:root {
+  --primary: #6366F1;
+  --primary-light: #A5B4FC;
+  --primary-bg: #F5F3FF;
+  --card: #fff;
+  --border: #E2E8F0;
+  --text: #1E293B;
+  --text-muted: #94A3B8;
+}
 * { margin:0; padding:0; box-sizing:border-box; }
 body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #F1F5F9; min-height: 100vh; }
 
@@ -12,7 +21,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .header h1 { font-size: 18px; font-weight: 700; }
 .header .subtitle { font-size: 13px; opacity: .8; margin-top: 2px; }
 
-.container { max-width: 480px; margin: 0 auto; padding: 16px; }
+.container { max-width: 480px; margin: 0 auto; padding: 16px; padding-bottom: 100px; }
 
 /* 步驟指示器 */
 .steps { display: flex; justify-content: center; align-items: center; gap: 8px; margin-bottom: 20px; padding: 16px 0; }
@@ -26,6 +35,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 
 /* 卡片標題 */
 .panel-title { font-size: 18px; font-weight: 700; margin-bottom: 14px; color: #1E293B; }
+.section-title { font-size: 15px; font-weight: 700; margin-bottom: 10px; color: #1E293B; }
 
 /* 服務卡片 */
 .service-card { padding: 16px; background: #fff; border: 2px solid #E2E8F0; border-radius: 12px; margin-bottom: 10px; cursor: pointer; transition: all .2s; }
@@ -38,7 +48,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .staff-avatar { width: 48px; height: 48px; border-radius: 24px; background: linear-gradient(135deg,#6366F1,#8B5CF6); display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 18px; flex-shrink: 0; }
 
 /* 日期 */
-.date-list { display: flex; gap: 8px; overflow-x: auto; margin-bottom: 16px; padding-bottom: 4px; }
+.date-list { display: flex; gap: 8px; overflow-x: auto; margin-bottom: 16px; padding-bottom: 4px; scrollbar-width: none; }
+.date-list::-webkit-scrollbar { display: none; }
 .date-item { flex-shrink: 0; min-width: 64px; padding: 10px 12px; text-align: center; background: #fff; border: 2px solid #E2E8F0; border-radius: 10px; cursor: pointer; transition: all .2s; }
 .date-item.selected { border-color: #6366F1; background: #6366F1; color: #fff; }
 
@@ -49,6 +60,30 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .time-slot.selected { border-color: #6366F1; background: #6366F1; color: #fff; }
 .time-slot.disabled { background: #F8FAFC; color: #CBD5E1; cursor: not-allowed; border-color: #F1F5F9; }
 
+/* 膠囊按鈕（人數 / 稱謂） */
+.pill-btn {
+  flex: 0 0 auto; padding: 12px 22px; border: 2px solid var(--border); border-radius: 50px;
+  background: var(--card); color: var(--text); font-size: 15px; font-weight: 700;
+  cursor: pointer; transition: all .2s; white-space: nowrap; font-family: inherit;
+}
+.pill-btn:hover { border-color: var(--primary-light); }
+.pill-btn.active {
+  background: var(--primary); color: #fff; border-color: var(--primary);
+  box-shadow: 0 4px 12px rgba(99,102,241,.3);
+}
+
+/* 快速標籤 */
+.tag-btn {
+  padding: 8px 14px; border: 1.5px solid var(--border); border-radius: 20px;
+  background: var(--card); font-size: 13px; cursor: pointer; transition: all .2s;
+  user-select: none; font-family: inherit;
+}
+.tag-btn:hover { border-color: var(--primary-light); }
+.tag-btn.active {
+  background: var(--primary-bg); color: var(--primary); border-color: var(--primary);
+  font-weight: 600;
+}
+
 /* 按鈕 */
 .btn-primary { width: 100%; padding: 14px; background: #6366F1; color: #fff; border: none; border-radius: 12px; font-size: 16px; font-weight: 700; cursor: pointer; font-family: inherit; margin-top: 16px; }
 .btn-primary:disabled { background: #CBD5E1; cursor: not-allowed; }
@@ -56,7 +91,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 
 /* 表單 */
 .form-group { margin-bottom: 12px; }
-.form-group label { font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px; color: #374151; }
+.form-label { font-size: 13px; font-weight: 600; display: block; margin-bottom: 6px; color: #374151; }
 .form-input { width: 100%; padding: 12px; border: 2px solid #E2E8F0; border-radius: 10px; font-size: 15px; font-family: inherit; outline: none; transition: border-color .2s; }
 .form-input:focus { border-color: #6366F1; }
 textarea.form-input { resize: none; }
@@ -71,6 +106,23 @@ textarea.form-input { resize: none; }
 .success-page { text-align: center; padding: 40px 20px; }
 .success-icon { font-size: 64px; margin-bottom: 16px; }
 .booking-number { background: #F5F3FF; padding: 16px; border-radius: 12px; margin-bottom: 20px; font-size: 22px; font-weight: 800; color: #6366F1; }
+
+/* 底部懸浮按鈕 */
+.sticky-bottom {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  padding: 12px 16px; padding-bottom: calc(12px + env(safe-area-inset-bottom));
+  background: rgba(255,255,255,.95); backdrop-filter: blur(8px);
+  box-shadow: 0 -2px 12px rgba(0,0,0,.08); z-index: 50;
+  display: none;
+}
+.sticky-bottom.show { display: block; }
+.sticky-btn {
+  width: 100%; max-width: 480px; margin: 0 auto; display: block;
+  padding: 16px; background: linear-gradient(135deg, #4F46E5, #7C3AED);
+  color: #fff; border: none; border-radius: 14px; font-size: 16px; font-weight: 700;
+  cursor: pointer; font-family: inherit; box-shadow: 0 4px 12px rgba(99,102,241,.25);
+}
+.sticky-btn:disabled { background: #CBD5E1; box-shadow: none; cursor: not-allowed; }
 </style>
 </head>
 <body>
@@ -110,38 +162,70 @@ textarea.form-input { resize: none; }
     <button class="btn-outline" onclick="goStep(0)">上一步</button>
   </div>
 
-  <!-- Step 2: 選擇日期時間 -->
+  <!-- Step 2: 人數 + 日期 + 時段 -->
   <div class="step-panel" id="step2">
-    <div class="panel-title">選擇日期</div>
-    <div class="date-list" id="dateList"></div>
-    <div class="panel-title" style="font-size:16px;margin-bottom:10px;">選擇時段</div>
-    <div class="time-grid" id="timeGrid"><p style="grid-column:1/-1;text-align:center;color:#94A3B8;">請先選擇日期</p></div>
-    <button class="btn-primary" onclick="goStep(3)" id="btnToStep3" disabled>下一步</button>
-    <button class="btn-outline" onclick="goStep(1)">上一步</button>
+    <!-- 人數膠囊 -->
+    <div style="margin-bottom:20px;">
+      <div class="section-title">👥 預約人數</div>
+      <div style="display:flex;gap:8px;overflow-x:auto;padding:4px 0;scrollbar-width:none;-webkit-overflow-scrolling:touch;" id="partyPills"></div>
+    </div>
+
+    <!-- 日期選擇 -->
+    <div id="dateSection">
+      <div class="section-title">📅 選擇日期</div>
+      <div class="date-list" id="dateList"></div>
+    </div>
+
+    <!-- 時段選擇 -->
+    <div>
+      <div class="section-title">⏰ 選擇時段</div>
+      <div class="time-grid" id="timeGrid"><p style="grid-column:1/-1;text-align:center;color:#94A3B8;">請先選擇日期</p></div>
+    </div>
+
+    <button class="btn-outline" onclick="goStep(1)" style="margin-top:20px;">上一步</button>
   </div>
 
   <!-- Step 3: 填寫資料 -->
   <div class="step-panel" id="step3">
     <div class="panel-title">填寫資料</div>
     <div class="summary-card" id="bookingSummary"></div>
+
+    <!-- 稱謂 -->
     <div class="form-group">
-      <label>姓名 *</label>
+      <label class="form-label">稱謂</label>
+      <div style="display:flex;gap:8px;" id="titlePills">
+        <div class="pill-btn active" onclick="selectTitle('先生', this)">先生</div>
+        <div class="pill-btn" onclick="selectTitle('小姐', this)">小姐</div>
+      </div>
+    </div>
+
+    <!-- 姓名 -->
+    <div class="form-group">
+      <label class="form-label">姓名 *</label>
       <input type="text" id="custName" class="form-input" placeholder="請輸入姓名">
     </div>
+
+    <!-- 電話 -->
     <div class="form-group">
-      <label>電話 *</label>
+      <label class="form-label">電話 *</label>
       <input type="tel" id="custPhone" class="form-input" placeholder="手機號碼">
     </div>
+
+    <!-- 快速標籤 + 備註 -->
     <div class="form-group">
-      <label>人數</label>
-      <input type="number" id="custParty" class="form-input" value="1" min="1" max="20">
+      <label class="form-label">特殊需求</label>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;" id="quickTags">
+        <div class="tag-btn" onclick="toggleTag(this)" data-tag="需要兒童椅">👶 兒童椅</div>
+        <div class="tag-btn" onclick="toggleTag(this)" data-tag="慶生">🎂 慶生</div>
+        <div class="tag-btn" onclick="toggleTag(this)" data-tag="輪椅空間">♿ 輪椅</div>
+        <div class="tag-btn" onclick="toggleTag(this)" data-tag="靠窗座位">🪟 靠窗</div>
+        <div class="tag-btn" onclick="toggleTag(this)" data-tag="素食需求">🥬 素食</div>
+        <div class="tag-btn" onclick="toggleTag(this)" data-tag="安靜區域">🤫 安靜區</div>
+      </div>
+      <textarea class="form-input" id="custNotes" rows="2" placeholder="其他需求（選填）"></textarea>
     </div>
-    <div class="form-group">
-      <label>備註</label>
-      <textarea id="custNotes" class="form-input" rows="2" placeholder="特殊需求（選填）"></textarea>
-    </div>
-    <button class="btn-primary" onclick="submitBooking()">確認預約</button>
-    <button class="btn-outline" onclick="goStep(2)">上一步</button>
+
+    <button class="btn-outline" onclick="goStep(2)" style="margin-top:8px;">上一步</button>
   </div>
 
   <!-- 成功頁 -->
@@ -156,6 +240,11 @@ textarea.form-input { resize: none; }
   </div>
 </div>
 
+<!-- 底部懸浮確認按鈕 -->
+<div class="sticky-bottom" id="stickyBottom">
+  <button class="sticky-btn" id="stickyBtn" onclick="handleStickyBtn()" disabled>請選擇預約資訊</button>
+</div>
+
 <script>
 var SUPABASE_URL = 'https://nssuisyvlrqnqfxupklb.supabase.co';
 var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5zc3Vpc3l2bHJxbnFmeHVwa2xiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkyOTAwMzUsImV4cCI6MjA4NDg2NjAzNX0.q_B6v3gf1TOCuAq7z0xIw10wDueCSJn0p37VzdMfmbc';
@@ -168,6 +257,9 @@ var selectedTime = null;
 var services = [];
 var staffList = [];
 var currentStep = 0;
+var partySize = 1;
+var customerTitle = '先生';
+var selectedTags = [];
 
 function esc(str) {
   if (str == null) return '';
@@ -183,9 +275,7 @@ async function sbFetch(path, opts) {
     headers: headers,
     body: (opts && opts.body) ? JSON.stringify(opts.body) : undefined
   });
-  if (opts && opts.prefer && opts.prefer.includes('return=representation')) {
-    return res.json();
-  }
+  if (opts && opts.prefer && opts.prefer.includes('return=representation')) return res.json();
   if (res.status === 204) return null;
   return res.json();
 }
@@ -198,7 +288,6 @@ async function init() {
     document.querySelector('.container').innerHTML = '<p style="text-align:center;padding:40px;color:#EF4444;">缺少商店參數</p>';
     return;
   }
-
   var stores = await sbFetch('store_profiles?store_slug=eq.' + encodeURIComponent(slug) + '&limit=1');
   if (!Array.isArray(stores) || stores.length === 0) {
     document.querySelector('.container').innerHTML = '<p style="text-align:center;padding:40px;color:#EF4444;">找不到商店</p>';
@@ -218,6 +307,7 @@ async function init() {
   renderServices();
   renderStaff();
   generateDates();
+  renderPartyPills();
 }
 
 // ===== 步驟切換 =====
@@ -235,9 +325,51 @@ function goStep(n) {
   }
   currentStep = n;
 
-  if (n === 2) { generateTimeSlots(); }
-  if (n === 3) { renderSummary(); }
+  if (n === 2) generateTimeSlots();
+  if (n === 3) renderSummary();
   window.scrollTo(0, 0);
+  updateStickyBtn();
+}
+
+// ===== 人數膠囊 =====
+function renderPartyPills() {
+  var el = document.getElementById('partyPills');
+  if (!el) return;
+  var options = [1, 2, 3, 4, 5, 6, 7, 8];
+  el.innerHTML = options.map(function(n) {
+    var label = n === 8 ? '8人+' : n + '人';
+    return '<div class="pill-btn' + (partySize === n ? ' active' : '') + '" onclick="selectParty(' + n + ')">' + label + '</div>';
+  }).join('');
+}
+
+function selectParty(n) {
+  if (n === 8) {
+    var custom = prompt('請輸入人數：', '8');
+    if (custom === null) return;
+    partySize = parseInt(custom) || 8;
+  } else {
+    partySize = n;
+  }
+  renderPartyPills();
+  var dateSection = document.getElementById('dateSection');
+  if (dateSection) dateSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  updateStickyBtn();
+}
+
+// ===== 稱謂 =====
+function selectTitle(title, el) {
+  customerTitle = title;
+  document.querySelectorAll('#titlePills .pill-btn').forEach(function(p) { p.classList.remove('active'); });
+  el.classList.add('active');
+}
+
+// ===== 快速標籤 =====
+function toggleTag(el) {
+  el.classList.toggle('active');
+  var tag = el.getAttribute('data-tag');
+  var idx = selectedTags.indexOf(tag);
+  if (idx >= 0) selectedTags.splice(idx, 1);
+  else selectedTags.push(tag);
 }
 
 // ===== 服務列表 =====
@@ -273,15 +405,11 @@ function selectService(id) {
 // ===== 人員列表 =====
 function renderStaff() {
   var el = document.getElementById('staffList');
-  if (staffList.length === 0) {
-    el.innerHTML = '';
-    return;
-  }
+  if (staffList.length === 0) { el.innerHTML = ''; return; }
   el.innerHTML = staffList.map(function(s) {
     return '<div class="staff-card" id="staff_' + s.id + '" onclick="selectStaff(\'' + s.id + '\')">' +
       '<div class="staff-avatar">' + esc((s.display_name || '?').substring(0, 1)) + '</div>' +
-      '<div>' +
-      '<div style="font-weight:700;">' + esc(s.display_name) + '</div>' +
+      '<div><div style="font-weight:700;">' + esc(s.display_name) + '</div>' +
       (s.title ? '<div style="font-size:12px;color:#94A3B8;">' + esc(s.title) + '</div>' : '') +
       '</div></div>';
   }).join('');
@@ -295,11 +423,8 @@ function selectStaff(id) {
     }
   }
   document.querySelectorAll('.staff-card').forEach(function(c) { c.classList.remove('selected'); });
-  if (id) {
-    document.getElementById('staff_' + id).classList.add('selected');
-  } else {
-    document.getElementById('staffAny').classList.add('selected');
-  }
+  if (id) document.getElementById('staff_' + id).classList.add('selected');
+  else document.getElementById('staffAny').classList.add('selected');
 }
 
 // ===== 日期選擇 =====
@@ -326,11 +451,11 @@ function generateDates() {
 function selectDate(dateStr) {
   selectedDate = dateStr;
   selectedTime = null;
-  document.getElementById('btnToStep3').disabled = true;
   document.querySelectorAll('.date-item').forEach(function(d) { d.classList.remove('selected'); });
   var el = document.getElementById('date_' + dateStr);
   if (el) el.classList.add('selected');
   generateTimeSlots();
+  updateStickyBtn();
 }
 
 // ===== 時段選擇 =====
@@ -346,7 +471,6 @@ async function generateTimeSlots() {
   if (!Array.isArray(existing)) existing = [];
 
   var bookedTimes = existing.map(function(b) { return b.booking_time ? b.booking_time.substring(0, 5) : ''; });
-
   var now = new Date();
   var isToday = selectedDate === now.toISOString().split('T')[0];
   var html = '';
@@ -370,7 +494,39 @@ function selectTime(time, slotId) {
   selectedTime = time;
   document.querySelectorAll('.time-slot').forEach(function(s) { s.classList.remove('selected'); });
   document.getElementById(slotId).classList.add('selected');
-  document.getElementById('btnToStep3').disabled = false;
+  updateStickyBtn();
+}
+
+// ===== 底部懸浮按鈕 =====
+function updateStickyBtn() {
+  var sticky = document.getElementById('stickyBottom');
+  var btn = document.getElementById('stickyBtn');
+  if (currentStep === 2 || currentStep === 3) {
+    sticky.classList.add('show');
+  } else {
+    sticky.classList.remove('show');
+    return;
+  }
+  if (currentStep === 2) {
+    if (selectedDate && selectedTime) {
+      btn.disabled = false;
+      btn.textContent = '下一步：' + selectedDate.substring(5) + ' ' + selectedTime + '（' + partySize + '人）';
+    } else if (selectedDate) {
+      btn.disabled = true;
+      btn.textContent = '請選擇時段';
+    } else {
+      btn.disabled = true;
+      btn.textContent = '請選擇日期和時段';
+    }
+  } else if (currentStep === 3) {
+    btn.disabled = false;
+    btn.textContent = '確認預約：' + (selectedDate ? selectedDate.substring(5) : '') + ' ' + (selectedTime || '') + '（' + partySize + '人）';
+  }
+}
+
+function handleStickyBtn() {
+  if (currentStep === 2) goStep(3);
+  else if (currentStep === 3) submitBooking();
 }
 
 // ===== 摘要 =====
@@ -382,6 +538,7 @@ function renderSummary() {
     '<span class="summary-label">人員：</span><span class="summary-value">' + esc(selectedStaff ? selectedStaff.display_name : '不指定') + '</span>' +
     '<span class="summary-label">日期：</span><span class="summary-value">' + (selectedDate || '-') + '</span>' +
     '<span class="summary-label">時段：</span><span class="summary-value">' + (selectedTime || '-') + '</span>' +
+    '<span class="summary-label">人數：</span><span class="summary-value">' + partySize + ' 人</span>' +
     (selectedService && selectedService.price ? '<span class="summary-label">費用：</span><span class="summary-value" style="color:#059669;">$' + selectedService.price + '</span>' : '') +
     '</div>';
 }
@@ -390,11 +547,16 @@ function renderSummary() {
 async function submitBooking() {
   var name = document.getElementById('custName').value.trim();
   var phone = document.getElementById('custPhone').value.trim();
-  var party = parseInt(document.getElementById('custParty').value) || 1;
   var notes = document.getElementById('custNotes').value.trim();
 
   if (!name) { alert('請輸入姓名'); return; }
   if (!phone || phone.length < 8) { alert('請輸入有效電話'); return; }
+
+  // 組合備註：快速標籤 + 自由文字
+  var allNotes = [];
+  if (selectedTags.length > 0) allNotes.push(selectedTags.join('、'));
+  if (notes) allNotes.push(notes);
+  var finalNotes = allNotes.join(' / ') || null;
 
   var now = new Date();
   var bookingNumber = 'B' + (now.getMonth() + 1).toString().padStart(2, '0') +
@@ -403,7 +565,7 @@ async function submitBooking() {
     now.getMinutes().toString().padStart(2, '0') +
     now.getSeconds().toString().padStart(2, '0');
 
-  var btn = document.querySelector('#step3 .btn-primary');
+  var btn = document.getElementById('stickyBtn');
   btn.disabled = true;
   btn.textContent = '送出中...';
 
@@ -414,32 +576,33 @@ async function submitBooking() {
       body: {
         store_id: currentStoreId,
         booking_number: bookingNumber,
-        customer_name: name,
+        customer_name: customerTitle + ' ' + name,
         customer_phone: phone,
         booking_date: selectedDate,
         booking_time: selectedTime,
-        party_size: party,
+        party_size: partySize,
         service_id: selectedService ? selectedService.id : null,
         staff_id: selectedStaff ? selectedStaff.id : null,
         duration_minutes: selectedService ? selectedService.duration_minutes : 60,
-        notes: notes || null,
+        notes: finalNotes,
         status: 'pending'
       }
     });
 
     document.querySelectorAll('.step-panel').forEach(function(p) { p.classList.remove('active'); });
     document.getElementById('stepSuccess').classList.add('active');
+    document.getElementById('stickyBottom').classList.remove('show');
     document.getElementById('successNumber').textContent = '預約編號：' + bookingNumber;
     document.getElementById('successDetail').innerHTML =
       esc(selectedService ? selectedService.name : '') + '<br>' +
       selectedDate + ' ' + selectedTime + '<br>' +
-      esc(name) + ' · ' + esc(phone);
+      esc(customerTitle + ' ' + name) + ' · ' + esc(phone) + '<br>' + partySize + ' 人';
     window.scrollTo(0, 0);
   } catch (e) {
     console.error('Submit booking error:', e);
     alert('預約失敗，請重試');
     btn.disabled = false;
-    btn.textContent = '確認預約';
+    updateStickyBtn();
   }
 }
 
@@ -449,7 +612,11 @@ function resetBooking() {
   selectedStaff = null;
   selectedDate = null;
   selectedTime = null;
+  partySize = 1;
+  customerTitle = '先生';
+  selectedTags = [];
   currentStep = 0;
+
   document.querySelectorAll('.step-panel').forEach(function(p) { p.classList.remove('active'); });
   document.getElementById('step0').classList.add('active');
   for (var i = 0; i < 4; i++) {
@@ -460,9 +627,11 @@ function resetBooking() {
   document.getElementById('staffAny').classList.add('selected');
   document.getElementById('custName').value = '';
   document.getElementById('custPhone').value = '';
-  document.getElementById('custParty').value = '1';
   document.getElementById('custNotes').value = '';
-  document.getElementById('btnToStep3').disabled = true;
+  document.querySelectorAll('#quickTags .tag-btn').forEach(function(t) { t.classList.remove('active'); });
+  document.querySelectorAll('#titlePills .pill-btn').forEach(function(p, i) { p.classList.toggle('active', i === 0); });
+  document.getElementById('stickyBottom').classList.remove('show');
+  renderPartyPills();
   window.scrollTo(0, 0);
 }
 
