@@ -10,7 +10,9 @@ const HASH_PAGE_MAP = {
     employee: 'employeePage',
     approval: 'approvalCenterPage',
     payroll: 'payrollPage',
-    feature: 'featurePage'
+    feature: 'featurePage',
+    booking: 'bookingMgrPage',
+    member: 'memberMgrPage'
 };
 
 function getHashTargetPage() {
