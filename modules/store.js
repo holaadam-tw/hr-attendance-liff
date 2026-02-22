@@ -2959,6 +2959,13 @@ export async function loadBookingStoreList() {
         }
 
         sel.innerHTML = stores.map(s => `<option value="${s.id}">${esc(s.store_name)}</option>`).join('');
+
+        if (stores.length === 1) {
+            sel.value = stores[0].id;
+            const wrapper = sel.closest('.form-group');
+            if (wrapper) wrapper.style.display = 'none';
+            await loadBookingForStore();
+        }
     } catch(e) {
         console.error('loadBookingStoreList error:', e);
         showToast('載入商店列表失敗');
@@ -2988,11 +2995,14 @@ export async function loadMemberStoreList() {
             return;
         }
 
-        // 填充下拉選單
         sel.innerHTML = stores.map(s => `<option value="${s.id}">${esc(s.store_name)}</option>`).join('');
-
-        // 自動選第一家商店並載入會員資料
         sel.value = stores[0].id;
+
+        if (stores.length === 1) {
+            const wrapper = sel.closest('.form-group');
+            if (wrapper) wrapper.style.display = 'none';
+        }
+
         await loadMembersForStore();
     } catch(e) {
         console.error('loadMemberStoreList error:', e);
