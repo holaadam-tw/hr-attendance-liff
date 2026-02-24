@@ -2060,7 +2060,7 @@ function renderTxRow(tx) {
 }
 
 // ============================================================
-// 預約管理（獨立頁面）- 時間軸看板版
+// 預約管理（獨立頁面）- 重構版
 // ============================================================
 let bookingCurrentStoreId = null;
 let selectedBookingDate = new Date().toISOString().split('T')[0];
@@ -2075,7 +2075,7 @@ export async function loadBookingForStore() {
     const content = document.getElementById('bookingContent');
     if (!bookingCurrentStoreId) { content.style.display = 'none'; return; }
     content.style.display = 'block';
-    content.innerHTML = '<p style="text-align:center;padding:30px;color:#94A3B8;">載入中...</p>';
+    content.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;padding:48px 0;"><div style="width:32px;height:32px;border:3px solid #E2E8F0;border-top-color:#D97706;border-radius:50%;animation:spin 0.8s linear infinite;"></div><style>@keyframes spin{to{transform:rotate(360deg)}}</style></div>';
 
     try {
         const storeId = bookingCurrentStoreId;
@@ -2111,14 +2111,18 @@ export async function loadBookingForStore() {
         const pendingCount = allBookings.filter(b => b.status === 'pending').length;
         const confirmedCount = allBookings.filter(b => b.status === 'confirmed' || b.status === 'checked_in').length;
 
-        // 今日選中日期的預約
+        // 選中日期的預約
         const dayBookings = allBookings.filter(b => b.booking_date === selectedBookingDate);
+
+        const statusColors = {pending:'#F59E0B',confirmed:'#3B82F6',checked_in:'#10B981',completed:'#6366F1',cancelled:'#EF4444'};
+        const statusLabels = {pending:'待確認',confirmed:'已確認',checked_in:'已報到',completed:'已完成',cancelled:'已取消'};
 
         let html = '';
 
         // ── 日期橫向滑動列 ──
         const wkDays = ['日','一','二','三','四','五','六'];
-        html += '<div style="display:flex;gap:8px;overflow-x:auto;padding:4px 0 12px;-webkit-overflow-scrolling:touch;">';
+        html += '<div style="display:flex;gap:6px;overflow-x:auto;padding:2px 0 14px;-webkit-overflow-scrolling:touch;scrollbar-width:none;" class="bk-date-scroll">';
+        html += '<style>.bk-date-scroll::-webkit-scrollbar{display:none}</style>';
         for (let i = -1; i < 14; i++) {
             const d = new Date(); d.setDate(d.getDate() + i);
             const ds = d.toISOString().split('T')[0];
@@ -2129,28 +2133,44 @@ export async function loadBookingForStore() {
             else { topLabel = (d.getMonth()+1)+'/'+d.getDate(); botLabel = '週'+wkDays[d.getDay()]; }
             const isSel = ds === selectedBookingDate;
             const cnt = allBookings.filter(b => b.booking_date === ds).length;
-            html += '<div onclick="selectBookingDate(\'' + ds + '\')" style="flex-shrink:0;min-width:58px;padding:8px 10px;text-align:center;border-radius:10px;cursor:pointer;';
-            html += isSel ? 'background:#6366F1;color:#fff;' : 'background:#fff;border:1px solid #E2E8F0;color:#1E293B;';
+            html += '<div onclick="selectBookingDate(\'' + ds + '\')" style="flex-shrink:0;min-width:56px;padding:8px 6px;text-align:center;border-radius:12px;cursor:pointer;transition:all .15s;';
+            if (isSel) {
+                html += 'background:#D97706;color:#fff;box-shadow:0 2px 8px rgba(217,119,6,.3);';
+            } else {
+                html += 'background:#fff;border:1.5px solid #E2E8F0;color:#1E293B;';
+            }
             html += '">';
-            html += '<div style="font-size:11px;' + (isSel ? 'opacity:.7;' : 'color:#94A3B8;') + '">' + botLabel + '</div>';
-            html += '<div style="font-size:13px;font-weight:700;">' + topLabel + '</div>';
-            if (cnt > 0) html += '<div style="font-size:10px;' + (isSel ? 'opacity:.8;' : 'color:#6366F1;font-weight:600;') + '">' + cnt + '筆</div>';
+            html += '<div style="font-size:10px;' + (isSel ? 'color:rgba(255,255,255,.7);' : 'color:#94A3B8;') + '">' + botLabel + '</div>';
+            html += '<div style="font-size:14px;font-weight:700;margin:2px 0;">' + topLabel + '</div>';
+            if (cnt > 0) html += '<div style="font-size:10px;font-weight:700;' + (isSel ? 'color:rgba(255,255,255,.85);' : 'color:#D97706;') + '">' + cnt + ' 筆</div>';
             html += '</div>';
         }
         html += '</div>';
 
-        // ── 統計方塊 ──
-        html += '<div style="display:flex;gap:8px;margin-bottom:16px;">';
-        html += '<div style="flex:1;background:#EFF6FF;border-radius:10px;padding:10px;text-align:center;"><div style="font-size:11px;color:#64748B;">今日預約</div><div style="font-size:20px;font-weight:800;color:#2563EB;">' + todayCount + '</div></div>';
-        html += '<div style="flex:1;background:#FEF3C7;border-radius:10px;padding:10px;text-align:center;"><div style="font-size:11px;color:#64748B;">待確認</div><div style="font-size:20px;font-weight:800;color:#F59E0B;">' + pendingCount + '</div></div>';
-        html += '<div style="flex:1;background:#F0FDF4;border-radius:10px;padding:10px;text-align:center;"><div style="font-size:11px;color:#64748B;">已確認</div><div style="font-size:20px;font-weight:800;color:#10B981;">' + confirmedCount + '</div></div>';
+        // ── 統計卡片 ──
+        html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px;">';
+        html += '<div style="background:linear-gradient(135deg,#EFF6FF,#DBEAFE);border-radius:12px;padding:12px 10px;text-align:center;">';
+        html += '<div style="font-size:10px;font-weight:600;color:#3B82F6;text-transform:uppercase;letter-spacing:.5px;">今日預約</div>';
+        html += '<div style="font-size:24px;font-weight:800;color:#1E40AF;margin-top:2px;">' + todayCount + '</div></div>';
+        html += '<div style="background:linear-gradient(135deg,#FFFBEB,#FEF3C7);border-radius:12px;padding:12px 10px;text-align:center;">';
+        html += '<div style="font-size:10px;font-weight:600;color:#D97706;text-transform:uppercase;letter-spacing:.5px;">待確認</div>';
+        html += '<div style="font-size:24px;font-weight:800;color:#B45309;margin-top:2px;">' + pendingCount + '</div></div>';
+        html += '<div style="background:linear-gradient(135deg,#F0FDF4,#DCFCE7);border-radius:12px;padding:12px 10px;text-align:center;">';
+        html += '<div style="font-size:10px;font-weight:600;color:#059669;text-transform:uppercase;letter-spacing:.5px;">已確認</div>';
+        html += '<div style="font-size:24px;font-weight:800;color:#065F46;margin-top:2px;">' + confirmedCount + '</div></div>';
         html += '</div>';
 
         // ── Tab 切換列 ──
-        html += '<div style="display:flex;gap:0;margin-bottom:16px;border-bottom:2px solid #E2E8F0;">';
-        [['timeline','📋 時間軸'],['calendar','📅 日曆'],['settings','⚙️ 設定']].forEach(function(t) {
+        html += '<div style="display:flex;gap:0;margin-bottom:16px;background:#F1F5F9;border-radius:10px;padding:3px;">';
+        [['timeline','時間軸'],['calendar','日曆'],['settings','設定']].forEach(function(t) {
             const active = bookingCurrentTabView === t[0];
-            html += '<button id="bkTab_' + t[0] + '" onclick="switchBookingView(\'' + t[0] + '\')" style="flex:1;padding:12px 4px;border:none;background:transparent;font-size:13px;font-weight:' + (active?'700':'600') + ';color:' + (active?'#6366F1':'#94A3B8') + ';border-bottom:3px solid ' + (active?'#6366F1':'transparent') + ';cursor:pointer;font-family:inherit;">' + t[1] + '</button>';
+            html += '<button id="bkTab_' + t[0] + '" onclick="switchBookingView(\'' + t[0] + '\')" style="flex:1;padding:8px 4px;border:none;border-radius:8px;font-size:13px;font-weight:' + (active ? '700' : '500') + ';cursor:pointer;font-family:inherit;transition:all .15s;';
+            if (active) {
+                html += 'background:#fff;color:#1E293B;box-shadow:0 1px 3px rgba(0,0,0,.1);';
+            } else {
+                html += 'background:transparent;color:#64748B;';
+            }
+            html += '">' + t[1] + '</button>';
         });
         html += '</div>';
 
@@ -2159,7 +2179,7 @@ export async function loadBookingForStore() {
         // ══════════════════════════════════════
         html += '<div id="bkTimelineTab" style="display:' + (bookingCurrentTabView === 'timeline' ? '' : 'none') + ';">';
 
-        // 狀態過濾
+        // 狀態過濾膠囊
         const filterDefs = [
             {k:'all',l:'全部',c:'#64748B'},
             {k:'pending',l:'待確認',c:'#F59E0B'},
@@ -2168,67 +2188,92 @@ export async function loadBookingForStore() {
             {k:'completed',l:'已完成',c:'#6366F1'},
             {k:'cancelled',l:'已取消',c:'#EF4444'}
         ];
-        html += '<div style="display:flex;gap:6px;margin-bottom:14px;overflow-x:auto;padding-bottom:2px;">';
+        html += '<div style="display:flex;gap:6px;margin-bottom:14px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none;">';
         filterDefs.forEach(function(f) {
             const cnt = f.k === 'all' ? dayBookings.length : dayBookings.filter(b => b.status === f.k).length;
             const active = bookingStatusFilter === f.k;
-            html += '<button onclick="filterBookings(\'' + f.k + '\')" style="flex-shrink:0;padding:6px 12px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;border:1.5px solid ' + f.c + ';' + (active ? 'background:' + f.c + ';color:#fff;' : 'background:#fff;color:' + f.c + ';') + '">' + f.l;
-            if (cnt > 0) html += ' <span style="opacity:.7;font-size:10px;">' + cnt + '</span>';
+            html += '<button onclick="filterBookings(\'' + f.k + '\')" style="flex-shrink:0;padding:5px 12px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s;';
+            if (active) {
+                html += 'border:1.5px solid ' + f.c + ';background:' + f.c + ';color:#fff;box-shadow:0 1px 4px ' + f.c + '33;';
+            } else {
+                html += 'border:1.5px solid #E2E8F0;background:#fff;color:#64748B;';
+            }
+            html += '">' + f.l;
+            if (cnt > 0) html += '<span style="margin-left:4px;font-size:10px;opacity:.8;">' + cnt + '</span>';
             html += '</button>';
         });
         html += '</div>';
 
-        // 時間軸卡片
+        // 時間軸卡片 — 按時段分組
         const filtered = bookingStatusFilter === 'all' ? dayBookings : dayBookings.filter(b => b.status === bookingStatusFilter);
         if (filtered.length === 0) {
-            html += '<div style="text-align:center;padding:40px;color:#94A3B8;"><div style="font-size:48px;margin-bottom:12px;">📅</div><div style="font-size:15px;">此日無預約</div></div>';
+            html += '<div style="text-align:center;padding:48px 20px;color:#94A3B8;">';
+            html += '<div style="width:56px;height:56px;margin:0 auto 12px;background:#F8FAFC;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:24px;">📭</div>';
+            html += '<div style="font-size:14px;font-weight:600;color:#64748B;">此日暫無預約</div>';
+            html += '<div style="font-size:12px;color:#94A3B8;margin-top:4px;">點擊右下角 + 新增預約</div>';
+            html += '</div>';
         } else {
             const morning = filtered.filter(b => (b.booking_time || '') < '12:00');
             const afternoon = filtered.filter(b => (b.booking_time || '') >= '12:00' && (b.booking_time || '') < '18:00');
             const evening = filtered.filter(b => (b.booking_time || '') >= '18:00');
-            const statusColors = {pending:'#F59E0B',confirmed:'#3B82F6',checked_in:'#10B981',completed:'#6366F1',cancelled:'#EF4444'};
-            const statusLabels = {pending:'⏳ 待確認',confirmed:'✅ 已確認',checked_in:'🟢 已報到',completed:'✔️ 已完成',cancelled:'❌ 已取消'};
 
-            [['🌅 上午', morning],['☀️ 下午', afternoon],['🌙 晚上', evening]].forEach(function(grp) {
+            [['上午', morning, '#F59E0B'],['下午', afternoon, '#3B82F6'],['晚上', evening, '#6366F1']].forEach(function(grp) {
                 if (grp[1].length === 0) return;
-                html += '<div style="font-size:12px;font-weight:700;color:#94A3B8;margin:12px 0 8px;padding-left:4px;">' + grp[0] + '</div>';
+                html += '<div style="display:flex;align-items:center;gap:8px;margin:14px 0 8px;">';
+                html += '<div style="font-size:12px;font-weight:700;color:#94A3B8;">' + grp[0] + '</div>';
+                html += '<div style="flex:1;height:1px;background:#E2E8F0;"></div>';
+                html += '<div style="font-size:11px;color:#94A3B8;">' + grp[1].length + ' 筆</div>';
+                html += '</div>';
+
                 grp[1].forEach(function(b) {
-                    const bc = statusColors[b.status] || '#E2E8F0';
-                    const bl = statusLabels[b.status] || b.status;
-                    html += '<div style="padding:14px;background:#fff;border-left:4px solid ' + bc + ';border-radius:0 12px 12px 0;margin-bottom:8px;box-shadow:0 1px 3px rgba(0,0,0,.05);">';
+                    const sc = statusColors[b.status] || '#E2E8F0';
+                    const sl = statusLabels[b.status] || b.status;
+                    html += '<div style="position:relative;padding:14px 14px 14px 18px;background:#fff;border-radius:12px;margin-bottom:8px;box-shadow:0 1px 3px rgba(0,0,0,.06);border:1px solid #F1F5F9;overflow:hidden;">';
+                    // Left color bar
+                    html += '<div style="position:absolute;left:0;top:0;bottom:0;width:4px;background:' + sc + ';border-radius:4px 0 0 4px;"></div>';
+
+                    // Row 1: time + status badge
                     html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">';
-                    html += '<div style="font-size:18px;font-weight:800;color:#1E293B;">' + ((b.booking_time || '').substring(0,5) || '--:--') + '</div>';
-                    html += '<span style="padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;color:#fff;background:' + bc + ';">' + bl + '</span>';
+                    html += '<div style="font-size:18px;font-weight:800;color:#1E293B;letter-spacing:-.5px;">' + ((b.booking_time || '').substring(0,5) || '--:--') + '</div>';
+                    html += '<span style="padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;color:#fff;background:' + sc + ';">' + sl + '</span>';
                     html += '</div>';
-                    html += '<div style="font-size:15px;font-weight:700;margin-bottom:4px;">' + esc(b.customer_name) + '</div>';
-                    html += '<div style="font-size:13px;color:#64748B;margin-bottom:6px;">📱 ' + esc(b.customer_phone) + '</div>';
+
+                    // Row 2: name + phone
+                    html += '<div style="font-size:15px;font-weight:700;color:#1E293B;margin-bottom:2px;">' + esc(b.customer_name) + '</div>';
+                    html += '<div style="font-size:13px;color:#64748B;margin-bottom:8px;">' + esc(b.customer_phone) + '</div>';
+
+                    // Row 3: badges
                     html += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">';
-                    if (b.service_name) html += '<span style="background:#F5F3FF;color:#6366F1;padding:3px 8px;border-radius:6px;font-size:12px;font-weight:600;">🔧 ' + esc(b.service_name) + '</span>';
-                    if (b.staff_name) html += '<span style="background:#FFF7ED;color:#F97316;padding:3px 8px;border-radius:6px;font-size:12px;font-weight:600;">👤 ' + esc(b.staff_name) + '</span>';
-                    if (b.party_size > 1) html += '<span style="background:#F0FDF4;color:#059669;padding:3px 8px;border-radius:6px;font-size:12px;font-weight:600;">👥 ' + b.party_size + '人</span>';
+                    if (b.service_name) html += '<span style="background:#FFF7ED;color:#C2410C;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:600;">' + esc(b.service_name) + '</span>';
+                    if (b.staff_name) html += '<span style="background:#EFF6FF;color:#1D4ED8;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:600;">' + esc(b.staff_name) + '</span>';
+                    if (b.party_size > 1) html += '<span style="background:#F0FDF4;color:#059669;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:600;">' + b.party_size + ' 人</span>';
+                    html += '</div>';
+
+                    // Notes with tag highlighting
                     if (b.notes) {
                         var tagIcons = {'兒童椅':'👶','慶生':'🎂','靠窗':'🪟','素食':'🥬','無障礙':'♿','安靜區':'🤫'};
                         var noteHtml = esc(b.notes);
                         Object.keys(tagIcons).forEach(function(k) {
                             if (b.notes.includes(k)) {
-                                noteHtml = noteHtml.replace(k, '<span style="background:#FEF3C7;padding:2px 6px;border-radius:4px;">' + tagIcons[k] + ' ' + k + '</span>');
+                                noteHtml = noteHtml.replace(k, '<span style="display:inline-block;background:#FEF3C7;padding:1px 6px;border-radius:4px;font-weight:600;">' + tagIcons[k] + ' ' + k + '</span>');
                             }
                         });
-                        html += '<div style="font-size:12px;margin-top:4px;">' + noteHtml + '</div>';
+                        html += '<div style="font-size:12px;color:#64748B;margin-bottom:8px;line-height:1.6;">' + noteHtml + '</div>';
                     }
-                    html += '</div>';
+
+                    // Action buttons
                     html += '<div style="display:flex;gap:6px;">';
                     if (b.status === 'pending') {
-                        html += '<button onclick="event.stopPropagation();updateBookingStatus(\'' + b.id + '\',\'confirmed\')" style="flex:1;padding:8px;border:none;border-radius:8px;background:#3B82F6;color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">✓ 確認預約</button>';
-                        html += '<button onclick="event.stopPropagation();updateBookingStatus(\'' + b.id + '\',\'cancelled\')" style="padding:8px 12px;border:1px solid #EF4444;border-radius:8px;background:#fff;color:#EF4444;font-size:13px;cursor:pointer;font-family:inherit;">✕</button>';
+                        html += '<button onclick="event.stopPropagation();updateBookingStatus(\'' + b.id + '\',\'confirmed\')" style="flex:1;padding:8px;border:none;border-radius:8px;background:#3B82F6;color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">確認預約</button>';
+                        html += '<button onclick="event.stopPropagation();updateBookingStatus(\'' + b.id + '\',\'cancelled\')" style="padding:8px 14px;border:1.5px solid #FCA5A5;border-radius:8px;background:#fff;color:#EF4444;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">拒絕</button>';
                     } else if (b.status === 'confirmed') {
-                        html += '<button onclick="event.stopPropagation();updateBookingStatus(\'' + b.id + '\',\'checked_in\')" style="flex:1;padding:8px;border:none;border-radius:8px;background:#10B981;color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">👉 報到入場</button>';
-                        html += '<button onclick="event.stopPropagation();updateBookingStatus(\'' + b.id + '\',\'cancelled\')" style="padding:8px 12px;border:1px solid #EF4444;border-radius:8px;background:#fff;color:#EF4444;font-size:13px;cursor:pointer;font-family:inherit;">✕</button>';
+                        html += '<button onclick="event.stopPropagation();updateBookingStatus(\'' + b.id + '\',\'checked_in\')" style="flex:1;padding:8px;border:none;border-radius:8px;background:#10B981;color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">報到入場</button>';
+                        html += '<button onclick="event.stopPropagation();updateBookingStatus(\'' + b.id + '\',\'cancelled\')" style="padding:8px 14px;border:1.5px solid #FCA5A5;border-radius:8px;background:#fff;color:#EF4444;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">取消</button>';
                     } else if (b.status === 'checked_in') {
-                        html += '<button onclick="event.stopPropagation();updateBookingStatus(\'' + b.id + '\',\'completed\')" style="flex:1;padding:8px;border:none;border-radius:8px;background:#6366F1;color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">✔️ 完成結帳</button>';
+                        html += '<button onclick="event.stopPropagation();updateBookingStatus(\'' + b.id + '\',\'completed\')" style="flex:1;padding:8px;border:none;border-radius:8px;background:#6366F1;color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">完成結帳</button>';
                     }
                     html += '</div>';
-                    html += '</div>';
+                    html += '</div>'; // end card
                 });
             });
         }
@@ -2238,14 +2283,19 @@ export async function loadBookingForStore() {
         // Tab 2: 日曆
         // ══════════════════════════════════════
         html += '<div id="bkCalendarTab" style="display:' + (bookingCurrentTabView === 'calendar' ? '' : 'none') + ';">';
-        html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">';
-        html += '<button onclick="changeBookingMonth(-1)" style="padding:6px 14px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;cursor:pointer;font-size:16px;">◀</button>';
-        html += '<div style="font-size:16px;font-weight:700;">' + calendarYear + '年' + (calendarMonth + 1) + '月</div>';
-        html += '<button onclick="changeBookingMonth(1)" style="padding:6px 14px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;cursor:pointer;font-size:16px;">▶</button>';
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">';
+        html += '<button onclick="changeBookingMonth(-1)" style="width:36px;height:36px;border:1.5px solid #E2E8F0;border-radius:10px;background:#fff;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;">◀</button>';
+        html += '<div style="font-size:16px;font-weight:700;color:#1E293B;">' + calendarYear + ' 年 ' + (calendarMonth + 1) + ' 月</div>';
+        html += '<button onclick="changeBookingMonth(1)" style="width:36px;height:36px;border:1.5px solid #E2E8F0;border-radius:10px;background:#fff;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;">▶</button>';
         html += '</div>';
-        html += '<div style="display:grid;grid-template-columns:repeat(7,1fr);text-align:center;margin-bottom:4px;">';
-        ['日','一','二','三','四','五','六'].forEach(function(d) { html += '<div style="font-size:12px;color:#94A3B8;padding:4px;">' + d + '</div>'; });
+
+        html += '<div style="display:grid;grid-template-columns:repeat(7,1fr);text-align:center;margin-bottom:6px;">';
+        ['日','一','二','三','四','五','六'].forEach(function(d, idx) {
+            var dayColor = idx === 0 ? '#EF4444' : idx === 6 ? '#3B82F6' : '#94A3B8';
+            html += '<div style="font-size:11px;font-weight:600;color:' + dayColor + ';padding:4px;">' + d + '</div>';
+        });
         html += '</div>';
+
         html += '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;">';
         const firstDay = new Date(calendarYear, calendarMonth, 1).getDay();
         const daysInMonth = new Date(calendarYear, calendarMonth + 1, 0).getDate();
@@ -2255,9 +2305,25 @@ export async function loadBookingForStore() {
             const cnt = allBookings.filter(b => b.booking_date === ds).length;
             const isToday = ds === today;
             const isSel = ds === selectedBookingDate;
-            html += '<div onclick="selectBookingDate(\'' + ds + '\');switchBookingView(\'timeline\')" style="padding:8px 2px;text-align:center;border-radius:8px;cursor:pointer;' + (isSel ? 'background:#6366F1;color:#fff;' : isToday ? 'background:#EFF6FF;' : '') + '">';
-            html += '<div style="font-size:13px;font-weight:' + (isToday || isSel ? '700' : '500') + ';">' + day + '</div>';
-            if (cnt > 0) html += '<div style="font-size:10px;' + (isSel ? 'color:rgba(255,255,255,.8);' : 'color:#6366F1;font-weight:600;') + '">' + cnt + '</div>';
+            html += '<div onclick="selectBookingDate(\'' + ds + '\');switchBookingView(\'timeline\')" style="padding:6px 2px;text-align:center;border-radius:10px;cursor:pointer;transition:all .15s;min-height:42px;';
+            if (isSel) {
+                html += 'background:#D97706;color:#fff;box-shadow:0 2px 6px rgba(217,119,6,.25);';
+            } else if (isToday) {
+                html += 'background:#FFFBEB;border:1.5px solid #D97706;';
+            } else {
+                html += '';
+            }
+            html += '">';
+            html += '<div style="font-size:13px;font-weight:' + (isToday || isSel ? '700' : '400') + ';">' + day + '</div>';
+            if (cnt > 0) {
+                html += '<div style="display:flex;justify-content:center;gap:1px;margin-top:2px;">';
+                var dots = Math.min(cnt, 3);
+                for (var di = 0; di < dots; di++) {
+                    html += '<div style="width:4px;height:4px;border-radius:50%;background:' + (isSel ? 'rgba(255,255,255,.8)' : '#D97706') + ';"></div>';
+                }
+                if (cnt > 3) html += '<div style="font-size:8px;color:' + (isSel ? 'rgba(255,255,255,.8)' : '#D97706') + ';font-weight:700;margin-left:1px;">+</div>';
+                html += '</div>';
+            }
             html += '</div>';
         }
         html += '</div>';
@@ -2269,39 +2335,52 @@ export async function loadBookingForStore() {
         html += '<div id="bkSettingsTab" style="display:' + (bookingCurrentTabView === 'settings' ? '' : 'none') + ';">';
 
         // 服務項目
-        html += '<div style="margin-bottom:20px;">';
-        html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">';
-        html += '<div style="font-size:15px;font-weight:700;">🔧 服務項目</div>';
-        html += '<button onclick="addBookingService(\'' + storeId + '\')" style="padding:6px 14px;border:none;border-radius:8px;background:#6366F1;color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">+ 新增</button>';
+        html += '<div style="margin-bottom:24px;">';
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">';
+        html += '<div style="font-size:15px;font-weight:700;color:#1E293B;">服務項目</div>';
+        html += '<button onclick="addBookingService(\'' + storeId + '\')" style="padding:6px 14px;border:none;border-radius:8px;background:#D97706;color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">+ 新增</button>';
         html += '</div>';
         if (!bkServices || bkServices.length === 0) {
-            html += '<div style="text-align:center;padding:20px;color:#94A3B8;background:#F8FAFC;border-radius:10px;">尚未設定服務項目</div>';
+            html += '<div style="text-align:center;padding:24px;color:#94A3B8;background:#F8FAFC;border-radius:12px;border:1.5px dashed #E2E8F0;">尚未設定服務項目</div>';
         } else {
             bkServices.forEach(function(s) {
-                html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:12px;background:#fff;border:1px solid #E2E8F0;border-radius:10px;margin-bottom:6px;">';
-                html += '<div><div style="font-weight:700;">' + esc(s.name) + '</div><div style="font-size:12px;color:#64748B;">⏱ ' + s.duration_minutes + '分' + (s.price ? ' · $' + s.price : ' · 免費') + '</div>' + (s.description ? '<div style="font-size:11px;color:#94A3B8;">' + esc(s.description) + '</div>' : '') + '</div>';
-                html += '<div style="display:flex;gap:6px;align-items:center;">';
-                html += '<label style="position:relative;display:inline-block;width:40px;height:22px;cursor:pointer;flex-shrink:0;"><input type="checkbox" ' + (s.is_active ? 'checked' : '') + ' onchange="toggleServiceActive(\'' + s.id + '\',this.checked)" style="opacity:0;width:0;height:0;"><span style="position:absolute;top:0;left:0;right:0;bottom:0;background:' + (s.is_active ? '#10B981' : '#CBD5E1') + ';border-radius:11px;"></span><span style="position:absolute;top:2px;left:' + (s.is_active ? '20' : '2') + 'px;width:18px;height:18px;background:#fff;border-radius:50%;transition:.3s;"></span></label>';
-                html += '<button onclick="editBookingService(\'' + s.id + '\')" style="padding:4px 8px;border:1px solid #E2E8F0;border-radius:6px;background:#fff;font-size:12px;cursor:pointer;">✏️</button>';
-                html += '<button onclick="deleteBookingService(\'' + s.id + '\')" style="padding:4px 8px;border:1px solid #FECACA;border-radius:6px;background:#fff;color:#EF4444;font-size:12px;cursor:pointer;">🗑</button>';
+                html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:#fff;border:1px solid #F1F5F9;border-radius:12px;margin-bottom:6px;">';
+                html += '<div style="flex:1;min-width:0;">';
+                html += '<div style="font-weight:700;color:#1E293B;font-size:14px;">' + esc(s.name) + '</div>';
+                html += '<div style="font-size:12px;color:#64748B;margin-top:2px;">' + s.duration_minutes + ' 分鐘' + (s.price ? ' · $' + s.price : ' · 免費') + '</div>';
+                if (s.description) html += '<div style="font-size:11px;color:#94A3B8;margin-top:2px;">' + esc(s.description) + '</div>';
+                html += '</div>';
+                html += '<div style="display:flex;gap:8px;align-items:center;flex-shrink:0;">';
+                // Toggle switch
+                html += '<label style="position:relative;display:inline-block;width:40px;height:22px;cursor:pointer;">';
+                html += '<input type="checkbox" ' + (s.is_active ? 'checked' : '') + ' onchange="toggleServiceActive(\'' + s.id + '\',this.checked)" style="opacity:0;width:0;height:0;">';
+                html += '<span style="position:absolute;inset:0;background:' + (s.is_active ? '#10B981' : '#CBD5E1') + ';border-radius:11px;transition:.2s;"></span>';
+                html += '<span style="position:absolute;top:2px;left:' + (s.is_active ? '20' : '2') + 'px;width:18px;height:18px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 2px rgba(0,0,0,.15);"></span>';
+                html += '</label>';
+                html += '<button onclick="editBookingService(\'' + s.id + '\')" style="width:32px;height:32px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;">✏️</button>';
+                html += '<button onclick="deleteBookingService(\'' + s.id + '\')" style="width:32px;height:32px;border:1px solid #FECACA;border-radius:8px;background:#fff;color:#EF4444;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;">🗑</button>';
                 html += '</div></div>';
             });
         }
         html += '</div>';
 
         // 服務人員
-        html += '<div style="margin-bottom:20px;">';
-        html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">';
-        html += '<div style="font-size:15px;font-weight:700;">👤 服務人員</div>';
-        html += '<button onclick="addBookingStaff(\'' + storeId + '\')" style="padding:6px 14px;border:none;border-radius:8px;background:#6366F1;color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">+ 新增</button>';
+        html += '<div style="margin-bottom:24px;">';
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">';
+        html += '<div style="font-size:15px;font-weight:700;color:#1E293B;">服務人員</div>';
+        html += '<button onclick="addBookingStaff(\'' + storeId + '\')" style="padding:6px 14px;border:none;border-radius:8px;background:#D97706;color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">+ 新增</button>';
         html += '</div>';
         if (!bkStaff || bkStaff.length === 0) {
-            html += '<div style="text-align:center;padding:20px;color:#94A3B8;background:#F8FAFC;border-radius:10px;">尚未設定服務人員</div>';
+            html += '<div style="text-align:center;padding:24px;color:#94A3B8;background:#F8FAFC;border-radius:12px;border:1.5px dashed #E2E8F0;">尚未設定服務人員</div>';
         } else {
             bkStaff.forEach(function(s) {
-                html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:12px;background:#fff;border:1px solid #E2E8F0;border-radius:10px;margin-bottom:6px;">';
-                html += '<div style="display:flex;align-items:center;gap:10px;"><div style="width:40px;height:40px;border-radius:20px;background:linear-gradient(135deg,#6366F1,#8B5CF6);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;flex-shrink:0;">' + esc((s.display_name || '?').substring(0, 1)) + '</div><div><div style="font-weight:700;">' + esc(s.display_name) + '</div>' + (s.title ? '<div style="font-size:12px;color:#94A3B8;">' + esc(s.title) + '</div>' : '') + '</div></div>';
-                html += '<button onclick="deleteBookingStaff(\'' + s.id + '\')" style="padding:4px 8px;border:1px solid #FECACA;border-radius:6px;background:#fff;color:#EF4444;font-size:12px;cursor:pointer;">🗑</button>';
+                html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:#fff;border:1px solid #F1F5F9;border-radius:12px;margin-bottom:6px;">';
+                html += '<div style="display:flex;align-items:center;gap:10px;">';
+                html += '<div style="width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#D97706,#F59E0B);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:16px;flex-shrink:0;">' + esc((s.display_name || '?').substring(0, 1)) + '</div>';
+                html += '<div><div style="font-weight:700;color:#1E293B;font-size:14px;">' + esc(s.display_name) + '</div>';
+                if (s.title) html += '<div style="font-size:12px;color:#94A3B8;">' + esc(s.title) + '</div>';
+                html += '</div></div>';
+                html += '<button onclick="deleteBookingStaff(\'' + s.id + '\')" style="width:32px;height:32px;border:1px solid #FECACA;border-radius:8px;background:#fff;color:#EF4444;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;">🗑</button>';
                 html += '</div>';
             });
         }
@@ -2309,29 +2388,29 @@ export async function loadBookingForStore() {
 
         // 預約連結 + QR
         const bookingUrl = 'https://holaadam-tw.github.io/hr-attendance-liff/booking.html?store=' + storeSlug;
-        html += '<div style="margin-bottom:20px;">';
-        html += '<div style="font-size:15px;font-weight:700;margin-bottom:10px;">🔗 消費者預約連結</div>';
-        html += '<div style="background:#F8FAFC;border-radius:10px;padding:14px;">';
+        html += '<div style="margin-bottom:24px;">';
+        html += '<div style="font-size:15px;font-weight:700;color:#1E293B;margin-bottom:12px;">消費者預約連結</div>';
+        html += '<div style="background:#FFFBEB;border:1.5px solid #FDE68A;border-radius:12px;padding:16px;">';
         if (storeSlug) {
-            html += '<div style="font-size:12px;color:#64748B;word-break:break-all;margin-bottom:10px;">' + bookingUrl + '</div>';
+            html += '<div style="font-size:12px;color:#92400E;word-break:break-all;margin-bottom:12px;padding:8px 10px;background:#fff;border-radius:8px;border:1px solid #FDE68A;">' + bookingUrl + '</div>';
             html += '<div style="display:flex;gap:8px;">';
-            html += '<button onclick="navigator.clipboard.writeText(\'' + bookingUrl + '\').then(function(){showToast(\'已複製連結\')})" style="flex:1;padding:10px;border:1px solid #6366F1;border-radius:8px;background:#fff;color:#6366F1;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">📋 複製連結</button>';
-            html += '<button onclick="showBookingQR(\'' + bookingUrl + '\')" style="flex:1;padding:10px;border:none;border-radius:8px;background:#6366F1;color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">📱 QR Code</button>';
+            html += '<button onclick="navigator.clipboard.writeText(\'' + bookingUrl + '\').then(function(){showToast(\'已複製連結\')})" style="flex:1;padding:10px;border:1.5px solid #D97706;border-radius:8px;background:#fff;color:#D97706;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">複製連結</button>';
+            html += '<button onclick="showBookingQR(\'' + bookingUrl + '\')" style="flex:1;padding:10px;border:none;border-radius:8px;background:#D97706;color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">QR Code</button>';
             html += '</div>';
         } else {
-            html += '<div style="color:#94A3B8;font-size:13px;">尚未設定商店網址代碼（store_slug）</div>';
+            html += '<div style="color:#92400E;font-size:13px;">尚未設定商店網址代碼（store_slug）</div>';
         }
         html += '</div></div>';
 
         html += '</div>'; // end settings tab
 
         // ── FAB 手動新增 ──
-        html += '<div onclick="manualAddBooking(\'' + storeId + '\')" style="position:fixed;bottom:80px;right:20px;width:56px;height:56px;border-radius:28px;background:linear-gradient(135deg,#6366F1,#8B5CF6);color:#fff;display:flex;align-items:center;justify-content:center;font-size:28px;box-shadow:0 4px 12px rgba(99,102,241,.4);cursor:pointer;z-index:100;line-height:1;">+</div>';
+        html += '<div onclick="manualAddBooking(\'' + storeId + '\')" style="position:fixed;bottom:80px;right:20px;width:52px;height:52px;border-radius:16px;background:#D97706;color:#fff;display:flex;align-items:center;justify-content:center;font-size:28px;box-shadow:0 4px 14px rgba(217,119,6,.35);cursor:pointer;z-index:100;line-height:1;transition:transform .15s;" onmousedown="this.style.transform=\'scale(.92)\'" onmouseup="this.style.transform=\'scale(1)\'" ontouchstart="this.style.transform=\'scale(.92)\'" ontouchend="this.style.transform=\'scale(1)\'">+</div>';
 
         content.innerHTML = html;
     } catch(e) {
         console.error('loadBookingForStore error:', e);
-        content.innerHTML = '<p style="text-align:center;padding:20px;color:#EF4444;">載入失敗</p>';
+        content.innerHTML = '<div style="text-align:center;padding:32px 20px;"><div style="font-size:14px;color:#EF4444;font-weight:600;">載入失敗</div><div style="font-size:12px;color:#94A3B8;margin-top:4px;">請重新整理再試</div></div>';
     }
 }
 
@@ -2353,9 +2432,17 @@ window.switchBookingView = function(tab) {
     ['timeline','calendar','settings'].forEach(function(t) {
         const el = document.getElementById('bkTab_' + t);
         if (el) {
-            el.style.color = t === tab ? '#6366F1' : '#94A3B8';
-            el.style.fontWeight = t === tab ? '700' : '600';
-            el.style.borderBottom = t === tab ? '3px solid #6366F1' : '3px solid transparent';
+            if (t === tab) {
+                el.style.background = '#fff';
+                el.style.color = '#1E293B';
+                el.style.fontWeight = '700';
+                el.style.boxShadow = '0 1px 3px rgba(0,0,0,.1)';
+            } else {
+                el.style.background = 'transparent';
+                el.style.color = '#64748B';
+                el.style.fontWeight = '500';
+                el.style.boxShadow = 'none';
+            }
         }
         const panel = document.getElementById('bk' + t.charAt(0).toUpperCase() + t.slice(1) + 'Tab');
         if (panel) panel.style.display = t === tab ? '' : 'none';
@@ -2375,7 +2462,7 @@ window.updateBookingStatus = async function(id, newStatus) {
     try {
         const { error } = await sb.from('bookings').update({ status: newStatus, updated_at: new Date().toISOString() }).eq('id', id);
         if (error) throw error;
-        showToast('✅ 已更新');
+        showToast('已更新狀態');
         await loadBookingForStore();
     } catch(e) {
         console.error(e);
@@ -2383,7 +2470,7 @@ window.updateBookingStatus = async function(id, newStatus) {
     }
 };
 
-// 手動新增預約
+// 手動新增預約（含 party_size）
 window.manualAddBooking = async function(storeId) {
     const name = prompt('客人姓名：');
     if (!name || !name.trim()) return;
@@ -2393,6 +2480,8 @@ window.manualAddBooking = async function(storeId) {
     if (!date) return;
     const time = prompt('預約時間（HH:MM）：', '10:00');
     if (!time) return;
+    const partySizeStr = prompt('人數：', '1');
+    const partySize = parseInt(partySizeStr) || 1;
     const notes = prompt('備註（可留空）：', '') || '';
 
     const now = new Date();
@@ -2406,11 +2495,12 @@ window.manualAddBooking = async function(storeId) {
             customer_phone: phone.trim(),
             booking_date: date,
             booking_time: time,
+            party_size: partySize,
             notes: notes || null,
             status: 'confirmed'
         });
         if (error) throw error;
-        showToast('✅ 已新增預約');
+        showToast('已新增預約');
         selectedBookingDate = date;
         await loadBookingForStore();
     } catch(e) {
@@ -2423,7 +2513,7 @@ window.manualAddBooking = async function(storeId) {
 window.toggleServiceActive = async function(id, active) {
     try {
         await sb.from('booking_services').update({ is_active: active }).eq('id', id);
-        showToast(active ? '✅ 已啟用' : '✅ 已停用');
+        showToast(active ? '已啟用' : '已停用');
     } catch(e) {
         showToast('更新失敗');
     }
@@ -2443,7 +2533,7 @@ window.editBookingService = async function(id) {
             duration_minutes: parseInt(dur) || 30,
             price: price && price.trim() ? parseInt(price) : null
         }).eq('id', id);
-        showToast('✅ 已更新');
+        showToast('已更新');
         await loadBookingForStore();
     } catch(e) {
         showToast('更新失敗');
@@ -2467,7 +2557,7 @@ window.addBookingService = async function(storeId) {
             is_active: true
         });
         if (error) throw error;
-        showToast('✅ 已新增服務');
+        showToast('已新增服務');
         await loadBookingForStore();
     } catch(e) {
         showToast('新增失敗：' + (e.message || ''));
@@ -2480,7 +2570,7 @@ window.deleteBookingService = async function(id) {
     try {
         const { error } = await sb.from('booking_services').delete().eq('id', id);
         if (error) throw error;
-        showToast('✅ 已刪除');
+        showToast('已刪除');
         await loadBookingForStore();
     } catch(e) {
         showToast('刪除失敗');
@@ -2500,7 +2590,7 @@ window.addBookingStaff = async function(storeId) {
             is_active: true
         });
         if (error) throw error;
-        showToast('✅ 已新增人員');
+        showToast('已新增人員');
         await loadBookingForStore();
     } catch(e) {
         showToast('新增失敗：' + (e.message || ''));
@@ -2513,7 +2603,7 @@ window.deleteBookingStaff = async function(id) {
     try {
         const { error } = await sb.from('booking_staff').delete().eq('id', id);
         if (error) throw error;
-        showToast('✅ 已刪除');
+        showToast('已刪除');
         await loadBookingForStore();
     } catch(e) {
         showToast('刪除失敗');
@@ -2524,18 +2614,16 @@ window.deleteBookingStaff = async function(id) {
 window.showBookingQR = function(url) {
     const qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=' + encodeURIComponent(url);
     const overlay = document.createElement('div');
-    overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:9999;';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:9999;backdrop-filter:blur(4px);';
     overlay.onclick = function() { document.body.removeChild(overlay); };
-    overlay.innerHTML = '<div style="background:#fff;border-radius:20px;padding:24px;text-align:center;max-width:300px;" onclick="event.stopPropagation()">' +
-        '<div style="font-size:16px;font-weight:700;margin-bottom:12px;">📱 預約 QR Code</div>' +
-        '<img src="' + qrUrl + '" style="width:200px;height:200px;border-radius:8px;">' +
-        '<div style="font-size:11px;color:#94A3B8;margin-top:10px;word-break:break-all;">' + esc(url) + '</div>' +
-        '<button onclick="this.closest(\'div\').parentElement.remove()" style="margin-top:12px;padding:10px 24px;border:none;border-radius:8px;background:#6366F1;color:#fff;font-size:14px;cursor:pointer;">關閉</button>' +
+    overlay.innerHTML = '<div style="background:#fff;border-radius:20px;padding:28px;text-align:center;max-width:300px;box-shadow:0 20px 60px rgba(0,0,0,.2);" onclick="event.stopPropagation()">' +
+        '<div style="font-size:16px;font-weight:700;color:#1E293B;margin-bottom:16px;">預約 QR Code</div>' +
+        '<img src="' + qrUrl + '" style="width:200px;height:200px;border-radius:12px;border:1px solid #E2E8F0;">' +
+        '<div style="font-size:11px;color:#94A3B8;margin-top:12px;word-break:break-all;line-height:1.4;">' + esc(url) + '</div>' +
+        '<button onclick="this.closest(\'div\').parentElement.remove()" style="margin-top:16px;padding:10px 28px;border:none;border-radius:10px;background:#D97706;color:#fff;font-size:14px;font-weight:600;cursor:pointer;">關閉</button>' +
         '</div>';
     document.body.appendChild(overlay);
 };
-
-// (loadBookingList and other old exports replaced by window.xxx functions above)
 
 
 // ============================================================
