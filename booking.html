@@ -2,637 +2,538 @@
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>線上預約</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>線上訂位</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
 :root {
-  --primary: #6366F1;
-  --primary-light: #A5B4FC;
-  --primary-bg: #F5F3FF;
-  --card: #fff;
-  --border: #E2E8F0;
+  --brand: #D97706;
+  --brand-light: #FDE68A;
+  --brand-bg: #FFFBEB;
+  --primary: #1E293B;
+  --accent: #D97706;
+  --success: #059669;
+  --danger: #DC2626;
   --text: #1E293B;
-  --text-muted: #94A3B8;
+  --text2: #475569;
+  --text3: #94A3B8;
+  --border: #E2E8F0;
+  --bg: #FAFAF9;
+  --card: #FFFFFF;
+  --radius: 16px;
 }
-* { margin:0; padding:0; box-sizing:border-box; }
-body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #F1F5F9; min-height: 100vh; }
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{font-family:'Noto Sans TC',-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg);min-height:100vh;color:var(--text);padding-bottom:env(safe-area-inset-bottom)}
 
-.header { background: linear-gradient(135deg, #6366F1, #8B5CF6); color: #fff; padding: 16px 20px; }
-.header h1 { font-size: 18px; font-weight: 700; }
-.header .subtitle { font-size: 13px; opacity: .8; margin-top: 2px; }
+/* Hero */
+.hero{position:relative;height:220px;overflow:hidden;background:#1E293B}
+.hero-img{width:100%;height:100%;object-fit:cover;opacity:.7}
+.hero-overlay{position:absolute;bottom:0;left:0;right:0;padding:20px;background:linear-gradient(transparent,rgba(0,0,0,.7))}
+.hero-logo{width:52px;height:52px;border-radius:14px;background:rgba(255,255,255,.95);display:flex;align-items:center;justify-content:center;margin-bottom:8px;box-shadow:0 2px 8px rgba(0,0,0,.15);overflow:hidden}
+.hero-logo img{width:100%;height:100%;object-fit:cover;border-radius:10px}
+.hero-name{font-size:24px;font-weight:900;color:#fff;letter-spacing:-.5px}
+.hero-desc{font-size:13px;color:rgba(255,255,255,.8);margin-top:2px}
+.hero-badge{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;background:rgba(255,255,255,.15);backdrop-filter:blur(4px);border-radius:20px;font-size:11px;color:#fff;margin-top:8px}
 
-.container { max-width: 480px; margin: 0 auto; padding: 16px; padding-bottom: 100px; }
+/* Container */
+.container{max-width:480px;margin:0 auto;padding:0 16px 120px}
 
-/* 步驟指示器 */
-.steps { display: flex; justify-content: center; align-items: center; gap: 8px; margin-bottom: 20px; padding: 16px 0; }
-.step-dot { width: 10px; height: 10px; border-radius: 50%; background: #CBD5E1; transition: all .3s; }
-.step-dot.active { background: #6366F1; width: 24px; border-radius: 5px; }
-.step-dot.done { background: #10B981; }
+/* Notice */
+.notice{display:flex;gap:10px;padding:14px 16px;background:var(--brand-bg);border-radius:12px;margin:16px 0;font-size:13px;color:#92400E;line-height:1.5}
+.notice-icon{font-size:18px;flex-shrink:0;margin-top:1px}
 
-/* 步驟內容 */
-.step-panel { display: none; }
-.step-panel.active { display: block; }
+/* Section */
+.section{margin-bottom:24px}
+.section-header{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.section-num{width:28px;height:28px;border-radius:14px;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800}
+.section-num.done{background:var(--success)}
+.section-num.done::after{content:'✓'}
+.section-title{font-size:16px;font-weight:800;letter-spacing:-.3px}
 
-/* 卡片標題 */
-.panel-title { font-size: 18px; font-weight: 700; margin-bottom: 14px; color: #1E293B; }
-.section-title { font-size: 15px; font-weight: 700; margin-bottom: 10px; color: #1E293B; }
+/* Pills */
+.pills{display:flex;gap:8px;overflow-x:auto;padding:2px 0;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.pills::-webkit-scrollbar{display:none}
+.pill{flex:0 0 auto;padding:12px 22px;border:2px solid var(--border);border-radius:50px;background:var(--card);font-size:15px;font-weight:700;cursor:pointer;transition:all .2s;font-family:inherit;color:var(--text)}
+.pill:hover{border-color:var(--brand-light)}
+.pill.active{background:var(--primary);color:#fff;border-color:var(--primary);box-shadow:0 4px 12px rgba(30,41,59,.2)}
 
-/* 服務卡片 */
-.service-card { padding: 16px; background: #fff; border: 2px solid #E2E8F0; border-radius: 12px; margin-bottom: 10px; cursor: pointer; transition: all .2s; }
-.service-card:hover { border-color: #A5B4FC; }
-.service-card.selected { border-color: #6366F1; background: #F5F3FF; }
+/* Date cards */
+.date-row{display:flex;gap:8px;overflow-x:auto;padding:2px 0;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.date-row::-webkit-scrollbar{display:none}
+.date-card{flex:0 0 auto;min-width:62px;padding:10px 14px;text-align:center;border-radius:12px;cursor:pointer;transition:all .2s;background:var(--card);border:2px solid var(--border)}
+.date-card:hover{border-color:var(--brand-light)}
+.date-card.selected{background:var(--primary);color:#fff;border-color:var(--primary);box-shadow:0 4px 12px rgba(30,41,59,.2)}
+.date-card.selected .d-sub{color:rgba(255,255,255,.7)!important}
+.d-sub{font-size:11px;color:var(--text3)}
+.d-num{font-size:18px;font-weight:800;margin:2px 0}
 
-/* 人員卡片 */
-.staff-card { display: flex; align-items: center; gap: 12px; padding: 14px; background: #fff; border: 2px solid #E2E8F0; border-radius: 12px; margin-bottom: 10px; cursor: pointer; transition: all .2s; }
-.staff-card.selected { border-color: #6366F1; background: #F5F3FF; }
-.staff-avatar { width: 48px; height: 48px; border-radius: 24px; background: linear-gradient(135deg,#6366F1,#8B5CF6); display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; font-size: 18px; flex-shrink: 0; }
+/* Time grid */
+.time-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.time-slot{padding:12px 4px;text-align:center;border-radius:10px;cursor:pointer;transition:all .15s;background:var(--card);border:2px solid var(--border);font-size:14px;font-weight:600}
+.time-slot:hover:not(.off){border-color:var(--brand-light)}
+.time-slot.active{background:var(--primary);color:#fff;border-color:var(--primary)}
+.time-slot.off{background:#F8FAFC;color:#CBD5E1;cursor:not-allowed;border-color:transparent}
 
-/* 日期 */
-.date-list { display: flex; gap: 8px; overflow-x: auto; margin-bottom: 16px; padding-bottom: 4px; scrollbar-width: none; }
-.date-list::-webkit-scrollbar { display: none; }
-.date-item { flex-shrink: 0; min-width: 64px; padding: 10px 12px; text-align: center; background: #fff; border: 2px solid #E2E8F0; border-radius: 10px; cursor: pointer; transition: all .2s; }
-.date-item.selected { border-color: #6366F1; background: #6366F1; color: #fff; }
+/* Tags */
+.tags{display:flex;flex-wrap:wrap;gap:6px}
+.tag{padding:8px 14px;border:1.5px solid var(--border);border-radius:20px;background:var(--card);font-size:13px;cursor:pointer;transition:all .2s;user-select:none;font-family:inherit}
+.tag:hover{border-color:var(--brand-light)}
+.tag.on{background:var(--brand-bg);color:var(--accent);border-color:var(--accent);font-weight:600}
 
-/* 時段格子 */
-.time-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-.time-slot { padding: 12px; text-align: center; background: #fff; border: 2px solid #E2E8F0; border-radius: 10px; cursor: pointer; font-size: 14px; font-weight: 600; transition: all .2s; }
-.time-slot:hover { border-color: #A5B4FC; }
-.time-slot.selected { border-color: #6366F1; background: #6366F1; color: #fff; }
-.time-slot.disabled { background: #F8FAFC; color: #CBD5E1; cursor: not-allowed; border-color: #F1F5F9; }
+/* Form */
+.form-row{margin-bottom:14px}
+.form-label{font-size:13px;font-weight:600;color:var(--text2);margin-bottom:6px;display:block}
+.form-label .req{color:var(--danger);margin-left:2px}
+.form-input{width:100%;padding:14px 16px;border:2px solid var(--border);border-radius:12px;font-size:15px;font-family:inherit;transition:border-color .2s;background:var(--card)}
+.form-input:focus{outline:none;border-color:var(--accent)}
+.title-pills{display:flex;gap:8px;margin-bottom:12px}
+.title-pill{padding:10px 20px;border:2px solid var(--border);border-radius:50px;font-size:14px;font-weight:600;cursor:pointer;transition:all .2s;background:var(--card);font-family:inherit}
+.title-pill.active{background:var(--primary);color:#fff;border-color:var(--primary)}
 
-/* 膠囊按鈕（人數 / 稱謂） */
-.pill-btn {
-  flex: 0 0 auto; padding: 12px 22px; border: 2px solid var(--border); border-radius: 50px;
-  background: var(--card); color: var(--text); font-size: 15px; font-weight: 700;
-  cursor: pointer; transition: all .2s; white-space: nowrap; font-family: inherit;
-}
-.pill-btn:hover { border-color: var(--primary-light); }
-.pill-btn.active {
-  background: var(--primary); color: #fff; border-color: var(--primary);
-  box-shadow: 0 4px 12px rgba(99,102,241,.3);
-}
+/* Summary */
+.summary{background:linear-gradient(135deg,#FFFBEB,#FEF3C7);border-radius:14px;padding:18px;margin-bottom:20px;border:1px solid #FDE68A}
+.sum-row{display:flex;justify-content:space-between;padding:5px 0;font-size:14px}
+.sum-label{color:var(--text2)}
+.sum-val{font-weight:600}
+.sum-line{border-top:1px dashed #E5D5A0;margin:6px 0}
+.sum-total{font-size:18px;font-weight:900;color:var(--accent)}
 
-/* 快速標籤 */
-.tag-btn {
-  padding: 8px 14px; border: 1.5px solid var(--border); border-radius: 20px;
-  background: var(--card); font-size: 13px; cursor: pointer; transition: all .2s;
-  user-select: none; font-family: inherit;
-}
-.tag-btn:hover { border-color: var(--primary-light); }
-.tag-btn.active {
-  background: var(--primary-bg); color: var(--primary); border-color: var(--primary);
-  font-weight: 600;
-}
+/* Sticky */
+.sticky{position:fixed;bottom:0;left:0;right:0;padding:12px 16px;padding-bottom:calc(12px + env(safe-area-inset-bottom));background:rgba(255,255,255,.97);backdrop-filter:blur(10px);box-shadow:0 -2px 16px rgba(0,0,0,.06);z-index:50;transition:transform .3s}
+.sticky.hide{transform:translateY(100%)}
+.sticky-inner{max-width:480px;margin:0 auto}
+.sticky-info{font-size:12px;color:var(--text3);text-align:center;margin-bottom:6px}
+.sticky-btn{width:100%;padding:16px;background:var(--primary);color:#fff;border:none;border-radius:14px;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .2s;box-shadow:0 4px 12px rgba(30,41,59,.15)}
+.sticky-btn:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(30,41,59,.2)}
+.sticky-btn:active{transform:scale(.98)}
+.sticky-btn:disabled{background:#CBD5E1;box-shadow:none;cursor:not-allowed}
+.sticky-btn .btn-sub{font-size:12px;font-weight:400;opacity:.8;margin-top:2px}
 
-/* 按鈕 */
-.btn-primary { width: 100%; padding: 14px; background: #6366F1; color: #fff; border: none; border-radius: 12px; font-size: 16px; font-weight: 700; cursor: pointer; font-family: inherit; margin-top: 16px; }
-.btn-primary:disabled { background: #CBD5E1; cursor: not-allowed; }
-.btn-outline { width: 100%; padding: 14px; background: #fff; color: #6366F1; border: 2px solid #6366F1; border-radius: 12px; font-size: 16px; font-weight: 700; cursor: pointer; font-family: inherit; margin-top: 8px; }
+/* Success */
+.success-wrap{text-align:center;padding:24px 0}
+.success-circle{width:80px;height:80px;margin:0 auto 16px;border-radius:40px;background:linear-gradient(135deg,#059669,#34D399);display:flex;align-items:center;justify-content:center;animation:pop .5s ease}
+@keyframes pop{0%{transform:scale(0)}60%{transform:scale(1.15)}100%{transform:scale(1)}}
+.success-circle span{font-size:40px;color:#fff}
+.bk-num-card{background:linear-gradient(135deg,#FFFBEB,#FEF3C7);border:2px dashed var(--brand-light);border-radius:14px;padding:20px;margin:20px 0}
+.bk-num{font-size:28px;font-weight:900;color:var(--accent);letter-spacing:2px}
 
-/* 表單 */
-.form-group { margin-bottom: 12px; }
-.form-label { font-size: 13px; font-weight: 600; display: block; margin-bottom: 6px; color: #374151; }
-.form-input { width: 100%; padding: 12px; border: 2px solid #E2E8F0; border-radius: 10px; font-size: 15px; font-family: inherit; outline: none; transition: border-color .2s; }
-.form-input:focus { border-color: #6366F1; }
-textarea.form-input { resize: none; }
+/* Hidden */
+.hidden{display:none!important}
 
-/* 摘要卡 */
-.summary-card { background: #F5F3FF; border-radius: 12px; padding: 16px; margin-bottom: 16px; }
-.summary-grid { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; font-size: 14px; }
-.summary-label { color: #94A3B8; }
-.summary-value { font-weight: 600; color: #1E293B; }
-
-/* 成功頁 */
-.success-page { text-align: center; padding: 40px 20px; }
-.success-icon { font-size: 64px; margin-bottom: 16px; }
-.booking-number { background: #F5F3FF; padding: 16px; border-radius: 12px; margin-bottom: 20px; font-size: 22px; font-weight: 800; color: #6366F1; }
-
-/* 底部懸浮按鈕 */
-.sticky-bottom {
-  position: fixed; bottom: 0; left: 0; right: 0;
-  padding: 12px 16px; padding-bottom: calc(12px + env(safe-area-inset-bottom));
-  background: rgba(255,255,255,.95); backdrop-filter: blur(8px);
-  box-shadow: 0 -2px 12px rgba(0,0,0,.08); z-index: 50;
-  display: none;
-}
-.sticky-bottom.show { display: block; }
-.sticky-btn {
-  width: 100%; max-width: 480px; margin: 0 auto; display: block;
-  padding: 16px; background: linear-gradient(135deg, #4F46E5, #7C3AED);
-  color: #fff; border: none; border-radius: 14px; font-size: 16px; font-weight: 700;
-  cursor: pointer; font-family: inherit; box-shadow: 0 4px 12px rgba(99,102,241,.25);
-}
-.sticky-btn:disabled { background: #CBD5E1; box-shadow: none; cursor: not-allowed; }
+/* Service cards (for non-restaurant: beauty/clinic) */
+.svc-card{padding:16px;background:var(--card);border:2px solid var(--border);border-radius:14px;margin-bottom:10px;cursor:pointer;transition:all .2s;position:relative}
+.svc-card::after{content:'✓';position:absolute;top:12px;right:12px;width:24px;height:24px;border-radius:12px;background:var(--primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;opacity:0;transform:scale(.5);transition:all .2s}
+.svc-card:hover{border-color:var(--brand-light);transform:translateY(-1px)}
+.svc-card.selected{border-color:var(--primary);background:#F8FAFC}
+.svc-card.selected::after{opacity:1;transform:scale(1)}
 </style>
 </head>
 <body>
 
-<div class="header">
-  <h1 id="storeName">載入中...</h1>
-  <div class="subtitle" id="storeSubtitle"></div>
+<!-- Hero -->
+<div class="hero" id="heroSection">
+  <img class="hero-img" id="heroImg" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 220'%3E%3Crect fill='%231E293B' width='400' height='220'/%3E%3C/svg%3E" alt="">
+  <div class="hero-overlay">
+    <div class="hero-logo" id="heroLogo">🏪</div>
+    <div class="hero-name" id="storeName">載入中...</div>
+    <div class="hero-desc" id="storeDesc"></div>
+    <div class="hero-badge" id="storeBadge">📍 <span id="storeAddr">-</span></div>
+  </div>
 </div>
 
 <div class="container">
-  <!-- 步驟指示器 -->
-  <div class="steps">
-    <div class="step-dot active" id="dot0"></div>
-    <div class="step-dot" id="dot1"></div>
-    <div class="step-dot" id="dot2"></div>
-    <div class="step-dot" id="dot3"></div>
+
+<!-- Notice -->
+<div class="notice" id="storeNotice" style="display:none">
+  <span class="notice-icon">💡</span>
+  <span id="noticeText"></span>
+</div>
+
+<!-- ========== 餐廳模式：一頁式預約 ========== -->
+<div id="restaurantMode">
+
+<!-- 1. 人數 -->
+<div class="section" id="sec1">
+  <div class="section-header">
+    <div class="section-num" id="sn1">1</div>
+    <div class="section-title">用餐人數</div>
   </div>
+  <div class="pills" id="partyPills"></div>
+</div>
 
-  <!-- Step 0: 選擇服務 -->
-  <div class="step-panel active" id="step0">
-    <div class="panel-title">選擇服務</div>
-    <div id="serviceList"></div>
+<!-- 2. 日期 -->
+<div class="section" id="sec2">
+  <div class="section-header">
+    <div class="section-num" id="sn2">2</div>
+    <div class="section-title">選擇日期</div>
   </div>
+  <div class="date-row" id="dateRow"></div>
+</div>
 
-  <!-- Step 1: 選擇人員 -->
-  <div class="step-panel" id="step1">
-    <div class="panel-title">選擇服務人員</div>
-    <div class="staff-card selected" onclick="selectStaff(null)" id="staffAny">
-      <div class="staff-avatar">🎲</div>
-      <div>
-        <div style="font-weight:700;">不指定</div>
-        <div style="font-size:12px;color:#94A3B8;">由店家安排</div>
-      </div>
-    </div>
-    <div id="staffList"></div>
-    <button class="btn-primary" onclick="goStep(2)">下一步</button>
-    <button class="btn-outline" onclick="goStep(0)">上一步</button>
+<!-- 3. 時段 -->
+<div class="section" id="sec3">
+  <div class="section-header">
+    <div class="section-num" id="sn3">3</div>
+    <div class="section-title">選擇時段</div>
   </div>
-
-  <!-- Step 2: 人數 + 日期 + 時段 -->
-  <div class="step-panel" id="step2">
-    <!-- 人數膠囊 -->
-    <div style="margin-bottom:20px;">
-      <div class="section-title">👥 預約人數</div>
-      <div style="display:flex;gap:8px;overflow-x:auto;padding:4px 0;scrollbar-width:none;-webkit-overflow-scrolling:touch;" id="partyPills"></div>
-    </div>
-
-    <!-- 日期選擇 -->
-    <div id="dateSection">
-      <div class="section-title">📅 選擇日期</div>
-      <div class="date-list" id="dateList"></div>
-    </div>
-
-    <!-- 時段選擇 -->
-    <div>
-      <div class="section-title">⏰ 選擇時段</div>
-      <div class="time-grid" id="timeGrid"><p style="grid-column:1/-1;text-align:center;color:#94A3B8;">請先選擇日期</p></div>
-    </div>
-
-    <button class="btn-outline" onclick="goStep(1)" style="margin-top:20px;">上一步</button>
+  <div id="mealTabs" style="display:flex;gap:8px;margin-bottom:10px;">
+    <div class="pill active" onclick="filterMeal('lunch')" id="tabLunch" style="padding:8px 16px;font-size:13px;">🌞 午餐</div>
+    <div class="pill" onclick="filterMeal('dinner')" id="tabDinner" style="padding:8px 16px;font-size:13px;">🌙 晚餐</div>
   </div>
-
-  <!-- Step 3: 填寫資料 -->
-  <div class="step-panel" id="step3">
-    <div class="panel-title">填寫資料</div>
-    <div class="summary-card" id="bookingSummary"></div>
-
-    <!-- 稱謂 -->
-    <div class="form-group">
-      <label class="form-label">稱謂</label>
-      <div style="display:flex;gap:8px;" id="titlePills">
-        <div class="pill-btn active" onclick="selectTitle('先生', this)">先生</div>
-        <div class="pill-btn" onclick="selectTitle('小姐', this)">小姐</div>
-      </div>
-    </div>
-
-    <!-- 姓名 -->
-    <div class="form-group">
-      <label class="form-label">姓名 *</label>
-      <input type="text" id="custName" class="form-input" placeholder="請輸入姓名">
-    </div>
-
-    <!-- 電話 -->
-    <div class="form-group">
-      <label class="form-label">電話 *</label>
-      <input type="tel" id="custPhone" class="form-input" placeholder="手機號碼">
-    </div>
-
-    <!-- 快速標籤 + 備註 -->
-    <div class="form-group">
-      <label class="form-label">特殊需求</label>
-      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;" id="quickTags">
-        <div class="tag-btn" onclick="toggleTag(this)" data-tag="需要兒童椅">👶 兒童椅</div>
-        <div class="tag-btn" onclick="toggleTag(this)" data-tag="慶生">🎂 慶生</div>
-        <div class="tag-btn" onclick="toggleTag(this)" data-tag="輪椅空間">♿ 輪椅</div>
-        <div class="tag-btn" onclick="toggleTag(this)" data-tag="靠窗座位">🪟 靠窗</div>
-        <div class="tag-btn" onclick="toggleTag(this)" data-tag="素食需求">🥬 素食</div>
-        <div class="tag-btn" onclick="toggleTag(this)" data-tag="安靜區域">🤫 安靜區</div>
-      </div>
-      <textarea class="form-input" id="custNotes" rows="2" placeholder="其他需求（選填）"></textarea>
-    </div>
-
-    <button class="btn-outline" onclick="goStep(2)" style="margin-top:8px;">上一步</button>
-  </div>
-
-  <!-- 成功頁 -->
-  <div class="step-panel" id="stepSuccess">
-    <div class="success-page">
-      <div class="success-icon">🎉</div>
-      <h2 style="margin-bottom:8px;font-size:22px;">預約成功！</h2>
-      <div id="successDetail" style="color:#64748B;font-size:14px;margin-bottom:20px;line-height:1.8;"></div>
-      <div class="booking-number" id="successNumber"></div>
-      <button class="btn-outline" onclick="resetBooking()">重新預約</button>
-    </div>
+  <div class="time-grid" id="timeGrid">
+    <div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--text3)">請先選擇日期</div>
   </div>
 </div>
 
-<!-- 底部懸浮確認按鈕 -->
-<div class="sticky-bottom" id="stickyBottom">
-  <button class="sticky-btn" id="stickyBtn" onclick="handleStickyBtn()" disabled>請選擇預約資訊</button>
+<!-- 4. 填寫資料（選完時間後展開） -->
+<div class="section hidden" id="sec4">
+  <div class="section-header">
+    <div class="section-num" id="sn4">4</div>
+    <div class="section-title">填寫資料</div>
+  </div>
+
+  <!-- 摘要 -->
+  <div class="summary" id="summaryCard"></div>
+
+  <!-- 稱謂 -->
+  <div class="title-pills">
+    <div class="title-pill active" onclick="pickTitle(this,'先生')">先生</div>
+    <div class="title-pill" onclick="pickTitle(this,'小姐')">小姐</div>
+    <div class="title-pill" onclick="pickTitle(this,'其他')">其他</div>
+  </div>
+
+  <div class="form-row">
+    <label class="form-label">姓名<span class="req">*</span></label>
+    <input type="text" class="form-input" id="fName" placeholder="請輸入姓名">
+  </div>
+  <div class="form-row">
+    <label class="form-label">手機<span class="req">*</span></label>
+    <input type="tel" class="form-input" id="fPhone" placeholder="09xxxxxxxx">
+  </div>
+
+  <!-- 快速標籤 -->
+  <div class="form-row">
+    <label class="form-label">特殊需求</label>
+    <div class="tags" id="quickTags">
+      <div class="tag" onclick="toggleTag(this)" data-t="兒童椅">👶 兒童椅</div>
+      <div class="tag" onclick="toggleTag(this)" data-t="慶生佈置">🎂 慶生</div>
+      <div class="tag" onclick="toggleTag(this)" data-t="靠窗座位">🪟 靠窗</div>
+      <div class="tag" onclick="toggleTag(this)" data-t="素食">🥬 素食</div>
+      <div class="tag" onclick="toggleTag(this)" data-t="輪椅空間">♿ 無障礙</div>
+      <div class="tag" onclick="toggleTag(this)" data-t="安靜區">🤫 安靜區</div>
+    </div>
+  </div>
+  <div class="form-row">
+    <textarea class="form-input" id="fNotes" rows="2" placeholder="其他備註（選填）" style="resize:none"></textarea>
+  </div>
+</div>
+
+</div><!-- restaurantMode -->
+
+<!-- ========== 成功頁 ========== -->
+<div id="successPage" class="hidden">
+  <div class="success-wrap">
+    <div class="success-circle"><span>✓</span></div>
+    <div style="font-size:22px;font-weight:900;margin-bottom:4px">訂位成功！</div>
+    <div style="font-size:14px;color:var(--text3)">我們會盡快與您確認</div>
+    <div class="bk-num-card">
+      <div style="font-size:12px;color:var(--text3);margin-bottom:4px">訂位編號</div>
+      <div class="bk-num" id="okNum"></div>
+    </div>
+    <div class="summary" id="okSummary"></div>
+    <div class="notice" style="display:flex;margin-bottom:16px;">
+      <span class="notice-icon">⏰</span>
+      <span>請提前 10 分鐘到達，逾時 15 分鐘將自動取消訂位</span>
+    </div>
+    <button class="sticky-btn" onclick="location.reload()" style="background:var(--success)">完成</button>
+  </div>
+</div>
+
+</div><!-- container -->
+
+<!-- Sticky bottom -->
+<div class="sticky hide" id="stickyBar">
+  <div class="sticky-inner">
+    <div class="sticky-info" id="stickyInfo"></div>
+    <button class="sticky-btn" id="stickyBtn" onclick="handleSticky()" disabled>
+      請選擇預約資訊
+    </button>
+  </div>
 </div>
 
 <script>
-var SUPABASE_URL = 'https://nssuisyvlrqnqfxupklb.supabase.co';
-var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5zc3Vpc3l2bHJxbnFmeHVwa2xiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkyOTAwMzUsImV4cCI6MjA4NDg2NjAzNX0.q_B6v3gf1TOCuAq7z0xIw10wDueCSJn0p37VzdMfmbc';
+var SB_URL='https://nssuisyvlrqnqfxupklb.supabase.co';
+var SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5zc3Vpc3l2bHJxbnFmeHVwa2xiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkyOTAwMzUsImV4cCI6MjA4NDg2NjAzNX0.q_B6v3gf1TOCuAq7z0xIw10wDueCSJn0p37VzdMfmbc';
 
-var currentStoreId = null;
-var selectedService = null;
-var selectedStaff = null;
-var selectedDate = null;
-var selectedTime = null;
-var services = [];
-var staffList = [];
-var currentStep = 0;
-var partySize = 1;
-var customerTitle = '先生';
-var selectedTags = [];
+var storeId=null, slug=null;
+var party=2, selDate=null, selTime=null, mealFilter='lunch';
+var custTitle='先生', selTags=[];
+var services=[], staffList=[];
 
-function esc(str) {
-  if (str == null) return '';
-  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
+function esc(s){return s==null?'':String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+async function api(path){var r=await fetch(SB_URL+'/rest/v1/'+path,{headers:{'apikey':SB_KEY}});return r.json()}
+async function post(table,data){var r=await fetch(SB_URL+'/rest/v1/'+table,{method:'POST',headers:{'apikey':SB_KEY,'Content-Type':'application/json','Prefer':'return=representation'},body:JSON.stringify(data)});return r.json()}
 
-async function sbFetch(path, opts) {
-  var url = SUPABASE_URL + '/rest/v1/' + path;
-  var headers = { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' };
-  if (opts && opts.prefer) headers['Prefer'] = opts.prefer;
-  var res = await fetch(url, {
-    method: (opts && opts.method) || 'GET',
-    headers: headers,
-    body: (opts && opts.body) ? JSON.stringify(opts.body) : undefined
-  });
-  if (opts && opts.prefer && opts.prefer.includes('return=representation')) return res.json();
-  if (res.status === 204) return null;
-  return res.json();
-}
+// ===== Init =====
+async function init(){
+  slug = new URLSearchParams(location.search).get('store');
+  if(!slug){showErr('請透過店家提供的連結或 QR Code 進入');return}
 
-// ===== 初始化 =====
-async function init() {
-  var params = new URLSearchParams(window.location.search);
-  var slug = params.get('store');
-  if (!slug) {
-    document.querySelector('.container').innerHTML = '<p style="text-align:center;padding:40px;color:#EF4444;">缺少商店參數</p>';
-    return;
+  var stores = await api('store_profiles?store_slug=eq.'+slug+'&limit=1');
+  if(!stores?.length){showErr('找不到此商店');return}
+  var s=stores[0];
+  storeId=s.id;
+
+  document.getElementById('storeName').textContent=s.store_name||'線上訂位';
+  document.getElementById('storeDesc').textContent=s.description||'';
+  if(s.address){document.getElementById('storeAddr').textContent=s.address}
+  if(s.logo_url){
+    document.getElementById('heroLogo').innerHTML='<img src="'+esc(s.logo_url)+'" alt="">';
   }
-  var stores = await sbFetch('store_profiles?store_slug=eq.' + encodeURIComponent(slug) + '&limit=1');
-  if (!Array.isArray(stores) || stores.length === 0) {
-    document.querySelector('.container').innerHTML = '<p style="text-align:center;padding:40px;color:#EF4444;">找不到商店</p>';
-    return;
+  // 如果有封面圖 hero image
+  if(s.cover_url||s.logo_url){
+    document.getElementById('heroImg').src=s.cover_url||s.logo_url;
   }
-  var store = stores[0];
-  currentStoreId = store.id;
-  document.getElementById('storeName').textContent = store.store_name || '線上預約';
-  document.getElementById('storeSubtitle').textContent = store.description || '';
+  document.title=(s.store_name||'訂位')+' - 線上訂位';
 
-  services = await sbFetch('booking_services?store_id=eq.' + currentStoreId + '&is_active=eq.true&order=sort_order');
-  if (!Array.isArray(services)) services = [];
+  // 載入服務
+  services = await api('booking_services?store_id=eq.'+storeId+'&is_active=eq.true&order=sort_order');
+  if(!Array.isArray(services)) services=[];
 
-  staffList = await sbFetch('booking_staff?store_id=eq.' + currentStoreId + '&is_active=eq.true&order=sort_order');
-  if (!Array.isArray(staffList)) staffList = [];
-
-  renderServices();
-  renderStaff();
-  generateDates();
-  renderPartyPills();
+  renderParty();
+  renderDates();
+  updateSticky();
 }
 
-// ===== 步驟切換 =====
-function goStep(n) {
-  if (n === 1 && !selectedService) { alert('請先選擇服務'); return; }
-  if (n === 2 && !selectedService) { alert('請先選擇服務'); return; }
-  if (n === 3 && (!selectedDate || !selectedTime)) { alert('請先選擇日期和時段'); return; }
-
-  document.querySelectorAll('.step-panel').forEach(function(p) { p.classList.remove('active'); });
-  document.getElementById('step' + n).classList.add('active');
-
-  for (var i = 0; i < 4; i++) {
-    var dot = document.getElementById('dot' + i);
-    dot.className = 'step-dot' + (i === n ? ' active' : (i < n ? ' done' : ''));
-  }
-  currentStep = n;
-
-  if (n === 2) generateTimeSlots();
-  if (n === 3) renderSummary();
-  window.scrollTo(0, 0);
-  updateStickyBtn();
+function showErr(msg){
+  document.getElementById('restaurantMode').innerHTML='<div style="text-align:center;padding:60px 20px"><div style="font-size:48px;margin-bottom:12px">😕</div><div style="font-size:16px;color:var(--text2)">'+esc(msg)+'</div></div>';
+  document.getElementById('stickyBar').classList.add('hide');
 }
 
-// ===== 人數膠囊 =====
-function renderPartyPills() {
-  var el = document.getElementById('partyPills');
-  if (!el) return;
-  var options = [1, 2, 3, 4, 5, 6, 7, 8];
-  el.innerHTML = options.map(function(n) {
-    var label = n === 8 ? '8人+' : n + '人';
-    return '<div class="pill-btn' + (partySize === n ? ' active' : '') + '" onclick="selectParty(' + n + ')">' + label + '</div>';
+// ===== Party pills =====
+function renderParty(){
+  var el=document.getElementById('partyPills');
+  var opts=[1,2,3,4,5,6,7,8];
+  el.innerHTML=opts.map(function(n){
+    var lbl=n===8?'8人+':n+'人';
+    return '<div class="pill'+(party===n?' active':'')+'" onclick="pickParty('+n+')">'+lbl+'</div>';
   }).join('');
 }
 
-function selectParty(n) {
-  if (n === 8) {
-    var custom = prompt('請輸入人數：', '8');
-    if (custom === null) return;
-    partySize = parseInt(custom) || 8;
-  } else {
-    partySize = n;
-  }
-  renderPartyPills();
-  var dateSection = document.getElementById('dateSection');
-  if (dateSection) dateSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  updateStickyBtn();
+function pickParty(n){
+  if(n===8){var c=prompt('請輸入人數：','8');if(!c)return;party=parseInt(c)||8}
+  else party=n;
+  renderParty();
+  document.getElementById('sn1').classList.add('done');
+  document.getElementById('sn1').textContent='';
+  // 滑到日期
+  document.getElementById('sec2').scrollIntoView({behavior:'smooth',block:'start'});
+  updateSticky();
 }
 
-// ===== 稱謂 =====
-function selectTitle(title, el) {
-  customerTitle = title;
-  document.querySelectorAll('#titlePills .pill-btn').forEach(function(p) { p.classList.remove('active'); });
+// ===== Dates =====
+function renderDates(){
+  var el=document.getElementById('dateRow');
+  var dn=['日','一','二','三','四','五','六'];
+  var html='';
+  for(var i=0;i<14;i++){
+    var d=new Date();d.setDate(d.getDate()+i);
+    var ds=d.toISOString().split('T')[0];
+    var isToday=i===0;
+    html+='<div class="date-card'+(selDate===ds?' selected':'')+'" id="d_'+ds+'" onclick="pickDate(\''+ds+'\')">';
+    html+='<div class="d-sub">週'+dn[d.getDay()]+'</div>';
+    html+='<div class="d-num">'+(isToday?'今天':d.getDate())+'</div>';
+    html+='<div class="d-sub">'+(d.getMonth()+1)+'月</div>';
+    html+='</div>';
+  }
+  el.innerHTML=html;
+}
+
+function pickDate(ds){
+  selDate=ds; selTime=null;
+  document.querySelectorAll('.date-card').forEach(function(c){c.classList.remove('selected')});
+  var el=document.getElementById('d_'+ds);if(el)el.classList.add('selected');
+  document.getElementById('sn2').classList.add('done');
+  document.getElementById('sn2').textContent='';
+  loadTimes();
+  updateSticky();
+}
+
+// ===== Meal tabs =====
+function filterMeal(m){
+  mealFilter=m;
+  document.getElementById('tabLunch').className='pill'+(m==='lunch'?' active':'');
+  document.getElementById('tabDinner').className='pill'+(m==='dinner'?' active':'');
+  loadTimes();
+}
+
+// ===== Time slots =====
+async function loadTimes(){
+  var grid=document.getElementById('timeGrid');
+  if(!selDate){grid.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--text3)">請先選擇日期</div>';return}
+  grid.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--text3)">載入中...</div>';
+
+  var existing=await api('bookings?store_id=eq.'+storeId+'&booking_date=eq.'+selDate+'&status=neq.cancelled&select=booking_time');
+  if(!Array.isArray(existing))existing=[];
+  var booked=existing.map(function(b){return b.booking_time?.substring(0,5)});
+
+  var now=new Date();
+  var isToday=selDate===now.toISOString().split('T')[0];
+  var html='';
+
+  // 午餐 11:00-14:00，晚餐 17:00-21:00
+  var ranges=mealFilter==='lunch'?[[11,0],[14,0]]:[[17,0],[21,0]];
+  var startH=ranges[0][0], endH=ranges[1][0];
+  var hasSlots=false;
+
+  for(var h=startH;h<=endH;h++){
+    for(var m=0;m<60;m+=30){
+      if(h===endH&&m>0)break;
+      var ts=String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');
+      var isPast=isToday&&(h<now.getHours()||(h===now.getHours()&&m<=now.getMinutes()));
+      var isFull=booked.includes(ts);
+      var off=isPast||isFull;
+      hasSlots=true;
+
+      html+='<div class="time-slot'+(off?' off':'')+(selTime===ts?' active':'')+'" '+
+        (off?'':'onclick="pickTime(\''+ts+'\')"')+
+        ' id="t_'+ts.replace(':','')+'">'+ts+'</div>';
+    }
+  }
+  grid.innerHTML=html||'<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--text3)">此時段無可用時間</div>';
+}
+
+function pickTime(t){
+  selTime=t;
+  document.querySelectorAll('.time-slot').forEach(function(s){s.classList.remove('active')});
+  var el=document.getElementById('t_'+t.replace(':',''));if(el)el.classList.add('active');
+  document.getElementById('sn3').classList.add('done');
+  document.getElementById('sn3').textContent='';
+
+  // 展開填寫區
+  document.getElementById('sec4').classList.remove('hidden');
+  renderSummary();
+  setTimeout(function(){document.getElementById('sec4').scrollIntoView({behavior:'smooth',block:'start'})},100);
+  updateSticky();
+}
+
+// ===== Title & Tags =====
+function pickTitle(el,t){
+  custTitle=t;
+  document.querySelectorAll('.title-pill').forEach(function(p){p.classList.remove('active')});
   el.classList.add('active');
 }
 
-// ===== 快速標籤 =====
-function toggleTag(el) {
-  el.classList.toggle('active');
-  var tag = el.getAttribute('data-tag');
-  var idx = selectedTags.indexOf(tag);
-  if (idx >= 0) selectedTags.splice(idx, 1);
-  else selectedTags.push(tag);
+function toggleTag(el){
+  el.classList.toggle('on');
+  var t=el.getAttribute('data-t');
+  var i=selTags.indexOf(t);
+  if(i>=0)selTags.splice(i,1);else selTags.push(t);
 }
 
-// ===== 服務列表 =====
-function renderServices() {
-  var el = document.getElementById('serviceList');
-  if (services.length === 0) {
-    el.innerHTML = '<p style="text-align:center;color:#94A3B8;padding:30px;">此商店尚未設定服務項目</p>';
-    return;
-  }
-  el.innerHTML = services.map(function(s) {
-    return '<div class="service-card" id="svc_' + s.id + '" onclick="selectService(\'' + s.id + '\')">' +
-      '<div style="display:flex;justify-content:space-between;align-items:flex-start;">' +
-      '<div style="flex:1;">' +
-      '<div style="font-weight:700;font-size:15px;">' + esc(s.name) + '</div>' +
-      (s.description ? '<div style="font-size:12px;color:#94A3B8;margin-top:3px;">' + esc(s.description) + '</div>' : '') +
-      '<div style="font-size:12px;color:#64748B;margin-top:6px;">⏱ ' + s.duration_minutes + ' 分鐘' + (s.price ? ' · $' + s.price : ' · 免費') + '</div>' +
-      '</div>' +
-      '<div style="font-size:18px;font-weight:800;color:#6366F1;margin-left:12px;">' + (s.price ? '$' + s.price : '') + '</div>' +
-      '</div></div>';
-  }).join('');
+// ===== Summary =====
+function renderSummary(){
+  var h='';
+  h+='<div class="sum-row"><span class="sum-label">人數</span><span class="sum-val">'+party+' 位</span></div>';
+  h+='<div class="sum-row"><span class="sum-label">日期</span><span class="sum-val">'+formatDate(selDate)+'</span></div>';
+  h+='<div class="sum-row"><span class="sum-label">時段</span><span class="sum-val">'+(selTime||'-')+'</span></div>';
+  document.getElementById('summaryCard').innerHTML=h;
 }
 
-function selectService(id) {
-  selectedService = null;
-  for (var i = 0; i < services.length; i++) {
-    if (services[i].id === id) { selectedService = services[i]; break; }
-  }
-  document.querySelectorAll('.service-card').forEach(function(c) { c.classList.remove('selected'); });
-  document.getElementById('svc_' + id).classList.add('selected');
-  setTimeout(function() { goStep(1); }, 200);
+function formatDate(ds){
+  if(!ds)return'-';
+  var d=new Date(ds+'T00:00:00');
+  var dn=['日','一','二','三','四','五','六'];
+  return (d.getMonth()+1)+'/'+d.getDate()+' (週'+dn[d.getDay()]+')';
 }
 
-// ===== 人員列表 =====
-function renderStaff() {
-  var el = document.getElementById('staffList');
-  if (staffList.length === 0) { el.innerHTML = ''; return; }
-  el.innerHTML = staffList.map(function(s) {
-    return '<div class="staff-card" id="staff_' + s.id + '" onclick="selectStaff(\'' + s.id + '\')">' +
-      '<div class="staff-avatar">' + esc((s.display_name || '?').substring(0, 1)) + '</div>' +
-      '<div><div style="font-weight:700;">' + esc(s.display_name) + '</div>' +
-      (s.title ? '<div style="font-size:12px;color:#94A3B8;">' + esc(s.title) + '</div>' : '') +
-      '</div></div>';
-  }).join('');
-}
+// ===== Sticky =====
+function updateSticky(){
+  var bar=document.getElementById('stickyBar');
+  var btn=document.getElementById('stickyBtn');
+  var info=document.getElementById('stickyInfo');
 
-function selectStaff(id) {
-  selectedStaff = null;
-  if (id) {
-    for (var i = 0; i < staffList.length; i++) {
-      if (staffList[i].id === id) { selectedStaff = staffList[i]; break; }
-    }
-  }
-  document.querySelectorAll('.staff-card').forEach(function(c) { c.classList.remove('selected'); });
-  if (id) document.getElementById('staff_' + id).classList.add('selected');
-  else document.getElementById('staffAny').classList.add('selected');
-}
-
-// ===== 日期選擇 =====
-function generateDates() {
-  var el = document.getElementById('dateList');
-  var days = ['日','一','二','三','四','五','六'];
-  var html = '';
-  for (var i = 0; i < 14; i++) {
-    var d = new Date();
-    d.setDate(d.getDate() + i);
-    var dateStr = d.toISOString().split('T')[0];
-    var topLabel = (d.getMonth() + 1) + '/' + d.getDate();
-    var botLabel = '週' + days[d.getDay()];
-    if (i === 0) { topLabel = '今天'; botLabel = (d.getMonth() + 1) + '/' + d.getDate(); }
-    else if (i === 1) { topLabel = '明天'; botLabel = (d.getMonth() + 1) + '/' + d.getDate(); }
-    html += '<div class="date-item" id="date_' + dateStr + '" onclick="selectDate(\'' + dateStr + '\')">' +
-      '<div style="font-size:13px;font-weight:700;">' + topLabel + '</div>' +
-      '<div style="font-size:11px;color:inherit;opacity:.7;">' + botLabel + '</div>' +
-      '</div>';
-  }
-  el.innerHTML = html;
-}
-
-function selectDate(dateStr) {
-  selectedDate = dateStr;
-  selectedTime = null;
-  document.querySelectorAll('.date-item').forEach(function(d) { d.classList.remove('selected'); });
-  var el = document.getElementById('date_' + dateStr);
-  if (el) el.classList.add('selected');
-  generateTimeSlots();
-  updateStickyBtn();
-}
-
-// ===== 時段選擇 =====
-async function generateTimeSlots() {
-  var grid = document.getElementById('timeGrid');
-  if (!selectedDate) {
-    grid.innerHTML = '<p style="grid-column:1/-1;text-align:center;color:#94A3B8;">請先選擇日期</p>';
-    return;
-  }
-  grid.innerHTML = '<p style="grid-column:1/-1;text-align:center;color:#94A3B8;padding:12px;">載入中...</p>';
-
-  var existing = await sbFetch('bookings?store_id=eq.' + currentStoreId + '&booking_date=eq.' + selectedDate + '&status=neq.cancelled&select=booking_time,duration_minutes');
-  if (!Array.isArray(existing)) existing = [];
-
-  var bookedTimes = existing.map(function(b) { return b.booking_time ? b.booking_time.substring(0, 5) : ''; });
-  var now = new Date();
-  var isToday = selectedDate === now.toISOString().split('T')[0];
-  var html = '';
-
-  for (var h = 9; h < 20; h++) {
-    for (var m = 0; m < 60; m += 30) {
-      var timeStr = (h < 10 ? '0' : '') + h + ':' + (m === 0 ? '00' : '30');
-      var isBooked = bookedTimes.indexOf(timeStr) !== -1;
-      var isPast = isToday && (h < now.getHours() || (h === now.getHours() && m <= now.getMinutes()));
-      var disabled = isBooked || isPast;
-      var slotId = 'time_' + h + '_' + (m === 0 ? '00' : '30');
-      html += '<div class="time-slot' + (disabled ? ' disabled' : '') + '" id="' + slotId + '"' +
-        (disabled ? '' : ' onclick="selectTime(\'' + timeStr + '\',\'' + slotId + '\')"') + '>' +
-        timeStr + '</div>';
-    }
-  }
-  grid.innerHTML = html;
-}
-
-function selectTime(time, slotId) {
-  selectedTime = time;
-  document.querySelectorAll('.time-slot').forEach(function(s) { s.classList.remove('selected'); });
-  document.getElementById(slotId).classList.add('selected');
-  updateStickyBtn();
-}
-
-// ===== 底部懸浮按鈕 =====
-function updateStickyBtn() {
-  var sticky = document.getElementById('stickyBottom');
-  var btn = document.getElementById('stickyBtn');
-  if (currentStep === 2 || currentStep === 3) {
-    sticky.classList.add('show');
-  } else {
-    sticky.classList.remove('show');
-    return;
-  }
-  if (currentStep === 2) {
-    if (selectedDate && selectedTime) {
-      btn.disabled = false;
-      btn.textContent = '下一步：' + selectedDate.substring(5) + ' ' + selectedTime + '（' + partySize + '人）';
-    } else if (selectedDate) {
-      btn.disabled = true;
-      btn.textContent = '請選擇時段';
+  if(!selDate||!selTime){
+    if(party&&selDate&&!selTime){
+      bar.classList.remove('hide');
+      btn.disabled=true;
+      btn.innerHTML='請選擇用餐時段';
+      info.textContent=party+'人 · '+formatDate(selDate);
+    } else if(party&&!selDate){
+      bar.classList.remove('hide');
+      btn.disabled=true;
+      btn.innerHTML='請選擇用餐日期';
+      info.textContent=party+'人用餐';
     } else {
-      btn.disabled = true;
-      btn.textContent = '請選擇日期和時段';
+      bar.classList.add('hide');
     }
-  } else if (currentStep === 3) {
-    btn.disabled = false;
-    btn.textContent = '確認預約：' + (selectedDate ? selectedDate.substring(5) : '') + ' ' + (selectedTime || '') + '（' + partySize + '人）';
+    return;
   }
+
+  bar.classList.remove('hide');
+  btn.disabled=false;
+  info.textContent=party+'人 · '+formatDate(selDate)+' · '+selTime;
+  btn.innerHTML='確認訂位<div class="btn-sub">'+party+'人 · '+formatDate(selDate)+' '+selTime+'</div>';
 }
 
-function handleStickyBtn() {
-  if (currentStep === 2) goStep(3);
-  else if (currentStep === 3) submitBooking();
+function handleSticky(){
+  submitBooking();
 }
 
-// ===== 摘要 =====
-function renderSummary() {
-  var el = document.getElementById('bookingSummary');
-  el.innerHTML = '<div style="font-size:14px;font-weight:700;margin-bottom:10px;">📋 預約摘要</div>' +
-    '<div class="summary-grid">' +
-    '<span class="summary-label">服務：</span><span class="summary-value">' + esc(selectedService ? selectedService.name : '-') + '</span>' +
-    '<span class="summary-label">人員：</span><span class="summary-value">' + esc(selectedStaff ? selectedStaff.display_name : '不指定') + '</span>' +
-    '<span class="summary-label">日期：</span><span class="summary-value">' + (selectedDate || '-') + '</span>' +
-    '<span class="summary-label">時段：</span><span class="summary-value">' + (selectedTime || '-') + '</span>' +
-    '<span class="summary-label">人數：</span><span class="summary-value">' + partySize + ' 人</span>' +
-    (selectedService && selectedService.price ? '<span class="summary-label">費用：</span><span class="summary-value" style="color:#059669;">$' + selectedService.price + '</span>' : '') +
-    '</div>';
-}
+// ===== Submit =====
+async function submitBooking(){
+  var name=document.getElementById('fName').value.trim();
+  var phone=document.getElementById('fPhone').value.trim();
+  var notes=document.getElementById('fNotes').value.trim();
 
-// ===== 送出預約 =====
-async function submitBooking() {
-  var name = document.getElementById('custName').value.trim();
-  var phone = document.getElementById('custPhone').value.trim();
-  var notes = document.getElementById('custNotes').value.trim();
+  if(!name){alert('請輸入姓名');document.getElementById('fName').focus();return}
+  if(!phone||phone.length<9){alert('請輸入有效手機號碼');document.getElementById('fPhone').focus();return}
 
-  if (!name) { alert('請輸入姓名'); return; }
-  if (!phone || phone.length < 8) { alert('請輸入有效電話'); return; }
+  var btn=document.getElementById('stickyBtn');
+  btn.disabled=true;btn.textContent='訂位中...';
 
-  // 組合備註：快速標籤 + 自由文字
-  var allNotes = [];
-  if (selectedTags.length > 0) allNotes.push(selectedTags.join('、'));
-  if (notes) allNotes.push(notes);
-  var finalNotes = allNotes.join(' / ') || null;
+  var now=new Date();
+  var bn='R'+String(now.getMonth()+1).padStart(2,'0')+String(now.getDate()).padStart(2,'0')+'-'+String(now.getHours()).padStart(2,'0')+String(now.getMinutes()).padStart(2,'0')+String(now.getSeconds()).padStart(2,'0');
 
-  var now = new Date();
-  var bookingNumber = 'B' + (now.getMonth() + 1).toString().padStart(2, '0') +
-    now.getDate().toString().padStart(2, '0') + '-' +
-    now.getHours().toString().padStart(2, '0') +
-    now.getMinutes().toString().padStart(2, '0') +
-    now.getSeconds().toString().padStart(2, '0');
+  var allNotes=[];
+  if(selTags.length)allNotes.push(selTags.join('、'));
+  if(notes)allNotes.push(notes);
+  var finalNotes=allNotes.join(' / ')||null;
 
-  var btn = document.getElementById('stickyBtn');
-  btn.disabled = true;
-  btn.textContent = '送出中...';
-
-  try {
-    await sbFetch('bookings', {
-      method: 'POST',
-      prefer: 'return=minimal',
-      body: {
-        store_id: currentStoreId,
-        booking_number: bookingNumber,
-        customer_name: customerTitle + ' ' + name,
-        customer_phone: phone,
-        booking_date: selectedDate,
-        booking_time: selectedTime,
-        party_size: partySize,
-        service_id: selectedService ? selectedService.id : null,
-        staff_id: selectedStaff ? selectedStaff.id : null,
-        duration_minutes: selectedService ? selectedService.duration_minutes : 60,
-        notes: finalNotes,
-        status: 'pending'
-      }
+  try{
+    await post('bookings',{
+      store_id:storeId,
+      booking_number:bn,
+      customer_name:custTitle+' '+name,
+      customer_phone:phone,
+      booking_date:selDate,
+      booking_time:selTime,
+      party_size:party,
+      notes:finalNotes,
+      status:'pending',
+      booking_type:'restaurant'
     });
 
-    document.querySelectorAll('.step-panel').forEach(function(p) { p.classList.remove('active'); });
-    document.getElementById('stepSuccess').classList.add('active');
-    document.getElementById('stickyBottom').classList.remove('show');
-    document.getElementById('successNumber').textContent = '預約編號：' + bookingNumber;
-    document.getElementById('successDetail').innerHTML =
-      esc(selectedService ? selectedService.name : '') + '<br>' +
-      selectedDate + ' ' + selectedTime + '<br>' +
-      esc(customerTitle + ' ' + name) + ' · ' + esc(phone) + '<br>' + partySize + ' 人';
-    window.scrollTo(0, 0);
-  } catch (e) {
-    console.error('Submit booking error:', e);
-    alert('預約失敗，請重試');
-    btn.disabled = false;
-    updateStickyBtn();
-  }
-}
+    // 成功
+    document.getElementById('restaurantMode').classList.add('hidden');
+    document.getElementById('successPage').classList.remove('hidden');
+    document.getElementById('stickyBar').classList.add('hide');
+    document.getElementById('okNum').textContent=bn;
 
-// ===== 重置 =====
-function resetBooking() {
-  selectedService = null;
-  selectedStaff = null;
-  selectedDate = null;
-  selectedTime = null;
-  partySize = 1;
-  customerTitle = '先生';
-  selectedTags = [];
-  currentStep = 0;
+    var sh='';
+    sh+='<div class="sum-row"><span class="sum-label">人數</span><span class="sum-val">'+party+' 位</span></div>';
+    sh+='<div class="sum-row"><span class="sum-label">日期</span><span class="sum-val">'+formatDate(selDate)+'</span></div>';
+    sh+='<div class="sum-row"><span class="sum-label">時段</span><span class="sum-val">'+selTime+'</span></div>';
+    sh+='<div class="sum-row"><span class="sum-label">姓名</span><span class="sum-val">'+esc(custTitle+' '+name)+'</span></div>';
+    sh+='<div class="sum-row"><span class="sum-label">電話</span><span class="sum-val">'+esc(phone)+'</span></div>';
+    if(finalNotes)sh+='<div class="sum-row"><span class="sum-label">備註</span><span class="sum-val">'+esc(finalNotes)+'</span></div>';
+    document.getElementById('okSummary').innerHTML=sh;
 
-  document.querySelectorAll('.step-panel').forEach(function(p) { p.classList.remove('active'); });
-  document.getElementById('step0').classList.add('active');
-  for (var i = 0; i < 4; i++) {
-    document.getElementById('dot' + i).className = 'step-dot' + (i === 0 ? ' active' : '');
+    window.scrollTo({top:0,behavior:'smooth'});
+  }catch(e){
+    console.error(e);alert('訂位失敗，請重試');
+    btn.disabled=false;updateSticky();
   }
-  document.querySelectorAll('.service-card').forEach(function(c) { c.classList.remove('selected'); });
-  document.querySelectorAll('.staff-card').forEach(function(c) { c.classList.remove('selected'); });
-  document.getElementById('staffAny').classList.add('selected');
-  document.getElementById('custName').value = '';
-  document.getElementById('custPhone').value = '';
-  document.getElementById('custNotes').value = '';
-  document.querySelectorAll('#quickTags .tag-btn').forEach(function(t) { t.classList.remove('active'); });
-  document.querySelectorAll('#titlePills .pill-btn').forEach(function(p, i) { p.classList.toggle('active', i === 0); });
-  document.getElementById('stickyBottom').classList.remove('show');
-  renderPartyPills();
-  window.scrollTo(0, 0);
 }
 
 init();

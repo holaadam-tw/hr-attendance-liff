@@ -2206,7 +2206,16 @@ export async function loadBookingForStore() {
                     if (b.service_name) html += '<span style="background:#F5F3FF;color:#6366F1;padding:3px 8px;border-radius:6px;font-size:12px;font-weight:600;">🔧 ' + esc(b.service_name) + '</span>';
                     if (b.staff_name) html += '<span style="background:#FFF7ED;color:#F97316;padding:3px 8px;border-radius:6px;font-size:12px;font-weight:600;">👤 ' + esc(b.staff_name) + '</span>';
                     if (b.party_size > 1) html += '<span style="background:#F0FDF4;color:#059669;padding:3px 8px;border-radius:6px;font-size:12px;font-weight:600;">👥 ' + b.party_size + '人</span>';
-                    if (b.notes) html += '<span style="background:#FEF3C7;color:#92400E;padding:3px 8px;border-radius:6px;font-size:12px;">📝 ' + esc(b.notes) + '</span>';
+                    if (b.notes) {
+                        var tagIcons = {'兒童椅':'👶','慶生':'🎂','靠窗':'🪟','素食':'🥬','無障礙':'♿','安靜區':'🤫'};
+                        var noteHtml = esc(b.notes);
+                        Object.keys(tagIcons).forEach(function(k) {
+                            if (b.notes.includes(k)) {
+                                noteHtml = noteHtml.replace(k, '<span style="background:#FEF3C7;padding:2px 6px;border-radius:4px;">' + tagIcons[k] + ' ' + k + '</span>');
+                            }
+                        });
+                        html += '<div style="font-size:12px;margin-top:4px;">' + noteHtml + '</div>';
+                    }
                     html += '</div>';
                     html += '<div style="display:flex;gap:6px;">';
                     if (b.status === 'pending') {
