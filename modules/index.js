@@ -277,7 +277,7 @@ window.loadTransactions = loadTransactions;
 window.toggleLoyalty = toggleLoyalty;
 
 // booking management (independent page)
-// interactive callbacks (selectBookingDate, switchBookingView, etc.) are window.xxx in store.js
+// interactive callbacks (selectBookingDate, switchBookingTab, etc.) are window.xxx in store.js
 window.loadBookingForStore = loadBookingForStore;
 window.loadBookingStoreList = loadBookingStoreList;
 
