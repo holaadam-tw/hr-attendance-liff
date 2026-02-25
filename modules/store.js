@@ -2062,9 +2062,14 @@ function renderTxRow(tx) {
 // ============================================================
 // 預約管理（獨立頁面）- 重構版 v2
 // ============================================================
+function localDate(d) {
+    var dd = d || new Date();
+    return dd.getFullYear() + '-' + String(dd.getMonth()+1).padStart(2,'0') + '-' + String(dd.getDate()).padStart(2,'0');
+}
+
 let bookingCurrentStoreId = null;
 let bookingCurrentTabView = 'timeline';
-window.selectedBookingDate = window.selectedBookingDate || new Date().toISOString().split('T')[0];
+window.selectedBookingDate = window.selectedBookingDate || localDate();
 window.currentBookingFilter = window.currentBookingFilter || 'all';
 window.calendarYear = window.calendarYear || new Date().getFullYear();
 window.calendarMonth = window.calendarMonth != null ? window.calendarMonth : new Date().getMonth();
@@ -2079,15 +2084,18 @@ export async function loadBookingForStore() {
 
     try {
         const storeId = bookingCurrentStoreId;
-        const today = new Date().toISOString().split('T')[0];
+        const today = localDate();
 
         // 取商店 slug（用於預約連結）
         const { data: storeInfo } = await sb.from('store_profiles').select('store_slug').eq('id', storeId).maybeSingle();
         const storeSlug = storeInfo?.store_slug || '';
 
-        // 取本月預約（含 join）
-        const monthStart = new Date(window.calendarYear, window.calendarMonth, 1).toISOString().split('T')[0];
-        const monthEnd = new Date(window.calendarYear, window.calendarMonth + 1, 0).toISOString().split('T')[0];
+        // 取本月預約（含 join）— 用本地時間避免 UTC 偏移
+        const y = window.calendarYear;
+        const m = window.calendarMonth;
+        const monthStart = y + '-' + String(m + 1).padStart(2, '0') + '-01';
+        const lastDay = new Date(y, m + 1, 0).getDate();
+        const monthEnd = y + '-' + String(m + 1).padStart(2, '0') + '-' + String(lastDay).padStart(2, '0');
         const { data: rawBookings } = await sb.from('bookings')
             .select('*, booking_services(name), booking_staff(display_name)')
             .eq('store_id', storeId)
@@ -2144,7 +2152,7 @@ export async function loadBookingForStore() {
         html += '<style>.bk-date-scroll::-webkit-scrollbar{display:none}</style>';
         for (let i = -1; i < 14; i++) {
             const d = new Date(); d.setDate(d.getDate() + i);
-            const ds = d.toISOString().split('T')[0];
+            const ds = localDate(d);
             let topLabel, botLabel;
             if (i === -1) { topLabel = '昨天'; botLabel = (d.getMonth()+1)+'/'+d.getDate(); }
             else if (i === 0) { topLabel = '今天'; botLabel = (d.getMonth()+1)+'/'+d.getDate(); }
