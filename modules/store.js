@@ -2073,6 +2073,8 @@ window.selectedBookingDate = window.selectedBookingDate || localDate();
 window.currentBookingFilter = window.currentBookingFilter || 'all';
 window.calendarYear = window.calendarYear || new Date().getFullYear();
 window.calendarMonth = window.calendarMonth != null ? window.calendarMonth : new Date().getMonth();
+var bookingInterval = parseInt(localStorage.getItem('bk_interval')) || 30;
+var bookingSettings = JSON.parse(localStorage.getItem('bk_settings') || '{}');
 
 export async function loadBookingForStore() {
     const sel = document.getElementById('bookingStoreSelect');
@@ -2328,56 +2330,72 @@ export async function loadBookingForStore() {
         // ══════════════════════════════════════
         html += '<div id="bkSettingsTab" style="display:' + (bookingCurrentTabView === 'settings' ? '' : 'none') + ';">';
 
-        // 🔧 服務項目
+        // ⏰ 營業與預約設定
         html += '<div style="margin-bottom:24px;">';
-        html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">';
-        html += '<div style="font-size:15px;font-weight:700;color:#1E293B;">🔧 服務項目</div>';
-        html += '<button onclick="addBookingService(\'' + storeId + '\')" style="padding:6px 14px;border:none;border-radius:8px;background:linear-gradient(135deg,#7C3AED,#6D28D9);color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">+ 新增</button>';
-        html += '</div>';
-        if (!bkServices || bkServices.length === 0) {
-            html += '<div style="text-align:center;padding:24px;color:#94A3B8;background:#F8FAFC;border-radius:12px;border:1.5px dashed #E2E8F0;">尚未設定服務項目</div>';
-        } else {
-            bkServices.forEach(function(s) {
-                html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:#fff;border:1px solid #F1F5F9;border-radius:12px;margin-bottom:6px;">';
-                html += '<div style="flex:1;min-width:0;">';
-                html += '<div style="font-weight:700;color:#1E293B;font-size:14px;">' + esc(s.name) + '</div>';
-                html += '<div style="font-size:12px;color:#64748B;margin-top:2px;">⏱ ' + s.duration_minutes + ' 分鐘 · $' + (s.price || 0) + '</div>';
-                html += '</div>';
-                html += '<div style="display:flex;gap:8px;align-items:center;flex-shrink:0;">';
-                // Toggle switch
-                html += '<label style="position:relative;display:inline-block;width:40px;height:22px;cursor:pointer;">';
-                html += '<input type="checkbox" ' + (s.is_active ? 'checked' : '') + ' onchange="toggleServiceActive(\'' + s.id + '\',this.checked)" style="opacity:0;width:0;height:0;">';
-                html += '<span style="position:absolute;inset:0;background:' + (s.is_active ? '#10B981' : '#CBD5E1') + ';border-radius:11px;transition:.2s;"></span>';
-                html += '<span style="position:absolute;top:2px;left:' + (s.is_active ? '20' : '2') + 'px;width:18px;height:18px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 2px rgba(0,0,0,.15);"></span>';
-                html += '</label>';
-                html += '<button onclick="editBookingService(\'' + s.id + '\')" style="width:32px;height:32px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;">✏️</button>';
-                html += '<button onclick="deleteBookingService(\'' + s.id + '\')" style="width:32px;height:32px;border:1px solid #FECACA;border-radius:8px;background:#fff;color:#EF4444;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;">🗑</button>';
-                html += '</div></div>';
-            });
-        }
+        html += '<div style="font-size:16px;font-weight:800;margin-bottom:12px;">⏰ 營業與預約設定</div>';
+
+        // 可預約時段（午餐/晚餐）
+        html += '<div style="background:#fff;border:1px solid #E2E8F0;border-radius:12px;padding:16px;margin-bottom:10px;">';
+        html += '<div style="font-size:14px;font-weight:700;margin-bottom:10px;">🌅 午餐時段</div>';
+        html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">';
+        html += '<input type="time" id="bkLunchStart" value="' + (bookingSettings.lunchStart || '11:00') + '" style="padding:8px 12px;border:2px solid #E2E8F0;border-radius:8px;font-size:14px;font-family:inherit;">';
+        html += '<span style="color:#94A3B8;">～</span>';
+        html += '<input type="time" id="bkLunchEnd" value="' + (bookingSettings.lunchEnd || '14:00') + '" style="padding:8px 12px;border:2px solid #E2E8F0;border-radius:8px;font-size:14px;font-family:inherit;">';
         html += '</div>';
 
-        // 👤 服務人員
-        html += '<div style="margin-bottom:24px;">';
-        html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">';
-        html += '<div style="font-size:15px;font-weight:700;color:#1E293B;">👤 服務人員</div>';
-        html += '<button onclick="addBookingStaff(\'' + storeId + '\')" style="padding:6px 14px;border:none;border-radius:8px;background:linear-gradient(135deg,#7C3AED,#6D28D9);color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">+ 新增</button>';
+        html += '<div style="font-size:14px;font-weight:700;margin-bottom:10px;margin-top:16px;">🌙 晚餐時段</div>';
+        html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">';
+        html += '<input type="time" id="bkDinnerStart" value="' + (bookingSettings.dinnerStart || '17:00') + '" style="padding:8px 12px;border:2px solid #E2E8F0;border-radius:8px;font-size:14px;font-family:inherit;">';
+        html += '<span style="color:#94A3B8;">～</span>';
+        html += '<input type="time" id="bkDinnerEnd" value="' + (bookingSettings.dinnerEnd || '21:00') + '" style="padding:8px 12px;border:2px solid #E2E8F0;border-radius:8px;font-size:14px;font-family:inherit;">';
         html += '</div>';
-        if (!bkStaff || bkStaff.length === 0) {
-            html += '<div style="text-align:center;padding:24px;color:#94A3B8;background:#F8FAFC;border-radius:12px;border:1.5px dashed #E2E8F0;">尚未設定服務人員</div>';
-        } else {
-            bkStaff.forEach(function(s) {
-                html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:#fff;border:1px solid #F1F5F9;border-radius:12px;margin-bottom:6px;">';
-                html += '<div style="display:flex;align-items:center;gap:10px;">';
-                // 圓形頭像 (首字+漸層)
-                html += '<div style="width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#7C3AED,#A78BFA);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:16px;flex-shrink:0;">' + esc((s.display_name || '?').substring(0, 1)) + '</div>';
-                html += '<div><div style="font-weight:700;color:#1E293B;font-size:14px;">' + esc(s.display_name) + '</div>';
-                if (s.title) html += '<div style="font-size:12px;color:#94A3B8;">' + esc(s.title) + '</div>';
-                html += '</div></div>';
-                html += '<button onclick="deleteBookingStaff(\'' + s.id + '\')" style="width:32px;height:32px;border:1px solid #FECACA;border-radius:8px;background:#fff;color:#EF4444;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;">🗑</button>';
-                html += '</div>';
-            });
-        }
+        html += '</div>';
+
+        // 預約間隔
+        html += '<div style="background:#fff;border:1px solid #E2E8F0;border-radius:12px;padding:16px;margin-bottom:10px;">';
+        html += '<div style="font-size:14px;font-weight:700;margin-bottom:8px;">⏱ 預約間隔</div>';
+        html += '<div style="display:flex;gap:8px;flex-wrap:wrap;">';
+        [15,30,60].forEach(function(m) {
+            var isActive = bookingInterval === m;
+            html += '<div onclick="setBookingInterval(' + m + ')" style="padding:10px 20px;border-radius:10px;border:2px solid ' + (isActive ? '#6366F1' : '#E2E8F0') + ';background:' + (isActive ? '#EEF2FF' : '#fff') + ';color:' + (isActive ? '#6366F1' : '#475569') + ';font-size:14px;font-weight:700;cursor:pointer;">' + m + ' 分鐘</div>';
+        });
+        html += '</div></div>';
+
+        // 開放預約天數
+        html += '<div style="background:#fff;border:1px solid #E2E8F0;border-radius:12px;padding:16px;margin-bottom:10px;">';
+        html += '<div style="font-size:14px;font-weight:700;margin-bottom:8px;">📅 開放預約天數</div>';
+        html += '<div style="display:flex;align-items:center;gap:8px;">';
+        html += '<span style="font-size:14px;color:#475569;">未來</span>';
+        html += '<input type="number" id="bkOpenDays" value="' + (bookingSettings.openDays || 14) + '" min="1" max="60" style="width:70px;padding:8px 12px;border:2px solid #E2E8F0;border-radius:8px;font-size:16px;font-weight:700;text-align:center;font-family:inherit;">';
+        html += '<span style="font-size:14px;color:#475569;">天可預約</span>';
+        html += '</div></div>';
+
+        // 每時段最大組數
+        html += '<div style="background:#fff;border:1px solid #E2E8F0;border-radius:12px;padding:16px;margin-bottom:10px;">';
+        html += '<div style="font-size:14px;font-weight:700;margin-bottom:8px;">👥 每時段最大組數</div>';
+        html += '<div style="display:flex;align-items:center;gap:8px;">';
+        html += '<span style="font-size:14px;color:#475569;">每個時段最多</span>';
+        html += '<input type="number" id="bkMaxPerSlot" value="' + (bookingSettings.maxPerSlot || 5) + '" min="1" max="50" style="width:70px;padding:8px 12px;border:2px solid #E2E8F0;border-radius:8px;font-size:16px;font-weight:700;text-align:center;font-family:inherit;">';
+        html += '<span style="font-size:14px;color:#475569;">組客人</span>';
+        html += '</div></div>';
+
+        // 是否需要人工確認
+        var mcChecked = bookingSettings.manualConfirm !== false;
+        html += '<div style="background:#fff;border:1px solid #E2E8F0;border-radius:12px;padding:16px;margin-bottom:10px;">';
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;">';
+        html += '<div>';
+        html += '<div style="font-size:14px;font-weight:700;">🔔 需要人工確認</div>';
+        html += '<div style="font-size:12px;color:#94A3B8;margin-top:2px;">關閉後預約自動確認</div>';
+        html += '</div>';
+        html += '<label style="position:relative;display:inline-block;width:48px;height:26px;cursor:pointer;">';
+        html += '<input type="checkbox" id="bkManualConfirm" ' + (mcChecked ? 'checked' : '') + ' style="opacity:0;width:0;height:0;" onchange="toggleManualConfirm(this.checked)">';
+        html += '<span style="position:absolute;top:0;left:0;right:0;bottom:0;background:' + (mcChecked ? '#10B981' : '#CBD5E1') + ';border-radius:13px;transition:.3s;"></span>';
+        html += '<span style="position:absolute;top:2px;left:' + (mcChecked ? '24' : '2') + 'px;width:22px;height:22px;background:#fff;border-radius:50%;transition:.3s;box-shadow:0 1px 3px rgba(0,0,0,.1);"></span>';
+        html += '</label>';
+        html += '</div></div>';
+
+        // 儲存按鈕
+        html += '<button onclick="saveBookingSettings(\'' + storeId + '\')" style="width:100%;padding:14px;background:linear-gradient(135deg,#4F46E5,#6D28D9);color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:4px;box-shadow:0 4px 12px rgba(99,102,241,.25);">💾 儲存設定</button>';
         html += '</div>';
 
         // 🔗 消費者預約連結
@@ -2395,6 +2413,12 @@ export async function loadBookingForStore() {
             html += '<div style="color:#5B21B6;font-size:13px;">尚未設定商店網址代碼（store_slug）</div>';
         }
         html += '</div></div>';
+
+        // ⚠️ 進階設定（未來擴充）
+        html += '<div style="margin-top:20px;padding:16px;background:#F8FAFC;border-radius:12px;border:1px dashed #CBD5E1;">';
+        html += '<div style="font-size:14px;font-weight:700;color:#94A3B8;margin-bottom:4px;">🔮 即將推出</div>';
+        html += '<div style="font-size:13px;color:#94A3B8;">自動提醒簡訊 · 線上訂金收取 · 候位系統 · 顧客評價</div>';
+        html += '</div>';
 
         html += '</div>'; // end settings tab
 
@@ -2617,6 +2641,34 @@ window.showBookingQR = function(url) {
         '<button onclick="this.closest(\'div\').parentElement.remove()" style="margin-top:16px;padding:10px 28px;border:none;border-radius:10px;background:linear-gradient(135deg,#7C3AED,#6D28D9);color:#fff;font-size:14px;font-weight:600;cursor:pointer;">關閉</button>' +
         '</div>';
     document.body.appendChild(overlay);
+};
+
+// 預約間隔設定
+window.setBookingInterval = function(m) {
+    bookingInterval = m;
+    localStorage.setItem('bk_interval', m);
+    loadBookingForStore();
+};
+
+// 人工確認 toggle
+window.toggleManualConfirm = function(checked) {
+    bookingSettings.manualConfirm = checked;
+    localStorage.setItem('bk_settings', JSON.stringify(bookingSettings));
+};
+
+// 儲存全部預約設定
+window.saveBookingSettings = function(storeId) {
+    bookingSettings.lunchStart = document.getElementById('bkLunchStart')?.value || '11:00';
+    bookingSettings.lunchEnd = document.getElementById('bkLunchEnd')?.value || '14:00';
+    bookingSettings.dinnerStart = document.getElementById('bkDinnerStart')?.value || '17:00';
+    bookingSettings.dinnerEnd = document.getElementById('bkDinnerEnd')?.value || '21:00';
+    bookingSettings.interval = bookingInterval;
+    bookingSettings.openDays = parseInt(document.getElementById('bkOpenDays')?.value) || 14;
+    bookingSettings.maxPerSlot = parseInt(document.getElementById('bkMaxPerSlot')?.value) || 5;
+    bookingSettings.manualConfirm = document.getElementById('bkManualConfirm')?.checked ?? true;
+    localStorage.setItem('bk_settings', JSON.stringify(bookingSettings));
+    localStorage.setItem('bk_interval', bookingInterval);
+    showToast('設定已儲存');
 };
 
 
