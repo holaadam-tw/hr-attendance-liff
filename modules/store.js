@@ -2063,11 +2063,11 @@ function renderTxRow(tx) {
 // 預約管理（獨立頁面）- 重構版 v2
 // ============================================================
 let bookingCurrentStoreId = null;
-let selectedBookingDate = new Date().toISOString().split('T')[0];
-let currentBookingFilter = 'all';
 let bookingCurrentTabView = 'timeline';
-let calendarYear = new Date().getFullYear();
-let calendarMonth = new Date().getMonth();
+window.selectedBookingDate = window.selectedBookingDate || new Date().toISOString().split('T')[0];
+window.currentBookingFilter = window.currentBookingFilter || 'all';
+window.calendarYear = window.calendarYear || new Date().getFullYear();
+window.calendarMonth = window.calendarMonth != null ? window.calendarMonth : new Date().getMonth();
 
 export async function loadBookingForStore() {
     const sel = document.getElementById('bookingStoreSelect');
@@ -2086,8 +2086,8 @@ export async function loadBookingForStore() {
         const storeSlug = storeInfo?.store_slug || '';
 
         // 取本月預約（含 join）
-        const monthStart = new Date(calendarYear, calendarMonth, 1).toISOString().split('T')[0];
-        const monthEnd = new Date(calendarYear, calendarMonth + 1, 0).toISOString().split('T')[0];
+        const monthStart = new Date(window.calendarYear, window.calendarMonth, 1).toISOString().split('T')[0];
+        const monthEnd = new Date(window.calendarYear, window.calendarMonth + 1, 0).toISOString().split('T')[0];
         const { data: rawBookings } = await sb.from('bookings')
             .select('*, booking_services(name), booking_staff(display_name)')
             .eq('store_id', storeId)
@@ -2112,7 +2112,7 @@ export async function loadBookingForStore() {
         const confirmedCount = allBookings.filter(b => b.status === 'confirmed' || b.status === 'checked_in').length;
 
         // 選中日期的預約
-        const dayBookings = allBookings.filter(b => b.booking_date === selectedBookingDate);
+        const dayBookings = allBookings.filter(b => b.booking_date === window.selectedBookingDate);
 
         const statusColors = {pending:'#F59E0B',confirmed:'#3B82F6',checked_in:'#10B981',completed:'#6366F1',cancelled:'#EF4444'};
         const statusLabels = {pending:'待確認',confirmed:'已確認',checked_in:'已報到',completed:'已完成',cancelled:'已取消'};
@@ -2150,7 +2150,7 @@ export async function loadBookingForStore() {
             else if (i === 0) { topLabel = '今天'; botLabel = (d.getMonth()+1)+'/'+d.getDate(); }
             else if (i === 1) { topLabel = '明天'; botLabel = (d.getMonth()+1)+'/'+d.getDate(); }
             else { topLabel = (d.getMonth()+1)+'/'+d.getDate(); botLabel = '週'+wkDays[d.getDay()]; }
-            const isSel = ds === selectedBookingDate;
+            const isSel = ds === window.selectedBookingDate;
             const isToday = i === 0;
             const cnt = allBookings.filter(b => b.booking_date === ds).length;
             html += '<div onclick="selectBookingDate(\'' + ds + '\')" style="flex-shrink:0;min-width:56px;padding:8px 6px;text-align:center;border-radius:12px;cursor:pointer;transition:all .15s;';
@@ -2194,7 +2194,7 @@ export async function loadBookingForStore() {
         html += '<div style="display:flex;gap:6px;margin-bottom:14px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none;">';
         filterDefs.forEach(function(f) {
             const cnt = f.k === 'all' ? dayBookings.length : dayBookings.filter(b => b.status === f.k).length;
-            const active = currentBookingFilter === f.k;
+            const active = window.currentBookingFilter === f.k;
             html += '<button onclick="filterBookings(\'' + f.k + '\')" style="flex-shrink:0;padding:5px 12px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s;';
             if (active) {
                 html += 'border:1.5px solid ' + f.c + ';background:' + f.c + ';color:#fff;box-shadow:0 1px 4px ' + f.c + '33;';
@@ -2208,7 +2208,7 @@ export async function loadBookingForStore() {
         html += '</div>';
 
         // 時間軸卡片 — 按時段分組
-        const filtered = currentBookingFilter === 'all' ? dayBookings : dayBookings.filter(b => b.status === currentBookingFilter);
+        const filtered = window.currentBookingFilter === 'all' ? dayBookings : dayBookings.filter(b => b.status === window.currentBookingFilter);
         if (filtered.length === 0) {
             html += '<div style="text-align:center;padding:48px 20px;color:#94A3B8;">';
             html += '<div style="font-size:48px;margin-bottom:12px;">📅</div>';
@@ -2277,7 +2277,7 @@ export async function loadBookingForStore() {
         html += '<div id="bkCalendarTab" style="display:' + (bookingCurrentTabView === 'calendar' ? '' : 'none') + ';">';
         html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">';
         html += '<button onclick="changeBookingMonth(-1)" style="width:36px;height:36px;border:1.5px solid #E2E8F0;border-radius:10px;background:#fff;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;">◀</button>';
-        html += '<div style="font-size:16px;font-weight:700;color:#1E293B;">' + calendarYear + '年' + (calendarMonth + 1) + '月</div>';
+        html += '<div style="font-size:16px;font-weight:700;color:#1E293B;">' + window.calendarYear + '年' + (window.calendarMonth + 1) + '月</div>';
         html += '<button onclick="changeBookingMonth(1)" style="width:36px;height:36px;border:1.5px solid #E2E8F0;border-radius:10px;background:#fff;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;">▶</button>';
         html += '</div>';
 
@@ -2289,14 +2289,14 @@ export async function loadBookingForStore() {
         html += '</div>';
 
         html += '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;">';
-        const firstDay = new Date(calendarYear, calendarMonth, 1).getDay();
-        const daysInMonth = new Date(calendarYear, calendarMonth + 1, 0).getDate();
+        const firstDay = new Date(window.calendarYear, window.calendarMonth, 1).getDay();
+        const daysInMonth = new Date(window.calendarYear, window.calendarMonth + 1, 0).getDate();
         for (let i = 0; i < firstDay; i++) html += '<div></div>';
         for (let day = 1; day <= daysInMonth; day++) {
-            const ds = calendarYear + '-' + String(calendarMonth + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+            const ds = window.calendarYear + '-' + String(window.calendarMonth + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
             const cnt = allBookings.filter(b => b.booking_date === ds).length;
             const isToday = ds === today;
-            const isSel = ds === selectedBookingDate;
+            const isSel = ds === window.selectedBookingDate;
             html += '<div onclick="selectBookingDate(\'' + ds + '\');switchBookingTab(\'timeline\')" style="padding:6px 2px;text-align:center;border-radius:10px;cursor:pointer;transition:all .15s;min-height:42px;';
             if (isSel) {
                 html += 'background:linear-gradient(135deg,#7C3AED,#6D28D9);color:#fff;box-shadow:0 2px 6px rgba(124,58,237,.25);';
@@ -2402,13 +2402,13 @@ export async function loadBookingForStore() {
 
 // 日期切換
 window.selectBookingDate = async function(date) {
-    selectedBookingDate = date;
+    window.selectedBookingDate = date;
     await loadBookingForStore();
 };
 
 // 狀態過濾（切換後重新渲染）
 window.filterBookings = async function(filter) {
-    currentBookingFilter = filter;
+    window.currentBookingFilter = filter;
     await loadBookingForStore();
 };
 
@@ -2437,9 +2437,9 @@ window.switchBookingTab = function(tab) {
 
 // 月份切換
 window.changeBookingMonth = async function(delta) {
-    calendarMonth += delta;
-    if (calendarMonth > 11) { calendarMonth = 0; calendarYear++; }
-    if (calendarMonth < 0) { calendarMonth = 11; calendarYear--; }
+    window.calendarMonth += delta;
+    if (window.calendarMonth > 11) { window.calendarMonth = 0; window.calendarYear++; }
+    if (window.calendarMonth < 0) { window.calendarMonth = 11; window.calendarYear--; }
     await loadBookingForStore();
 };
 
@@ -2462,7 +2462,7 @@ window.manualAddBooking = async function(storeId) {
     if (!name || !name.trim()) return;
     const phone = prompt('電話：');
     if (!phone || !phone.trim()) return;
-    const date = prompt('預約日期（YYYY-MM-DD）：', selectedBookingDate);
+    const date = prompt('預約日期（YYYY-MM-DD）：', window.selectedBookingDate);
     if (!date) return;
     const time = prompt('預約時間（HH:MM）：', '10:00');
     if (!time) return;
@@ -2487,7 +2487,7 @@ window.manualAddBooking = async function(storeId) {
         });
         if (error) throw error;
         showToast('已新增預約');
-        selectedBookingDate = date;
+        window.selectedBookingDate = date;
         await loadBookingForStore();
     } catch(e) {
         console.error(e);
