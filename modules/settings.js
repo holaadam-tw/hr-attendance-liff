@@ -333,7 +333,7 @@ export async function publishAnnouncement() {
 
     try {
         const row = {
-            company_id: window.currentEmployee?.company_id || null,
+            company_id: window.currentCompanyId || null,
             title,
             content: content || null,
             type,
@@ -370,7 +370,7 @@ export async function loadAnnouncementList() {
             .select('*')
             .order('created_at', { ascending: false })
             .limit(30);
-        if (window.currentCompanyId) query = query.or('company_id.eq.' + window.currentCompanyId + ',company_id.is.null');
+        if (window.currentCompanyId) query = query.eq('company_id', window.currentCompanyId);
 
         const { data, error } = await query;
         if (error) throw error;
