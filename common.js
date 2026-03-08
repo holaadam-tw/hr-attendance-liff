@@ -813,9 +813,10 @@ async function loadMakeupHistory() {
 // ===== LINE Messaging API 推播 =====
 async function sendLineMessage(to, text) {
     const setting = getCachedSetting('line_messaging_api');
-    if (!setting?.token) return;
+    console.log('[LINE Push] token:', setting?.token ? '有' : '無', 'to:', to ? (to.substring(0, 8) + '...') : '無');
+    if (!setting?.token || !to) { console.warn('[LINE Push] 未設定，跳過'); return; }
     try {
-        await fetch('https://nssuisyvlrqnqfxupklb.supabase.co/functions/v1/line-push', {
+        const res = await fetch('https://nssuisyvlrqnqfxupklb.supabase.co/functions/v1/line-push', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -823,8 +824,10 @@ async function sendLineMessage(to, text) {
             },
             body: JSON.stringify({ token: setting.token, to, text })
         });
+        const result = await res.json().catch(() => ({}));
+        console.log('[LINE Push] 回傳:', result);
     } catch(e) {
-        console.log('LINE 推播失敗（非必要）', e);
+        console.error('[LINE Push] 錯誤:', e);
     }
 }
 

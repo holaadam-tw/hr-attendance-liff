@@ -108,8 +108,9 @@ export async function saveNotifyToken() {
         }
         showToast('✅ 設定已儲存');
         if (status) { status.style.display = 'block'; status.style.color = '#059669'; status.textContent = '✅ 已儲存'; }
-        // 重新載入快取
-        if (typeof loadSystemSettings === 'function') await loadSystemSettings();
+        // 清除快取並重新載入，讓 sendLineMessage 讀到新值
+        invalidateSettingsCache();
+        await loadSettings();
     } catch(e) { showToast('❌ 儲存失敗'); }
 }
 
