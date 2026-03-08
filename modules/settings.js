@@ -370,7 +370,7 @@ export async function loadAnnouncementList() {
             .select('*')
             .order('created_at', { ascending: false })
             .limit(30);
-        if (window.currentCompanyId) query = query.eq('company_id', window.currentCompanyId);
+        if (window.currentCompanyId) query = query.or('company_id.eq.' + window.currentCompanyId + ',company_id.is.null');
 
         const { data, error } = await query;
         if (error) throw error;

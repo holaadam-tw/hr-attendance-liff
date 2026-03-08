@@ -862,7 +862,7 @@ async function loadAnnouncements() {
             .lte('publish_at', now)
             .order('created_at', { ascending: false })
             .limit(20);
-        if (currentCompanyId) query = query.eq('company_id', currentCompanyId);
+        if (currentCompanyId) query = query.or('company_id.eq.' + currentCompanyId + ',company_id.is.null');
 
         var { data: announcements } = await query;
         announcements = (announcements || []).filter(function(a) {
@@ -1469,7 +1469,7 @@ async function loadAllRequests() {
             .order('created_at', { ascending: false })
             .limit(50);
 
-        if (currentCompanyId) query = query.eq('company_id', currentCompanyId);
+        if (currentCompanyId) query = query.or('company_id.eq.' + currentCompanyId + ',company_id.is.null');
         if (reqMgrFilter !== 'all') {
             if (reqMgrFilter === 'completed') {
                 query = query.in('status', ['completed', 'rejected']);
@@ -1770,7 +1770,7 @@ async function checkForcedAnnouncements() {
             .eq('type', 'urgent')
             .lte('publish_at', now)
             .order('created_at', { ascending: false });
-        if (currentCompanyId) query = query.eq('company_id', currentCompanyId);
+        if (currentCompanyId) query = query.or('company_id.eq.' + currentCompanyId + ',company_id.is.null');
 
         var { data: forced } = await query;
         forced = (forced || []).filter(function(a) {
