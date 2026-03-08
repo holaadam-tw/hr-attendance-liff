@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LINE Messaging API 測試</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,sans-serif;background:#0F172A;color:#E2E8F0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.card{background:#1E293B;border-radius:20px;padding:32px;max-width:500px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+h1{font-size:20px;font-weight:800;margin-bottom:4px;color:#fff}
+.sub{font-size:13px;color:#64748B;margin-bottom:24px}
+.field{margin-bottom:16px}
+label{font-size:13px;font-weight:600;color:#94A3B8;display:block;margin-bottom:6px}
+input,textarea{width:100%;padding:12px 14px;background:#0F172A;border:2px solid #334155;border-radius:10px;color:#E2E8F0;font-size:14px;font-family:inherit;transition:.2s}
+input:focus,textarea:focus{outline:none;border-color:#6366F1}
+textarea{resize:none;height:80px}
+.info{padding:10px 14px;background:#1E1B4B;border-radius:8px;font-size:12px;color:#A5B4FC;margin-bottom:16px;word-break:break-all}
+.info span{color:#6366F1;font-weight:600}
+.btn{width:100%;padding:14px;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;transition:.2s;margin-bottom:8px}
+.btn-primary{background:linear-gradient(135deg,#4F46E5,#7C3AED);color:#fff;box-shadow:0 4px 12px rgba(99,102,241,.3)}
+.btn-primary:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(99,102,241,.4)}
+.btn-primary:disabled{background:#334155;box-shadow:none;cursor:wait}
+.btn-secondary{background:#334155;color:#94A3B8}
+.btn-secondary:hover{background:#475569;color:#fff}
+.result{margin-top:16px;padding:14px;border-radius:10px;font-size:13px;display:none}
+.result.success{display:block;background:#064E3B;color:#6EE7B7;border:1px solid #10B981}
+.result.error{display:block;background:#450A0A;color:#FCA5A5;border:1px solid #EF4444}
+.result.loading{display:block;background:#1E1B4B;color:#A5B4FC;border:1px solid #6366F1}
+.templates{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
+.tpl{padding:6px 12px;background:#334155;border-radius:8px;font-size:12px;cursor:pointer;transition:.2s}
+.tpl:hover{background:#475569;color:#fff}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>📤 LINE Messaging API 測試</h1>
+  <div class="sub">測試推播訊息到群組或個人</div>
+
+  <div class="field">
+    <label>Channel Access Token</label>
+    <input type="password" id="token" placeholder="貼上你的 Channel Access Token">
+  </div>
+
+  <div class="field">
+    <label>發送對象 ID（群組或個人）</label>
+    <input type="text" id="target" placeholder="C... 或 U...">
+  </div>
+
+  <div class="field">
+    <label>訊息內容</label>
+    <textarea id="msg">🔔 HR系統測試通知
+這是來自 Messaging API 的測試訊息！</textarea>
+  </div>
+
+  <div>
+    <label style="margin-bottom:8px">快速範本</label>
+    <div class="templates">
+      <div class="tpl" onclick="setMsg('🔔 HR系統測試通知\n這是來自 Messaging API 的測試訊息！')">測試通知</div>
+      <div class="tpl" onclick="setMsg('📋 請假通知\n員工 Adam 申請請假\n日期：2026/3/5\n類型：特休\n請主管審核')">請假通知</div>
+      <div class="tpl" onclick="setMsg('⏰ 打卡提醒\n現在是 08:55，別忘了打上班卡！')">打卡提醒</div>
+      <div class="tpl" onclick="setMsg('📅 預約通知\n新預約！\n客人：張先生\n日期：2/28 14:00\n人數：4位\n備註：靠窗座位')">預約通知</div>
+    </div>
+  </div>
+
+  <button class="btn btn-primary" id="sendBtn" onclick="sendMessage()">📤 發送訊息</button>
+
+  <div class="result" id="result"></div>
+</div>
+
+<script>
+function setMsg(t) {
+  document.getElementById('msg').value = t.replace(/\\n/g, '\n');
+}
+
+async function sendMessage() {
+  var token = document.getElementById('token').value.trim();
+  var to = document.getElementById('target').value.trim();
+  var msg = document.getElementById('msg').value.trim();
+  var btn = document.getElementById('sendBtn');
+
+  if (!token) { showResult('error', '請填入 Channel Access Token'); return; }
+  if (!to) { showResult('error', '請填入發送對象 ID'); return; }
+  if (!msg) { showResult('error', '請填入訊息內容'); return; }
+
+  btn.disabled = true;
+  btn.textContent = '發送中...';
+  showResult('loading', '正在發送...');
+
+  try {
+    var response = await fetch('https://nssuisyvlrqnqfxupklb.supabase.co/functions/v1/line-push', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: token, to: to, message: msg })
+    });
+
+    if (!response.ok && response.status === 404) {
+      response = await fetch('https://api.line.me/v2/bot/message/push', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + token
+        },
+        body: JSON.stringify({
+          to: to,
+          messages: [{ type: 'text', text: msg }]
+        })
+      });
+    }
+
+    if (response.ok || response.status === 200) {
+      var data = await response.json().catch(function() { return {}; });
+      showResult('success', '✅ 發送成功！請查看 LINE 是否收到訊息。\n' + JSON.stringify(data));
+    } else {
+      var errText = await response.text().catch(function() { return '未知錯誤'; });
+      showResult('error', '❌ 發送失敗 (HTTP ' + response.status + ')\n' + errText);
+    }
+  } catch(e) {
+    showResult('error', '❌ 瀏覽器 CORS 限制，無法直接呼叫 LINE API。\n\n替代方案：\n1. 請複製下方 curl 指令到終端機執行\n2. 或使用 Postman 發送\n\n' + getCurlCommand(token, to, msg));
+  }
+
+  btn.disabled = false;
+  btn.textContent = '📤 發送訊息';
+}
+
+function getCurlCommand(token, to, msg) {
+  return 'curl -X POST https://api.line.me/v2/bot/message/push \\\n' +
+    '  -H "Content-Type: application/json" \\\n' +
+    '  -H "Authorization: Bearer ' + token.substring(0,20) + '..." \\\n' +
+    "  -d '{\"to\":\"" + to + "\",\"messages\":[{\"type\":\"text\",\"text\":\"" + msg.replace(/\n/g, '\\n').replace(/"/g, '\\"') + "\"}]}'";
+}
+
+function showResult(type, text) {
+  var el = document.getElementById('result');
+  el.className = 'result ' + type;
+  el.textContent = text;
+  el.style.whiteSpace = 'pre-wrap';
+}
+</script>
+</body>
+</html>
