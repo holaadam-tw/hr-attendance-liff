@@ -852,45 +852,142 @@ async function sendUserNotify(employeeId, message) {
     } catch(e) { console.log('推播失敗', e); }
 }
 
-// ===== 公告系統 =====
+// ===== 公告系統（使用 announcements 資料表） =====
 async function loadAnnouncements() {
-    const el = document.getElementById('announcementBanner');
-    if (!el) return;
-    
     try {
-        const todayStr = getTaiwanDate();
-        const annData = getCachedSetting('announcements');
+        var now = new Date().toISOString();
+        var query = sb.from('announcements')
+            .select('*')
+            .eq('is_active', true)
+            .lte('publish_at', now)
+            .order('created_at', { ascending: false })
+            .limit(20);
+        if (currentCompanyId) query = query.eq('company_id', currentCompanyId);
 
-        if (!annData?.items || annData.items.length === 0) {
-            el.style.display = 'none';
-            return;
+        var { data: announcements } = await query;
+        announcements = (announcements || []).filter(function(a) {
+            return !a.expire_at || new Date(a.expire_at) > new Date();
+        });
+
+        // 首頁橫幅（向後相容）
+        var banner = document.getElementById('announcementBanner');
+        if (banner) {
+            if (announcements.length === 0) { banner.style.display = 'none'; }
+            else {
+                var typeStyle = { info: { bg:'#EFF6FF', color:'#2563EB', icon:'📢' }, important: { bg:'#FFF7ED', color:'#EA580C', icon:'🟡' }, urgent: { bg:'#FEF2F2', color:'#DC2626', icon:'🚨' } };
+                banner.style.display = 'block';
+                banner.innerHTML = announcements.slice(0, 3).map(function(a) {
+                    var s = typeStyle[a.type] || typeStyle.info;
+                    return '<div style="background:' + s.bg + ';color:' + s.color + ';padding:10px 14px;border-radius:10px;margin-bottom:6px;font-size:13px;cursor:pointer;" onclick="viewAnnouncement(\'' + a.id + '\')">' +
+                        '<b>' + s.icon + ' ' + escapeHTML(a.title) + '</b>' +
+                        (a.content ? '<div style="font-size:12px;margin-top:2px;opacity:.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHTML(a.content) + '</div>' : '') +
+                    '</div>';
+                }).join('');
+            }
         }
-        
-        // 過濾有效公告（未過期）
-        const active = annData.items.filter(a => !a.expire_date || a.expire_date >= todayStr);
-        if (active.length === 0) { el.style.display = 'none'; return; }
-        
-        const pinned = active.filter(a => a.pinned);
-        const normal = active.filter(a => !a.pinned);
-        const sorted = [...pinned, ...normal];
-        
-        el.style.display = 'block';
-        el.innerHTML = sorted.map(a => {
-            const typeStyle = {
-                'info': { bg: '#EFF6FF', color: '#2563EB', icon: '📢' },
-                'warning': { bg: '#FFF7ED', color: '#EA580C', icon: '⚠️' },
-                'urgent': { bg: '#FEF2F2', color: '#DC2626', icon: '🚨' },
-                'event': { bg: '#F5F3FF', color: '#7C3AED', icon: '🎉' }
-            }[a.type] || { bg: '#F1F5F9', color: '#64748B', icon: '📌' };
 
-            return `<div class="ann-block" style="background:${typeStyle.bg};color:${typeStyle.color};">
-                <div class="ann-title">${typeStyle.icon} ${escapeHTML(a.title)}</div>
-                ${a.content ? `<div class="ann-content">${escapeHTML(a.content)}</div>` : ''}
-                ${a.expire_date ? `<div class="ann-expire">有效至 ${escapeHTML(a.expire_date)}</div>` : ''}
-            </div>`;
-        }).join('');
-    } catch(e) { el.style.display = 'none'; }
+        // 公告小卡（右側）
+        var card = document.getElementById('announcementCard');
+        if (card && announcements.length > 0) {
+            card.style.display = '';
+
+            // 未讀數
+            var empId = currentEmployee?.id;
+            var ackedIds = [];
+            if (empId) {
+                var { data: acks } = await sb.from('announcement_acknowledgments')
+                    .select('announcement_id').eq('employee_id', empId);
+                ackedIds = (acks || []).map(function(a) { return a.announcement_id; });
+            }
+            var unread = announcements.filter(function(a) { return ackedIds.indexOf(a.id) === -1; });
+
+            var badge = document.getElementById('announceBadge');
+            if (badge) {
+                if (unread.length > 0) { badge.textContent = unread.length; badge.style.display = ''; }
+                else { badge.style.display = 'none'; }
+            }
+
+            var preview = document.getElementById('announcePreview');
+            if (preview) {
+                var icons = { urgent:'🔴', important:'🟡', info:'📋' };
+                preview.innerHTML = announcements.slice(0, 2).map(function(a) {
+                    return '<div style="margin-bottom:4px;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' +
+                        (icons[a.type] || '📋') + ' ' + escapeHTML(a.title) + '</div>';
+                }).join('');
+            }
+
+            window._announcements = announcements;
+            window._unreadAnnouncements = unread;
+        }
+    } catch(e) {
+        console.error('載入公告失敗:', e);
+    }
 }
+
+// 公告列表彈窗
+window.showAnnouncementList = function() {
+    var announcements = window._announcements || [];
+    var unreadIds = (window._unreadAnnouncements || []).map(function(u) { return u.id; });
+    var icons = { urgent:'🔴', important:'🟡', info:'📋' };
+
+    var html = announcements.map(function(a) {
+        var isUnread = unreadIds.indexOf(a.id) !== -1;
+        var date = new Date(a.created_at);
+        var dateStr = (date.getMonth() + 1) + '/' + date.getDate();
+        return '<div style="padding:14px;background:#fff;border-radius:12px;margin-bottom:8px;cursor:pointer;' +
+            (isUnread ? 'border-left:4px solid #6366F1;' : 'border-left:4px solid #E2E8F0;opacity:.7;') +
+            '" onclick="event.stopPropagation();viewAnnouncement(\'' + a.id + '\')">' +
+            '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+            '<div style="font-size:14px;font-weight:700;">' + (icons[a.type] || '📋') + ' ' + escapeHTML(a.title) + '</div>' +
+            '<span style="font-size:11px;color:#94A3B8;">' + dateStr + '</span></div>' +
+            (a.content ? '<div style="font-size:12px;color:#64748B;margin-top:4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">' + escapeHTML(a.content) + '</div>' : '') +
+            (isUnread ? '<div style="font-size:10px;color:#6366F1;font-weight:600;margin-top:4px;">● 未讀</div>' : '') +
+            '</div>';
+    }).join('');
+
+    var overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:flex-end;justify-content:center;';
+    overlay.onclick = function() { document.body.removeChild(overlay); };
+    overlay.innerHTML = '<div style="background:#F8FAFC;border-radius:20px 20px 0 0;padding:20px;max-height:70vh;overflow-y:auto;width:100%;max-width:480px;" onclick="event.stopPropagation()">' +
+        '<div style="text-align:center;margin-bottom:16px;"><div style="width:40px;height:4px;background:#CBD5E1;border-radius:2px;margin:0 auto 12px;"></div>' +
+        '<div style="font-size:18px;font-weight:800;">📢 公告</div></div>' +
+        (html || '<div style="text-align:center;padding:30px;color:#94A3B8;">目前沒有公告</div>') +
+        '</div>';
+    document.body.appendChild(overlay);
+};
+
+// 查看單則公告 + 標記已讀
+window.viewAnnouncement = async function(id) {
+    var a = (window._announcements || []).find(function(x) { return x.id === id; });
+    if (!a) return;
+
+    var empId = currentEmployee?.id;
+    if (empId) {
+        try {
+            await sb.from('announcement_acknowledgments').upsert({
+                announcement_id: a.id,
+                employee_id: empId
+            }, { onConflict: 'announcement_id,employee_id', ignoreDuplicates: true });
+        } catch(e) {}
+    }
+
+    var typeLabels = { urgent:'🔴 緊急公告', important:'🟡 重要公告', info:'📋 一般公告' };
+    var typeColors = { urgent:'#DC2626', important:'#EA580C', info:'#2563EB' };
+    var date = new Date(a.created_at);
+    var dateStr = date.getFullYear() + '/' + (date.getMonth() + 1) + '/' + date.getDate();
+
+    var overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;';
+    overlay.onclick = function() { document.body.removeChild(overlay); loadAnnouncements(); };
+    overlay.innerHTML = '<div style="background:#fff;border-radius:20px;padding:24px;max-width:440px;width:100%;max-height:80vh;overflow-y:auto;" onclick="event.stopPropagation()">' +
+        '<div style="font-size:12px;color:' + (typeColors[a.type] || '#2563EB') + ';font-weight:600;margin-bottom:4px;">' + (typeLabels[a.type] || '') + '</div>' +
+        '<div style="font-size:20px;font-weight:800;margin-bottom:8px;">' + escapeHTML(a.title) + '</div>' +
+        '<div style="font-size:12px;color:#94A3B8;margin-bottom:16px;">' + dateStr + '</div>' +
+        '<div style="font-size:14px;line-height:1.7;color:#475569;white-space:pre-wrap;">' + escapeHTML(a.content || '') + '</div>' +
+        '<button onclick="this.closest(\'div\').parentElement.remove();loadAnnouncements();" style="width:100%;padding:14px;background:#6366F1;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;margin-top:20px;font-family:inherit;">已讀</button>' +
+        '</div>';
+    document.body.appendChild(overlay);
+};
 
 // ===== 月度出勤查詢 =====
 async function loadMonthlyAttendance() {
@@ -1661,82 +1758,73 @@ async function writeAuditLog(action, targetTable, targetId, targetName, details 
     } catch(e) { console.log('Audit log failed (non-critical)', e); }
 }
 
-// ===== 強制公告簽署 =====
+// ===== 重要公告彈窗（登入時自動跳出） =====
 async function checkForcedAnnouncements() {
     if (!currentEmployee) return;
     try {
-        const settingValue = getCachedSetting('announcements');
-        if (!settingValue?.items) return;
-        
-        const todayStr = getTaiwanDate();
-        const forced = settingValue.items.filter(a =>
-            a.require_ack && (!a.expire_date || a.expire_date >= todayStr)
-        );
+        var now = new Date().toISOString();
+        var query = sb.from('announcements')
+            .select('*')
+            .eq('is_active', true)
+            .eq('is_popup', true)
+            .eq('type', 'urgent')
+            .lte('publish_at', now)
+            .order('created_at', { ascending: false });
+        if (currentCompanyId) query = query.eq('company_id', currentCompanyId);
+
+        var { data: forced } = await query;
+        forced = (forced || []).filter(function(a) {
+            return !a.expire_at || new Date(a.expire_at) > new Date();
+        });
         if (forced.length === 0) return;
-        
-        // 查已簽署記錄
-        const ids = forced.map(a => a.id);
-        const { data: acks } = await sb.from('announcement_acknowledgments')
+
+        var ids = forced.map(function(a) { return a.id; });
+        var { data: acks } = await sb.from('announcement_acknowledgments')
             .select('announcement_id')
             .eq('employee_id', currentEmployee.id)
             .in('announcement_id', ids);
-        
-        const ackedIds = new Set((acks || []).map(a => a.announcement_id));
-        const unacked = forced.filter(a => !ackedIds.has(a.id));
-        
+
+        var ackedIds = (acks || []).map(function(a) { return a.announcement_id; });
+        var unacked = forced.filter(function(a) { return ackedIds.indexOf(a.id) === -1; });
         if (unacked.length === 0) return;
-        
-        // 顯示強制閱讀 Modal
-        showForcedAnnouncementModal(unacked[0]);
+
+        showPopupAnnouncement(unacked[0]);
     } catch(e) { console.log('Forced announcement check failed', e); }
 }
 
-function showForcedAnnouncementModal(announcement) {
-    const existing = document.getElementById('forcedAnnModal');
+function showPopupAnnouncement(a) {
+    var existing = document.getElementById('forcedAnnModal');
     if (existing) existing.remove();
-    
-    const typeIcon = { info:'📢', warning:'⚠️', urgent:'🚨', event:'🎉' }[announcement.type] || '📌';
-    const typeColor = { info:'#2563EB', warning:'#EA580C', urgent:'#DC2626', event:'#7C3AED' }[announcement.type] || '#64748B';
-    
-    const modal = document.createElement('div');
+
+    var typeColor = { urgent:'#DC2626', important:'#EA580C', info:'#2563EB' }[a.type] || '#64748B';
+
+    var modal = document.createElement('div');
     modal.id = 'forcedAnnModal';
     modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;';
-    modal.innerHTML = `
-        <div style="background:#fff;border-radius:20px;max-width:380px;width:100%;padding:24px;animation:pageIn 0.3s ease-out;">
-            <div style="text-align:center;font-size:36px;margin-bottom:12px;">${typeIcon}</div>
-            <h3 style="text-align:center;font-size:18px;font-weight:800;color:${typeColor};margin-bottom:12px;">${escapeHTML(announcement.title)}</h3>
-            ${announcement.content ? `<div style="font-size:14px;color:#374151;line-height:1.8;padding:14px;background:#F8FAFC;border-radius:12px;margin-bottom:16px;max-height:300px;overflow-y:auto;white-space:pre-wrap;">${escapeHTML(announcement.content)}</div>` : ''}
-            <div style="font-size:11px;color:#94A3B8;text-align:center;margin-bottom:16px;">
-                發布者：${escapeHTML(announcement.created_by || '-')} · ${announcement.created_at ? new Date(announcement.created_at).toLocaleDateString() : ''}
-            </div>
-            <button id="forcedAckBtn" onclick="acknowledgeForcedAnnouncement('${escapeHTML(announcement.id)}')"
-                style="width:100%;padding:14px;border:none;border-radius:12px;background:${typeColor};color:#fff;font-size:15px;font-weight:800;cursor:pointer;">
-                ✅ 我已閱讀並確認
-            </button>
-            <p style="font-size:10px;color:#94A3B8;text-align:center;margin-top:8px;">確認後才能繼續使用系統</p>
-        </div>
-    `;
+    modal.innerHTML = '<div style="background:#fff;border-radius:20px;max-width:380px;width:100%;padding:24px;animation:pageIn 0.3s ease-out;">' +
+        '<div style="text-align:center;font-size:48px;margin-bottom:12px;">🚨</div>' +
+        '<div style="text-align:center;font-size:12px;color:#EF4444;font-weight:700;margin-bottom:4px;">緊急公告</div>' +
+        '<h3 style="text-align:center;font-size:18px;font-weight:800;color:' + typeColor + ';margin-bottom:12px;">' + escapeHTML(a.title) + '</h3>' +
+        (a.content ? '<div style="font-size:14px;color:#374151;line-height:1.8;padding:14px;background:#F8FAFC;border-radius:12px;margin-bottom:16px;max-height:300px;overflow-y:auto;white-space:pre-wrap;">' + escapeHTML(a.content) + '</div>' : '') +
+        '<button id="forcedAckBtn" onclick="acknowledgeForcedAnnouncement(\'' + a.id + '\')" style="width:100%;padding:14px;border:none;border-radius:12px;background:' + typeColor + ';color:#fff;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit;">✅ 我已閱讀並確認</button>' +
+        '<p style="font-size:10px;color:#94A3B8;text-align:center;margin-top:8px;">確認後才能繼續使用系統</p>' +
+    '</div>';
     document.body.appendChild(modal);
 }
 
 async function acknowledgeForcedAnnouncement(announcementId) {
-    const btn = document.getElementById('forcedAckBtn');
+    var btn = document.getElementById('forcedAckBtn');
     if (btn) { btn.disabled = true; btn.textContent = '處理中...'; }
-    
     try {
         await sb.from('announcement_acknowledgments').insert({
             announcement_id: announcementId,
             employee_id: currentEmployee.id
         });
-        
         writeAuditLog('acknowledge', 'announcements', announcementId, currentEmployee.name, { announcement_id: announcementId });
-        
-        const modal = document.getElementById('forcedAnnModal');
+        var modal = document.getElementById('forcedAnnModal');
         if (modal) modal.remove();
         showToast('✅ 已確認');
-        
-        // 檢查是否還有未簽署的
-        setTimeout(() => checkForcedAnnouncements(), 300);
+        setTimeout(function() { checkForcedAnnouncements(); }, 300);
     } catch(e) {
         showToast('❌ 確認失敗');
         if (btn) { btn.disabled = false; btn.textContent = '✅ 我已閱讀並確認'; }

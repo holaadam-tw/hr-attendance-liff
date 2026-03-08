@@ -499,10 +499,9 @@
                     <div class="form-group">
                         <label>類型</label>
                         <select id="annType">
-                            <option value="info">📢 一般通知</option>
-                            <option value="warning">⚠️ 注意事項</option>
-                            <option value="urgent">🚨 緊急通知</option>
-                            <option value="event">🎉 活動公告</option>
+                            <option value="info">📋 一般公告</option>
+                            <option value="important">🟡 重要公告</option>
+                            <option value="urgent">🔴 緊急公告</option>
                         </select>
                     </div>
                     <div class="form-group"><label>標題</label><input type="text" id="annTitle" placeholder="例：下週一停電通知"></div>
@@ -511,18 +510,15 @@
                         <label>到期日 (選填，留空永久顯示)</label>
                         <input type="date" id="annExpire">
                     </div>
-                    <div class="form-group" style="display:flex;flex-direction:column;gap:10px;">
-                        <input type="checkbox" id="annPinned" style="display:none;">
-                        <div id="annPinnedCard" onclick="toggleAnnCheck('annPinned')"
+                    <div class="form-group">
+                        <input type="checkbox" id="annIsPopup" style="display:none;">
+                        <div id="annIsPopupCard" onclick="toggleAnnCheck('annIsPopup')"
                              style="display:flex;align-items:center;gap:12px;padding:14px;background:#F8FAFC;border:2px solid #E5E7EB;border-radius:12px;cursor:pointer;transition:all 0.2s;">
-                            <div id="annPinnedBox" style="width:26px;height:26px;border:2px solid #CBD5E1;border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all 0.2s;background:#fff;font-size:16px;color:#fff;"></div>
-                            <span style="font-size:14px;font-weight:600;">📌 置頂</span>
-                        </div>
-                        <input type="checkbox" id="annRequireAck" style="display:none;">
-                        <div id="annRequireAckCard" onclick="toggleAnnCheck('annRequireAck')"
-                             style="display:flex;align-items:center;gap:12px;padding:14px;background:#F8FAFC;border:2px solid #E5E7EB;border-radius:12px;cursor:pointer;transition:all 0.2s;">
-                            <div id="annRequireAckBox" style="width:26px;height:26px;border:2px solid #CBD5E1;border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all 0.2s;background:#fff;font-size:16px;color:#fff;"></div>
-                            <span style="font-size:14px;font-weight:600;">✍️ 強制閱讀簽署（員工必須確認才能使用系統）</span>
+                            <div id="annIsPopupBox" style="width:26px;height:26px;border:2px solid #CBD5E1;border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all 0.2s;background:#fff;font-size:16px;color:#fff;"></div>
+                            <div>
+                                <span style="font-size:14px;font-weight:600;">🔔 彈窗通知</span>
+                                <div style="font-size:11px;color:#94A3B8;">緊急公告建議開啟，員工登入時強制確認</div>
+                            </div>
                         </div>
                     </div>
                     <button class="btn btn-primary" onclick="publishAnnouncement()">📤 發布公告</button>

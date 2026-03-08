@@ -83,7 +83,7 @@ import {
     loadNotifyToken, saveNotifyToken, testNotify,
     loadFeatureSettings, updateToggleCard, toggleFeature, applyIndustryTemplate,
     toggleAnnCheck, publishAnnouncement, loadAnnouncementList,
-    deleteAnnouncement, loadClientList, filterClients,
+    toggleAnnouncement, deleteAnnouncement, loadClientList, filterClients,
     showClientModal, closeClientModal, editClient, getClientGPS,
     saveClient, toggleClientActive, loadServiceItemList,
     addServiceItem, deleteServiceItem, initFieldWorkApproval,
@@ -301,6 +301,7 @@ window.applyIndustryTemplate = applyIndustryTemplate;
 window.toggleAnnCheck = toggleAnnCheck;
 window.publishAnnouncement = publishAnnouncement;
 window.loadAnnouncementList = loadAnnouncementList;
+window.toggleAnnouncement = toggleAnnouncement;
 window.deleteAnnouncement = deleteAnnouncement;
 window.loadClientList = loadClientList;
 window.filterClients = filterClients;

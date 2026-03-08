@@ -323,43 +323,42 @@ export function toggleAnnCheck(id) {
 }
 
 export async function publishAnnouncement() {
-    const title = document.getElementById('annTitle')?.value;
-    const content = document.getElementById('annContent')?.value;
-    const type = document.getElementById('annType')?.value;
+    const title = document.getElementById('annTitle')?.value?.trim();
+    const content = document.getElementById('annContent')?.value?.trim();
+    const type = document.getElementById('annType')?.value || 'info';
     const expire = document.getElementById('annExpire')?.value;
-    const pinned = document.getElementById('annPinned')?.checked;
-    const requireAck = document.getElementById('annRequireAck')?.checked;
+    const isPopup = document.getElementById('annIsPopup')?.checked || false;
 
     if (!title) return showToast('❌ 請輸入標題');
 
     try {
-        const { data: existing } = await sb.from('system_settings')
-            .select('value').eq('key', 'announcements').maybeSingle();
+        const row = {
+            company_id: window.currentEmployee?.company_id || null,
+            title,
+            content: content || null,
+            type,
+            is_popup: isPopup,
+            is_active: true,
+            expire_at: expire ? new Date(expire + 'T23:59:59').toISOString() : null,
+            created_by: window.currentEmployee?.id || null
+        };
 
-        const items = existing?.value?.items || [];
-        items.unshift({
-            id: Date.now().toString(),
-            title, content, type, pinned,
-            require_ack: requireAck || false,
-            expire_date: expire || null,
-            created_at: new Date().toISOString(),
-            created_by: window.currentAdminEmployee?.name || 'admin'
-        });
-
-        if (existing) {
-            await sb.from('system_settings').update({ value: { items }, updated_at: new Date().toISOString() }).eq('key', 'announcements');
-        } else {
-            await sb.from('system_settings').insert({ key: 'announcements', value: { items }, description: '公告系統' });
-        }
+        const { error } = await sb.from('announcements').insert(row);
+        if (error) throw error;
 
         showToast('📢 公告已發布');
         document.getElementById('annTitle').value = '';
         document.getElementById('annContent').value = '';
         document.getElementById('annExpire').value = '';
-        document.getElementById('annPinned').checked = false;
-        if (document.getElementById('annRequireAck')) document.getElementById('annRequireAck').checked = false;
+        if (document.getElementById('annIsPopup')) document.getElementById('annIsPopup').checked = false;
+
+        // 緊急公告推播 LINE 群組
+        if (type === 'urgent') {
+            sendAdminNotify('🚨 緊急公告\n' + title + (content ? '\n' + content : ''));
+        }
+
         loadAnnouncementList();
-    } catch(e) { showToast('❌ 發布失敗：' + friendlyError(e)); }
+    } catch(e) { showToast('❌ 發布失敗：' + (e.message || e)); }
 }
 
 export async function loadAnnouncementList() {
@@ -367,42 +366,52 @@ export async function loadAnnouncementList() {
     if (!el) return;
 
     try {
-        const { data } = await sb.from('system_settings')
-            .select('value').eq('key', 'announcements').maybeSingle();
+        var query = sb.from('announcements')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(30);
+        if (window.currentCompanyId) query = query.eq('company_id', window.currentCompanyId);
 
-        const items = data?.value?.items || [];
+        const { data, error } = await query;
+        if (error) throw error;
+
+        const items = data || [];
         if (items.length === 0) { el.innerHTML = '<p style="text-align:center;color:#999;">尚無公告</p>'; return; }
 
-        const typeIcon = { info:'📢', warning:'⚠️', urgent:'🚨', event:'🎉' };
-        const typeColor = { info:'#2563EB', warning:'#EA580C', urgent:'#DC2626', event:'#7C3AED' };
-        const typeBg = { info:'#EFF6FF', warning:'#FFF7ED', urgent:'#FEF2F2', event:'#F5F3FF' };
+        const typeIcon = { info:'📢', important:'🟡', urgent:'🚨' };
+        const typeColor = { info:'#2563EB', important:'#EA580C', urgent:'#DC2626' };
+        const typeBg = { info:'#EFF6FF', important:'#FFF7ED', urgent:'#FEF2F2' };
 
-        el.innerHTML = items.map(a => `
-            <div style="background:${typeBg[a.type] || '#F1F5F9'};border-radius:12px;padding:14px;margin-bottom:10px;">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-                    <span style="font-weight:800;color:${typeColor[a.type] || '#64748B'};">${typeIcon[a.type] || '📌'} ${a.title}</span>
-                    <button onclick="deleteAnnouncement('${a.id}')" style="background:none;border:none;font-size:14px;cursor:pointer;padding:4px;">🗑️</button>
-                </div>
-                ${a.content ? `<div style="font-size:12px;color:#64748B;margin-bottom:4px;">${a.content}</div>` : ''}
-                <div style="font-size:10px;color:#94A3B8;">
-                    ${a.pinned ? '📌 置頂 · ' : ''}
-                    ${a.expire_date ? '到期：' + a.expire_date + ' · ' : '永久 · '}
-                    ${a.created_by || ''} · ${a.created_at ? new Date(a.created_at).toLocaleDateString() : ''}
-                </div>
-            </div>
-        `).join('');
+        el.innerHTML = items.map(a => {
+            var expireStr = a.expire_at ? '到期：' + new Date(a.expire_at).toLocaleDateString() : '永久';
+            var activeLabel = a.is_active ? '' : ' <span style="color:#EF4444;">（已停用）</span>';
+            var popupLabel = a.is_popup ? '🔔 彈窗 · ' : '';
+            return '<div style="background:' + (typeBg[a.type] || '#F1F5F9') + ';border-radius:12px;padding:14px;margin-bottom:10px;' + (!a.is_active ? 'opacity:.5;' : '') + '">' +
+                '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">' +
+                '<span style="font-weight:800;color:' + (typeColor[a.type] || '#64748B') + ';">' + (typeIcon[a.type] || '📌') + ' ' + escapeHTML(a.title) + activeLabel + '</span>' +
+                '<div style="display:flex;gap:4px;">' +
+                '<button onclick="toggleAnnouncement(\'' + a.id + '\',' + (a.is_active ? 'false' : 'true') + ')" style="background:none;border:none;font-size:14px;cursor:pointer;padding:4px;">' + (a.is_active ? '⏸️' : '▶️') + '</button>' +
+                '<button onclick="deleteAnnouncement(\'' + a.id + '\')" style="background:none;border:none;font-size:14px;cursor:pointer;padding:4px;">🗑️</button>' +
+                '</div></div>' +
+                (a.content ? '<div style="font-size:12px;color:#64748B;margin-bottom:4px;">' + escapeHTML(a.content) + '</div>' : '') +
+                '<div style="font-size:10px;color:#94A3B8;">' + popupLabel + expireStr + ' · ' + (a.created_at ? new Date(a.created_at).toLocaleDateString() : '') + '</div>' +
+            '</div>';
+        }).join('');
     } catch(e) { el.innerHTML = '<p style="text-align:center;color:#ef4444;">載入失敗</p>'; }
+}
+
+export async function toggleAnnouncement(id, active) {
+    try {
+        await sb.from('announcements').update({ is_active: active, updated_at: new Date().toISOString() }).eq('id', id);
+        showToast(active ? '✅ 已啟用' : '⏸️ 已停用');
+        loadAnnouncementList();
+    } catch(e) { showToast('❌ 操作失敗'); }
 }
 
 export async function deleteAnnouncement(id) {
     if (!confirm('確定刪除此公告？')) return;
     try {
-        const { data } = await sb.from('system_settings')
-            .select('value').eq('key', 'announcements').maybeSingle();
-        if (!data?.value?.items) return;
-
-        const items = data.value.items.filter(a => a.id !== id);
-        await sb.from('system_settings').update({ value: { items }, updated_at: new Date().toISOString() }).eq('key', 'announcements');
+        await sb.from('announcements').delete().eq('id', id);
         showToast('🗑️ 已刪除');
         loadAnnouncementList();
     } catch(e) { showToast('❌ 刪除失敗'); }
