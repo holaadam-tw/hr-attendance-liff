@@ -810,30 +810,42 @@ async function loadMakeupHistory() {
     }
 }
 
-// ===== LINE Notify 推播 =====
-async function sendAdminNotify(message) {
+// ===== LINE Messaging API 推播 =====
+async function sendLineMessage(to, text) {
+    const setting = getCachedSetting('line_messaging_api');
+    if (!setting?.token) return;
     try {
-        const setting = getCachedSetting('line_notify_token');
-        if (!setting?.token) return;
-        
-        // 透過 Supabase Edge Function 發送（避免 CORS）
-        await sb.functions.invoke('send-line-notify', {
-            body: { token: setting.token, message }
+        await fetch('https://api.line.me/v2/bot/message/push', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + setting.token
+            },
+            body: JSON.stringify({ to, messages: [{ type: 'text', text }] })
         });
     } catch(e) {
-        console.log('LINE Notify 發送失敗（非必要）', e);
+        console.log('LINE 推播失敗（非必要）', e);
+    }
+}
+
+async function sendAdminNotify(message) {
+    try {
+        const setting = getCachedSetting('line_messaging_api');
+        if (!setting?.token || !setting?.groupId) return;
+        await sendLineMessage(setting.groupId, message);
+    } catch(e) {
+        console.log('LINE 推播失敗（非必要）', e);
     }
 }
 
 async function sendUserNotify(employeeId, message) {
     try {
+        const setting = getCachedSetting('line_messaging_api');
+        if (!setting?.token) return;
         const { data: emp } = await sb.from('employees')
             .select('line_user_id').eq('id', employeeId).maybeSingle();
         if (!emp?.line_user_id) return;
-        
-        await sb.functions.invoke('send-line-notify', {
-            body: { userId: emp.line_user_id, message }
-        });
+        await sendLineMessage(emp.line_user_id, message);
     } catch(e) { console.log('推播失敗', e); }
 }
 

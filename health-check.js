@@ -169,12 +169,12 @@ async function main() {
     log(WARN, '功能', 'companies 資料', 'RLS 限制或無資料');
   }
 
-  // LINE Notify
-  const notifyQ = await tableQuery('system_settings', 'key=eq.line_notify_token&select=value');
+  // LINE Messaging API
+  const notifyQ = await tableQuery('system_settings', 'key=eq.line_messaging_api&select=value');
   if (notifyQ.data && notifyQ.data.length > 0 && notifyQ.data[0].value?.token) {
-    log(PASS, '功能', 'LINE Notify Token', '已設定');
+    log(PASS, '功能', 'LINE Messaging API', '已設定');
   } else {
-    log(INFO, '功能', 'LINE Notify Token', '未設定');
+    log(INFO, '功能', 'LINE Messaging API', '未設定');
   }
 
   // ===== 6. 預約系統資料 =====

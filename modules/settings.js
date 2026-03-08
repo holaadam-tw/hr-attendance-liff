@@ -77,32 +77,39 @@ export function switchSysTab(tab, btn) {
     if (tab === 'audit') loadAuditLogs();
 }
 
-// ===== LINE Notify =====
+// ===== LINE Messaging API 推播設定 =====
 export async function loadNotifyToken() {
     try {
         const { data } = await sb.from('system_settings')
-            .select('value').eq('key', 'line_notify_token').maybeSingle();
-        if (data?.value?.token) {
-            const el = document.getElementById('lineNotifyToken');
-            if (el) el.value = data.value.token;
+            .select('value').eq('key', 'line_messaging_api').maybeSingle();
+        if (data?.value) {
+            const tokenEl = document.getElementById('lineChannelToken');
+            const groupEl = document.getElementById('lineGroupId');
+            if (tokenEl && data.value.token) tokenEl.value = data.value.token;
+            if (groupEl && data.value.groupId) groupEl.value = data.value.groupId;
         }
     } catch(e) {}
 }
 
 export async function saveNotifyToken() {
-    const token = document.getElementById('lineNotifyToken')?.value?.trim();
-    if (!token) return showToast('❌ 請輸入 Token');
+    const token = document.getElementById('lineChannelToken')?.value?.trim();
+    const groupId = document.getElementById('lineGroupId')?.value?.trim();
+    if (!token) return showToast('❌ 請輸入 Channel Access Token');
+    if (!groupId) return showToast('❌ 請輸入 Group ID');
     const status = document.getElementById('notifyStatus');
     try {
+        const value = { token, groupId };
         const { data: existing } = await sb.from('system_settings')
-            .select('id').eq('key', 'line_notify_token').maybeSingle();
+            .select('id').eq('key', 'line_messaging_api').maybeSingle();
         if (existing) {
-            await sb.from('system_settings').update({ value: { token }, updated_at: new Date().toISOString() }).eq('key', 'line_notify_token');
+            await sb.from('system_settings').update({ value, updated_at: new Date().toISOString() }).eq('key', 'line_messaging_api');
         } else {
-            await sb.from('system_settings').insert({ key: 'line_notify_token', value: { token }, description: 'LINE Notify 推播 Token' });
+            await sb.from('system_settings').insert({ key: 'line_messaging_api', value, description: 'LINE Messaging API 推播設定' });
         }
-        showToast('✅ Token 已儲存');
+        showToast('✅ 設定已儲存');
         if (status) { status.style.display = 'block'; status.style.color = '#059669'; status.textContent = '✅ 已儲存'; }
+        // 重新載入快取
+        if (typeof loadSystemSettings === 'function') await loadSystemSettings();
     } catch(e) { showToast('❌ 儲存失敗'); }
 }
 
@@ -110,12 +117,12 @@ export async function testNotify() {
     const status = document.getElementById('notifyStatus');
     if (status) { status.style.display = 'block'; status.style.color = '#6D28D9'; status.textContent = '⏳ 發送測試...'; }
     try {
-        await sendAdminNotify('🔔 HR 系統推播測試\n如果您收到此訊息，表示 LINE Notify 設定成功！');
+        await sendAdminNotify('🔔 HR 系統推播測試\n如果您收到此訊息，表示 LINE Messaging API 設定成功！');
         showToast('✅ 測試推播已發送');
         if (status) { status.style.color = '#059669'; status.textContent = '✅ 推播成功！請查看 LINE 群組'; }
     } catch(e) {
         showToast('❌ 推播失敗');
-        if (status) { status.style.color = '#DC2626'; status.textContent = '❌ 推播失敗，請檢查 Token 或 Edge Function'; }
+        if (status) { status.style.color = '#DC2626'; status.textContent = '❌ 推播失敗，請檢查設定'; }
     }
 }
 

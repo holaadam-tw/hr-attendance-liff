@@ -785,13 +785,20 @@
                 <div id="featureSaveStatus" style="margin-top:12px;text-align:center;font-size:13px;color:#059669;display:none;">✅ 已儲存</div>
                 <p style="color:#94A3B8;font-size:12px;margin-top:16px;text-align:center;">💡 底部導航列（首頁/班表/打卡/薪資/管理）為管理員專屬，不受此設定影響</p>
 
-                <!-- LINE Notify 設定 -->
+                <!-- LINE Messaging API 推播設定 -->
                 <div style="margin-top:30px;padding-top:20px;border-top:2px dashed #e5e7eb;">
-                    <h3 style="margin-bottom:12px;">🔔 LINE Notify 推播設定</h3>
-                    <p style="color:#94A3B8;font-size:12px;margin-bottom:12px;">設定後，請假/補打卡申請會自動推播通知管理員群組</p>
+                    <h3 style="margin-bottom:12px;">🔔 LINE 推播設定（Messaging API）</h3>
+                    <p style="color:#94A3B8;font-size:12px;margin-bottom:12px;">設定後，請假/補打卡/換班申請會自動推播通知管理員群組</p>
                     <div class="form-group">
-                        <label>LINE Notify Token</label>
-                        <input type="text" id="lineNotifyToken" placeholder="請貼上 LINE Notify Token">
+                        <label>Channel Access Token</label>
+                        <div style="position:relative;">
+                            <input type="password" id="lineChannelToken" placeholder="貼上 Channel Access Token" style="padding-right:40px;">
+                            <span onclick="var el=document.getElementById('lineChannelToken');el.type=el.type==='password'?'text':'password';this.textContent=el.type==='password'?'👁️':'🙈';" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:16px;">👁️</span>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Group ID <span style="font-weight:400;color:#94A3B8;">（管理員群組）</span></label>
+                        <input type="text" id="lineGroupId" placeholder="C... 開頭的群組 ID">
                     </div>
                     <div style="display:flex;gap:8px;">
                         <button class="btn btn-primary" onclick="saveNotifyToken()" style="flex:1;">💾 儲存</button>
@@ -799,11 +806,11 @@
                     </div>
                     <div id="notifyStatus" style="margin-top:8px;text-align:center;font-size:13px;display:none;"></div>
                     <div style="margin-top:12px;padding:10px;background:#FFF7ED;border-radius:10px;font-size:11px;color:#EA580C;line-height:1.6;">
-                        📌 如何取得 Token：<br>
-                        1. 前往 <b>notify-bot.line.me</b><br>
-                        2. 登入 → 發行權杖<br>
-                        3. 選擇要接收通知的群組<br>
-                        4. 複製 Token 貼到上方
+                        📌 設定步驟：<br>
+                        1. 到 <b>LINE Developers Console</b> 建立 Messaging API Channel<br>
+                        2. 取得 <b>Channel Access Token</b>（長效）<br>
+                        3. 把 Bot 加入管理員群組<br>
+                        4. 透過 Webhook 或測試工具取得 <b>Group ID</b>
                     </div>
                 </div>
                 </div>
