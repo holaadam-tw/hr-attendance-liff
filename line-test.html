@@ -91,22 +91,8 @@ async function sendMessage() {
     var response = await fetch('https://nssuisyvlrqnqfxupklb.supabase.co/functions/v1/line-push', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token: token, to: to, message: msg })
+      body: JSON.stringify({ token: token, to: to, text: msg })
     });
-
-    if (!response.ok && response.status === 404) {
-      response = await fetch('https://api.line.me/v2/bot/message/push', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + token
-        },
-        body: JSON.stringify({
-          to: to,
-          messages: [{ type: 'text', text: msg }]
-        })
-      });
-    }
 
     if (response.ok || response.status === 200) {
       var data = await response.json().catch(function() { return {}; });

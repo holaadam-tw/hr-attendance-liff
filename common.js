@@ -815,13 +815,13 @@ async function sendLineMessage(to, text) {
     const setting = getCachedSetting('line_messaging_api');
     if (!setting?.token) return;
     try {
-        await fetch('https://api.line.me/v2/bot/message/push', {
+        await fetch('https://nssuisyvlrqnqfxupklb.supabase.co/functions/v1/line-push', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': 'Bearer ' + setting.token
+                'Authorization': 'Bearer ' + CONFIG.SUPABASE_ANON_KEY
             },
-            body: JSON.stringify({ to, messages: [{ type: 'text', text }] })
+            body: JSON.stringify({ token: setting.token, to, text })
         });
     } catch(e) {
         console.log('LINE 推播失敗（非必要）', e);
