@@ -114,7 +114,7 @@
             </div>
 
             <!-- 智慧分流選單：根據產業別和角色動態顯示 -->
-            <div class="menu-grid" id="smartMenuGrid">
+            <div class="menu-grid" id="smartMenuGrid" style="opacity:0;transition:opacity .3s ease;">
                 <!-- 通用功能 -->
                 <div class="menu-item" data-feature="leave" onclick="window.location.href='records.html'">
                     <div class="icon">📝</div><div class="label">我要請假</div>
@@ -451,6 +451,8 @@
                     }
                     await Promise.all(tasks.map(p => Promise.resolve(p).catch(e => console.error(e))));
                     applyFeatureVisibility();
+                    const menuGrid = document.getElementById('smartMenuGrid');
+                    if (menuGrid) menuGrid.style.opacity = '1';
                     if (typeof updatePageTitle === 'function') updatePageTitle();
                     preloadGPS();
                 } else {
