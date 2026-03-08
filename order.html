@@ -2114,16 +2114,14 @@ function updateShopHeader(shop) {
       }
 
       // 渲染
+      hoursEl.style.lineHeight = '1.6';
       hoursEl.innerHTML = groups.map(function(g) {
-        if (g.days.length > 2) {
-          return '<div style="display:flex;justify-content:space-between;padding:1px 0;">' +
-            '<span style="color:#64748B;">' + g.days[0] + '～' + g.days[g.days.length - 1] + '</span>' +
-            '<span style="font-weight:600;">' + g.time + '</span></div>';
-        } else {
-          return '<div style="display:flex;justify-content:space-between;padding:1px 0;">' +
-            '<span style="color:#64748B;">' + g.days.join('、') + '</span>' +
-            '<span style="font-weight:600;">' + g.time + '</span></div>';
-        }
+        var dayStr = g.days.length > 2
+          ? g.days[0] + '～' + g.days[g.days.length - 1]
+          : g.days.join('、');
+        return '<div style="display:flex;justify-content:space-between;padding:2px 0;font-size:14px;color:#334155;font-weight:500;">' +
+          '<span>' + dayStr + '</span>' +
+          '<span style="margin-left:12px;">' + g.time + '</span></div>';
       }).join('');
     }
   }
