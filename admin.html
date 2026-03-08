@@ -150,6 +150,9 @@
                 <div class="menu-item" data-require="admin" data-feature="member" onclick="showPage('memberMgrPage')">
                     <div class="icon">👥</div><div class="label">會員管理</div>
                 </div>
+                <div class="menu-item" data-require="admin" onclick="showPage('requestsMgrPage')">
+                    <div class="icon">⚠️</div><div class="label">申請管理</div>
+                </div>
                 <div class="menu-item" data-require="admin" onclick="showPage('featurePage')">
                     <div class="icon">🎛️</div><div class="label">系統設定</div>
                 </div>
@@ -465,6 +468,21 @@
                     <p style="color:#94A3B8;font-size:12px;margin-bottom:12px;">雙方同意後才會出現在此列表</p>
                     <div id="swapApprovalList"><p style="text-align:center;color:#666;">載入中...</p></div>
                 </div>
+            </div>
+        </div>
+
+        <!-- ====== 申請管理（報修+採購） ====== -->
+        <div id="requestsMgrPage" class="page">
+            <button class="btn btn-secondary" onclick="showPage('adminHomePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
+            <div class="checkin-page">
+                <h2 style="margin-bottom:16px;">⚠️ 申請管理</h2>
+                <div style="display:flex;gap:4px;margin-bottom:12px;background:#F1F5F9;border-radius:10px;padding:3px;">
+                    <button class="reqMgrTab" onclick="switchReqMgrFilter('all',this)" style="flex:1;padding:8px;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;background:#fff;color:#4F46E5;box-shadow:0 1px 4px rgba(0,0,0,.08);">全部</button>
+                    <button class="reqMgrTab" onclick="switchReqMgrFilter('pending',this)" style="flex:1;padding:8px;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;background:transparent;color:#94A3B8;">待審核</button>
+                    <button class="reqMgrTab" onclick="switchReqMgrFilter('in_progress',this)" style="flex:1;padding:8px;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;background:transparent;color:#94A3B8;">進行中</button>
+                    <button class="reqMgrTab" onclick="switchReqMgrFilter('completed',this)" style="flex:1;padding:8px;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;background:transparent;color:#94A3B8;">已完成</button>
+                </div>
+                <div id="reqMgrList"><p style="text-align:center;color:#666;">載入中...</p></div>
             </div>
         </div>
 
@@ -812,6 +830,15 @@
                         3. 把 Bot 加入管理員群組<br>
                         4. 透過 Webhook 或測試工具取得 <b>Group ID</b>
                     </div>
+                </div>
+
+                <!-- 底部導航設定 -->
+                <div style="margin-top:30px;padding-top:20px;border-top:2px dashed #e5e7eb;">
+                    <h3 style="margin-bottom:12px;">📱 底部導航設定</h3>
+                    <p style="color:#94A3B8;font-size:12px;margin-bottom:12px;">勾選要顯示的項目（最多 5 個，首頁與管理固定）</p>
+                    <div id="navSettingsItems" style="display:flex;flex-direction:column;gap:8px;"></div>
+                    <button class="btn btn-primary" onclick="saveNavSettings()" style="margin-top:12px;">💾 儲存導航設定</button>
+                    <div id="navSaveStatus" style="margin-top:8px;text-align:center;font-size:13px;display:none;"></div>
                 </div>
                 </div>
 

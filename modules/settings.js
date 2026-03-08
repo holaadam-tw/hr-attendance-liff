@@ -34,7 +34,10 @@ export const ADMIN_FEATURE_LIST = [
 
     // 客戶經營
     { key: 'booking',       label: '線上預約',    desc: '客戶線上預約服務或訂位',    icon: '📅', category: 'crm' },
-    { key: 'member',        label: '會員集點',    desc: '消費集點與會員管理',        icon: '👥', category: 'crm' }
+    { key: 'member',        label: '會員集點',    desc: '消費集點與會員管理',        icon: '👥', category: 'crm' },
+
+    // 申請系統
+    { key: 'requests',      label: '報修/採購',   desc: '設備報修與採購申請',        icon: '⚠️', category: 'ops' }
 ];
 
 export let featureState = {
@@ -46,12 +49,12 @@ export let featureState = {
 
 // 產業別模板
 export const INDUSTRY_TEMPLATES = {
-    general:       { label: '🏢 一般公司', features: { leave: true, attendance: true, schedule: true, salary: true, lunch: false, fieldwork: false, sales_target: false, store_ordering: false, qr_order: false, kds: false, booking: false, member: false } },
-    manufacturing: { label: '🏭 製造業',   features: { leave: true, attendance: true, schedule: true, salary: true, lunch: true, fieldwork: true, sales_target: true, store_ordering: false, qr_order: false, kds: false, booking: false, member: false } },
-    restaurant:    { label: '🍽️ 餐飲業',   features: { leave: true, attendance: true, schedule: true, salary: true, lunch: false, fieldwork: false, sales_target: false, store_ordering: true, qr_order: true, kds: true, booking: true, member: true } },
-    service:       { label: '💅 服務業',   features: { leave: true, attendance: true, schedule: true, salary: true, lunch: false, fieldwork: false, sales_target: false, store_ordering: false, qr_order: false, kds: false, booking: true, member: true } },
-    clinic:        { label: '🏥 診所/醫療', features: { leave: true, attendance: true, schedule: true, salary: true, lunch: false, fieldwork: false, sales_target: false, store_ordering: false, qr_order: false, kds: false, booking: true, member: true } },
-    retail:        { label: '🛒 零售業',   features: { leave: true, attendance: true, schedule: true, salary: true, lunch: false, fieldwork: false, sales_target: false, store_ordering: true, qr_order: true, kds: false, booking: false, member: true } }
+    general:       { label: '🏢 一般公司', features: { leave: true, attendance: true, schedule: true, salary: true, lunch: false, fieldwork: false, sales_target: false, store_ordering: false, qr_order: false, kds: false, booking: false, member: false, requests: true } },
+    manufacturing: { label: '🏭 製造業',   features: { leave: true, attendance: true, schedule: true, salary: true, lunch: true, fieldwork: true, sales_target: true, store_ordering: false, qr_order: false, kds: false, booking: false, member: false, requests: true } },
+    restaurant:    { label: '🍽️ 餐飲業',   features: { leave: true, attendance: true, schedule: true, salary: true, lunch: false, fieldwork: false, sales_target: false, store_ordering: true, qr_order: true, kds: true, booking: true, member: true, requests: true } },
+    service:       { label: '💅 服務業',   features: { leave: true, attendance: true, schedule: true, salary: true, lunch: false, fieldwork: false, sales_target: false, store_ordering: false, qr_order: false, kds: false, booking: true, member: true, requests: true } },
+    clinic:        { label: '🏥 診所/醫療', features: { leave: true, attendance: true, schedule: true, salary: true, lunch: false, fieldwork: false, sales_target: false, store_ordering: false, qr_order: false, kds: false, booking: true, member: true, requests: true } },
+    retail:        { label: '🛒 零售業',   features: { leave: true, attendance: true, schedule: true, salary: true, lunch: false, fieldwork: false, sales_target: false, store_ordering: true, qr_order: true, kds: false, booking: false, member: true, requests: true } }
 };
 
 // ===== Tab 切換 =====
@@ -73,7 +76,7 @@ export function switchSysTab(tab, btn) {
         btn.style.boxShadow = '0 1px 4px rgba(0,0,0,0.08)';
     }
     // 載入對應資料
-    if (tab === 'feature') { loadFeatureSettings(); loadNotifyToken(); }
+    if (tab === 'feature') { loadFeatureSettings(); loadNotifyToken(); loadNavSettings(); }
     if (tab === 'audit') loadAuditLogs();
 }
 

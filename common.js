@@ -1221,6 +1221,19 @@ async function adjustEmployeeBonus(employeeId, year, bonusAmount, reason) {
 }
 
 // ===== 底部導航列（管理員限定，動態產生） =====
+// 所有可用的導航項目
+var ALL_NAV_ITEMS = [
+    { id: 'home',      icon: '🏠', label: '首頁',   page: 'index.html',          fixed: true },
+    { id: 'schedule',  icon: '📅', label: '班表',   page: 'schedule.html' },
+    { id: 'checkin',   icon: '🎯', label: '打卡',   page: 'checkin.html?type=in' },
+    { id: 'requests',  icon: '⚠️', label: '申請',   page: 'requests.html' },
+    { id: 'salary',    icon: '💰', label: '薪資',   page: 'salary.html' },
+    { id: 'orders',    icon: '📋', label: '訂單',   page: 'admin.html#restaurant' },
+    { id: 'booking',   icon: '📅', label: '預約',   page: 'admin.html#booking' },
+    { id: 'records',   icon: '📊', label: '紀錄',   page: 'records.html' },
+    { id: 'admin',     icon: '⚙️', label: '管理',   page: 'admin.html', adminOnly: true, fixed: true }
+];
+
 function initBottomNav() {
     const isAdmin = checkIsAdmin();
 
@@ -1232,38 +1245,253 @@ function initBottomNav() {
         return;
     }
 
-    // 判斷當前頁面以標記 active
-    const page = window.location.pathname.split('/').pop() || 'index.html';
-    var items = [
-        { href: 'index.html',          icon: '🏠', label: '首頁' },
-        { href: 'schedule.html',       icon: '📅', label: '班表' },
-        { href: 'checkin.html?type=in', icon: '📍', label: '打卡' },
-        { href: 'salary.html',         icon: '💰', label: '薪資' },
-        { href: 'admin.html',          icon: '⚙️', label: '管理' }
-    ];
+    // 從 system_settings 讀取導航設定
+    var navConfig = getCachedSetting('bottom_nav_config');
+    var tabs;
 
-    // 餐飲業：把薪資換成訂單管理
-    if (currentCompanyIndustry === 'restaurant') {
-        items = [
-            { href: 'index.html',          icon: '🏠', label: '首頁' },
-            { href: 'schedule.html',       icon: '📅', label: '班表' },
-            { href: 'checkin.html?type=in', icon: '📍', label: '打卡' },
-            { href: 'admin.html#restaurant',icon: '🍽️', label: '訂單' },
-            { href: 'admin.html',          icon: '⚙️', label: '管理' }
+    if (navConfig && navConfig.tabs) {
+        tabs = navConfig.tabs;
+    } else {
+        // 預設導航（向後相容）
+        tabs = [
+            { id: 'home',     icon: '🏠', label: '首頁',   page: 'index.html' },
+            { id: 'schedule', icon: '📅', label: '班表',   page: 'schedule.html' },
+            { id: 'checkin',  icon: '🎯', label: '打卡',   page: 'checkin.html?type=in' },
+            { id: 'requests', icon: '⚠️', label: '申請',   page: 'requests.html' },
+            { id: 'admin',    icon: '⚙️', label: '管理',   page: 'admin.html', adminOnly: true }
         ];
     }
+
+    // 過濾 adminOnly 項目
+    tabs = tabs.filter(function(t) {
+        if (t.adminOnly && !isAdmin) return false;
+        return true;
+    });
+
+    // 判斷當前頁面以標記 active
+    const page = window.location.pathname.split('/').pop() || 'index.html';
 
     const nav = document.createElement('nav');
     nav.className = 'bottom-nav';
     nav.style.display = 'flex';
-    nav.innerHTML = items.map(it => {
-        const isActive = page === it.href.split('?')[0];
-        return `<a class="nav-item${isActive ? ' active' : ''}" onclick="window.location.href='${it.href}'">
-            <span class="nav-icon">${it.icon}</span><span class="nav-label">${it.label}</span>
-        </a>`;
+    nav.innerHTML = tabs.map(function(t) {
+        var href = t.page || t.href || '#';
+        var isActive = page === href.split('?')[0].split('#')[0];
+        return '<a class="nav-item' + (isActive ? ' active' : '') + '" onclick="window.location.href=\'' + href + '\'">' +
+            '<span class="nav-icon">' + t.icon + '</span><span class="nav-label">' + t.label + '</span>' +
+        '</a>';
     }).join('');
 
     document.body.appendChild(nav);
+}
+
+// ===== 底部導航設定（管理後台） =====
+function loadNavSettings() {
+    var container = document.getElementById('navSettingsItems');
+    if (!container) return;
+
+    var navConfig = getCachedSetting('bottom_nav_config');
+    var enabledIds = [];
+    if (navConfig && navConfig.tabs) {
+        enabledIds = navConfig.tabs.map(function(t) { return t.id; });
+    } else {
+        enabledIds = ['home', 'schedule', 'checkin', 'requests', 'admin'];
+    }
+
+    container.innerHTML = ALL_NAV_ITEMS.map(function(item) {
+        var checked = item.fixed || enabledIds.indexOf(item.id) !== -1;
+        var disabled = item.fixed ? 'disabled' : '';
+        var note = item.fixed ? ' <span style="color:#94A3B8;font-size:11px;">(固定)</span>' : '';
+        if (item.adminOnly) note = ' <span style="color:#94A3B8;font-size:11px;">(管理員)</span>';
+        return '<label style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:#FAFBFC;border-radius:10px;cursor:pointer;">' +
+            '<input type="checkbox" data-nav-id="' + item.id + '" ' + (checked ? 'checked' : '') + ' ' + disabled +
+            ' style="width:18px;height:18px;accent-color:#4F46E5;">' +
+            '<span style="font-size:18px;">' + item.icon + '</span>' +
+            '<span style="font-size:14px;font-weight:600;">' + item.label + note + '</span>' +
+        '</label>';
+    }).join('');
+}
+
+async function saveNavSettings() {
+    var checks = document.querySelectorAll('#navSettingsItems input[data-nav-id]');
+    var selected = [];
+    checks.forEach(function(cb) {
+        if (cb.checked) {
+            var id = cb.getAttribute('data-nav-id');
+            var item = ALL_NAV_ITEMS.find(function(n) { return n.id === id; });
+            if (item) selected.push({ id: item.id, icon: item.icon, label: item.label, page: item.page, adminOnly: item.adminOnly || false, fixed: item.fixed || false });
+        }
+    });
+
+    // 限制最多 5 個（不含固定項）
+    var nonFixed = selected.filter(function(t) { return !t.fixed; });
+    if (nonFixed.length > 3) {
+        showToast('❌ 可選項目最多 3 個（加上首頁和管理共 5 個）');
+        return;
+    }
+
+    var status = document.getElementById('navSaveStatus');
+    try {
+        var value = { tabs: selected };
+        var existing = await sb.from('system_settings').select('id').eq('key', 'bottom_nav_config').maybeSingle();
+        if (existing.data) {
+            await sb.from('system_settings').update({ value: value, updated_at: new Date().toISOString() }).eq('key', 'bottom_nav_config');
+        } else {
+            await sb.from('system_settings').insert({ key: 'bottom_nav_config', value: value, description: '底部導航列設定' });
+        }
+        showToast('✅ 導航設定已儲存');
+        if (status) { status.style.display = 'block'; status.style.color = '#059669'; status.textContent = '✅ 已儲存，重新整理頁面後生效'; }
+        invalidateSettingsCache();
+        await loadSettings();
+    } catch(e) {
+        console.error(e);
+        showToast('❌ 儲存失敗');
+    }
+}
+
+// ===== 申請管理（管理後台） =====
+var reqMgrFilter = 'all';
+
+function switchReqMgrFilter(filter, btn) {
+    reqMgrFilter = filter;
+    document.querySelectorAll('.reqMgrTab').forEach(function(b) {
+        b.style.background = 'transparent'; b.style.color = '#94A3B8'; b.style.boxShadow = 'none';
+    });
+    if (btn) { btn.style.background = '#fff'; btn.style.color = '#4F46E5'; btn.style.boxShadow = '0 1px 4px rgba(0,0,0,.08)'; }
+    loadAllRequests();
+}
+
+async function loadAllRequests() {
+    var el = document.getElementById('reqMgrList');
+    if (!el) return;
+    el.innerHTML = '<p style="text-align:center;color:#666;">載入中...</p>';
+
+    try {
+        var query = sb.from('requests')
+            .select('*, employees!requests_employee_id_fkey(name, department)')
+            .order('created_at', { ascending: false })
+            .limit(50);
+
+        if (currentCompanyId) query = query.eq('company_id', currentCompanyId);
+        if (reqMgrFilter !== 'all') {
+            if (reqMgrFilter === 'completed') {
+                query = query.in('status', ['completed', 'rejected']);
+            } else {
+                query = query.eq('status', reqMgrFilter);
+            }
+        }
+
+        var { data, error } = await query;
+        if (error) throw error;
+
+        if (!data || data.length === 0) {
+            el.innerHTML = '<p style="text-align:center;color:#94A3B8;padding:30px;">沒有申請紀錄</p>';
+            return;
+        }
+
+        el.innerHTML = data.map(function(r) {
+            return renderAdminRequestCard(r);
+        }).join('');
+    } catch(e) {
+        console.error(e);
+        el.innerHTML = '<p style="text-align:center;color:#EF4444;">載入失敗</p>';
+    }
+}
+
+function renderAdminRequestCard(r) {
+    var typeLabel = r.type === 'repair' ? '🔧 報修' : '🛒 採購';
+    var typeBg = r.type === 'repair' ? '#DBEAFE' : '#F3E8FF';
+    var typeColor = r.type === 'repair' ? '#1E40AF' : '#6B21A8';
+
+    var statusMap = {
+        pending:     { label: '待審核', bg: '#FEF3C7', color: '#92400E' },
+        approved:    { label: '已核准', bg: '#DBEAFE', color: '#1E40AF' },
+        in_progress: { label: '進行中', bg: '#D1FAE5', color: '#065F46' },
+        completed:   { label: '已完成', bg: '#EDE9FE', color: '#5B21B6' },
+        rejected:    { label: '已退回', bg: '#FEE2E2', color: '#991B1B' }
+    };
+    var st = statusMap[r.status] || statusMap.pending;
+
+    var urgencyMap = {
+        urgent: { label: '🔴 急迫', bg: '#FEE2E2', color: '#991B1B' },
+        high:   { label: '⚡ 緊急', bg: '#FEF3C7', color: '#92400E' }
+    };
+    var urg = urgencyMap[r.urgency];
+
+    var empName = r.employees?.name || '未知';
+    var empDept = r.employees?.department ? ' (' + r.employees.department + ')' : '';
+
+    var date = new Date(r.created_at);
+    var dateStr = (date.getMonth() + 1) + '/' + date.getDate() + ' ' +
+        String(date.getHours()).padStart(2, '0') + ':' + String(date.getMinutes()).padStart(2, '0');
+
+    var costStr = r.estimated_cost ? ' | $' + Number(r.estimated_cost).toLocaleString() : '';
+
+    var html = '<div style="background:#fff;border-radius:14px;padding:14px 14px 14px 18px;margin-bottom:10px;box-shadow:0 2px 8px rgba(0,0,0,.04);border-left:4px solid ' +
+        (r.status === 'pending' ? '#F59E0B' : r.status === 'approved' ? '#3B82F6' : r.status === 'in_progress' ? '#10B981' : r.status === 'completed' ? '#8B5CF6' : '#EF4444') + ';">';
+    html += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;flex-wrap:wrap;">';
+    html += '<span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;background:' + typeBg + ';color:' + typeColor + ';">' + typeLabel + '</span>';
+    html += '<span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;background:' + st.bg + ';color:' + st.color + ';">' + st.label + '</span>';
+    if (urg) html += '<span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;background:' + urg.bg + ';color:' + urg.color + ';">' + urg.label + '</span>';
+    html += '</div>';
+    html += '<div style="font-size:14px;font-weight:700;color:#1F2937;margin-bottom:2px;">' + escapeHTML(r.title) + '</div>';
+    html += '<div style="font-size:12px;color:#64748B;margin-bottom:6px;">' + escapeHTML(empName) + empDept + ' · ' + dateStr + costStr + '</div>';
+    if (r.description) html += '<div style="font-size:12px;color:#94A3B8;margin-bottom:8px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">' + escapeHTML(r.description) + '</div>';
+
+    // 操作按鈕
+    if (r.status === 'pending') {
+        html += '<div style="display:flex;gap:6px;">';
+        html += '<button onclick="approveRequest(\'' + r.id + '\')" style="flex:1;padding:8px;border:none;border-radius:8px;background:#D1FAE5;color:#065F46;font-weight:700;font-size:12px;cursor:pointer;">✓ 核准</button>';
+        html += '<button onclick="rejectRequest(\'' + r.id + '\')" style="flex:1;padding:8px;border:none;border-radius:8px;background:#FEE2E2;color:#991B1B;font-weight:700;font-size:12px;cursor:pointer;">✕ 退回</button>';
+        html += '</div>';
+    } else if (r.status === 'approved') {
+        html += '<button onclick="updateRequestStatus(\'' + r.id + '\',\'in_progress\')" style="width:100%;padding:8px;border:none;border-radius:8px;background:#DBEAFE;color:#1E40AF;font-weight:700;font-size:12px;cursor:pointer;">🔄 標記進行中</button>';
+    } else if (r.status === 'in_progress') {
+        html += '<button onclick="updateRequestStatus(\'' + r.id + '\',\'completed\')" style="width:100%;padding:8px;border:none;border-radius:8px;background:#EDE9FE;color:#5B21B6;font-weight:700;font-size:12px;cursor:pointer;">✔ 標記完成</button>';
+    }
+    if (r.status === 'rejected' && r.rejection_reason) {
+        html += '<div style="margin-top:6px;padding:6px 10px;background:#FEE2E2;border-radius:8px;font-size:12px;color:#991B1B;">退回原因：' + escapeHTML(r.rejection_reason) + '</div>';
+    }
+
+    html += '</div>';
+    return html;
+}
+
+async function approveRequest(id) {
+    try {
+        await sb.from('requests').update({
+            status: 'approved',
+            approver_id: currentEmployee.id,
+            approved_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+        }).eq('id', id);
+        showToast('✅ 已核准');
+        loadAllRequests();
+    } catch(e) { showToast('❌ 操作失敗'); }
+}
+
+async function rejectRequest(id) {
+    var reason = prompt('請輸入退回原因：');
+    if (reason === null) return;
+    try {
+        await sb.from('requests').update({
+            status: 'rejected',
+            approver_id: currentEmployee.id,
+            rejection_reason: reason || '',
+            updated_at: new Date().toISOString()
+        }).eq('id', id);
+        showToast('已退回');
+        loadAllRequests();
+    } catch(e) { showToast('❌ 操作失敗'); }
+}
+
+async function updateRequestStatus(id, status) {
+    try {
+        var update = { status: status, updated_at: new Date().toISOString() };
+        await sb.from('requests').update(update).eq('id', id);
+        showToast('✅ 已更新');
+        loadAllRequests();
+    } catch(e) { showToast('❌ 操作失敗'); }
 }
 
 // ===== 功能顯示設定 =====
@@ -1280,7 +1508,8 @@ const DEFAULT_FEATURES = {
     qr_order: false,       // 客人掃碼點餐
     kds: false,            // 廚房出單
     booking: false,        // 客戶預約/訂位
-    member: false          // 會員集點
+    member: false,         // 會員集點
+    requests: true         // 報修/採購申請
 };
 
 function getFeatureVisibility() {

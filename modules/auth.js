@@ -43,6 +43,7 @@ export function showPage(id) {
     if (id === 'restaurantDetailPage') { /* loaded via openRestaurantDetail */ }
     if (id === 'bookingMgrPage') { window.loadBookingStoreList?.(); }
     if (id === 'memberMgrPage') { window.loadMemberStoreList?.(); }
+    if (id === 'requestsMgrPage') { window.loadAllRequests?.(); }
 }
 
 // ===== 檢查管理員權限 =====

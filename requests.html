@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>申請系統</title>
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .req-tabs { display:flex; gap:4px; margin-bottom:16px; background:#F1F5F9; border-radius:10px; padding:3px; }
+        .req-tab { flex:1; padding:10px; border:none; border-radius:8px; cursor:pointer; font-weight:700; font-size:13px; transition:all .2s; background:transparent; color:#64748B; }
+        .req-tab.active { background:#fff; color:#4F46E5; box-shadow:0 2px 8px rgba(0,0,0,.08); }
+        .urgency-group { display:flex; gap:6px; flex-wrap:wrap; }
+        .urgency-btn { padding:8px 16px; border:2px solid #E2E8F0; border-radius:20px; background:#FAFBFC; font-size:13px; font-weight:600; cursor:pointer; transition:all .2s; }
+        .urgency-btn.active { border-color:#4F46E5; background:#EEF2FF; color:#4F46E5; }
+        .urgency-btn[data-val="high"].active { border-color:#F59E0B; background:#FEF3C7; color:#92400E; }
+        .urgency-btn[data-val="urgent"].active { border-color:#EF4444; background:#FEE2E2; color:#991B1B; }
+        .req-card { background:#fff; border-radius:14px; padding:14px 14px 14px 18px; margin-bottom:10px; box-shadow:0 2px 8px rgba(0,0,0,.04); position:relative; border-left:4px solid #E2E8F0; }
+        .req-card[data-status="pending"] { border-left-color:#F59E0B; }
+        .req-card[data-status="approved"] { border-left-color:#3B82F6; }
+        .req-card[data-status="in_progress"] { border-left-color:#10B981; }
+        .req-card[data-status="completed"] { border-left-color:#8B5CF6; }
+        .req-card[data-status="rejected"] { border-left-color:#EF4444; }
+        .req-meta { display:flex; align-items:center; gap:6px; margin-bottom:6px; flex-wrap:wrap; }
+        .req-badge { display:inline-block; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:700; }
+        .req-title { font-size:14px; font-weight:700; color:#1F2937; margin-bottom:4px; }
+        .req-desc { font-size:12px; color:#64748B; margin-bottom:6px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+        .req-footer { display:flex; justify-content:space-between; align-items:center; font-size:11px; color:#94A3B8; }
+        .req-reject { margin-top:6px; padding:6px 10px; background:#FEE2E2; border-radius:8px; font-size:12px; color:#991B1B; }
+        .req-empty { text-align:center; padding:40px 20px; color:#94A3B8; font-size:14px; }
+    </style>
+</head>
+<body>
+    <div id="loadingPage" class="loading-screen">
+        <div class="spinner"></div>
+        <p>系統載入中...</p>
+    </div>
+
+    <div class="container">
+        <div id="requestsPage" class="page active">
+            <div class="card" style="padding:16px;">
+                <h2 style="font-size:18px;font-weight:800;margin-bottom:4px;">📋 申請系統</h2>
+                <p style="font-size:12px;color:#64748B;margin-bottom:16px;">設備報修與採購申請</p>
+
+                <!-- 類型切換 -->
+                <div class="req-tabs">
+                    <button class="req-tab active" onclick="switchReqTab('repair',this)">🔧 設備報修</button>
+                    <button class="req-tab" onclick="switchReqTab('purchase',this)">🛒 採購申請</button>
+                </div>
+
+                <!-- 報修表單 -->
+                <div id="repairForm">
+                    <div class="form-group">
+                        <label>標題 *</label>
+                        <input type="text" id="repairTitle" placeholder="例如：3號機台異常">
+                    </div>
+                    <div class="form-group">
+                        <label>故障描述</label>
+                        <textarea id="repairDesc" placeholder="請描述故障狀況" rows="3" style="resize:none;"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>急迫程度</label>
+                        <div class="urgency-group" id="repairUrgency">
+                            <div class="urgency-btn active" data-val="normal" onclick="setUrgency('repairUrgency',this)">一般</div>
+                            <div class="urgency-btn" data-val="high" onclick="setUrgency('repairUrgency',this)">⚡ 緊急</div>
+                            <div class="urgency-btn" data-val="urgent" onclick="setUrgency('repairUrgency',this)">🔴 急迫</div>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" id="repairBtn" onclick="submitRequest('repair')">🔧 提交報修</button>
+                </div>
+
+                <!-- 採購表單 -->
+                <div id="purchaseForm" style="display:none;">
+                    <div class="form-group">
+                        <label>品名 *</label>
+                        <input type="text" id="purchaseTitle" placeholder="例如：螺絲 M8x20">
+                    </div>
+                    <div class="form-group">
+                        <label>說明</label>
+                        <textarea id="purchaseDesc" placeholder="規格、數量、用途" rows="3" style="resize:none;"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>預估金額</label>
+                        <input type="number" id="purchaseCost" placeholder="選填">
+                    </div>
+                    <div class="form-group">
+                        <label>急迫程度</label>
+                        <div class="urgency-group" id="purchaseUrgency">
+                            <div class="urgency-btn active" data-val="normal" onclick="setUrgency('purchaseUrgency',this)">一般</div>
+                            <div class="urgency-btn" data-val="high" onclick="setUrgency('purchaseUrgency',this)">⚡ 緊急</div>
+                            <div class="urgency-btn" data-val="urgent" onclick="setUrgency('purchaseUrgency',this)">🔴 急迫</div>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" id="purchaseBtn" onclick="submitRequest('purchase')">🛒 提交採購</button>
+                </div>
+            </div>
+
+            <!-- 我的申請列表 -->
+            <div style="margin-top:8px;">
+                <h3 style="font-size:15px;font-weight:700;margin-bottom:12px;">📄 我的申請</h3>
+                <div id="myRequestsList"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="common.js"></script>
+    <script>
+        var currentReqTab = 'repair';
+
+        function switchReqTab(type, btn) {
+            currentReqTab = type;
+            document.querySelectorAll('.req-tab').forEach(function(b) { b.classList.remove('active'); });
+            btn.classList.add('active');
+            document.getElementById('repairForm').style.display = type === 'repair' ? 'block' : 'none';
+            document.getElementById('purchaseForm').style.display = type === 'purchase' ? 'block' : 'none';
+        }
+
+        function setUrgency(groupId, btn) {
+            document.querySelectorAll('#' + groupId + ' .urgency-btn').forEach(function(b) { b.classList.remove('active'); });
+            btn.classList.add('active');
+        }
+
+        function getUrgency(groupId) {
+            var active = document.querySelector('#' + groupId + ' .urgency-btn.active');
+            return active ? active.getAttribute('data-val') : 'normal';
+        }
+
+        async function submitRequest(type) {
+            if (!currentEmployee) return showToast('❌ 請先登入');
+            var title, desc, urgency, cost;
+
+            if (type === 'repair') {
+                title = document.getElementById('repairTitle').value.trim();
+                desc = document.getElementById('repairDesc').value.trim();
+                urgency = getUrgency('repairUrgency');
+                if (!title) return showToast('❌ 請輸入標題');
+            } else {
+                title = document.getElementById('purchaseTitle').value.trim();
+                desc = document.getElementById('purchaseDesc').value.trim();
+                urgency = getUrgency('purchaseUrgency');
+                cost = parseFloat(document.getElementById('purchaseCost').value) || null;
+                if (!title) return showToast('❌ 請輸入品名');
+            }
+
+            var btn = document.getElementById(type === 'repair' ? 'repairBtn' : 'purchaseBtn');
+            btn.disabled = true;
+            btn.textContent = '提交中...';
+
+            try {
+                var row = {
+                    company_id: currentEmployee.company_id,
+                    employee_id: currentEmployee.id,
+                    type: type,
+                    title: title,
+                    description: desc || null,
+                    urgency: urgency,
+                    status: 'pending'
+                };
+                if (cost) row.estimated_cost = cost;
+
+                var result = await sb.from('requests').insert(row);
+                if (result.error) throw result.error;
+
+                showToast('✅ 申請已提交');
+
+                // 清空表單
+                if (type === 'repair') {
+                    document.getElementById('repairTitle').value = '';
+                    document.getElementById('repairDesc').value = '';
+                } else {
+                    document.getElementById('purchaseTitle').value = '';
+                    document.getElementById('purchaseDesc').value = '';
+                    document.getElementById('purchaseCost').value = '';
+                }
+
+                // 推播通知
+                var typeLabel = type === 'repair' ? '🔧 報修' : '🛒 採購';
+                var urgencyLabel = urgency === 'urgent' ? '🔴急迫' : urgency === 'high' ? '⚡緊急' : '';
+                sendAdminNotify(typeLabel + '申請\n' + currentEmployee.name + '：' + title + (urgencyLabel ? '\n' + urgencyLabel : ''));
+
+                loadMyRequests();
+            } catch(e) {
+                console.error(e);
+                showToast('❌ 提交失敗');
+            }
+
+            btn.disabled = false;
+            btn.textContent = type === 'repair' ? '🔧 提交報修' : '🛒 提交採購';
+        }
+
+        async function loadMyRequests() {
+            var el = document.getElementById('myRequestsList');
+            if (!currentEmployee) { el.innerHTML = '<div class="req-empty">請先登入</div>'; return; }
+
+            try {
+                var { data, error } = await sb.from('requests')
+                    .select('*')
+                    .eq('employee_id', currentEmployee.id)
+                    .order('created_at', { ascending: false })
+                    .limit(30);
+
+                if (error) throw error;
+                if (!data || data.length === 0) {
+                    el.innerHTML = '<div class="req-empty">尚無申請紀錄</div>';
+                    return;
+                }
+
+                el.innerHTML = data.map(function(r) {
+                    return renderRequestCard(r);
+                }).join('');
+            } catch(e) {
+                console.error(e);
+                el.innerHTML = '<div class="req-empty">載入失敗</div>';
+            }
+        }
+
+        function renderRequestCard(r) {
+            var typeLabel = r.type === 'repair' ? '🔧 報修' : '🛒 採購';
+            var typeBg = r.type === 'repair' ? '#DBEAFE' : '#F3E8FF';
+            var typeColor = r.type === 'repair' ? '#1E40AF' : '#6B21A8';
+
+            var statusMap = {
+                pending: { label: '待審核', bg: '#FEF3C7', color: '#92400E' },
+                approved: { label: '已核准', bg: '#DBEAFE', color: '#1E40AF' },
+                in_progress: { label: '進行中', bg: '#D1FAE5', color: '#065F46' },
+                completed: { label: '已完成', bg: '#EDE9FE', color: '#5B21B6' },
+                rejected: { label: '已退回', bg: '#FEE2E2', color: '#991B1B' }
+            };
+            var st = statusMap[r.status] || statusMap.pending;
+
+            var urgencyMap = {
+                urgent: { label: '🔴 急迫', bg: '#FEE2E2', color: '#991B1B' },
+                high: { label: '⚡ 緊急', bg: '#FEF3C7', color: '#92400E' }
+            };
+            var urg = urgencyMap[r.urgency];
+
+            var date = new Date(r.created_at);
+            var dateStr = (date.getMonth() + 1) + '/' + date.getDate() + ' ' +
+                String(date.getHours()).padStart(2, '0') + ':' + String(date.getMinutes()).padStart(2, '0');
+
+            var costStr = r.estimated_cost ? ' | $' + Number(r.estimated_cost).toLocaleString() : '';
+
+            var html = '<div class="req-card" data-status="' + r.status + '">';
+            html += '<div class="req-meta">';
+            html += '<span class="req-badge" style="background:' + typeBg + ';color:' + typeColor + ';">' + typeLabel + '</span>';
+            html += '<span class="req-badge" style="background:' + st.bg + ';color:' + st.color + ';">' + st.label + '</span>';
+            if (urg) html += '<span class="req-badge" style="background:' + urg.bg + ';color:' + urg.color + ';">' + urg.label + '</span>';
+            html += '</div>';
+            html += '<div class="req-title">' + escapeHTML(r.title) + '</div>';
+            if (r.description) html += '<div class="req-desc">' + escapeHTML(r.description) + '</div>';
+            html += '<div class="req-footer"><span>' + dateStr + costStr + '</span></div>';
+            if (r.status === 'rejected' && r.rejection_reason) {
+                html += '<div class="req-reject">退回原因：' + escapeHTML(r.rejection_reason) + '</div>';
+            }
+            html += '</div>';
+            return html;
+        }
+
+        window.addEventListener('load', async function() {
+            if (typeof initializeLiff === 'undefined') return;
+            var ok = await initializeLiff();
+            if (ok) {
+                var li = await checkUserStatus();
+                if (li) {
+                    initBottomNav();
+                    loadMyRequests();
+                }
+            }
+        });
+    </script>
+</body>
+</html>
