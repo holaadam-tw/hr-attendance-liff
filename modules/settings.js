@@ -73,22 +73,19 @@ export function switchSysTab(tab, btn) {
         btn.style.boxShadow = '0 1px 4px rgba(0,0,0,0.08)';
     }
     // 載入對應資料
-    if (tab === 'feature') loadFeatureSettings();
+    if (tab === 'feature') { loadFeatureSettings(); loadNotifyToken(); }
     if (tab === 'audit') loadAuditLogs();
 }
 
 // ===== LINE Messaging API 推播設定 =====
-export async function loadNotifyToken() {
-    try {
-        const { data } = await sb.from('system_settings')
-            .select('value').eq('key', 'line_messaging_api').maybeSingle();
-        if (data?.value) {
-            const tokenEl = document.getElementById('lineChannelToken');
-            const groupEl = document.getElementById('lineGroupId');
-            if (tokenEl && data.value.token) tokenEl.value = data.value.token;
-            if (groupEl && data.value.groupId) groupEl.value = data.value.groupId;
-        }
-    } catch(e) {}
+export function loadNotifyToken() {
+    const setting = getCachedSetting('line_messaging_api');
+    if (setting) {
+        const tokenEl = document.getElementById('lineChannelToken');
+        const groupEl = document.getElementById('lineGroupId');
+        if (tokenEl && setting.token) tokenEl.value = setting.token;
+        if (groupEl && setting.groupId) groupEl.value = setting.groupId;
+    }
 }
 
 export async function saveNotifyToken() {
