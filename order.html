@@ -432,9 +432,9 @@ body {
 .item-sizes { display: flex; gap: 6px; margin-top: 4px; }
 .size-option {
   font-size: 13px; color: var(--text-secondary);
-  cursor: pointer; padding: 4px 0; border-radius: 6px;
+  cursor: pointer; padding: 4px 10px; border-radius: 6px;
   border: 1.5px solid var(--border); transition: all 0.15s;
-  font-weight: 600; min-width: 96px; text-align: center;
+  font-weight: 600;
 }
 .size-option:hover, .size-option.active {
   border-color: var(--primary); color: var(--primary);
@@ -2115,12 +2115,15 @@ function updateShopHeader(shop) {
 
       // 渲染
       hoursEl.innerHTML = groups.map(function(g) {
-        var dayStr = g.days.length > 2
-          ? g.days[0] + '～' + g.days[g.days.length - 1]
-          : g.days.join('、');
-        return '<div style="display:flex;align-items:center;gap:10px;padding:1px 0;">' +
-          '<span style="opacity:0.75;">' + dayStr + '</span>' +
-          '<span style="font-weight:700;">' + g.time + '</span></div>';
+        if (g.days.length > 2) {
+          return '<div style="display:flex;justify-content:space-between;padding:1px 0;">' +
+            '<span style="color:#64748B;">' + g.days[0] + '～' + g.days[g.days.length - 1] + '</span>' +
+            '<span style="font-weight:600;">' + g.time + '</span></div>';
+        } else {
+          return '<div style="display:flex;justify-content:space-between;padding:1px 0;">' +
+            '<span style="color:#64748B;">' + g.days.join('、') + '</span>' +
+            '<span style="font-weight:600;">' + g.time + '</span></div>';
+        }
       }).join('');
     }
   }
