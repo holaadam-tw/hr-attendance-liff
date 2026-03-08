@@ -869,24 +869,7 @@ async function loadAnnouncements() {
             return !a.expire_at || new Date(a.expire_at) > new Date();
         });
 
-        // 首頁橫幅（向後相容）
-        var banner = document.getElementById('announcementBanner');
-        if (banner) {
-            if (announcements.length === 0) { banner.style.display = 'none'; }
-            else {
-                var typeStyle = { info: { bg:'#EFF6FF', color:'#2563EB', icon:'📢' }, important: { bg:'#FFF7ED', color:'#EA580C', icon:'🟡' }, urgent: { bg:'#FEF2F2', color:'#DC2626', icon:'🚨' } };
-                banner.style.display = 'block';
-                banner.innerHTML = announcements.slice(0, 3).map(function(a) {
-                    var s = typeStyle[a.type] || typeStyle.info;
-                    return '<div style="background:' + s.bg + ';color:' + s.color + ';padding:10px 14px;border-radius:10px;margin-bottom:6px;font-size:13px;cursor:pointer;" onclick="viewAnnouncement(\'' + a.id + '\')">' +
-                        '<b>' + s.icon + ' ' + escapeHTML(a.title) + '</b>' +
-                        (a.content ? '<div style="font-size:12px;margin-top:2px;opacity:.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + escapeHTML(a.content) + '</div>' : '') +
-                    '</div>';
-                }).join('');
-            }
-        }
-
-        // 公告小卡（右側）
+        // 公告小卡（員工卡右側）
         var card = document.getElementById('announcementCard');
         if (card && announcements.length > 0) {
             card.style.display = '';

@@ -49,16 +49,27 @@
             <!-- 用戶卡片 -->
             <div class="user-card">
                 <div id="homeCompanyName" style="font-size:13px;font-weight:700;color:#4F46E5;margin-bottom:8px;display:none;"></div>
-                <div class="user-info">
-                    <div class="avatar" id="userAvatar">?</div>
-                    <div class="user-details">
-                        <h2 id="userName">載入中...</h2>
-                        <p id="userDept">-</p>
-                        <p id="userId" style="font-size: 11px; opacity: 0.7;">ID: -</p>
+                <div style="display:flex;gap:12px;">
+                    <div style="flex:1;">
+                        <div class="user-info">
+                            <div class="avatar" id="userAvatar">?</div>
+                            <div class="user-details">
+                                <h2 id="userName">載入中...</h2>
+                                <p id="userDept">-</p>
+                                <p id="userId" style="font-size: 11px; opacity: 0.7;">ID: -</p>
+                            </div>
+                            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
+                                <span class="user-status-badge" id="userStatusBadge" style="background:#D1FAE5;color:#065F46;">-</span>
+                                <span class="user-status-badge" id="userTypeBadge" style="background:#DBEAFE;color:#1E40AF;display:none;font-size:10px;">正職</span>
+                            </div>
+                        </div>
                     </div>
-                    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
-                        <span class="user-status-badge" id="userStatusBadge" style="background:#D1FAE5;color:#065F46;">-</span>
-                        <span class="user-status-badge" id="userTypeBadge" style="background:#DBEAFE;color:#1E40AF;display:none;font-size:10px;">正職</span>
+                    <div id="announcementCard" onclick="showAnnouncementList()" style="flex:0 0 110px;background:#F8FAFC;border-radius:12px;padding:10px;cursor:pointer;display:none;border:1px solid #E2E8F0;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                            <span style="font-size:12px;font-weight:700;">📢 公告</span>
+                            <span id="announceBadge" style="background:#EF4444;color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:6px;display:none;">0</span>
+                        </div>
+                        <div id="announcePreview" style="font-size:11px;color:#64748B;line-height:1.4;"></div>
                     </div>
                 </div>
                 <div class="location-status loading" id="locationStatus">
@@ -66,19 +77,8 @@
                 </div>
             </div>
 
-            <!-- 公告小卡 -->
-            <div id="announcementCard" onclick="showAnnouncementList()" style="display:none;background:#fff;border-radius:14px;padding:14px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.05);margin-bottom:16px;">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                    <span style="font-size:13px;font-weight:700;">📢 公告</span>
-                    <span id="announceBadge" style="background:#EF4444;color:#fff;font-size:10px;font-weight:700;padding:2px 6px;border-radius:8px;display:none;">0</span>
-                </div>
-                <div id="announcePreview" style="font-size:12px;color:#64748B;"></div>
-            </div>
-
             <!-- 今日資訊卡 -->
             <div class="card" style="padding:16px;">
-                <!-- 公告橫幅 -->
-                <div id="announcementBanner" style="display:none;margin-bottom:12px;"></div>
 
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
                     <span style="font-size:14px;font-weight:700;color:#0F172A;">📋 今日資訊</span>
