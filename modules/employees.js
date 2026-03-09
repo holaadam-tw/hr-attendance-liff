@@ -58,18 +58,35 @@ export function initEmployeeFormHandler() {
 }
 
 // ===== QR Code =====
-export function showJoinQRCode() {
+export async function showJoinQRCode() {
     const modal = document.getElementById('qrModal');
     const qrcodeDiv = document.getElementById('qrcode');
     qrcodeDiv.innerHTML = '';
 
-    const liffUrl = `https://liff.line.me/${CONFIG.LIFF_ID}?type=bind&company=HR_SYSTEM_001`;
+    let companyCode = 'UNKNOWN';
+    let companyName = '';
+    try {
+        const { data } = await sb.from('companies').select('code, name').eq('id', window.currentCompanyId).maybeSingle();
+        if (data) {
+            companyCode = data.code;
+            companyName = data.name;
+        }
+    } catch (e) {
+        console.error('Failed to fetch company info for QR code', e);
+    }
+
+    const liffUrl = `https://liff.line.me/${CONFIG.LIFF_ID}?type=bind&company=${companyCode}`;
 
     new QRCode(qrcodeDiv, {
         text: liffUrl, width: 200, height: 200,
         colorDark: "#1f2937", colorLight: "#ffffff",
         correctLevel: QRCode.CorrectLevel.H
     });
+
+    const nameEl = document.getElementById('qrCompanyName');
+    const codeEl = document.getElementById('qrCompanyCode');
+    if (nameEl) nameEl.textContent = companyName;
+    if (codeEl) codeEl.textContent = companyCode;
 
     modal.style.display = 'flex';
 }
