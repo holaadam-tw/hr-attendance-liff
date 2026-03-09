@@ -7,10 +7,58 @@
 
 let currentSalaryEmpId = null;
 
+// ===== 部門下拉選單 =====
+export function loadDepartmentOptions(selectId, currentValue) {
+    var depts = getCachedSetting('departments') || ['管理部', '生產部', '業務部', '倉管部'];
+    var select = document.getElementById(selectId);
+    if (!select) return;
+
+    var html = '<option value="">選擇部門</option>';
+    depts.forEach(function(d) {
+        html += '<option value="' + escapeHTML(d) + '"' + (d === currentValue ? ' selected' : '') + '>' + escapeHTML(d) + '</option>';
+    });
+    select.innerHTML = html;
+}
+
+export async function addNewDepartment(selectId) {
+    var name = prompt('輸入新部門名稱：');
+    if (!name || !name.trim()) return;
+    name = name.trim();
+
+    var depts = getCachedSetting('departments') || [];
+    if (depts.includes(name)) { alert('此部門已存在'); return; }
+
+    depts.push(name);
+
+    var existing = await sb.from('system_settings')
+        .select('id')
+        .eq('key', 'departments')
+        .or('company_id.eq.' + window.currentCompanyId + ',company_id.is.null')
+        .maybeSingle();
+
+    if (existing?.data?.id) {
+        await sb.from('system_settings').update({ value: depts }).eq('id', existing.data.id);
+    } else {
+        await sb.from('system_settings').insert({
+            key: 'departments',
+            value: depts,
+            company_id: window.currentCompanyId,
+            description: '部門列表'
+        });
+    }
+
+    sessionStorage.removeItem('system_settings_cache');
+    await loadSettings();
+
+    loadDepartmentOptions(selectId, name);
+    showToast('✅ 已新增部門：' + name);
+}
+
 // ===== 新增員工 Modal =====
 export function showAddEmployeeModal() {
     document.getElementById('addEmployeeModal').style.display = 'flex';
     document.getElementById('newEmployeeHireDate').value = fmtDate(new Date());
+    loadDepartmentOptions('newEmployeeDepartment', '');
 }
 
 export function closeAddEmployeeModal() {
@@ -261,7 +309,7 @@ export async function openEditEmployeeModal(empId) {
         const { data } = await sb.from('employees').select('*').eq('id', empId).single();
         if (data) {
             document.getElementById('editEmpName').value = data.name || '';
-            document.getElementById('editEmpDept').value = data.department || '管理部';
+            loadDepartmentOptions('editEmpDept', data.department || '');
             document.getElementById('editEmpPosition').value = data.position || '';
             document.getElementById('editEmpHireDate').value = data.hire_date || '';
             document.getElementById('editEmpType').value = data.employment_type || 'fulltime';

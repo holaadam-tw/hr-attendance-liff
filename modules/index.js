@@ -19,7 +19,7 @@ import {
     showJoinQRCode, closeQRModal, loadEmployeeList, updateEmployeeRoleAdmin,
     searchEmployees, openSalarySettingModal, closeSalarySettingModal,
     onSalaryTypeChange, saveSalarySetting, openEditEmployeeModal,
-    closeEditEmployeeModal, saveEditEmployee
+    closeEditEmployeeModal, saveEditEmployee, loadDepartmentOptions, addNewDepartment
 } from './employees.js';
 
 import {
@@ -126,6 +126,8 @@ window.saveSalarySetting = saveSalarySetting;
 window.openEditEmployeeModal = openEditEmployeeModal;
 window.closeEditEmployeeModal = closeEditEmployeeModal;
 window.saveEditEmployee = saveEditEmployee;
+window.loadDepartmentOptions = loadDepartmentOptions;
+window.addNewDepartment = addNewDepartment;
 
 // leave
 window.switchApprovalType = switchApprovalType;

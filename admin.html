@@ -246,13 +246,12 @@
                         </div>
                         <div class="form-group">
                             <label>部門</label>
-                            <select id="newEmployeeDepartment">
-                                <option value="管理部">管理部</option>
-                                <option value="業務部">業務部</option>
-                                <option value="技術部">技術部</option>
-                                <option value="人事部">人事部</option>
-                                <option value="財務部">財務部</option>
-                            </select>
+                            <div style="position:relative;">
+                                <select id="newEmployeeDepartment" style="width:100%;padding:12px;padding-right:70px;border:2px solid #E2E8F0;border-radius:10px;font-size:14px;font-family:inherit;appearance:none;background:#fff;">
+                                    <option value="">選擇部門</option>
+                                </select>
+                                <div onclick="addNewDepartment('newEmployeeDepartment')" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);padding:4px 10px;background:#6366F1;color:#fff;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">+ 新增</div>
+                            </div>
                         </div>
                         <div class="form-group">
                             <label>職位</label>
@@ -380,13 +379,12 @@
                     </div>
                     <div class="form-group">
                         <label>部門</label>
-                        <select id="editEmpDept">
-                            <option value="管理部">管理部</option>
-                            <option value="業務部">業務部</option>
-                            <option value="技術部">技術部</option>
-                            <option value="人事部">人事部</option>
-                            <option value="財務部">財務部</option>
-                        </select>
+                        <div style="position:relative;">
+                            <select id="editEmpDept" style="width:100%;padding:12px;padding-right:70px;border:2px solid #E2E8F0;border-radius:10px;font-size:14px;font-family:inherit;appearance:none;background:#fff;">
+                                <option value="">選擇部門</option>
+                            </select>
+                            <div onclick="addNewDepartment('editEmpDept')" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);padding:4px 10px;background:#6366F1;color:#fff;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;">+ 新增</div>
+                        </div>
                     </div>
                     <div class="form-group">
                         <label>職位</label>
