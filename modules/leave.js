@@ -137,10 +137,10 @@ export async function loadMaxLeaveSetting() {
 export async function saveMaxLeave() {
     const statusEl = document.getElementById('maxLeaveSaveStatus');
     try {
-        const { data: existing } = await sb.from('system_settings').select('id').eq('key', 'max_concurrent_leave').eq('company_id', window.currentCompanyId).maybeSingle();
+        const { data: existing } = await sb.from('system_settings').select('id').eq('key', 'max_concurrent_leave').or('company_id.eq.' + window.currentCompanyId + ',company_id.is.null').maybeSingle();
         const val = { max: maxLeaveValue };
         if (existing) {
-            await sb.from('system_settings').update({ value: val, updated_at: new Date().toISOString() }).eq('key', 'max_concurrent_leave').eq('company_id', window.currentCompanyId);
+            await sb.from('system_settings').update({ value: val, company_id: window.currentCompanyId, updated_at: new Date().toISOString() }).eq('id', existing.id);
         } else {
             await sb.from('system_settings').insert({ key: 'max_concurrent_leave', value: val, description: '同時請假人數上限', company_id: window.currentCompanyId });
         }
@@ -237,10 +237,10 @@ export async function saveSchedulingMode() {
         const st = document.getElementById('fixedStartTime')?.value || '08:00';
         const et = document.getElementById('fixedEndTime')?.value || '17:00';
         fixedShiftStart = st; fixedShiftEnd = et;
-        const { data: existing } = await sb.from('system_settings').select('id').eq('key', 'scheduling_mode').eq('company_id', window.currentCompanyId).maybeSingle();
+        const { data: existing } = await sb.from('system_settings').select('id').eq('key', 'scheduling_mode').or('company_id.eq.' + window.currentCompanyId + ',company_id.is.null').maybeSingle();
         const val = { mode: currentSchedulingMode, start: st, end: et };
         if (existing) {
-            await sb.from('system_settings').update({ value: val, updated_at: new Date().toISOString() }).eq('key', 'scheduling_mode').eq('company_id', window.currentCompanyId);
+            await sb.from('system_settings').update({ value: val, company_id: window.currentCompanyId, updated_at: new Date().toISOString() }).eq('id', existing.id);
         } else {
             await sb.from('system_settings').insert({ key: 'scheduling_mode', value: val, description: '排班模式：shift=排班制, fixed=固定班', company_id: window.currentCompanyId });
         }
@@ -312,9 +312,9 @@ export async function removeLunchManager(empId) {
 async function saveLunchManagers() {
     try {
         const val = { employee_ids: lunchManagerIds };
-        const { data: existing } = await sb.from('system_settings').select('id').eq('key', 'lunch_managers').eq('company_id', window.currentCompanyId).maybeSingle();
+        const { data: existing } = await sb.from('system_settings').select('id').eq('key', 'lunch_managers').or('company_id.eq.' + window.currentCompanyId + ',company_id.is.null').maybeSingle();
         if (existing) {
-            await sb.from('system_settings').update({ value: val, updated_at: new Date().toISOString() }).eq('key', 'lunch_managers').eq('company_id', window.currentCompanyId);
+            await sb.from('system_settings').update({ value: val, company_id: window.currentCompanyId, updated_at: new Date().toISOString() }).eq('id', existing.id);
         } else {
             await sb.from('system_settings').insert({ key: 'lunch_managers', value: val, description: '便當管理員名單', company_id: window.currentCompanyId });
         }

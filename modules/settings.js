@@ -100,9 +100,9 @@ export async function saveNotifyToken() {
     try {
         const value = { token, groupId };
         const { data: existing } = await sb.from('system_settings')
-            .select('id').eq('key', 'line_messaging_api').eq('company_id', window.currentCompanyId).maybeSingle();
+            .select('id').eq('key', 'line_messaging_api').or('company_id.eq.' + window.currentCompanyId + ',company_id.is.null').maybeSingle();
         if (existing) {
-            await sb.from('system_settings').update({ value, updated_at: new Date().toISOString() }).eq('key', 'line_messaging_api').eq('company_id', window.currentCompanyId);
+            await sb.from('system_settings').update({ value, company_id: window.currentCompanyId, updated_at: new Date().toISOString() }).eq('id', existing.id);
         } else {
             await sb.from('system_settings').insert({ key: 'line_messaging_api', value, description: 'LINE Messaging API 推播設定', company_id: window.currentCompanyId });
         }

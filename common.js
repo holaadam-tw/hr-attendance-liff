@@ -1418,9 +1418,9 @@ async function saveNavSettings() {
     var status = document.getElementById('navSaveStatus');
     try {
         var value = { tabs: selected };
-        var existing = await sb.from('system_settings').select('id').eq('key', 'bottom_nav_config').eq('company_id', window.currentCompanyId).maybeSingle();
-        if (existing.data) {
-            await sb.from('system_settings').update({ value: value, updated_at: new Date().toISOString() }).eq('key', 'bottom_nav_config').eq('company_id', window.currentCompanyId);
+        var { data: existing } = await sb.from('system_settings').select('id').eq('key', 'bottom_nav_config').or('company_id.eq.' + window.currentCompanyId + ',company_id.is.null').maybeSingle();
+        if (existing) {
+            await sb.from('system_settings').update({ value: value, company_id: window.currentCompanyId, updated_at: new Date().toISOString() }).eq('id', existing.id);
         } else {
             await sb.from('system_settings').insert({ key: 'bottom_nav_config', value: value, description: '底部導航列設定', company_id: window.currentCompanyId });
         }
