@@ -333,7 +333,8 @@ async function loadSettings() {
 
         // 一次查出所有 system_settings，避免多次查詢
         const { data, error } = await sb.from('system_settings')
-            .select('key, value');
+            .select('key, value')
+            .or('company_id.eq.' + window.currentCompanyId + ',company_id.is.null');
         if (!error && data) {
             _settingsCache = {};
             data.forEach(row => { _settingsCache[row.key] = row.value; });
@@ -571,7 +572,7 @@ async function checkLeaveAvailability(startDate, endDate) {
         // 4. 查排班資料，看該日是否人手不足（用 count 避免拉全部員工資料）
         let staffWarning = '';
         try {
-            const { count: totalCount } = await sb.from('employees').select('id', { count: 'exact', head: true }).eq('is_active', true);
+            const { count: totalCount } = await sb.from('employees').select('id', { count: 'exact', head: true }).eq('company_id', window.currentCompanyId).eq('is_active', true);
 
             if (totalCount > 0 && maxDayConflict + 1 >= totalCount) {
                 staffWarning = `⚠️ 若核准此假，最少只剩 ${totalCount - maxDayConflict - 1} 人上班`;
@@ -1413,11 +1414,11 @@ async function saveNavSettings() {
     var status = document.getElementById('navSaveStatus');
     try {
         var value = { tabs: selected };
-        var existing = await sb.from('system_settings').select('id').eq('key', 'bottom_nav_config').maybeSingle();
+        var existing = await sb.from('system_settings').select('id').eq('key', 'bottom_nav_config').eq('company_id', window.currentCompanyId).maybeSingle();
         if (existing.data) {
-            await sb.from('system_settings').update({ value: value, updated_at: new Date().toISOString() }).eq('key', 'bottom_nav_config');
+            await sb.from('system_settings').update({ value: value, updated_at: new Date().toISOString() }).eq('key', 'bottom_nav_config').eq('company_id', window.currentCompanyId);
         } else {
-            await sb.from('system_settings').insert({ key: 'bottom_nav_config', value: value, description: '底部導航列設定' });
+            await sb.from('system_settings').insert({ key: 'bottom_nav_config', value: value, description: '底部導航列設定', company_id: window.currentCompanyId });
         }
         showToast('✅ 導航設定已儲存');
         if (status) { status.style.display = 'block'; status.style.color = '#059669'; status.textContent = '✅ 已儲存，重新整理頁面後生效'; }

@@ -49,7 +49,7 @@ export async function loadShiftMgr() {
     document.getElementById('smHead').innerHTML = '';
     document.getElementById('shiftDaySummary').innerHTML = '';
     try {
-        const { data: emps } = await sb.from('employees').select('id, name, department').eq('is_active', true).order('name');
+        const { data: emps } = await sb.from('employees').select('id, name, department').eq('company_id', window.currentCompanyId).eq('is_active', true).order('name');
         smEmployees = emps || [];
         const { data: scheds } = await sb.from('schedules').select('employee_id, date, shift_type_id, shift_types(name, code)')
             .gte('date', startStr).lte('date', endStr);

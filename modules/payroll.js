@@ -73,7 +73,7 @@ export async function loadHybridBonusData() {
 
     try {
         const [empRes, salaryRes, attRes, leaveRes] = await Promise.all([
-            sb.from('employees').select('id, name, employee_number, department, hire_date').eq('is_active', true).order('department').order('name'),
+            sb.from('employees').select('id, name, employee_number, department, hire_date').eq('company_id', window.currentCompanyId).eq('is_active', true).order('department').order('name'),
             sb.from('salary_settings').select('employee_id, base_salary').eq('is_current', true),
             sb.from('attendance').select('employee_id, is_late').gte('date', `${year}-01-01`).lte('date', `${year}-12-31`),
             sb.from('leave_requests').select('employee_id, days').eq('status', 'approved').gte('start_date', `${year}-01-01`).lte('start_date', `${year}-12-31`)
@@ -339,7 +339,7 @@ export async function loadSalarySettingList() {
     const listEl = document.getElementById('salarySettingList');
     try {
         const [empRes, ssRes] = await Promise.all([
-            sb.from('employees').select('id, name, employee_number, department').eq('is_active', true).order('department'),
+            sb.from('employees').select('id, name, employee_number, department').eq('company_id', window.currentCompanyId).eq('is_active', true).order('department'),
             sb.from('salary_settings').select('employee_id, salary_type, base_salary').eq('is_current', true)
         ]);
         const ssMap = {};
@@ -392,7 +392,7 @@ export async function loadPayrollData() {
 
     try {
         const [empRes, salaryRes, attRes, leaveRes, otRes, existRes, bracketRes] = await Promise.all([
-            sb.from('employees').select('id, name, employee_number, department, is_active').eq('is_active', true),
+            sb.from('employees').select('id, name, employee_number, department, is_active').eq('company_id', window.currentCompanyId).eq('is_active', true),
             sb.from('salary_settings').select('*').eq('is_current', true),
             sb.from('attendance').select('employee_id, date, is_late, total_work_hours, overtime_hours, check_in_time, check_out_time').gte('date', startDate).lte('date', endDate),
             sb.from('leave_requests').select('employee_id, days, leave_type').eq('status', 'approved').gte('start_date', startDate).lte('end_date', endDate),

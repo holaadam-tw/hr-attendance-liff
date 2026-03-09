@@ -100,11 +100,11 @@ export async function saveNotifyToken() {
     try {
         const value = { token, groupId };
         const { data: existing } = await sb.from('system_settings')
-            .select('id').eq('key', 'line_messaging_api').maybeSingle();
+            .select('id').eq('key', 'line_messaging_api').eq('company_id', window.currentCompanyId).maybeSingle();
         if (existing) {
-            await sb.from('system_settings').update({ value, updated_at: new Date().toISOString() }).eq('key', 'line_messaging_api');
+            await sb.from('system_settings').update({ value, updated_at: new Date().toISOString() }).eq('key', 'line_messaging_api').eq('company_id', window.currentCompanyId);
         } else {
-            await sb.from('system_settings').insert({ key: 'line_messaging_api', value, description: 'LINE Messaging API 推播設定' });
+            await sb.from('system_settings').insert({ key: 'line_messaging_api', value, description: 'LINE Messaging API 推播設定', company_id: window.currentCompanyId });
         }
         showToast('✅ 設定已儲存');
         if (status) { status.style.display = 'block'; status.style.color = '#059669'; status.textContent = '✅ 已儲存'; }
@@ -233,15 +233,17 @@ export async function toggleFeature(key) {
         const { data: existing } = await sb.from('system_settings')
             .select('id')
             .eq('key', 'feature_visibility')
+            .eq('company_id', window.currentCompanyId)
             .maybeSingle();
 
         if (existing) {
             await sb.from('system_settings')
                 .update({ value: featureState, updated_at: new Date().toISOString() })
-                .eq('key', 'feature_visibility');
+                .eq('key', 'feature_visibility')
+                .eq('company_id', window.currentCompanyId);
         } else {
             await sb.from('system_settings')
-                .insert({ key: 'feature_visibility', value: featureState, description: '員工可見功能設定' });
+                .insert({ key: 'feature_visibility', value: featureState, description: '員工可見功能設定', company_id: window.currentCompanyId });
         }
 
         invalidateSettingsCache();
@@ -271,14 +273,15 @@ export async function applyIndustryTemplate(industryKey) {
     // 儲存到 DB
     try {
         const { data: existing } = await sb.from('system_settings')
-            .select('id').eq('key', 'feature_visibility').maybeSingle();
+            .select('id').eq('key', 'feature_visibility').eq('company_id', window.currentCompanyId).maybeSingle();
         if (existing) {
             await sb.from('system_settings')
                 .update({ value: featureState, updated_at: new Date().toISOString() })
-                .eq('key', 'feature_visibility');
+                .eq('key', 'feature_visibility')
+                .eq('company_id', window.currentCompanyId);
         } else {
             await sb.from('system_settings')
-                .insert({ key: 'feature_visibility', value: featureState, description: '員工可見功能設定' });
+                .insert({ key: 'feature_visibility', value: featureState, description: '員工可見功能設定', company_id: window.currentCompanyId });
         }
         invalidateSettingsCache();
     } catch(e) {

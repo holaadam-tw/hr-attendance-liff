@@ -195,7 +195,7 @@
             // 先檢查排班模式
             try {
                 if (typeof sb !== 'undefined') {
-                    const { data: modeData } = await sb.from('system_settings').select('value').eq('key', 'scheduling_mode').maybeSingle();
+                    const { data: modeData } = await sb.from('system_settings').select('value').eq('key', 'scheduling_mode').or('company_id.eq.' + window.currentCompanyId + ',company_id.is.null').maybeSingle();
                     if (modeData?.value?.mode === 'fixed') {
                         isFixedDayShift = true;
                         const fStart = modeData.value.start || '08:00';
@@ -386,7 +386,7 @@
             // 載入同事列表
             try {
                 const { data } = await sb.from('employees')
-                    .select('id, name, department').eq('is_active', true).neq('id', currentEmployee.id).order('name');
+                    .select('id, name, department').eq('company_id', window.currentCompanyId).eq('is_active', true).neq('id', currentEmployee.id).order('name');
                 const sel = document.getElementById('swapTarget');
                 sel.innerHTML = '<option value="">-- 請選擇同事 --</option>';
                 (data||[]).forEach(e => { sel.innerHTML += `<option value="${e.id}">${escapeHTML(e.name)}（${escapeHTML(e.department||'')}）</option>`; });

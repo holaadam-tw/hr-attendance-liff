@@ -86,6 +86,7 @@ export async function loadEmployeeList() {
     try {
         const { data, error } = await sb.from('employees')
             .select('*')
+            .eq('company_id', window.currentCompanyId)
             .eq('is_active', true)
             .order('department', { ascending: true });
 

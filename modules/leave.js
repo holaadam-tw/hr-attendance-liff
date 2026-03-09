@@ -128,7 +128,7 @@ export function adjustMaxLeave(d) {
 
 export async function loadMaxLeaveSetting() {
     try {
-        const { data } = await sb.from('system_settings').select('value').eq('key', 'max_concurrent_leave').maybeSingle();
+        const { data } = await sb.from('system_settings').select('value').eq('key', 'max_concurrent_leave').or('company_id.eq.' + window.currentCompanyId + ',company_id.is.null').maybeSingle();
         if (data?.value?.max) maxLeaveValue = data.value.max;
     } catch (e) { }
     document.getElementById('maxLeaveNum').textContent = maxLeaveValue;
@@ -137,12 +137,12 @@ export async function loadMaxLeaveSetting() {
 export async function saveMaxLeave() {
     const statusEl = document.getElementById('maxLeaveSaveStatus');
     try {
-        const { data: existing } = await sb.from('system_settings').select('id').eq('key', 'max_concurrent_leave').maybeSingle();
+        const { data: existing } = await sb.from('system_settings').select('id').eq('key', 'max_concurrent_leave').eq('company_id', window.currentCompanyId).maybeSingle();
         const val = { max: maxLeaveValue };
         if (existing) {
-            await sb.from('system_settings').update({ value: val, updated_at: new Date().toISOString() }).eq('key', 'max_concurrent_leave');
+            await sb.from('system_settings').update({ value: val, updated_at: new Date().toISOString() }).eq('key', 'max_concurrent_leave').eq('company_id', window.currentCompanyId);
         } else {
-            await sb.from('system_settings').insert({ key: 'max_concurrent_leave', value: val, description: '同時請假人數上限' });
+            await sb.from('system_settings').insert({ key: 'max_concurrent_leave', value: val, description: '同時請假人數上限', company_id: window.currentCompanyId });
         }
         statusEl.style.display = 'block'; statusEl.style.color = '#059669'; statusEl.textContent = '✅ 已儲存';
         setTimeout(() => { statusEl.style.display = 'none'; }, 2000);
@@ -158,7 +158,7 @@ let fixedShiftEnd = '17:00';
 
 export async function loadSchedulingMode() {
     try {
-        const { data } = await sb.from('system_settings').select('value').eq('key', 'scheduling_mode').maybeSingle();
+        const { data } = await sb.from('system_settings').select('value').eq('key', 'scheduling_mode').or('company_id.eq.' + window.currentCompanyId + ',company_id.is.null').maybeSingle();
         if (data?.value?.mode) currentSchedulingMode = data.value.mode;
         if (data?.value?.start) fixedShiftStart = data.value.start;
         if (data?.value?.end) fixedShiftEnd = data.value.end;
@@ -237,12 +237,12 @@ export async function saveSchedulingMode() {
         const st = document.getElementById('fixedStartTime')?.value || '08:00';
         const et = document.getElementById('fixedEndTime')?.value || '17:00';
         fixedShiftStart = st; fixedShiftEnd = et;
-        const { data: existing } = await sb.from('system_settings').select('id').eq('key', 'scheduling_mode').maybeSingle();
+        const { data: existing } = await sb.from('system_settings').select('id').eq('key', 'scheduling_mode').eq('company_id', window.currentCompanyId).maybeSingle();
         const val = { mode: currentSchedulingMode, start: st, end: et };
         if (existing) {
-            await sb.from('system_settings').update({ value: val, updated_at: new Date().toISOString() }).eq('key', 'scheduling_mode');
+            await sb.from('system_settings').update({ value: val, updated_at: new Date().toISOString() }).eq('key', 'scheduling_mode').eq('company_id', window.currentCompanyId);
         } else {
-            await sb.from('system_settings').insert({ key: 'scheduling_mode', value: val, description: '排班模式：shift=排班制, fixed=固定班' });
+            await sb.from('system_settings').insert({ key: 'scheduling_mode', value: val, description: '排班模式：shift=排班制, fixed=固定班', company_id: window.currentCompanyId });
         }
         const modeLabel = currentSchedulingMode === 'shift' ? '排班制' : `固定班 ${st}-${et}`;
         statusEl.style.display = 'block'; statusEl.style.color = '#059669';
@@ -260,13 +260,13 @@ let lunchManagerIds = [];
 
 export async function loadLunchManagers() {
     try {
-        const { data } = await sb.from('system_settings').select('value').eq('key', 'lunch_managers').maybeSingle();
+        const { data } = await sb.from('system_settings').select('value').eq('key', 'lunch_managers').or('company_id.eq.' + window.currentCompanyId + ',company_id.is.null').maybeSingle();
         lunchManagerIds = data?.value?.employee_ids || [];
     } catch (e) { lunchManagerIds = []; }
     const sel = document.getElementById('lunchMgrSelect');
     if (!sel) return;
     try {
-        const { data: emps } = await sb.from('employees').select('id, name, employee_number').eq('is_active', true).order('name');
+        const { data: emps } = await sb.from('employees').select('id, name, employee_number').eq('company_id', window.currentCompanyId).eq('is_active', true).order('name');
         sel.innerHTML = '<option value="">-- 選擇員工 --</option>';
         (emps || []).forEach(e => {
             if (!lunchManagerIds.includes(e.id)) {
@@ -312,11 +312,11 @@ export async function removeLunchManager(empId) {
 async function saveLunchManagers() {
     try {
         const val = { employee_ids: lunchManagerIds };
-        const { data: existing } = await sb.from('system_settings').select('id').eq('key', 'lunch_managers').maybeSingle();
+        const { data: existing } = await sb.from('system_settings').select('id').eq('key', 'lunch_managers').eq('company_id', window.currentCompanyId).maybeSingle();
         if (existing) {
-            await sb.from('system_settings').update({ value: val, updated_at: new Date().toISOString() }).eq('key', 'lunch_managers');
+            await sb.from('system_settings').update({ value: val, updated_at: new Date().toISOString() }).eq('key', 'lunch_managers').eq('company_id', window.currentCompanyId);
         } else {
-            await sb.from('system_settings').insert({ key: 'lunch_managers', value: val, description: '便當管理員名單' });
+            await sb.from('system_settings').insert({ key: 'lunch_managers', value: val, description: '便當管理員名單', company_id: window.currentCompanyId });
         }
         invalidateSettingsCache();
         showToast('✅ 便當管理員已更新');
@@ -359,7 +359,7 @@ export async function loadStaffOverview() {
     const el = document.getElementById('staffOverview');
     if (!el) return;
     try {
-        const { data: emps } = await sb.from('employees').select('id, is_active').eq('is_active', true);
+        const { data: emps } = await sb.from('employees').select('id, is_active').eq('company_id', window.currentCompanyId).eq('is_active', true);
         const total = emps?.length || 0;
         if (total === 0) {
             el.innerHTML = `
@@ -409,14 +409,14 @@ export async function loadLeaveCal() {
 
     let maxC = maxLeaveValue || 2;
     try {
-        const { data: s } = await sb.from('system_settings').select('value').eq('key', 'max_concurrent_leave').maybeSingle();
+        const { data: s } = await sb.from('system_settings').select('value').eq('key', 'max_concurrent_leave').or('company_id.eq.' + window.currentCompanyId + ',company_id.is.null').maybeSingle();
         if (s?.value?.max) maxC = s.value.max;
     } catch (e) { }
     document.getElementById('lcMax').textContent = maxC;
 
     let employees = [], leaves = [];
     try {
-        const { data: emps } = await sb.from('employees').select('id, name, department').eq('is_active', true).order('department').order('name');
+        const { data: emps } = await sb.from('employees').select('id, name, department').eq('company_id', window.currentCompanyId).eq('is_active', true).order('department').order('name');
         employees = emps || [];
         const { data: lvs } = await sb.from('leave_requests').select('employee_id, start_date, end_date, leave_type, status')
             .in('status', ['approved', 'pending']).or(`and(start_date.lte.${me},end_date.gte.${ms})`);
