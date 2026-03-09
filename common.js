@@ -332,9 +332,13 @@ async function loadSettings() {
         }
 
         // 一次查出所有 system_settings，避免多次查詢
-        const { data, error } = await sb.from('system_settings')
-            .select('key, value')
-            .or('company_id.eq.' + window.currentCompanyId + ',company_id.is.null');
+        var query = sb.from('system_settings').select('key, value');
+        if (window.currentCompanyId) {
+            query = query.or('company_id.eq.' + window.currentCompanyId + ',company_id.is.null');
+        } else {
+            query = query.is('company_id', null);
+        }
+        const { data, error } = await query;
         if (!error && data) {
             _settingsCache = {};
             data.forEach(row => { _settingsCache[row.key] = row.value; });
