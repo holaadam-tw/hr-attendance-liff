@@ -128,7 +128,7 @@ export function adjustMaxLeave(d) {
 
 export async function loadMaxLeaveSetting() {
     try {
-        const { data } = await sb.from('system_settings').select('value').eq('key', 'max_concurrent_leave').or('company_id.eq.' + window.currentCompanyId + ',company_id.is.null').maybeSingle();
+        const { data } = await sb.from('system_settings').select('value').eq('key', 'max_concurrent_leave').eq('company_id', window.currentCompanyId).maybeSingle();
         if (data?.value?.max) maxLeaveValue = data.value.max;
     } catch (e) { }
     document.getElementById('maxLeaveNum').textContent = maxLeaveValue;
@@ -137,13 +137,8 @@ export async function loadMaxLeaveSetting() {
 export async function saveMaxLeave() {
     const statusEl = document.getElementById('maxLeaveSaveStatus');
     try {
-        const { data: existing } = await sb.from('system_settings').select('id').eq('key', 'max_concurrent_leave').or('company_id.eq.' + window.currentCompanyId + ',company_id.is.null').maybeSingle();
         const val = { max: maxLeaveValue };
-        if (existing) {
-            await sb.from('system_settings').update({ value: val, company_id: window.currentCompanyId, updated_at: new Date().toISOString() }).eq('id', existing.id);
-        } else {
-            await sb.from('system_settings').insert({ key: 'max_concurrent_leave', value: val, description: '同時請假人數上限', company_id: window.currentCompanyId });
-        }
+        await saveSetting('max_concurrent_leave', val, '同時請假人數上限');
         statusEl.style.display = 'block'; statusEl.style.color = '#059669'; statusEl.textContent = '✅ 已儲存';
         setTimeout(() => { statusEl.style.display = 'none'; }, 2000);
     } catch (e) {
@@ -158,7 +153,7 @@ let fixedShiftEnd = '17:00';
 
 export async function loadSchedulingMode() {
     try {
-        const { data } = await sb.from('system_settings').select('value').eq('key', 'scheduling_mode').or('company_id.eq.' + window.currentCompanyId + ',company_id.is.null').maybeSingle();
+        const { data } = await sb.from('system_settings').select('value').eq('key', 'scheduling_mode').eq('company_id', window.currentCompanyId).maybeSingle();
         if (data?.value?.mode) currentSchedulingMode = data.value.mode;
         if (data?.value?.start) fixedShiftStart = data.value.start;
         if (data?.value?.end) fixedShiftEnd = data.value.end;
@@ -237,13 +232,8 @@ export async function saveSchedulingMode() {
         const st = document.getElementById('fixedStartTime')?.value || '08:00';
         const et = document.getElementById('fixedEndTime')?.value || '17:00';
         fixedShiftStart = st; fixedShiftEnd = et;
-        const { data: existing } = await sb.from('system_settings').select('id').eq('key', 'scheduling_mode').or('company_id.eq.' + window.currentCompanyId + ',company_id.is.null').maybeSingle();
         const val = { mode: currentSchedulingMode, start: st, end: et };
-        if (existing) {
-            await sb.from('system_settings').update({ value: val, company_id: window.currentCompanyId, updated_at: new Date().toISOString() }).eq('id', existing.id);
-        } else {
-            await sb.from('system_settings').insert({ key: 'scheduling_mode', value: val, description: '排班模式：shift=排班制, fixed=固定班', company_id: window.currentCompanyId });
-        }
+        await saveSetting('scheduling_mode', val, '排班模式：shift=排班制, fixed=固定班');
         const modeLabel = currentSchedulingMode === 'shift' ? '排班制' : `固定班 ${st}-${et}`;
         statusEl.style.display = 'block'; statusEl.style.color = '#059669';
         statusEl.textContent = '✅ 已儲存 — ' + modeLabel;
@@ -260,7 +250,7 @@ let lunchManagerIds = [];
 
 export async function loadLunchManagers() {
     try {
-        const { data } = await sb.from('system_settings').select('value').eq('key', 'lunch_managers').or('company_id.eq.' + window.currentCompanyId + ',company_id.is.null').maybeSingle();
+        const { data } = await sb.from('system_settings').select('value').eq('key', 'lunch_managers').eq('company_id', window.currentCompanyId).maybeSingle();
         lunchManagerIds = data?.value?.employee_ids || [];
     } catch (e) { lunchManagerIds = []; }
     const sel = document.getElementById('lunchMgrSelect');
@@ -311,14 +301,7 @@ export async function removeLunchManager(empId) {
 
 async function saveLunchManagers() {
     try {
-        const val = { employee_ids: lunchManagerIds };
-        const { data: existing } = await sb.from('system_settings').select('id').eq('key', 'lunch_managers').or('company_id.eq.' + window.currentCompanyId + ',company_id.is.null').maybeSingle();
-        if (existing) {
-            await sb.from('system_settings').update({ value: val, company_id: window.currentCompanyId, updated_at: new Date().toISOString() }).eq('id', existing.id);
-        } else {
-            await sb.from('system_settings').insert({ key: 'lunch_managers', value: val, description: '便當管理員名單', company_id: window.currentCompanyId });
-        }
-        invalidateSettingsCache();
+        await saveSetting('lunch_managers', { employee_ids: lunchManagerIds }, '便當管理員名單');
         showToast('✅ 便當管理員已更新');
     } catch (e) { showToast('❌ 儲存失敗'); }
 }
@@ -409,7 +392,7 @@ export async function loadLeaveCal() {
 
     let maxC = maxLeaveValue || 2;
     try {
-        const { data: s } = await sb.from('system_settings').select('value').eq('key', 'max_concurrent_leave').or('company_id.eq.' + window.currentCompanyId + ',company_id.is.null').maybeSingle();
+        const { data: s } = await sb.from('system_settings').select('value').eq('key', 'max_concurrent_leave').eq('company_id', window.currentCompanyId).maybeSingle();
         if (s?.value?.max) maxC = s.value.max;
     } catch (e) { }
     document.getElementById('lcMax').textContent = maxC;

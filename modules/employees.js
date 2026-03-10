@@ -30,24 +30,7 @@ export async function addNewDepartment(selectId) {
 
     depts.push(name);
 
-    var existing = await sb.from('system_settings')
-        .select('id')
-        .eq('key', 'departments')
-        .or('company_id.eq.' + window.currentCompanyId + ',company_id.is.null')
-        .maybeSingle();
-
-    if (existing?.data?.id) {
-        await sb.from('system_settings').update({ value: depts }).eq('id', existing.data.id);
-    } else {
-        await sb.from('system_settings').insert({
-            key: 'departments',
-            value: depts,
-            company_id: window.currentCompanyId,
-            description: '部門列表'
-        });
-    }
-
-    sessionStorage.removeItem('system_settings_cache');
+    await saveSetting('departments', depts, '部門列表');
     await loadSettings();
 
     loadDepartmentOptions(selectId, name);

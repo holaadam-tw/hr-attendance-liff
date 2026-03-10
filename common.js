@@ -332,13 +332,10 @@ async function loadSettings() {
         }
 
         // 一次查出所有 system_settings，避免多次查詢
-        var query = sb.from('system_settings').select('key, value');
-        if (window.currentCompanyId) {
-            query = query.or('company_id.eq.' + window.currentCompanyId + ',company_id.is.null');
-        } else {
-            query = query.is('company_id', null);
-        }
-        const { data, error } = await query;
+        if (!window.currentCompanyId) return;
+        const { data, error } = await sb.from('system_settings')
+            .select('key, value')
+            .eq('company_id', window.currentCompanyId);
         if (!error && data) {
             _settingsCache = {};
             data.forEach(row => { _settingsCache[row.key] = row.value; });
@@ -360,6 +357,43 @@ function invalidateSettingsCache() {
 // 從快取取得 system_settings 的值，避免重複查詢 DB
 function getCachedSetting(key) {
     return _settingsCache ? _settingsCache[key] : null;
+}
+
+// 統一儲存 system_settings（先查再更新，避免重複 insert）
+async function saveSetting(key, value, description) {
+    var companyId = window.currentCompanyId;
+    if (!companyId) { console.warn('saveSetting: no companyId'); return; }
+
+    var { data: existing } = await sb.from('system_settings')
+        .select('id')
+        .eq('key', key)
+        .eq('company_id', companyId)
+        .maybeSingle();
+
+    if (existing) {
+        await sb.from('system_settings')
+            .update({ value: value, updated_at: new Date().toISOString() })
+            .eq('id', existing.id);
+    } else {
+        await sb.from('system_settings')
+            .insert({ key: key, value: value, company_id: companyId, description: description || key });
+    }
+
+    invalidateSettingsCache();
+}
+
+// 新公司初始化預設設定
+async function initCompanySettings(companyId) {
+    var defaults = [
+        { key: 'feature_visibility', value: {attendance:true, leave:true, schedule:true, salary:false, lunch:false, fieldwork:false, requests:true}, description: '功能開關' },
+        { key: 'work_hours', value: {start:'08:00', end:'18:00', break:60}, description: '工作時間' },
+        { key: 'check_in_radius', value: {meters:1000}, description: '打卡距離' },
+        { key: 'bottom_nav_config', value: {tabs:[{id:'home',icon:'🏠',label:'首頁',page:'index.html',fixed:true},{id:'schedule',icon:'📅',label:'班表',page:'schedule.html'},{id:'checkin',icon:'🎯',label:'打卡',page:'checkin.html?type=in'},{id:'requests',icon:'⚠️',label:'申請',page:'requests.html'},{id:'admin',icon:'⚙️',label:'管理',page:'admin.html',adminOnly:true,fixed:true}]}, description: '底部導航' },
+        { key: 'departments', value: ['管理部','生產部','業務部','倉管部'], description: '部門列表' }
+    ];
+    for (var d of defaults) {
+        await sb.from('system_settings').insert({ ...d, company_id: companyId }).catch(function() {});
+    }
 }
 
 // ===== GPS 功能 =====
@@ -1417,17 +1451,10 @@ async function saveNavSettings() {
 
     var status = document.getElementById('navSaveStatus');
     try {
-        var value = { tabs: selected };
-        var { data: existing } = await sb.from('system_settings').select('id').eq('key', 'bottom_nav_config').or('company_id.eq.' + window.currentCompanyId + ',company_id.is.null').maybeSingle();
-        if (existing) {
-            await sb.from('system_settings').update({ value: value, company_id: window.currentCompanyId, updated_at: new Date().toISOString() }).eq('id', existing.id);
-        } else {
-            await sb.from('system_settings').insert({ key: 'bottom_nav_config', value: value, description: '底部導航列設定', company_id: window.currentCompanyId });
-        }
+        await saveSetting('bottom_nav_config', { tabs: selected }, '底部導航列設定');
+        await loadSettings();
         showToast('✅ 導航設定已儲存');
         if (status) { status.style.display = 'block'; status.style.color = '#059669'; status.textContent = '✅ 已儲存，重新整理頁面後生效'; }
-        invalidateSettingsCache();
-        await loadSettings();
     } catch(e) {
         console.error(e);
         showToast('❌ 儲存失敗');

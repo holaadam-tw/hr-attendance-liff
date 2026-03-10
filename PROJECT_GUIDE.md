@@ -67,6 +67,13 @@
 5. **CORS**：瀏覽器不能直接呼叫 LINE API，必須透過 Edge Function
 6. **GitHub Pages 部署**：push 後可能需要 1-2 分鐘，有時需空 commit 觸發
 
+## system_settings 規則 ⚠️
+- company_id 是 NOT NULL，每筆設定都屬於一間公司
+- 讀取用 `.eq('company_id', currentCompanyId)`
+- 寫入用 `saveSetting(key, value, description)` 共用函數（在 common.js）
+- 不要直接 insert，用先查再更新模式
+- 新公司建立時需呼叫 `initCompanySettings(companyId)` 初始化預設設定
+
 ## Supabase Edge Functions
 | Function | 用途 |
 |----------|------|

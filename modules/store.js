@@ -19,7 +19,7 @@ let miPreviewMode = false;
 export async function loadRestaurantList() {
     try {
         let q = sb.from('store_profiles').select('*').order('created_at', { ascending: false });
-        if (window.currentCompanyId) q = q.or('company_id.eq.' + window.currentCompanyId + ',company_id.is.null');
+        if (window.currentCompanyId) q = q.eq('company_id', window.currentCompanyId);
         const { data } = await q;
         smStores = data || [];
         const today = fmtDate(new Date());

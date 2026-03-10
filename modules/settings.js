@@ -99,18 +99,10 @@ export async function saveNotifyToken() {
     const status = document.getElementById('notifyStatus');
     try {
         const value = { token, groupId };
-        const { data: existing } = await sb.from('system_settings')
-            .select('id').eq('key', 'line_messaging_api').or('company_id.eq.' + window.currentCompanyId + ',company_id.is.null').maybeSingle();
-        if (existing) {
-            await sb.from('system_settings').update({ value, company_id: window.currentCompanyId, updated_at: new Date().toISOString() }).eq('id', existing.id);
-        } else {
-            await sb.from('system_settings').insert({ key: 'line_messaging_api', value, description: 'LINE Messaging API 推播設定', company_id: window.currentCompanyId });
-        }
+        await saveSetting('line_messaging_api', value, 'LINE Messaging API 推播設定');
+        await loadSettings();
         showToast('✅ 設定已儲存');
         if (status) { status.style.display = 'block'; status.style.color = '#059669'; status.textContent = '✅ 已儲存'; }
-        // 清除快取並重新載入，讓 sendLineMessage 讀到新值
-        invalidateSettingsCache();
-        await loadSettings();
     } catch(e) { showToast('❌ 儲存失敗'); }
 }
 
@@ -230,23 +222,7 @@ export async function toggleFeature(key) {
     updateToggleCard(key);
 
     try {
-        const { data: existing } = await sb.from('system_settings')
-            .select('id')
-            .eq('key', 'feature_visibility')
-            .eq('company_id', window.currentCompanyId)
-            .maybeSingle();
-
-        if (existing) {
-            await sb.from('system_settings')
-                .update({ value: featureState, updated_at: new Date().toISOString() })
-                .eq('key', 'feature_visibility')
-                .eq('company_id', window.currentCompanyId);
-        } else {
-            await sb.from('system_settings')
-                .insert({ key: 'feature_visibility', value: featureState, description: '員工可見功能設定', company_id: window.currentCompanyId });
-        }
-
-        invalidateSettingsCache();
+        await saveSetting('feature_visibility', featureState, '員工可見功能設定');
 
         const el = document.getElementById('featureSaveStatus');
         el.style.display = 'block';
@@ -272,18 +248,7 @@ export async function applyIndustryTemplate(industryKey) {
 
     // 儲存到 DB
     try {
-        const { data: existing } = await sb.from('system_settings')
-            .select('id').eq('key', 'feature_visibility').eq('company_id', window.currentCompanyId).maybeSingle();
-        if (existing) {
-            await sb.from('system_settings')
-                .update({ value: featureState, updated_at: new Date().toISOString() })
-                .eq('key', 'feature_visibility')
-                .eq('company_id', window.currentCompanyId);
-        } else {
-            await sb.from('system_settings')
-                .insert({ key: 'feature_visibility', value: featureState, description: '員工可見功能設定', company_id: window.currentCompanyId });
-        }
-        invalidateSettingsCache();
+        await saveSetting('feature_visibility', featureState, '員工可見功能設定');
     } catch(e) {
         console.error(e);
         showToast('❌ 儲存失敗');

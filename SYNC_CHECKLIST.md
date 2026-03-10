@@ -4,7 +4,7 @@
 
 ## 資料查詢
 - [ ] 查詢 employees 表有加 `.eq('company_id', window.currentCompanyId)`？
-- [ ] 查詢 system_settings 有加 `.or('company_id.eq.'+id+',company_id.is.null')`？
+- [ ] 查詢 system_settings 有加 `.eq('company_id', window.currentCompanyId)`？
 - [ ] 新增資料有帶 `company_id: window.currentCompanyId`？
 - [ ] 查詢商店相關資料有用 `store_id` 篩選？
 
@@ -19,8 +19,8 @@
 - [ ] 新函數有 export 到 `window`（modules/index.js）？
 
 ## 設定相關
-- [ ] 修改 system_settings 後有清 sessionStorage 快取？
-- [ ] 設定有考慮 company_id 篩選？
+- [ ] 寫入 system_settings 有用 `saveSetting()` 共用函數？
+- [ ] 設定有用 `.eq('company_id', currentCompanyId)` 篩選？
 
 ## UI 相關
 - [ ] 新 UI 在手機 LINE LIFF 測試過？
