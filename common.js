@@ -532,14 +532,17 @@ async function handleBind() {
     showStatus(statusBox, 'info', '驗證中...');
     try {
         const { data, error } = await sb.rpc('bind_employee', params);
+        console.log('[handleBind] rpc result:', { data, error });
         if (error) throw error;
-        
-        if (data && data.success) {
+
+        // RPC 回傳格式可能是 {success:true}, true, 或 null（無 error 即成功）
+        if (data && data.error) {
+            showStatus(statusBox, 'error', data.error);
+        } else if (data === false || (data && data.success === false)) {
+            showStatus(statusBox, 'error', (data && data.message) || '綁定失敗，請檢查資料');
+        } else {
             showStatus(statusBox, 'success', '✅ 綁定成功！');
             setTimeout(() => { window.location.href = 'index.html'; }, 1500);
-        } else {
-            const errorMsg = (data && data.error) ? data.error : '綁定失敗，請檢查資料';
-            showStatus(statusBox, 'error', errorMsg);
         }
     } catch (err) {
         console.error('綁定錯誤:', err);
