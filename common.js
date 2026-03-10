@@ -1204,11 +1204,15 @@ function renderLocationList() {
     }
     listEl.innerHTML = officeLocations.map((loc, index) => `
         <div class="stat-row" style="align-items:center;">
-            <div style="text-align:left;">
+            <div style="text-align:left;flex:1;min-width:0;">
                 <div style="font-weight:bold;">${escapeHTML(loc.name)}</div>
+                ${loc.address ? '<div style="font-size:11px;color:#64748B;margin-top:2px;">📮 ' + escapeHTML(loc.address) + '</div>' : ''}
                 <div style="font-size:11px;color:#999;">範圍: ${escapeHTML(String(loc.radius))}m</div>
             </div>
-            <button onclick="deleteLocation(${index})" class="btn-danger" style="font-size:12px;padding:6px 12px;">刪除</button>
+            <div style="display:flex;gap:6px;">
+                <button onclick="editLocation(${index})" style="font-size:12px;padding:6px 12px;border:1px solid #6366F1;border-radius:8px;background:#EEF2FF;color:#6366F1;cursor:pointer;">✏️</button>
+                <button onclick="deleteLocation(${index})" class="btn-danger" style="font-size:12px;padding:6px 12px;">刪除</button>
+            </div>
         </div>
     `).join('');
 }
@@ -1232,11 +1236,13 @@ function getCurrentGPSForSetting() {
 async function addNewLocation() {
     // [BUG FIX] 同時支援 settings 和 admin 頁面的元素 ID
     const nameEl = document.getElementById('newLocName') || document.getElementById('adminNewLocName');
+    const addressEl = document.getElementById('newLocAddress') || document.getElementById('adminNewLocAddress');
     const radiusEl = document.getElementById('newLocRadius') || document.getElementById('adminNewLocRadius');
     const latEl = document.getElementById('newLocLat') || document.getElementById('adminNewLocLat');
     const lngEl = document.getElementById('newLocLng') || document.getElementById('adminNewLocLng');
-    
+
     const name = nameEl?.value.trim();
+    const address = addressEl?.value.trim() || '';
     const radius = parseInt(radiusEl?.value);
     const lat = parseFloat(latEl?.value);
     const lng = parseFloat(lngEl?.value);
@@ -1244,12 +1250,41 @@ async function addNewLocation() {
     if (!name || !lat || !lng) return showToast('⚠️ 資料不完整');
     if (!radius || radius < 50) return showToast('⚠️ 打卡半徑至少 50 公尺');
 
-    const newLocations = [...officeLocations, { name, lat, lng, radius }];
+    var loc = { name, lat, lng, radius };
+    if (address) loc.address = address;
+    const newLocations = [...officeLocations, loc];
     await saveLocationsToDB(newLocations);
-    
+
     if (nameEl) nameEl.value = '';
+    if (addressEl) addressEl.value = '';
     if (latEl) latEl.value = '';
     if (lngEl) lngEl.value = '';
+}
+
+function editLocation(index) {
+    var loc = officeLocations[index];
+    if (!loc) return;
+
+    var newName = prompt('地點名稱：', loc.name);
+    if (newName === null) return;
+    newName = newName.trim();
+    if (!newName) return showToast('⚠️ 名稱不可為空');
+
+    var newAddress = prompt('地址（可留空）：', loc.address || '');
+    if (newAddress === null) return;
+
+    var newRadius = prompt('打卡半徑 (公尺)：', loc.radius);
+    if (newRadius === null) return;
+    newRadius = parseInt(newRadius);
+    if (!newRadius || newRadius < 50) return showToast('⚠️ 打卡半徑至少 50 公尺');
+
+    var updated = officeLocations.map(function(l, i) {
+        if (i !== index) return l;
+        var copy = { name: newName, lat: l.lat, lng: l.lng, radius: newRadius };
+        if (newAddress.trim()) copy.address = newAddress.trim();
+        return copy;
+    });
+    saveLocationsToDB(updated);
 }
 
 async function deleteLocation(index) {
