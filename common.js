@@ -1295,19 +1295,11 @@ async function deleteLocation(index) {
 
 async function saveLocationsToDB(newLocations) {
     try {
-        const { data, error } = await sb.rpc('update_office_locations', {
-            p_locations: newLocations,
-            p_line_user_id: liffProfile.userId
-        });
-
-        if (error) throw error;
-        if (!data.success) { showToast('❌ ' + data.error); return; }
-        
+        await saveSetting('office_locations', newLocations, '打卡地點');
         officeLocations = newLocations;
-        invalidateSettingsCache();
         showToast('✅ 設定已更新');
         renderLocationList();
-        preloadGPS(); 
+        preloadGPS();
     } catch (err) {
         console.error(err);
         showToast('❌ 儲存失敗：' + friendlyError(err));
