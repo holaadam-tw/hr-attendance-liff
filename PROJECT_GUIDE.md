@@ -67,6 +67,18 @@
 5. **CORS**：瀏覽器不能直接呼叫 LINE API，必須透過 Edge Function
 6. **GitHub Pages 部署**：push 後可能需要 1-2 分鐘，有時需空 commit 觸發
 
+## 權限分級
+| 角色 | 首頁功能 | 管理頁面 | 薪酬 |
+|------|---------|---------|------|
+| platform_admin | 全部 | 全部 | 🔒 密碼鎖 |
+| admin | 受 feature_visibility 控制 | 除薪酬外全部 | ⛔ 隱藏 |
+| manager | 受 feature_visibility 控制 | 部分（請假/考勤/排班） | ⛔ 隱藏 |
+| user | 受 feature_visibility 控制 | 無 | ⛔ 隱藏 |
+
+- 薪酬密碼存在 system_settings key='payroll_password'，預設 '0000'
+- 密碼鎖僅限 platform_admin，admin 角色完全看不到薪酬入口
+- session 內驗證一次即通過（`window._payrollUnlocked`）
+
 ## system_settings 規則 ⚠️
 - company_id 是 NOT NULL，每筆設定都屬於一間公司
 - 讀取用 `.eq('company_id', currentCompanyId)`

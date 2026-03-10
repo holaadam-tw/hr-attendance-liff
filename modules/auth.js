@@ -26,6 +26,17 @@ export let companyAllowedFeatures = null;
 
 // ===== 頁面路由 =====
 export function showPage(id) {
+    // 薪酬相關頁面需要權限檢查
+    if (id === 'payrollPage') {
+        if (typeof checkPayrollAccess === 'function') {
+            checkPayrollAccess(function() { _doShowPage(id); });
+            return;
+        }
+    }
+    _doShowPage(id);
+}
+
+function _doShowPage(id) {
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.getElementById(id).classList.add('active');
 
@@ -134,6 +145,10 @@ export async function checkAdminPermission() {
                 document.getElementById('bottomNav').style.display = 'flex';
                 // 平台管理員 — 不受角色限制，所有功能可見
                 applyAdminFeatureVisibility();
+                if (typeof applyAdminPermissions === 'function') applyAdminPermissions();
+                // 顯示薪酬密碼設定
+                var pwSection = document.getElementById('payrollPwSection');
+                if (pwSection) pwSection.style.display = '';
                 renderAdminCompanySwitcher();
             }, 800);
             return;
@@ -191,6 +206,7 @@ export async function checkAdminPermission() {
             document.getElementById('bottomNav').style.display = 'flex';
             applyRoleVisibility();
             applyAdminFeatureVisibility();
+            if (typeof applyAdminPermissions === 'function') applyAdminPermissions();
         }, 800);
 
     } catch (err) {
@@ -285,6 +301,7 @@ export async function switchCompanyAdmin(companyId) {
         el.style.display = '';
     });
     applyAdminFeatureVisibility();
+    if (typeof applyAdminPermissions === 'function') applyAdminPermissions();
 
     // 更新公司名稱
     const el = document.getElementById('adminCompanyName');

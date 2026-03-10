@@ -111,7 +111,7 @@
             </div>
 
             <div class="menu-grid">
-                <div class="menu-item" data-require="admin" onclick="showPage('payrollPage')">
+                <div class="menu-item" data-require="admin" data-permission="payroll" onclick="showPage('payrollPage')">
                     <div class="icon">💰</div><div class="label">薪酬管理</div>
                 </div>
                 <div class="menu-item" data-require="admin" onclick="showPage('locationPage')">
@@ -838,6 +838,16 @@
                     <button class="btn btn-primary" onclick="saveNavSettings()" style="margin-top:12px;">💾 儲存導航設定</button>
                     <div id="navSaveStatus" style="margin-top:8px;text-align:center;font-size:13px;display:none;"></div>
                 </div>
+                </div>
+
+                <!-- === 薪酬密碼設定（platform_admin 專用） === -->
+                <div id="payrollPwSection" style="display:none;margin-top:20px;padding:20px;background:#fff;border-radius:16px;box-shadow:0 2px 8px rgba(0,0,0,0.04);">
+                    <h3 style="margin-bottom:8px;">🔒 薪酬管理密碼</h3>
+                    <p style="font-size:12px;color:#64748B;margin-bottom:14px;">platform_admin 進入薪酬模組需驗證此密碼（預設：0000）</p>
+                    <div style="display:flex;gap:10px;">
+                        <input type="password" id="payrollNewPw" placeholder="設定新密碼" style="flex:1;padding:12px;border:2px solid #E2E8F0;border-radius:10px;font-size:14px;font-family:inherit;">
+                        <button onclick="savePayrollPassword()" style="padding:12px 18px;background:#6366F1;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;">💾 儲存</button>
+                    </div>
                 </div>
 
                 <!-- === 操作日誌 TAB === -->

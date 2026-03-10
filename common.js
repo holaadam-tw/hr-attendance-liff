@@ -1325,6 +1325,109 @@ function calculateAndUpdateMonthsWorked(hireDate, targetElement) {
     targetElement.textContent = `${months} 個月`;
 }
 
+// ===== 權限分級 =====
+var ROLE_PERMISSIONS = {
+    platform_admin: {
+        admin_pages: ['employees', 'leave', 'attendance', 'schedule', 'payroll', 'settings', 'announcements', 'requests', 'restaurant', 'booking', 'members', 'location', 'report', 'staff', 'lunch', 'client', 'fieldwork'],
+        payroll_locked: true
+    },
+    admin: {
+        admin_pages: ['employees', 'leave', 'attendance', 'schedule', 'settings', 'announcements', 'requests', 'restaurant', 'booking', 'members', 'location', 'report', 'staff', 'lunch', 'client', 'fieldwork'],
+        payroll_locked: false
+    },
+    manager: {
+        admin_pages: ['leave', 'attendance', 'schedule', 'announcements'],
+        payroll_locked: false
+    },
+    user: {
+        admin_pages: [],
+        payroll_locked: false
+    }
+};
+
+function getCurrentRole() {
+    if (isPlatformAdmin && !window.viewAsEmployee) return 'platform_admin';
+    return (currentEmployee && currentEmployee.role) || 'user';
+}
+
+function getRolePermissions() {
+    return ROLE_PERMISSIONS[getCurrentRole()] || ROLE_PERMISSIONS.user;
+}
+
+// 套用 admin 頁面權限（隱藏無權限的格子）
+function applyAdminPermissions() {
+    var perms = getRolePermissions();
+    var allowed = perms.admin_pages || [];
+    document.querySelectorAll('[data-permission]').forEach(function(el) {
+        var perm = el.getAttribute('data-permission');
+        el.style.display = allowed.includes(perm) ? '' : 'none';
+    });
+}
+
+// ===== 薪酬密碼鎖 =====
+function checkPayrollAccess(callback) {
+    var perms = getRolePermissions();
+    if (!perms.admin_pages.includes('payroll')) {
+        showToast('⛔ 您沒有權限查看薪酬資料');
+        return;
+    }
+    if (perms.payroll_locked) {
+        showPayrollPasswordDialog(callback);
+    } else {
+        callback();
+    }
+}
+
+function showPayrollPasswordDialog(callback) {
+    if (window._payrollUnlocked) { callback(); return; }
+
+    var overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.6);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;';
+    overlay.innerHTML = '<div style="background:#fff;border-radius:20px;padding:28px;max-width:360px;width:100%;text-align:center;">' +
+        '<div style="font-size:40px;margin-bottom:12px;">🔒</div>' +
+        '<div style="font-size:18px;font-weight:800;margin-bottom:4px;">薪酬管理</div>' +
+        '<div style="font-size:13px;color:#64748B;margin-bottom:20px;">請輸入管理密碼</div>' +
+        '<input type="password" id="payrollPwInput" placeholder="輸入密碼" style="width:100%;padding:14px;border:2px solid #E2E8F0;border-radius:12px;font-size:16px;text-align:center;font-family:inherit;margin-bottom:16px;box-sizing:border-box;" onkeypress="if(event.key===\'Enter\')verifyPayrollPw()">' +
+        '<div style="display:flex;gap:10px;">' +
+        '<button onclick="this.closest(\'div\').parentElement.parentElement.remove()" style="flex:1;padding:12px;background:#F1F5F9;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;">取消</button>' +
+        '<button onclick="verifyPayrollPw()" style="flex:1;padding:12px;background:#6366F1;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;">確認</button>' +
+        '</div>' +
+        '<div id="payrollPwError" style="color:#EF4444;font-size:12px;margin-top:10px;display:none;">密碼錯誤</div>' +
+        '</div>';
+    document.body.appendChild(overlay);
+
+    window._payrollCallback = callback;
+    window._payrollOverlay = overlay;
+
+    setTimeout(function() { document.getElementById('payrollPwInput')?.focus(); }, 100);
+}
+
+window.verifyPayrollPw = function() {
+    var input = document.getElementById('payrollPwInput')?.value;
+    var setting = getCachedSetting('payroll_password');
+    var correctPw = (setting && setting.password) ? setting.password : '0000';
+
+    if (input === correctPw) {
+        window._payrollUnlocked = true;
+        if (window._payrollOverlay) window._payrollOverlay.remove();
+        if (window._payrollCallback) window._payrollCallback();
+    } else {
+        var err = document.getElementById('payrollPwError');
+        if (err) err.style.display = '';
+        var inp = document.getElementById('payrollPwInput');
+        if (inp) { inp.value = ''; inp.focus(); }
+    }
+};
+
+window.savePayrollPassword = async function() {
+    var pw = document.getElementById('payrollNewPw')?.value.trim();
+    if (!pw) { showToast('⚠️ 請輸入密碼'); return; }
+    await saveSetting('payroll_password', { password: pw }, '薪酬管理密碼');
+    showToast('✅ 密碼已更新');
+    document.getElementById('payrollNewPw').value = '';
+    window._payrollUnlocked = false;
+};
+
 // ===== 視角切換（platform_admin 專用） =====
 window.viewAsEmployee = false;
 
