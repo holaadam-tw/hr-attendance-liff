@@ -41,10 +41,10 @@ export const ADMIN_FEATURE_LIST = [
 ];
 
 export let featureState = {
-    leave: true, attendance: true, schedule: true, salary: true,
-    lunch: true, fieldwork: true, sales_target: true,
+    leave: false, attendance: false, schedule: false, salary: false,
+    lunch: false, fieldwork: false, sales_target: false,
     store_ordering: false, qr_order: false, kds: false,
-    booking: false, member: false
+    booking: false, member: false, requests: false
 };
 
 // 產業別模板
@@ -124,6 +124,7 @@ export async function loadFeatureSettings() {
         const { data } = await sb.from('system_settings')
             .select('value')
             .eq('key', 'feature_visibility')
+            .eq('company_id', window.currentCompanyId)
             .maybeSingle();
         if (data?.value) {
             featureState = { ...featureState, ...data.value };
@@ -172,7 +173,7 @@ export async function loadFeatureSettings() {
 
         visible.forEach(f => {
             const keys = f.key.split(',');
-            const on = keys.some(k => featureState[k.trim()] !== false);
+            const on = keys.some(k => featureState[k.trim()] === true);
             const cardId = f.key.replace(',', '_');
             html += `<div class="feature-toggle-card" id="ftCard_${cardId}" onclick="toggleFeature('${f.key}')"` +
                 ` style="display:flex;align-items:center;gap:14px;padding:14px;background:${on ? '#F5F3FF' : '#F8FAFC'};` +
@@ -196,7 +197,7 @@ export function updateToggleCard(key) {
     const card = document.getElementById('ftCard_' + cardId);
     if (!card) return;
     const keys = key.split(',');
-    const on = keys.some(k => featureState[k.trim()] !== false);
+    const on = keys.some(k => featureState[k.trim()] === true);
     const box = card.querySelector('.ft-indicator');
 
     if (on) {
@@ -216,7 +217,7 @@ export function updateToggleCard(key) {
 
 export async function toggleFeature(key) {
     const keys = key.split(',');
-    const currentlyOn = keys.some(k => featureState[k.trim()] !== false);
+    const currentlyOn = keys.some(k => featureState[k.trim()] === true);
     keys.forEach(k => { featureState[k.trim()] = !currentlyOn; });
     updateToggleCard(key);
 
