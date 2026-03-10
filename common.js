@@ -195,6 +195,7 @@ async function checkUserStatus() {
 
         if (padmin) {
             isPlatformAdmin = true;
+            window.isPlatformAdmin = true;
             currentPlatformAdmin = padmin;
             // 載入可管理公司列表（含 role）
             const { data: pac } = await sb.from('platform_admin_companies')
@@ -1294,11 +1295,33 @@ function calculateAndUpdateMonthsWorked(hireDate, targetElement) {
     targetElement.textContent = `${months} 個月`;
 }
 
+// ===== 視角切換（platform_admin 專用） =====
+window.viewAsEmployee = false;
+
+window.toggleViewMode = function() {
+    window.viewAsEmployee = !window.viewAsEmployee;
+    var btn = document.getElementById('viewToggleBtn');
+    if (btn) {
+        if (window.viewAsEmployee) {
+            btn.textContent = '👑 切回管理員視角';
+            btn.style.background = '#6366F1';
+            btn.style.color = '#fff';
+        } else {
+            btn.textContent = '👁 切換員工視角';
+            btn.style.background = '#fff';
+            btn.style.color = '#6366F1';
+        }
+    }
+    applyFeatureVisibility();
+    initBottomNav();
+};
+
 // ===== 管理員功能 =====
 // [優化] 直接從已載入的 currentEmployee 判斷，不再額外查詢 DB
 function checkIsAdmin() {
     if (!currentEmployee) return false;
-    return currentEmployee.role === 'admin';
+    if (window.viewAsEmployee) return false;
+    return currentEmployee.role === 'admin' || isPlatformAdmin;
 }
 
 // [優化] 直接從已載入的 currentEmployee 取得，不再額外查詢 DB
@@ -1663,18 +1686,17 @@ function getFeatureVisibility() {
 
 // 根據設定隱藏首頁「中間選單」項目（不影響底部導航列）
 function applyFeatureVisibility() {
+    var skipFilter = isPlatformAdmin && !window.viewAsEmployee;
     const features = getFeatureVisibility();
 
     // 用 data-feature 屬性精確控制每個選單項目
     // 支援逗號分隔多 key（OR 邏輯：任一為 true 就顯示）
     document.querySelectorAll('.menu-grid .menu-item[data-feature]').forEach(item => {
         const keys = item.getAttribute('data-feature').split(',').map(k => k.trim());
-        const visible = keys.some(k => features[k] === true);
-        if (!visible) {
-            item.style.display = 'none';
-        }
-        // 職位限制：外勤/業務只有「業務」職位才看得到
-        if (visible && (keys.includes('fieldwork') || keys.includes('sales_target'))) {
+        const visible = skipFilter ? true : keys.some(k => features[k] === true);
+        item.style.display = visible ? '' : 'none';
+        // 職位限制：外勤/業務只有「業務」職位才看得到（員工視角時才限制）
+        if (visible && !skipFilter && (keys.includes('fieldwork') || keys.includes('sales_target'))) {
             if (currentEmployee && currentEmployee.position !== '業務') {
                 item.style.display = 'none';
             }
