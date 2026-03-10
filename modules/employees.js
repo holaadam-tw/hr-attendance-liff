@@ -31,7 +31,6 @@ export async function addNewDepartment(selectId) {
     depts.push(name);
 
     await saveSetting('departments', depts, '部門列表');
-    await loadSettings();
 
     loadDepartmentOptions(selectId, name);
     showToast('✅ 已新增部門：' + name);

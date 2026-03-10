@@ -319,16 +319,18 @@ function updateUserInfo(data) {
 // ===== 系統設定（含快取） =====
 let _settingsCache = null; // { key: value, ... }
 
-async function loadSettings() {
+async function loadSettings(forceRefresh) {
     try {
         // 優先從 sessionStorage 讀取快取（跨頁共用，減少 API 呼叫）
-        const cached = sessionStorage.getItem('system_settings_cache');
-        if (cached) {
-            try {
-                _settingsCache = JSON.parse(cached);
-                officeLocations = _settingsCache['office_locations'] || [];
-                return;
-            } catch(e) { sessionStorage.removeItem('system_settings_cache'); }
+        if (!forceRefresh) {
+            const cached = sessionStorage.getItem('system_settings_cache');
+            if (cached) {
+                try {
+                    _settingsCache = JSON.parse(cached);
+                    officeLocations = _settingsCache['office_locations'] || [];
+                    return;
+                } catch(e) { sessionStorage.removeItem('system_settings_cache'); }
+            }
         }
 
         // 一次查出所有 system_settings，避免多次查詢
@@ -380,6 +382,7 @@ async function saveSetting(key, value, description) {
     }
 
     invalidateSettingsCache();
+    await loadSettings(true);
 }
 
 // 新公司初始化預設設定
@@ -1452,7 +1455,6 @@ async function saveNavSettings() {
     var status = document.getElementById('navSaveStatus');
     try {
         await saveSetting('bottom_nav_config', { tabs: selected }, '底部導航列設定');
-        await loadSettings();
         showToast('✅ 導航設定已儲存');
         if (status) { status.style.display = 'block'; status.style.color = '#059669'; status.textContent = '✅ 已儲存，重新整理頁面後生效'; }
     } catch(e) {

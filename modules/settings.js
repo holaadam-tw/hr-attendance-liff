@@ -100,7 +100,6 @@ export async function saveNotifyToken() {
     try {
         const value = { token, groupId };
         await saveSetting('line_messaging_api', value, 'LINE Messaging API 推播設定');
-        await loadSettings();
         showToast('✅ 設定已儲存');
         if (status) { status.style.display = 'block'; status.style.color = '#059669'; status.textContent = '✅ 已儲存'; }
     } catch(e) { showToast('❌ 儲存失敗'); }
