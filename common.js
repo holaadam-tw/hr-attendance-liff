@@ -1784,19 +1784,15 @@ async function updateRequestStatus(id, status) {
 // ===== 功能顯示設定 =====
 // 優先從 companies.features 讀取（多租戶），fallback 到 system_settings
 const DEFAULT_FEATURES = {
-    leave: true,           // 我要請假
-    lunch: true,           // 便當訂購
-    attendance: true,      // 考勤查詢
-    fieldwork: true,       // 外勤打卡
-    sales_target: true,    // 業務目標
-    store_ordering: false, // 線上點餐/查訂單
-    schedule: true,        // 我的排班
-    salary: true,          // 薪資查詢
-    qr_order: false,       // 客人掃碼點餐
-    kds: false,            // 廚房出單
-    booking: false,        // 客戶預約/訂位
-    member: false,         // 會員集點
-    requests: true         // 報修/採購申請
+    leave: true,         // 我要請假（預設開啟）
+    attendance: true,    // 考勤查詢（預設開啟）
+    salary: true,        // 薪資查詢（預設開啟）
+    lunch: false,        // 便當訂購（需 Platform Admin 開啟）
+    fieldwork: false,    // 外勤/業務（需 Platform Admin 開啟）
+    sales_target: false, // 業務目標（需 Platform Admin 開啟）
+    store_ordering: false,// 線上點餐（需 Platform Admin 開啟，餐飲業）
+    booking: false,      // 預約系統（需 Platform Admin 開啟，餐飲業）
+    loyalty: false       // 集點會員（需 Platform Admin 開啟，付費）
 };
 
 function getFeatureVisibility() {

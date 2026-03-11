@@ -174,18 +174,27 @@
         let allPCompanies = [];
 
         const FEATURE_LIST = [
-            { key: 'leave', label: '請假管理', icon: '📝' },
-            { key: 'lunch', label: '便當訂購', icon: '🍱' },
-            { key: 'attendance', label: '考勤查詢', icon: '📊' },
-            { key: 'fieldwork', label: '外勤打卡', icon: '📍' },
-            { key: 'sales_target', label: '業務目標', icon: '🎯' },
-            { key: 'store_ordering', label: '線上點餐/預約', icon: '🛍️' }
+            // 基本功能（預設開啟）
+            { key: 'leave', label: '我要請假', icon: '📝', group: 'basic' },
+            { key: 'attendance', label: '考勤查詢', icon: '📊', group: 'basic' },
+            { key: 'salary', label: '薪資查詢', icon: '💰', group: 'basic' },
+            // 進階功能（預設關閉，需 Platform Admin 開啟）
+            { key: 'lunch', label: '便當訂購', icon: '🍱', group: 'advanced' },
+            { key: 'fieldwork', label: '外勤/業務', icon: '📍', group: 'advanced' },
+            { key: 'store_ordering', label: '線上點餐（餐飲業）', icon: '🍽️', group: 'advanced' },
+            { key: 'booking', label: '預約系統（餐飲業）', icon: '📅', group: 'advanced' },
+            { key: 'loyalty', label: '集點會員（付費模組）', icon: '🎁', group: 'advanced' }
         ];
 
+        const FEATURE_DEFAULTS = {
+            leave: true, attendance: true, salary: true,
+            lunch: false, fieldwork: false, store_ordering: false, booking: false, loyalty: false
+        };
+
         const FEATURE_PRESETS = {
-            general:  { leave: true, lunch: true, attendance: true, fieldwork: true, sales_target: true, store_ordering: false },
-            catering: { leave: true, lunch: false, attendance: true, fieldwork: false, sales_target: false, store_ordering: true },
-            all:      { leave: true, lunch: true, attendance: true, fieldwork: true, sales_target: true, store_ordering: true }
+            general:  { ...FEATURE_DEFAULTS, lunch: true, fieldwork: true },
+            catering: { ...FEATURE_DEFAULTS, store_ordering: true, booking: true },
+            all:      Object.fromEntries(FEATURE_LIST.map(f => [f.key, true]))
         };
 
         function togglePFeatureCard(card) {
@@ -359,16 +368,24 @@
             document.getElementById('pCompanyIndustry').value = editData?.industry || 'general';
 
             // 功能開關
-            const features = editData?.features || { leave: true, lunch: true, attendance: true, fieldwork: true, sales_target: true, store_ordering: false };
+            const features = { ...FEATURE_DEFAULTS, ...(editData?.features || {}) };
             const togglesEl = document.getElementById('pFeatureToggles');
-            togglesEl.innerHTML = FEATURE_LIST.map(f => {
+            let html = '';
+            let lastGroup = '';
+            FEATURE_LIST.forEach(f => {
+                if (f.group !== lastGroup) {
+                    lastGroup = f.group;
+                    const groupLabel = f.group === 'basic' ? '📋 基本功能' : '⚡ 進階功能';
+                    html += `<div style="font-size:12px;font-weight:700;color:#64748B;margin-top:${f.group === 'basic' ? '0' : '8px'};margin-bottom:2px;">${groupLabel}</div>`;
+                }
                 const on = !!features[f.key];
-                return `<div id="pFt_${f.key}" data-key="${f.key}" onclick="togglePFeatureCard(this)" data-checked="${on}"
+                html += `<div id="pFt_${f.key}" data-key="${f.key}" onclick="togglePFeatureCard(this)" data-checked="${on}"
                     style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:${on ? '#F5F3FF' : '#F8FAFC'};border:2px solid ${on ? '#4F46E5' : '#E5E7EB'};border-radius:12px;cursor:pointer;transition:all 0.2s;">
                     <div style="width:24px;height:24px;border:2px solid ${on ? '#4F46E5' : '#CBD5E1'};border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:${on ? '#4F46E5' : '#fff'};color:#fff;font-size:14px;transition:all 0.2s;">${on ? '✓' : ''}</div>
                     <span style="font-size:13px;font-weight:600;">${f.icon} ${f.label}</span>
                 </div>`;
-            }).join('');
+            });
+            togglesEl.innerHTML = html;
 
             document.getElementById('pCompanyModal').style.display = 'block';
         }
@@ -390,6 +407,8 @@
             FEATURE_LIST.forEach(f => {
                 features[f.key] = document.getElementById('pFt_' + f.key)?.dataset.checked === 'true';
             });
+            // sales_target 跟隨 fieldwork 開關（首頁格子用 data-feature="fieldwork,sales_target"）
+            features.sales_target = features.fieldwork;
 
             const row = {
                 code, name,
