@@ -1454,6 +1454,22 @@ window.toggleViewMode = function() {
             btn.style.color = '#6366F1';
         }
     }
+
+    // 員工視角：如果編輯模式開啟，先退出並清理 toggle
+    if (window.viewAsEmployee && window.featureEditMode) {
+        window.featureEditMode = false;
+        var editBtn = document.getElementById('featureEditBtn');
+        if (editBtn) { editBtn.textContent = '✏️ 編輯'; editBtn.style.background = '#fff'; editBtn.style.color = '#6366F1'; }
+        document.querySelectorAll('.feature-toggle').forEach(function(t) { t.remove(); });
+        document.querySelectorAll('[data-feature]').forEach(function(el) { el.style.opacity = ''; });
+    }
+
+    // 員工視角隱藏編輯按鈕和管理後台入口
+    var editBar = document.getElementById('featureEditBar');
+    if (editBar) editBar.style.display = window.viewAsEmployee ? 'none' : '';
+    var adminEntry = document.getElementById('adminEntry');
+    if (adminEntry) adminEntry.style.display = window.viewAsEmployee ? 'none' : 'block';
+
     applyFeatureVisibility();
     initBottomNav();
 };
