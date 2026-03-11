@@ -44,7 +44,7 @@ function _doShowPage(id) {
     if (id === 'employeePage') window.loadEmployeeList?.();
     if (id === 'approvalCenterPage') { window.switchApprovalType?.('leave', document.querySelector('.aprTab')); }
     if (id === 'announcementPage') window.loadAnnouncementList?.();
-    if (id === 'featurePage') { window.switchSysTab?.('feature', document.querySelector('.sysTab')); }
+    if (id === 'featurePage') { window.switchSysTab?.('setting', document.querySelector('.sysTab')); }
     if (id === 'staffMgrPage') { window.loadShiftMgr?.(); window.loadMaxLeaveSetting?.(); window.loadStaffOverview?.(); window.loadSchedulingMode?.(); }
     if (id === 'lunchMgrPage') { window.loadLunchManagers?.(); window.loadAdminLunchStats?.(); }
     if (id === 'payrollPage') { window.switchPayTab?.('payroll', document.querySelector('.payTab')); }

@@ -788,22 +788,17 @@
 
                 <!-- 兩頁籤 -->
                 <div style="display:flex;gap:4px;margin-bottom:16px;background:#F1F5F9;border-radius:10px;padding:3px;">
-                    <button class="sysTab" onclick="switchSysTab('feature',this)" style="flex:1;padding:10px;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;background:#fff;color:#4F46E5;box-shadow:0 1px 4px rgba(0,0,0,0.08);">🎛️ 功能管理</button>
+                    <button class="sysTab" onclick="switchSysTab('setting',this)" style="flex:1;padding:10px;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;background:#fff;color:#4F46E5;box-shadow:0 1px 4px rgba(0,0,0,0.08);">⚙️ 系統設定</button>
                     <button class="sysTab" onclick="switchSysTab('audit',this)" style="flex:1;padding:10px;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;background:transparent;color:#94A3B8;">📜 操作日誌</button>
                 </div>
 
-                <!-- === 功能管理 TAB === -->
-                <div id="sysTabFeature" class="sysTabContent">
-                <p style="color:#6b7280;font-size:13px;margin-bottom:16px;">控制員工首頁<b>中間選單</b>顯示哪些功能</p>
+                <!-- === 系統設定 TAB === -->
+                <div id="sysTabSetting" class="sysTabContent">
 
-                <div id="featureToggles" style="display:flex;flex-direction:column;gap:12px;">
-                    <p id="featureLoadingHint" style="text-align:center;color:#94A3B8;font-size:13px;">載入中...</p>
-                </div>
-                <div id="featureSaveStatus" style="margin-top:12px;text-align:center;font-size:13px;color:#059669;display:none;">✅ 已儲存</div>
-                <p style="color:#94A3B8;font-size:12px;margin-top:16px;text-align:center;">💡 底部導航列（首頁/班表/打卡/薪資/管理）為管理員專屬，不受此設定影響</p>
+                <p style="color:#94A3B8;font-size:12px;margin-bottom:16px;">💡 功能開關請到<b>員工首頁</b>，點右上角「✏️ 編輯」即可開關</p>
 
                 <!-- LINE Messaging API 推播設定 -->
-                <div style="margin-top:30px;padding-top:20px;border-top:2px dashed #e5e7eb;">
+                <div style="padding:0 0 20px;">
                     <h3 style="margin-bottom:12px;">🔔 LINE 推播設定（Messaging API）</h3>
                     <p style="color:#94A3B8;font-size:12px;margin-bottom:12px;">設定後，請假/補打卡/換班申請會自動推播通知管理員群組</p>
                     <div class="form-group">
@@ -832,7 +827,7 @@
                 </div>
 
                 <!-- 底部導航設定 -->
-                <div style="margin-top:30px;padding-top:20px;border-top:2px dashed #e5e7eb;">
+                <div style="padding-top:20px;border-top:2px dashed #e5e7eb;">
                     <h3 style="margin-bottom:12px;">📱 底部導航設定</h3>
                     <p style="color:#94A3B8;font-size:12px;margin-bottom:12px;">勾選要顯示的項目（最多 5 個，首頁與管理固定）</p>
                     <div id="navSettingsItems" style="display:flex;flex-direction:column;gap:8px;"></div>

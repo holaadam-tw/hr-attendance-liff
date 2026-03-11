@@ -1846,6 +1846,77 @@ function applyFeatureVisibility() {
     });
 }
 
+// ===== 首頁功能編輯模式 =====
+window.featureEditMode = false;
+
+window.toggleFeatureEditMode = function() {
+    window.featureEditMode = !window.featureEditMode;
+    var btn = document.getElementById('featureEditBtn');
+    var fv = getCachedSetting('feature_visibility') || {};
+
+    if (window.featureEditMode) {
+        btn.textContent = '✅ 儲存';
+        btn.style.background = '#6366F1';
+        btn.style.color = '#fff';
+
+        // 編輯模式：所有格子都顯示，加上開關 toggle
+        document.querySelectorAll('[data-feature]').forEach(function(el) {
+            el.style.display = '';
+            var features = el.getAttribute('data-feature').split(',');
+            var isOn = features.some(function(f) { return fv[f.trim()] === true; });
+
+            // 加 toggle 開關到格子右上角
+            var toggle = document.createElement('div');
+            toggle.className = 'feature-toggle';
+            toggle.setAttribute('data-toggle-feature', el.getAttribute('data-feature'));
+            toggle.setAttribute('data-on', isOn ? 'true' : 'false');
+            toggle.style.cssText = 'position:absolute;top:8px;right:8px;width:40px;height:22px;border-radius:11px;cursor:pointer;transition:all .2s;z-index:10;' +
+                (isOn ? 'background:#6366F1;' : 'background:#CBD5E1;');
+            toggle.innerHTML = '<div style="width:18px;height:18px;border-radius:50%;background:#fff;position:absolute;top:2px;transition:all .2s;' +
+                (isOn ? 'left:20px;' : 'left:2px;') + '"></div>';
+            toggle.onclick = function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                var on = this.getAttribute('data-on') === 'true';
+                this.setAttribute('data-on', !on ? 'true' : 'false');
+                this.style.background = !on ? '#6366F1' : '#CBD5E1';
+                this.querySelector('div').style.left = !on ? '20px' : '2px';
+                el.style.opacity = !on ? '1' : '0.4';
+            };
+
+            el.appendChild(toggle);
+            if (!isOn) el.style.opacity = '0.4';
+        });
+
+    } else {
+        // 儲存模式：收集所有 toggle 狀態
+        btn.textContent = '✏️ 編輯';
+        btn.style.background = '#fff';
+        btn.style.color = '#6366F1';
+
+        var newFv = Object.assign({}, fv);
+        document.querySelectorAll('.feature-toggle').forEach(function(toggle) {
+            var features = toggle.getAttribute('data-toggle-feature').split(',');
+            var isOn = toggle.getAttribute('data-on') === 'true';
+            features.forEach(function(f) {
+                newFv[f.trim()] = isOn;
+            });
+        });
+
+        // 儲存到 DB
+        saveSetting('feature_visibility', newFv, '功能開關').then(function() {
+            // 移除所有 toggle
+            document.querySelectorAll('.feature-toggle').forEach(function(t) { t.remove(); });
+            // 重新套用
+            document.querySelectorAll('[data-feature]').forEach(function(el) {
+                el.style.opacity = '';
+            });
+            applyFeatureVisibility();
+            showToast('✅ 功能設定已儲存');
+        });
+    }
+};
+
 // ===== 加班申請 =====
 async function submitOvertime() {
     if (!currentEmployee) return showToast('❌ 請先登入');
