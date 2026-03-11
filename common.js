@@ -1455,18 +1455,10 @@ window.toggleViewMode = function() {
         }
     }
 
-    // 員工視角：如果編輯模式開啟，先退出並清理 toggle
-    if (window.viewAsEmployee && window.featureEditMode) {
-        window.featureEditMode = false;
-        var editBtn = document.getElementById('featureEditBtn');
-        if (editBtn) { editBtn.textContent = '✏️ 編輯'; editBtn.style.background = '#fff'; editBtn.style.color = '#6366F1'; }
-        document.querySelectorAll('.feature-toggle').forEach(function(t) { t.remove(); });
-        document.querySelectorAll('[data-feature]').forEach(function(el) { el.style.opacity = ''; });
-    }
-
-    // 員工視角隱藏編輯按鈕和管理後台入口
-    var editBar = document.getElementById('featureEditBar');
-    if (editBar) editBar.style.display = window.viewAsEmployee ? 'none' : '';
+    // 員工視角隱藏 toggle 開關和管理後台入口
+    document.querySelectorAll('.feature-toggle').forEach(function(t) {
+        t.style.display = window.viewAsEmployee ? 'none' : '';
+    });
     var adminEntry = document.getElementById('adminEntry');
     if (adminEntry) adminEntry.style.display = window.viewAsEmployee ? 'none' : 'block';
 
@@ -1862,74 +1854,63 @@ function applyFeatureVisibility() {
     });
 }
 
-// ===== 首頁功能編輯模式 =====
-window.featureEditMode = false;
+// ===== 首頁功能 toggle 開關（platform_admin 專用）=====
+function renderFeatureToggles() {
+    if (!isPlatformAdmin || window.viewAsEmployee) return;
 
-window.toggleFeatureEditMode = function() {
-    window.featureEditMode = !window.featureEditMode;
-    var btn = document.getElementById('featureEditBtn');
     var fv = getCachedSetting('feature_visibility') || {};
 
-    if (window.featureEditMode) {
-        btn.textContent = '✅ 儲存';
-        btn.style.background = '#6366F1';
-        btn.style.color = '#fff';
+    document.querySelectorAll('.menu-grid .menu-item[data-feature]').forEach(function(el) {
+        // 已有 toggle 就跳過
+        if (el.querySelector('.feature-toggle')) return;
 
-        // 編輯模式：所有格子都顯示，加上開關 toggle
-        document.querySelectorAll('[data-feature]').forEach(function(el) {
-            el.style.display = '';
-            var features = el.getAttribute('data-feature').split(',');
-            var isOn = features.some(function(f) { return fv[f.trim()] === true; });
+        var featureKeys = el.getAttribute('data-feature');
+        var firstKey = featureKeys.split(',')[0].trim();
+        var isOn = fv[firstKey] === true;
 
-            // 加 toggle 開關到格子右上角
-            var toggle = document.createElement('div');
-            toggle.className = 'feature-toggle';
-            toggle.setAttribute('data-toggle-feature', el.getAttribute('data-feature'));
-            toggle.setAttribute('data-on', isOn ? 'true' : 'false');
-            toggle.style.cssText = 'position:absolute;top:8px;right:8px;width:40px;height:22px;border-radius:11px;cursor:pointer;transition:all .2s;z-index:10;' +
-                (isOn ? 'background:#6366F1;' : 'background:#CBD5E1;');
-            toggle.innerHTML = '<div style="width:18px;height:18px;border-radius:50%;background:#fff;position:absolute;top:2px;transition:all .2s;' +
-                (isOn ? 'left:20px;' : 'left:2px;') + '"></div>';
-            toggle.onclick = function(e) {
-                e.preventDefault();
-                e.stopPropagation();
-                var on = this.getAttribute('data-on') === 'true';
-                this.setAttribute('data-on', !on ? 'true' : 'false');
-                this.style.background = !on ? '#6366F1' : '#CBD5E1';
-                this.querySelector('div').style.left = !on ? '20px' : '2px';
-                el.style.opacity = !on ? '1' : '0.4';
-            };
+        var toggle = document.createElement('div');
+        toggle.className = 'feature-toggle';
+        toggle.style.cssText = 'position:absolute;top:6px;right:6px;z-index:5;';
+        toggle.innerHTML = '<label style="display:flex;align-items:center;cursor:pointer;">' +
+            '<input type="checkbox" data-feature-key="' + featureKeys + '" ' + (isOn ? 'checked' : '') +
+            ' onchange="toggleFeatureSwitch(this)" style="display:none;">' +
+            '<div style="width:36px;height:20px;background:' + (isOn ? '#22C55E' : '#CBD5E1') +
+            ';border-radius:10px;position:relative;transition:background .2s;">' +
+            '<div style="width:16px;height:16px;background:#fff;border-radius:50%;position:absolute;top:2px;' +
+            (isOn ? 'right:2px;' : 'left:2px;') + 'transition:all .2s;box-shadow:0 1px 3px rgba(0,0,0,.2);"></div>' +
+            '</div></label>';
 
-            el.appendChild(toggle);
-            if (!isOn) el.style.opacity = '0.4';
-        });
+        toggle.querySelector('label').onclick = function(e) { e.stopPropagation(); };
+        el.appendChild(toggle);
+    });
+}
 
-    } else {
-        // 儲存模式：收集所有 toggle 狀態
-        btn.textContent = '✏️ 編輯';
-        btn.style.background = '#fff';
-        btn.style.color = '#6366F1';
+window.toggleFeatureSwitch = async function(checkbox) {
+    var keys = checkbox.getAttribute('data-feature-key').split(',');
+    var isOn = checkbox.checked;
 
-        var newFv = Object.assign({}, fv);
-        document.querySelectorAll('.feature-toggle').forEach(function(toggle) {
-            var features = toggle.getAttribute('data-toggle-feature').split(',');
-            var isOn = toggle.getAttribute('data-on') === 'true';
-            features.forEach(function(f) {
-                newFv[f.trim()] = isOn;
-            });
-        });
+    if (!window.currentCompanyId) {
+        console.warn('toggleFeatureSwitch: no companyId');
+        checkbox.checked = !isOn;
+        return;
+    }
 
-        // 儲存到 DB
-        saveSetting('feature_visibility', newFv, '功能開關').then(function() {
-            // 移除所有 toggle
-            document.querySelectorAll('.feature-toggle').forEach(function(t) { t.remove(); });
-            // 重新套用
-            document.querySelectorAll('[data-feature]').forEach(function(el) {
-                el.style.opacity = '';
-            });
-            applyFeatureVisibility();
-            showToast('✅ 功能設定已儲存');
-        });
+    var fv = Object.assign({}, getCachedSetting('feature_visibility') || {});
+    keys.forEach(function(k) { fv[k.trim()] = isOn; });
+
+    try {
+        await saveSetting('feature_visibility', fv, '功能開關');
+
+        // 更新 toggle 外觀
+        var track = checkbox.nextElementSibling;
+        track.style.background = isOn ? '#22C55E' : '#CBD5E1';
+        var knob = track.firstElementChild;
+        if (isOn) { knob.style.left = ''; knob.style.right = '2px'; }
+        else { knob.style.right = ''; knob.style.left = '2px'; }
+    } catch(e) {
+        console.error('儲存失敗:', e);
+        checkbox.checked = !isOn;
+        showToast('❌ 儲存失敗');
     }
 };
 

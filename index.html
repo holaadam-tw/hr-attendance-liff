@@ -129,13 +129,6 @@
                 </div>
             </div>
 
-            <!-- 功能編輯按鈕（管理員限定） -->
-            <div id="featureEditBar" style="display:none;margin-bottom:12px;text-align:right;">
-                <button onclick="toggleFeatureEditMode()" id="featureEditBtn" style="padding:6px 16px;border:1.5px solid #6366F1;border-radius:20px;background:#fff;color:#6366F1;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">
-                    ✏️ 編輯
-                </button>
-            </div>
-
             <!-- 智慧分流選單：根據產業別和角色動態顯示 -->
             <div class="menu-grid" id="smartMenuGrid" style="opacity:0;transition:opacity .3s ease;">
                 <!-- 通用功能 -->
@@ -483,10 +476,7 @@
                         if (vt) vt.style.display = '';
                     }
                     applyFeatureVisibility();
-                    if (checkIsAdmin()) {
-                        var editBar = document.getElementById('featureEditBar');
-                        if (editBar) editBar.style.display = '';
-                    }
+                    renderFeatureToggles();
                     const menuGrid = document.getElementById('smartMenuGrid');
                     if (menuGrid) menuGrid.style.opacity = '1';
                     if (typeof updatePageTitle === 'function') updatePageTitle();
