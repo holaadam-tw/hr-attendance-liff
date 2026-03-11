@@ -1197,21 +1197,20 @@ function renderLocationList() {
     // [BUG FIX] 同時支援 settings 和 admin 頁面的地點列表容器
     const listEl = document.getElementById('locationList') || document.getElementById('adminLocationList');
     if (!listEl) return;
-    
+
     if (officeLocations.length === 0) {
         listEl.innerHTML = '<p class="text-center-muted">尚未設定地點</p>';
         return;
     }
     listEl.innerHTML = officeLocations.map((loc, index) => `
-        <div class="stat-row" style="align-items:center;">
-            <div style="text-align:left;flex:1;min-width:0;">
-                <div style="font-weight:bold;">${escapeHTML(loc.name)}</div>
-                ${loc.address ? '<div style="font-size:11px;color:#64748B;margin-top:2px;">📮 ' + escapeHTML(loc.address) + '</div>' : ''}
-                <div style="font-size:11px;color:#999;">範圍: ${escapeHTML(String(loc.radius))}m</div>
-            </div>
-            <div style="display:flex;gap:6px;">
-                <button onclick="editLocation(${index})" style="font-size:12px;padding:6px 12px;border:1px solid #6366F1;border-radius:8px;background:#EEF2FF;color:#6366F1;cursor:pointer;">✏️</button>
-                <button onclick="deleteLocation(${index})" class="btn-danger" style="font-size:12px;padding:6px 12px;">刪除</button>
+        <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:12px;padding:14px;margin-bottom:10px;">
+            <div style="font-weight:700;font-size:15px;color:#1E293B;margin-bottom:6px;">📍 ${escapeHTML(loc.name)}</div>
+            ${loc.address ? '<div style="font-size:13px;color:#64748B;margin-bottom:4px;">地址：' + escapeHTML(loc.address) + '</div>' : ''}
+            <div style="font-size:12px;color:#94A3B8;margin-bottom:4px;">座標：${loc.lat}, ${loc.lng}</div>
+            <div style="font-size:12px;color:#94A3B8;margin-bottom:8px;">打卡半徑：${loc.radius}m</div>
+            <div style="display:flex;gap:8px;">
+                <button onclick="editLocation(${index})" style="font-size:12px;padding:6px 14px;border:1px solid #6366F1;border-radius:8px;background:#EEF2FF;color:#6366F1;cursor:pointer;">✏️ 編輯</button>
+                <button onclick="deleteLocation(${index})" style="font-size:12px;padding:6px 14px;border:1px solid #EF4444;border-radius:8px;background:#FEF2F2;color:#EF4444;cursor:pointer;">🗑️ 刪除</button>
             </div>
         </div>
     `).join('');
@@ -1273,6 +1272,16 @@ function editLocation(index) {
     var newAddress = prompt('地址（可留空）：', loc.address || '');
     if (newAddress === null) return;
 
+    var newLat = prompt('緯度：', loc.lat);
+    if (newLat === null) return;
+    newLat = parseFloat(newLat);
+    if (isNaN(newLat)) return showToast('⚠️ 緯度格式錯誤');
+
+    var newLng = prompt('經度：', loc.lng);
+    if (newLng === null) return;
+    newLng = parseFloat(newLng);
+    if (isNaN(newLng)) return showToast('⚠️ 經度格式錯誤');
+
     var newRadius = prompt('打卡半徑 (公尺)：', loc.radius);
     if (newRadius === null) return;
     newRadius = parseInt(newRadius);
@@ -1280,7 +1289,7 @@ function editLocation(index) {
 
     var updated = officeLocations.map(function(l, i) {
         if (i !== index) return l;
-        var copy = { name: newName, lat: l.lat, lng: l.lng, radius: newRadius };
+        var copy = { name: newName, lat: newLat, lng: newLng, radius: newRadius };
         if (newAddress.trim()) copy.address = newAddress.trim();
         return copy;
     });
