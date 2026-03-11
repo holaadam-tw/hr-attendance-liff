@@ -1445,11 +1445,11 @@ window.toggleViewMode = function() {
     var btn = document.getElementById('viewToggleBtn');
     if (btn) {
         if (window.viewAsEmployee) {
-            btn.textContent = '👑 切回管理員視角';
+            btn.innerHTML = '👑 關閉員工視角';
             btn.style.background = '#6366F1';
             btn.style.color = '#fff';
         } else {
-            btn.textContent = '👁 切換員工視角';
+            btn.innerHTML = '👁 開啟員工視角';
             btn.style.background = '#fff';
             btn.style.color = '#6366F1';
         }
