@@ -389,7 +389,7 @@ async function saveSetting(key, value, description) {
 // 新公司初始化預設設定
 async function initCompanySettings(companyId) {
     var defaults = [
-        { key: 'feature_visibility', value: {attendance:true, leave:true, schedule:true, salary:false, lunch:false, fieldwork:false, requests:true}, description: '功能開關' },
+        { key: 'feature_visibility', value: {leave:true, attendance:true, salary:true, lunch:true, fieldwork:true, sales_target:true, store_ordering:true, booking:true, loyalty:true}, description: '功能開關（第二層，業主微調）' },
         { key: 'work_hours', value: {start:'08:00', end:'18:00', break:60}, description: '工作時間' },
         { key: 'check_in_radius', value: {meters:1000}, description: '打卡距離' },
         { key: 'departments', value: ['管理部','生產部','業務部','倉管部'], description: '部門列表' }
@@ -1710,31 +1710,40 @@ function getFeatureVisibility() {
     return result;
 }
 
-// 根據設定隱藏首頁「中間選單」項目（不影響底部導航列）
+// 根據設定隱藏首頁「中間選單」項目
 function applyFeatureVisibility() {
-    var skipFilter = isPlatformAdmin && !window.viewAsEmployee;
     const features = getFeatureVisibility();
 
     // 用 data-feature 屬性精確控制每個選單項目
     // 支援逗號分隔多 key（OR 邏輯：任一為 true 就顯示）
     document.querySelectorAll('.menu-grid .menu-item[data-feature]').forEach(item => {
         const keys = item.getAttribute('data-feature').split(',').map(k => k.trim());
-        const visible = skipFilter ? true : keys.some(k => features[k] === true);
-        item.style.display = visible ? '' : 'none';
-        // 職位限制：外勤/業務只有「業務」職位才看得到（員工視角時才限制）
-        if (visible && !skipFilter && (keys.includes('fieldwork') || keys.includes('sales_target'))) {
-            if (currentEmployee && currentEmployee.position !== '業務') {
-                item.style.display = 'none';
+        const visible = keys.some(k => features[k] === true);
+
+        if (isPlatformAdmin && !window.viewAsEmployee) {
+            // platform_admin 業主視角：所有格子都顯示，但關閉的格子半透明
+            item.style.display = '';
+            item.style.opacity = visible ? '1' : '0.4';
+        } else {
+            // 一般員工/員工視角：依 feature 設定隱藏
+            item.style.display = visible ? '' : 'none';
+            item.style.opacity = '1';
+            // 職位限制：外勤/業務只有「業務」職位才看得到
+            if (visible && (keys.includes('fieldwork') || keys.includes('sales_target'))) {
+                if (currentEmployee && currentEmployee.position !== '業務') {
+                    item.style.display = 'none';
+                }
             }
         }
     });
 }
 
 // ===== 首頁功能 toggle 開關（platform_admin 專用）=====
+// 控制第一層：companies.features
 function renderFeatureToggles() {
     if (!isPlatformAdmin || window.viewAsEmployee) return;
 
-    var fv = getCachedSetting('feature_visibility') || {};
+    var compFeatures = currentCompanyFeatures || {};
 
     document.querySelectorAll('.menu-grid .menu-item[data-feature]').forEach(function(el) {
         // 已有 toggle 就跳過
@@ -1742,7 +1751,8 @@ function renderFeatureToggles() {
 
         var featureKeys = el.getAttribute('data-feature');
         var firstKey = featureKeys.split(',')[0].trim();
-        var isOn = fv[firstKey] === true;
+        // 從 companies.features 讀取，沒設定的 key 用 DEFAULT_FEATURES
+        var isOn = compFeatures[firstKey] !== undefined ? compFeatures[firstKey] : (DEFAULT_FEATURES[firstKey] || false);
 
         var toggle = document.createElement('div');
         toggle.className = 'feature-toggle';
@@ -1771,11 +1781,18 @@ window.toggleFeatureSwitch = async function(checkbox) {
         return;
     }
 
-    var fv = Object.assign({}, getCachedSetting('feature_visibility') || {});
-    keys.forEach(function(k) { fv[k.trim()] = isOn; });
+    // 更新 companies.features（第一層）
+    var features = Object.assign({}, currentCompanyFeatures || {});
+    keys.forEach(function(k) { features[k.trim()] = isOn; });
 
     try {
-        await saveSetting('feature_visibility', fv, '功能開關');
+        var { error } = await sb.from('companies')
+            .update({ features: features })
+            .eq('id', window.currentCompanyId);
+        if (error) throw error;
+
+        // 同步更新記憶體中的 currentCompanyFeatures
+        currentCompanyFeatures = features;
 
         // 更新 toggle 外觀
         var track = checkbox.nextElementSibling;
@@ -1783,6 +1800,9 @@ window.toggleFeatureSwitch = async function(checkbox) {
         var knob = track.firstElementChild;
         if (isOn) { knob.style.left = ''; knob.style.right = '2px'; }
         else { knob.style.right = ''; knob.style.left = '2px'; }
+
+        // 立即重新套用顯示邏輯
+        applyFeatureVisibility();
     } catch(e) {
         console.error('儲存失敗:', e);
         checkbox.checked = !isOn;

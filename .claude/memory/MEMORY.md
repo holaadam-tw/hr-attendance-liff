@@ -32,7 +32,9 @@
 
 ## 員工視角 (viewAsEmployee)
 - `toggleViewMode()` 切換時：隱藏 toggle 開關、管理後台入口
-- `applyFeatureVisibility()` 的 skipFilter 只在非員工視角的 platform_admin 生效
+- platform_admin 業主視角：所有格子都顯示，關閉的 opacity:0.4；員工視角：正常隱藏
+- 首頁 toggle 開關控制第一層 companies.features（非 feature_visibility）
+- feature_visibility（第二層）預設全 true，業主只能關不能開
 
 ## 關鍵檔案路徑
 - [專案指南](../../hr-attendance-liff-main/PROJECT_GUIDE.md)
