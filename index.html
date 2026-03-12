@@ -369,6 +369,7 @@
         async function loadActiveOrders() {
             const item = document.getElementById('activeOrdersItem');
             const badge = document.getElementById('activeOrdersBadge');
+            if (!item) return;
             // 管理員顯示此格子
             item.style.display = '';
 
@@ -383,7 +384,7 @@
                     .in('store_id', stores.map(s => s.id))
                     .in('status', ['pending', 'confirmed', 'preparing', 'ready']);
 
-                if (count > 0) {
+                if (count > 0 && badge) {
                     badge.textContent = count;
                     badge.style.display = '';
                 }
