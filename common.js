@@ -1700,9 +1700,13 @@ function getFeatureVisibility() {
     // 只能進一步關閉平台允許的功能，不能開啟平台禁止的功能
     const adminSettings = getCachedSetting('feature_visibility');
     if (adminSettings) {
-        for (const key of Object.keys(result)) {
-            if (result[key] === true && adminSettings[key] === false) {
-                result[key] = false;
+        // 檢測是否為舊格式（包含已移除的 key 如 schedule/requests）
+        const isLegacy = adminSettings.schedule !== undefined || adminSettings.requests !== undefined;
+        if (!isLegacy) {
+            for (const key of Object.keys(result)) {
+                if (result[key] === true && adminSettings[key] === false) {
+                    result[key] = false;
+                }
             }
         }
     }
@@ -1775,7 +1779,8 @@ window.toggleFeatureSwitch = async function(checkbox) {
     var keys = checkbox.getAttribute('data-feature-key').split(',');
     var isOn = checkbox.checked;
 
-    if (!window.currentCompanyId) {
+    var companyId = currentCompanyId || currentEmployee?.company_id;
+    if (!companyId) {
         console.warn('toggleFeatureSwitch: no companyId');
         checkbox.checked = !isOn;
         return;
@@ -1788,7 +1793,7 @@ window.toggleFeatureSwitch = async function(checkbox) {
     try {
         var { error } = await sb.from('companies')
             .update({ features: features })
-            .eq('id', window.currentCompanyId);
+            .eq('id', companyId);
         if (error) throw error;
 
         // 同步更新記憶體中的 currentCompanyFeatures

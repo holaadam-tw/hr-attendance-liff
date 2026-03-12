@@ -9,7 +9,7 @@
 ## 核心規則
 - 多租戶：所有查詢必須 `.eq('company_id', window.currentCompanyId)`
 - 設定存取：用 `saveSetting(key, value, description)` — 先查再更新
-- 全域變數必須掛 `window.`（跨檔案共用）
+- 全域變數必須掛 `window.`（跨檔案共用），但 common.js 頂層用 `let` 宣告的變數（currentCompanyId 等）不會自動掛到 window，同檔案內直接用變數名存取
 - system_settings 的 company_id 是 NOT NULL
 - 快取：修改設定後 `invalidateSettingsCache()` + `loadSettings(true)`
 
