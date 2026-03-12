@@ -48,3 +48,4 @@ async function saveSetting(key, value, description) {
 - 2026-03-12: 統一功能開關架構（9 key），精簡 index.html 為 7 格，platform.html 分組 toggle
 - 2026-03-12: 移除 admin.html 底部導航設定（改由 platform admin 統一控制）
 - 2026-03-12: 修復 index.html loadActiveOrders() null reference（activeOrdersItem/Badge 已移除）
+- 2026-03-12: 完全移除底部導航列（initBottomNav/ALL_NAV_ITEMS/CSS/所有頁面呼叫/admin靜態DOM）

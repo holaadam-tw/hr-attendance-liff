@@ -1777,7 +1777,6 @@
             if (initialized) {
                 const isLoggedIn = await checkUserStatus();
                 if (isLoggedIn) {
-                    initBottomNav();
                     showPage(pageId);
                     // 若 hash 是 #sales，自動切到業務週報 tab
                     if (hash === '#sales') {

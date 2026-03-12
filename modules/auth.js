@@ -142,7 +142,6 @@ export async function checkAdminPermission() {
                 // 檢查 URL hash 跳轉（例如 admin.html#restaurant）
                 const hashPage = getHashTargetPage();
                 showPage(hashPage || 'adminHomePage');
-                document.getElementById('bottomNav').style.display = 'flex';
                 // 平台管理員 — 不受角色限制，所有功能可見
                 applyAdminFeatureVisibility();
                 if (typeof applyAdminPermissions === 'function') applyAdminPermissions();
@@ -203,7 +202,6 @@ export async function checkAdminPermission() {
         setTimeout(() => {
             const hashPage = getHashTargetPage();
             showPage(hashPage || 'adminHomePage');
-            document.getElementById('bottomNav').style.display = 'flex';
             applyRoleVisibility();
             applyAdminFeatureVisibility();
             if (typeof applyAdminPermissions === 'function') applyAdminPermissions();

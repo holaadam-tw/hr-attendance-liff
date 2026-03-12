@@ -494,7 +494,6 @@
                 const isLoggedIn = await checkUserStatus();
                 if (isLoggedIn) {
                     document.getElementById('loadingPage').style.display = 'none';
-                    initBottomNav();
                     loadSchedule();
                     loadSwapRequests();
                 } else {

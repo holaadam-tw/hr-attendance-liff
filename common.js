@@ -392,7 +392,6 @@ async function initCompanySettings(companyId) {
         { key: 'feature_visibility', value: {attendance:true, leave:true, schedule:true, salary:false, lunch:false, fieldwork:false, requests:true}, description: '功能開關' },
         { key: 'work_hours', value: {start:'08:00', end:'18:00', break:60}, description: '工作時間' },
         { key: 'check_in_radius', value: {meters:1000}, description: '打卡距離' },
-        { key: 'bottom_nav_config', value: {tabs:[{id:'home',icon:'🏠',label:'首頁',page:'index.html',fixed:true},{id:'schedule',icon:'📅',label:'班表',page:'schedule.html'},{id:'checkin',icon:'🎯',label:'打卡',page:'checkin.html?type=in'},{id:'requests',icon:'⚠️',label:'申請',page:'requests.html'},{id:'admin',icon:'⚙️',label:'管理',page:'admin.html',adminOnly:true,fixed:true}]}, description: '底部導航' },
         { key: 'departments', value: ['管理部','生產部','業務部','倉管部'], description: '部門列表' }
     ];
     for (var d of defaults) {
@@ -1463,7 +1462,6 @@ window.toggleViewMode = function() {
     if (adminEntry) adminEntry.style.display = window.viewAsEmployee ? 'none' : 'block';
 
     applyFeatureVisibility();
-    initBottomNav();
 };
 
 // ===== 管理員功能 =====
@@ -1515,70 +1513,7 @@ async function adjustEmployeeBonus(employeeId, year, bonusAmount, reason) {
     }
 }
 
-// ===== 底部導航列（管理員限定，動態產生） =====
-// 所有可用的導航項目
-var ALL_NAV_ITEMS = [
-    { id: 'home',      icon: '🏠', label: '首頁',   page: 'index.html',          fixed: true },
-    { id: 'schedule',  icon: '📅', label: '班表',   page: 'schedule.html' },
-    { id: 'checkin',   icon: '🎯', label: '打卡',   page: 'checkin.html?type=in' },
-    { id: 'requests',  icon: '⚠️', label: '申請',   page: 'requests.html' },
-    { id: 'salary',    icon: '💰', label: '薪資',   page: 'salary.html' },
-    { id: 'orders',    icon: '📋', label: '訂單',   page: 'admin.html#restaurant' },
-    { id: 'booking',   icon: '📅', label: '預約',   page: 'admin.html#booking' },
-    { id: 'records',   icon: '📊', label: '紀錄',   page: 'records.html' },
-    { id: 'admin',     icon: '⚙️', label: '管理',   page: 'admin.html', adminOnly: true, fixed: true }
-];
-
-function initBottomNav() {
-    const isAdmin = checkIsAdmin();
-
-    // 移除頁面上既有的靜態 bottom-nav（避免重複）
-    document.querySelectorAll('.bottom-nav').forEach(n => n.remove());
-
-    if (!isAdmin) {
-        document.querySelector('.container')?.style.setProperty('padding-bottom', '16px');
-        return;
-    }
-
-    // 從 system_settings 讀取導航設定
-    var navConfig = getCachedSetting('bottom_nav_config');
-    var tabs;
-
-    if (navConfig && navConfig.tabs) {
-        tabs = navConfig.tabs;
-    } else {
-        // 預設導航（向後相容）
-        tabs = [
-            { id: 'home',     icon: '🏠', label: '首頁',   page: 'index.html' },
-            { id: 'schedule', icon: '📅', label: '班表',   page: 'schedule.html' },
-            { id: 'checkin',  icon: '🎯', label: '打卡',   page: 'checkin.html?type=in' },
-            { id: 'requests', icon: '⚠️', label: '申請',   page: 'requests.html' },
-            { id: 'admin',    icon: '⚙️', label: '管理',   page: 'admin.html', adminOnly: true }
-        ];
-    }
-
-    // 過濾 adminOnly 項目
-    tabs = tabs.filter(function(t) {
-        if (t.adminOnly && !isAdmin) return false;
-        return true;
-    });
-
-    // 判斷當前頁面以標記 active
-    const page = window.location.pathname.split('/').pop() || 'index.html';
-
-    const nav = document.createElement('nav');
-    nav.className = 'bottom-nav';
-    nav.style.display = 'flex';
-    nav.innerHTML = tabs.map(function(t) {
-        var href = t.page || t.href || '#';
-        var isActive = page === href.split('?')[0].split('#')[0];
-        return '<a class="nav-item' + (isActive ? ' active' : '') + '" onclick="window.location.href=\'' + href + '\'">' +
-            '<span class="nav-icon">' + t.icon + '</span><span class="nav-label">' + t.label + '</span>' +
-        '</a>';
-    }).join('');
-
-    document.body.appendChild(nav);
-}
+function initBottomNav() { /* 已停用 */ }
 
 
 // ===== 申請管理（管理後台） =====
