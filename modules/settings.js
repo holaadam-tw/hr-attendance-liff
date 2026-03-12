@@ -34,7 +34,7 @@ export function switchSysTab(tab, btn) {
         btn.style.boxShadow = '0 1px 4px rgba(0,0,0,0.08)';
     }
     // 載入對應資料
-    if (tab === 'setting') { loadNotifyToken(); loadNavSettings(); }
+    if (tab === 'setting') { loadNotifyToken(); }
     if (tab === 'audit') loadAuditLogs();
 }
 

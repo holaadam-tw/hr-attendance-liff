@@ -28,6 +28,7 @@
 - 三層 AND 邏輯：DEFAULT_FEATURES × INDUSTRY_TEMPLATES × companies.features × feature_visibility
 - `INDUSTRY_TEMPLATES` 保留在 settings.js（common.js getFeatureVisibility 需要）
 - platform_admin 在首頁每個功能格子右上角看到即時 toggle 開關（綠/灰）
+- 底部導航設定已從 admin.html 移除（loadNavSettings/saveNavSettings 已刪），改由 platform admin 控制
 
 ## 員工視角 (viewAsEmployee)
 - `toggleViewMode()` 切換時：隱藏 toggle 開關、管理後台入口

@@ -46,3 +46,4 @@ async function saveSetting(key, value, description) {
 - 2026-03-11: 地點管理 UI 改善（卡片式+地址+可編輯座標）
 - 2026-03-11: 功能格子直接 toggle 開關（platform_admin），移除編輯模式
 - 2026-03-12: 統一功能開關架構（9 key），精簡 index.html 為 7 格，platform.html 分組 toggle
+- 2026-03-12: 移除 admin.html 底部導航設定（改由 platform admin 統一控制）

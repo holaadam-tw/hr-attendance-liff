@@ -1580,61 +1580,6 @@ function initBottomNav() {
     document.body.appendChild(nav);
 }
 
-// ===== 底部導航設定（管理後台） =====
-function loadNavSettings() {
-    var container = document.getElementById('navSettingsItems');
-    if (!container) return;
-
-    var navConfig = getCachedSetting('bottom_nav_config');
-    var enabledIds = [];
-    if (navConfig && navConfig.tabs) {
-        enabledIds = navConfig.tabs.map(function(t) { return t.id; });
-    } else {
-        enabledIds = ['home', 'schedule', 'checkin', 'requests', 'admin'];
-    }
-
-    container.innerHTML = ALL_NAV_ITEMS.map(function(item) {
-        var checked = item.fixed || enabledIds.indexOf(item.id) !== -1;
-        var disabled = item.fixed ? 'disabled' : '';
-        var note = item.fixed ? ' <span style="color:#94A3B8;font-size:11px;">(固定)</span>' : '';
-        if (item.adminOnly) note = ' <span style="color:#94A3B8;font-size:11px;">(管理員)</span>';
-        return '<label style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:#FAFBFC;border-radius:10px;cursor:pointer;">' +
-            '<input type="checkbox" data-nav-id="' + item.id + '" ' + (checked ? 'checked' : '') + ' ' + disabled +
-            ' style="width:18px;height:18px;accent-color:#4F46E5;">' +
-            '<span style="font-size:18px;">' + item.icon + '</span>' +
-            '<span style="font-size:14px;font-weight:600;">' + item.label + note + '</span>' +
-        '</label>';
-    }).join('');
-}
-
-async function saveNavSettings() {
-    var checks = document.querySelectorAll('#navSettingsItems input[data-nav-id]');
-    var selected = [];
-    checks.forEach(function(cb) {
-        if (cb.checked) {
-            var id = cb.getAttribute('data-nav-id');
-            var item = ALL_NAV_ITEMS.find(function(n) { return n.id === id; });
-            if (item) selected.push({ id: item.id, icon: item.icon, label: item.label, page: item.page, adminOnly: item.adminOnly || false, fixed: item.fixed || false });
-        }
-    });
-
-    // 限制最多 5 個（不含固定項）
-    var nonFixed = selected.filter(function(t) { return !t.fixed; });
-    if (nonFixed.length > 3) {
-        showToast('❌ 可選項目最多 3 個（加上首頁和管理共 5 個）');
-        return;
-    }
-
-    var status = document.getElementById('navSaveStatus');
-    try {
-        await saveSetting('bottom_nav_config', { tabs: selected }, '底部導航列設定');
-        showToast('✅ 導航設定已儲存');
-        if (status) { status.style.display = 'block'; status.style.color = '#059669'; status.textContent = '✅ 已儲存，重新整理頁面後生效'; }
-    } catch(e) {
-        console.error(e);
-        showToast('❌ 儲存失敗');
-    }
-}
 
 // ===== 申請管理（管理後台） =====
 var reqMgrFilter = 'all';
