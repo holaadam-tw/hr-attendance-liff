@@ -45,3 +45,4 @@ async function saveSetting(key, value, description) {
 - 2026-03-11: 員工視角修復（隱藏 toggle/編輯按鈕）
 - 2026-03-11: 地點管理 UI 改善（卡片式+地址+可編輯座標）
 - 2026-03-11: 功能格子直接 toggle 開關（platform_admin），移除編輯模式
+- 2026-03-12: 統一功能開關架構（9 key），精簡 index.html 為 7 格，platform.html 分組 toggle
