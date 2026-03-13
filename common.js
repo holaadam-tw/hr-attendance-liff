@@ -322,20 +322,33 @@ let _settingsCache = null; // { key: value, ... }
 
 async function loadSettings(forceRefresh) {
     try {
+        const _loadCompanyId = window.currentCompanyId || window.currentEmployee?.company_id || currentEmployee?.company_id;
+
         // 優先從 sessionStorage 讀取快取（跨頁共用，減少 API 呼叫）
+        // feature_visibility 不快取，每次從 DB 讀最新值
         if (!forceRefresh) {
             const cached = sessionStorage.getItem('system_settings_cache');
             if (cached) {
                 try {
                     _settingsCache = JSON.parse(cached);
                     officeLocations = _settingsCache['office_locations'] || [];
-                    return;
                 } catch(e) { sessionStorage.removeItem('system_settings_cache'); }
+                // 即使有快取，也要從 DB 讀取最新的 feature_visibility
+                if (_loadCompanyId) {
+                    try {
+                        const { data: fvData } = await sb.from('system_settings')
+                            .select('value')
+                            .eq('company_id', _loadCompanyId)
+                            .eq('key', 'feature_visibility')
+                            .maybeSingle();
+                        if (fvData) _settingsCache['feature_visibility'] = fvData.value;
+                    } catch(e) {}
+                }
+                return;
             }
         }
 
         // 一次查出所有 system_settings，避免多次查詢
-        const _loadCompanyId = window.currentCompanyId || window.currentEmployee?.company_id || currentEmployee?.company_id;
         if (!_loadCompanyId) return;
         const { data, error } = await sb.from('system_settings')
             .select('key, value')
@@ -344,8 +357,12 @@ async function loadSettings(forceRefresh) {
             _settingsCache = {};
             data.forEach(row => { _settingsCache[row.key] = row.value; });
             officeLocations = _settingsCache['office_locations'] || [];
-            // 寫入 sessionStorage（關閉瀏覽器自動清除）
-            try { sessionStorage.setItem('system_settings_cache', JSON.stringify(_settingsCache)); } catch(e) {}
+            // 寫入 sessionStorage，排除 feature_visibility（確保每次從 DB 讀最新值）
+            try {
+                const cacheToStore = { ..._settingsCache };
+                delete cacheToStore['feature_visibility'];
+                sessionStorage.setItem('system_settings_cache', JSON.stringify(cacheToStore));
+            } catch(e) {}
         }
     } catch (e) {
         console.error('載入設定失敗', e);
