@@ -336,7 +336,6 @@ async function loadSettings(forceRefresh) {
 
         // 一次查出所有 system_settings，避免多次查詢
         const _loadCompanyId = window.currentCompanyId || window.currentEmployee?.company_id || currentEmployee?.company_id;
-        console.log('[DEBUG] loadSettings companyId:', _loadCompanyId, '| window:', window.currentCompanyId, '| emp:', currentEmployee?.company_id);
         if (!_loadCompanyId) return;
         const { data, error } = await sb.from('system_settings')
             .select('key, value')
@@ -1717,15 +1716,6 @@ function getFeatureVisibility() {
 // 根據設定隱藏首頁「中間選單」項目
 function applyFeatureVisibility() {
     const features = getFeatureVisibility();
-    console.log('[DEBUG] features result:', features);
-    console.log('[DEBUG] fv setting:', getCachedSetting('feature_visibility'));
-    console.log('[DEBUG] checkIsAdmin:', checkIsAdmin(), '| viewAsEmployee:', window.viewAsEmployee);
-    console.log('[DEBUG] _settingsCache:', _settingsCache);
-
-    // 用 data-feature 屬性精確控制每個選單項目
-    // 支援逗號分隔多 key（OR 邏輯：任一為 true 就顯示）
-    // 取得第二層 feature_visibility 設定（業主 toggle 控制的層）
-    const fvSetting = getCachedSetting('feature_visibility') || {};
 
     document.querySelectorAll('.menu-grid .menu-item[data-feature]').forEach(item => {
         const keys = item.getAttribute('data-feature').split(',').map(k => k.trim());
@@ -1757,7 +1747,11 @@ function applyFeatureVisibility() {
 
 // ===== 首頁功能 toggle 開關（業主專用，控制第二層 feature_visibility）=====
 function renderFeatureToggles() {
-    if (!checkIsAdmin() || window.viewAsEmployee) return;
+    if (!checkIsAdmin() || window.viewAsEmployee) {
+        // 非業主或員工視角：移除所有已存在的 toggle
+        document.querySelectorAll('.feature-toggle').forEach(function(t) { t.remove(); });
+        return;
+    }
 
     var fvSetting = getCachedSetting('feature_visibility') || {};
 
