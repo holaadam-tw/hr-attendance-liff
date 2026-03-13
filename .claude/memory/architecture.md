@@ -4,6 +4,7 @@
 | 檔案 | 用途 |
 |------|------|
 | index.html | 員工首頁（功能格子 + 編輯模式） |
+| fieldwork.html | 外勤打卡 + 業務週報 + 客戶管理（三 tab） |
 | admin.html | 管理後台（地點/員工/排班/薪酬/系統設定） |
 | checkin.html | 打卡頁 |
 | common.js | 共用函數（saveSetting, loadSettings, applyFeatureVisibility 等） |
@@ -54,3 +55,4 @@ async function saveSetting(key, value, description) {
 - 2026-03-13: 修正 index.html toggle 開關架構：業主 toggle 控制第二層 feature_visibility（saveSetting），非 companies.features；業主視角顯示所有第一層允許的格子
 - 2026-03-13: 修正員工流程 loadSettings 時序（必須在 currentCompanyId 設定後）；移除 isLegacy 跳過邏輯；toggleViewMode 不再清快取；renderFeatureToggles 非業主時移除 toggle
 - 2026-03-13: 新增申請管理入口（index.html 格子 + common.js requests:true + platform.html toggle）；admin.html 預約管理加「（餐飲業）」；修復 salary_settings employee_id=null 查詢
+- 2026-03-14: 新建 fieldwork.html（外勤打卡+業務週報+客戶管理三tab）；services.html 精簡為便當訂購；admin.html 移除客戶管理；clients 表加 employee_id/company_id

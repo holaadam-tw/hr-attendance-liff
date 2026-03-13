@@ -24,6 +24,9 @@
 - platform.html：FEATURE_LIST 9 項（不含 sales_target，儲存時自動跟隨 fieldwork）
 - platform.html：FEATURE_DEFAULTS + FEATURE_PRESETS（general/catering/all）
 - index.html menu-grid 8 格：leave, attendance, salary, lunch, fieldwork+sales_target, store_ordering, requests, admin-only
+- fieldwork.html：外勤打卡 + 業務週報 + 客戶管理（三 tab），從 services.html 獨立出來
+- services.html：僅保留便當訂購 + 系統設定，舊 #fieldwork/#sales hash 自動重導 fieldwork.html
+- clients 資料表：需執行 016_clients_add_employee_company.sql 加 employee_id/company_id
 - booking/loyalty 格子尚未加入 index.html（待功能完成）
 - 三層 AND 邏輯：DEFAULT_FEATURES × INDUSTRY_TEMPLATES × companies.features × feature_visibility
 - `INDUSTRY_TEMPLATES` 保留在 settings.js（common.js getFeatureVisibility 需要）

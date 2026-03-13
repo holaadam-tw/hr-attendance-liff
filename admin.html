@@ -135,9 +135,8 @@
                 <div class="menu-item" onclick="showPage('lunchMgrPage')">
                     <div class="icon">🍱</div><div class="label">便當管理</div>
                 </div>
-                <div class="menu-item" data-require="admin" onclick="showPage('clientPage')">
-                    <div class="icon">🏢</div><div class="label">客戶管理</div>
-                </div>
+                <!-- 客戶管理已整合至 fieldwork.html -->
+
                 <div class="menu-item" data-require="admin" data-feature="fieldwork,sales_target" onclick="showPage('fieldSalesAdminPage')">
                     <div class="icon">📍</div><div class="label">外勤/業務</div>
                 </div>
@@ -1003,65 +1002,7 @@
                 </div>
             </div>
         </div>
-        <!-- 客戶管理頁面 -->
-        <div id="clientPage" class="page">
-            <button class="btn btn-secondary" onclick="showPage('adminHomePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
-            <div class="checkin-page">
-                <h2>🏢 客戶管理</h2>
-
-                <div style="display:flex;gap:8px;margin-bottom:12px;">
-                    <input type="text" id="clientSearch" placeholder="搜尋公司名稱..." oninput="filterClients()" style="flex:1;padding:10px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;">
-                    <button class="btn btn-primary" onclick="showClientModal()" style="white-space:nowrap;font-size:13px;padding:10px 16px;">+ 新增</button>
-                </div>
-
-                <div id="clientList">
-                    <p style="text-align:center;color:#94A3B8;font-size:13px;padding:16px;">載入中...</p>
-                </div>
-
-                <!-- 服務項目管理 -->
-                <div class="lunch-summary" style="margin-top:20px;">
-                    <h3 style="margin-bottom:10px;">🔧 服務項目管理</h3>
-                    <div id="serviceItemList"></div>
-                    <div style="display:flex;gap:8px;margin-top:10px;">
-                        <input type="text" id="newServiceItemName" placeholder="新增服務項目名稱" style="flex:1;padding:10px;border:1px solid #E2E8F0;border-radius:10px;font-size:13px;">
-                        <button class="btn btn-success" onclick="addServiceItem()" style="font-size:12px;padding:8px 14px;white-space:nowrap;">新增</button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 客戶新增/編輯 Modal -->
-            <div id="clientModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:999;overflow-y:auto;">
-                <div style="background:#fff;margin:40px auto;max-width:500px;border-radius:16px;padding:24px;">
-                    <h3 id="clientModalTitle" style="margin-bottom:16px;">新增客戶</h3>
-                    <input type="hidden" id="clientEditId">
-                    <div class="form-group"><label>公司名稱 *</label><input type="text" id="clientCompanyName" placeholder="公司名稱"></div>
-                    <div class="form-group"><label>聯絡人</label><input type="text" id="clientContactName" placeholder="聯絡人姓名"></div>
-                    <div class="form-group"><label>電話</label><input type="text" id="clientPhone" placeholder="電話"></div>
-                    <div class="form-group"><label>地址</label><input type="text" id="clientAddress" placeholder="地址"></div>
-                    <div class="form-group">
-                        <label>GPS 座標</label>
-                        <div style="display:flex;gap:8px;">
-                            <input type="text" id="clientLat" placeholder="緯度" style="flex:1;">
-                            <input type="text" id="clientLng" placeholder="經度" style="flex:1;">
-                        </div>
-                        <button class="btn btn-secondary" onclick="getClientGPS()" style="margin-top:6px;font-size:12px;padding:8px;">📍 抓取目前位置</button>
-                    </div>
-                    <div class="form-group">
-                        <label>分類</label>
-                        <select id="clientCategory" style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;">
-                            <option value="general">一般</option>
-                            <option value="vip">VIP ⭐</option>
-                        </select>
-                    </div>
-                    <div class="form-group"><label>產業別</label><input type="text" id="clientIndustry" placeholder="例：科技業、製造業"></div>
-                    <div class="form-group"><label>備註</label><textarea id="clientNotes" rows="2" placeholder="備註" style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;resize:vertical;box-sizing:border-box;"></textarea></div>
-                    <div style="display:flex;gap:8px;">
-                        <button class="btn btn-success" onclick="saveClient()" style="flex:1;">💾 儲存</button>
-                        <button class="btn btn-secondary" onclick="closeClientModal()" style="flex:1;">取消</button>
-                    </div>
-                </div>
-            </div>
-        </div>
+        <!-- 客戶管理已移至 fieldwork.html -->
 
         <!-- ====== 外勤/業務 合併管理頁 ====== -->
         <div id="fieldSalesAdminPage" class="page">
