@@ -37,6 +37,10 @@
 - 員工視角：兩層都 true 才顯示，無 toggle
 - feature_visibility（第二層）預設全 true，業主只能關不能開
 
+## 重要 Bug 紀錄
+- loadSettings() 必須在 currentCompanyId 和 currentCompanyFeatures 設定完成後才呼叫，否則因 companyId 為空直接 return，導致 _settingsCache 為空，feature_visibility 讀不到
+- feature_visibility 不應寫入 sessionStorage 快取，必須每次從 DB 讀取，確保跨裝置即時同步
+
 ## 關鍵檔案路徑
 - [專案指南](../../hr-attendance-liff-main/PROJECT_GUIDE.md)
 - [詳細架構筆記](./architecture.md)
