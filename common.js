@@ -1463,11 +1463,8 @@ window.toggleViewMode = function() {
     var adminEntry = document.getElementById('adminEntry');
     if (adminEntry) adminEntry.style.display = window.viewAsEmployee ? 'none' : 'block';
 
-    // 切換視角時重新載入設定，確保 feature_visibility 是最新值
-    invalidateSettingsCache();
-    loadSettings(true).then(function() {
-        applyFeatureVisibility();
-    });
+    // 切換視角時直接用已有快取重新套用，不清除快取（避免 companyId 為空時設定丟失）
+    applyFeatureVisibility();
 };
 
 // ===== 管理員功能 =====
