@@ -414,7 +414,7 @@
             const initialized = await initializeLiff();
             if (initialized) {
                 checkLiffParams();
-                
+
                 const isLoggedIn = await checkUserStatus();
                 if (isLoggedIn) {
                     showPage('homePage');
@@ -460,6 +460,14 @@
                 } else {
                     showPage('bindPage');
                 }
+            } else {
+                // 無 LIFF 環境（電腦瀏覽器直開）：仍載入設定並套用格子顯示
+                try {
+                    await loadSettings();
+                    applyFeatureVisibility();
+                    const menuGrid = document.getElementById('smartMenuGrid');
+                    if (menuGrid) menuGrid.style.opacity = '1';
+                } catch(e) { console.warn('非 LIFF 環境，功能格子使用預設值'); }
             }
         });
     </script>
