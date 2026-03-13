@@ -336,6 +336,7 @@ async function loadSettings(forceRefresh) {
 
         // 一次查出所有 system_settings，避免多次查詢
         const _loadCompanyId = window.currentCompanyId || window.currentEmployee?.company_id || currentEmployee?.company_id;
+        console.log('[DEBUG] loadSettings companyId:', _loadCompanyId, '| window:', window.currentCompanyId, '| emp:', currentEmployee?.company_id);
         if (!_loadCompanyId) return;
         const { data, error } = await sb.from('system_settings')
             .select('key, value')
@@ -1719,7 +1720,10 @@ function getFeatureVisibility() {
 // 根據設定隱藏首頁「中間選單」項目
 function applyFeatureVisibility() {
     const features = getFeatureVisibility();
-    console.log('[DEBUG] features result:', features, '| fv setting:', getCachedSetting('feature_visibility'));
+    console.log('[DEBUG] features result:', features);
+    console.log('[DEBUG] fv setting:', getCachedSetting('feature_visibility'));
+    console.log('[DEBUG] checkIsAdmin:', checkIsAdmin(), '| viewAsEmployee:', window.viewAsEmployee);
+    console.log('[DEBUG] _settingsCache:', _settingsCache);
 
     // 用 data-feature 屬性精確控制每個選單項目
     // 支援逗號分隔多 key（OR 邏輯：任一為 true 就顯示）
