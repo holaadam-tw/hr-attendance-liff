@@ -452,6 +452,7 @@
                         if (vt) vt.style.display = '';
                     }
                     applyFeatureVisibility();
+                    renderFeatureToggles();
                     const menuGrid = document.getElementById('smartMenuGrid');
                     if (menuGrid) menuGrid.style.opacity = '1';
                     if (typeof updatePageTitle === 'function') updatePageTitle();
