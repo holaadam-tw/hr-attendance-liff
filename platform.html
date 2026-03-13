@@ -178,6 +178,7 @@
             { key: 'leave', label: '我要請假', icon: '📝', group: 'basic' },
             { key: 'attendance', label: '考勤查詢', icon: '📊', group: 'basic' },
             { key: 'salary', label: '薪資查詢', icon: '💰', group: 'basic' },
+            { key: 'requests', label: '申請管理', icon: '📋', group: 'basic' },
             // 進階功能（預設關閉，需 Platform Admin 開啟）
             { key: 'lunch', label: '便當訂購', icon: '🍱', group: 'advanced' },
             { key: 'fieldwork', label: '外勤/業務', icon: '📍', group: 'advanced' },
@@ -187,7 +188,7 @@
         ];
 
         const FEATURE_DEFAULTS = {
-            leave: true, attendance: true, salary: true,
+            leave: true, attendance: true, salary: true, requests: true,
             lunch: false, fieldwork: false, store_ordering: false, booking: false, loyalty: false
         };
 

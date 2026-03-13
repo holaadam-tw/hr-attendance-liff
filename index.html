@@ -153,6 +153,11 @@
                     <div class="icon">🍽️</div><div class="label">線上點餐</div>
                 </div>
 
+                <!-- 申請管理 -->
+                <div class="menu-item" data-feature="requests" onclick="window.location.href='requests.html'">
+                    <div class="icon">📋</div><div class="label">申請管理</div>
+                </div>
+
                 <!-- 管理員專用 -->
                 <div class="menu-item admin-only" id="adminEntry" style="display:none;" onclick="window.location.href='admin.html'">
                     <span class="menu-badge"></span>
@@ -290,7 +295,7 @@
 
         // 載入員工類型（正職/兼職）
         async function loadEmployeeType() {
-            if (!currentEmployee) return;
+            if (!currentEmployee?.id) return;
             try {
                 const { data } = await sb.from('salary_settings')
                     .select('salary_type')

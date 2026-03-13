@@ -672,7 +672,7 @@
 
                     // 從 salary_settings 自動帶入
                     try {
-                        if (currentEmployee) {
+                        if (currentEmployee?.id) {
                             const { data } = await sb.from('salary_settings')
                                 .select('salary_type, base_salary, meal_allowance, full_attendance_bonus, pension_self_rate, position_allowance')
                                 .eq('employee_id', currentEmployee.id)

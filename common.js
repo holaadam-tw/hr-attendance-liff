@@ -1691,7 +1691,8 @@ const DEFAULT_FEATURES = {
     sales_target: false, // 業務目標（需 Platform Admin 開啟）
     store_ordering: false,// 線上點餐（需 Platform Admin 開啟，餐飲業）
     booking: false,      // 預約系統（需 Platform Admin 開啟，餐飲業）
-    loyalty: false       // 集點會員（需 Platform Admin 開啟，付費）
+    loyalty: false,      // 集點會員（需 Platform Admin 開啟，付費）
+    requests: true       // 申請管理（預設開啟）
 };
 
 function getFeatureVisibility() {
@@ -1733,6 +1734,7 @@ function getFeatureVisibility() {
 // 根據設定隱藏首頁「中間選單」項目
 function applyFeatureVisibility() {
     const features = getFeatureVisibility();
+    console.log('[applyFeatureVisibility] features:', JSON.stringify(features));
 
     document.querySelectorAll('.menu-grid .menu-item[data-feature]').forEach(item => {
         const keys = item.getAttribute('data-feature').split(',').map(k => k.trim());
