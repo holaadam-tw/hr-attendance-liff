@@ -335,10 +335,11 @@ async function loadSettings(forceRefresh) {
         }
 
         // 一次查出所有 system_settings，避免多次查詢
-        if (!window.currentCompanyId) return;
+        const _loadCompanyId = window.currentCompanyId || window.currentEmployee?.company_id || currentEmployee?.company_id;
+        if (!_loadCompanyId) return;
         const { data, error } = await sb.from('system_settings')
             .select('key, value')
-            .eq('company_id', window.currentCompanyId);
+            .eq('company_id', _loadCompanyId);
         if (!error && data) {
             _settingsCache = {};
             data.forEach(row => { _settingsCache[row.key] = row.value; });
@@ -364,7 +365,7 @@ function getCachedSetting(key) {
 
 // 統一儲存 system_settings（先查再更新，避免重複 insert）
 async function saveSetting(key, value, description) {
-    var companyId = window.currentCompanyId;
+    var companyId = window.currentCompanyId || window.currentEmployee?.company_id || currentEmployee?.company_id;
     if (!companyId) { console.warn('saveSetting: no companyId'); return; }
 
     var { data: existing } = await sb.from('system_settings')
