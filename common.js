@@ -263,8 +263,6 @@ async function checkUserStatus() {
             .eq('line_user_id', liffProfile.userId)
             .maybeSingle();
 
-        await loadSettings();
-
         if (loadingEl) loadingEl.style.display = 'none';
 
         if (data) {
@@ -282,6 +280,8 @@ async function checkUserStatus() {
                     currentCompanyIndustry = company?.industry || 'general';
                 } catch(e) { console.log('載入公司功能設定失敗', e); }
             }
+            // loadSettings 必須在 currentCompanyId 設定後才呼叫
+            await loadSettings();
             updateUserInfo(data);
             await checkTodayAttendance();
             return true;
