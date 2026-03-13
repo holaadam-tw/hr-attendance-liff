@@ -1705,13 +1705,10 @@ function getFeatureVisibility() {
     // 只能進一步關閉平台允許的功能，不能開啟平台禁止的功能
     const adminSettings = getCachedSetting('feature_visibility');
     if (adminSettings) {
-        // 檢測是否為舊格式（包含已移除的 key 如 schedule/requests）
-        const isLegacy = adminSettings.schedule !== undefined || adminSettings.requests !== undefined;
-        if (!isLegacy) {
-            for (const key of Object.keys(result)) {
-                if (result[key] === true && adminSettings[key] === false) {
-                    result[key] = false;
-                }
+        // 只套用已知的 feature key，忽略舊格式的 schedule/requests 等
+        for (const key of Object.keys(result)) {
+            if (result[key] === true && adminSettings[key] === false) {
+                result[key] = false;
             }
         }
     }
@@ -1722,6 +1719,7 @@ function getFeatureVisibility() {
 // 根據設定隱藏首頁「中間選單」項目
 function applyFeatureVisibility() {
     const features = getFeatureVisibility();
+    console.log('[DEBUG] features result:', features, '| fv setting:', getCachedSetting('feature_visibility'));
 
     // 用 data-feature 屬性精確控制每個選單項目
     // 支援逗號分隔多 key（OR 邏輯：任一為 true 就顯示）
