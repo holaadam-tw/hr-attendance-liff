@@ -1461,7 +1461,11 @@ window.toggleViewMode = function() {
     var adminEntry = document.getElementById('adminEntry');
     if (adminEntry) adminEntry.style.display = window.viewAsEmployee ? 'none' : 'block';
 
-    applyFeatureVisibility();
+    // 切換視角時重新載入設定，確保 feature_visibility 是最新值
+    invalidateSettingsCache();
+    loadSettings(true).then(function() {
+        applyFeatureVisibility();
+    });
 };
 
 // ===== 管理員功能 =====
@@ -1804,6 +1808,10 @@ window.toggleFeatureSwitch = async function(checkbox) {
     try {
         // 寫入 system_settings.feature_visibility（第二層）
         await saveSetting('feature_visibility', fv, '功能開關（第二層，業主微調）');
+
+        // saveSetting 已呼叫 invalidateSettingsCache + loadSettings(true)
+        // 額外確保記憶體快取同步（避免 getCachedSetting 讀到舊值）
+        if (_settingsCache) _settingsCache['feature_visibility'] = fv;
 
         // 更新 toggle 外觀
         var track = checkbox.nextElementSibling;
