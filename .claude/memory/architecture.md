@@ -51,3 +51,4 @@ async function saveSetting(key, value, description) {
 - 2026-03-12: 完全移除底部導航列（initBottomNav/ALL_NAV_ITEMS/CSS/所有頁面呼叫/admin靜態DOM）
 - 2026-03-12: 修復功能開關錯層（toggle改寫companies.features、移除skipFilter、feature_visibility預設全true）
 - 2026-03-13: 修復 toggleFeatureSwitch companyId 取值（用 let 變數非 window）、舊 feature_visibility 偵測跳過
+- 2026-03-13: 移除業主視角半透明邏輯與 index.html toggle 開關（renderFeatureToggles/toggleFeatureSwitch），統一所有視角 feature 關閉=隱藏

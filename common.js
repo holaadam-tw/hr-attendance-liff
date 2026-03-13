@@ -1454,10 +1454,6 @@ window.toggleViewMode = function() {
         }
     }
 
-    // 員工視角隱藏 toggle 開關和管理後台入口
-    document.querySelectorAll('.feature-toggle').forEach(function(t) {
-        t.style.display = window.viewAsEmployee ? 'none' : '';
-    });
     var adminEntry = document.getElementById('adminEntry');
     if (adminEntry) adminEntry.style.display = window.viewAsEmployee ? 'none' : 'block';
 
@@ -1724,96 +1720,18 @@ function applyFeatureVisibility() {
         const keys = item.getAttribute('data-feature').split(',').map(k => k.trim());
         const visible = keys.some(k => features[k] === true);
 
-        if (isPlatformAdmin && !window.viewAsEmployee) {
-            // platform_admin 業主視角：所有格子都顯示，但關閉的格子半透明
-            item.style.display = '';
-            item.style.opacity = visible ? '1' : '0.4';
-        } else {
-            // 一般員工/員工視角：依 feature 設定隱藏
-            item.style.display = visible ? '' : 'none';
-            item.style.opacity = '1';
-            // 職位限制：外勤/業務只有「業務」職位才看得到
-            if (visible && (keys.includes('fieldwork') || keys.includes('sales_target'))) {
-                if (currentEmployee && currentEmployee.position !== '業務') {
-                    item.style.display = 'none';
-                }
+        // 所有視角統一：feature 關閉就隱藏
+        item.style.display = visible ? '' : 'none';
+        item.style.opacity = '1';
+        // 職位限制：外勤/業務只有「業務」職位才看得到
+        if (visible && (keys.includes('fieldwork') || keys.includes('sales_target'))) {
+            if (currentEmployee && currentEmployee.position !== '業務') {
+                item.style.display = 'none';
             }
         }
     });
 }
 
-// ===== 首頁功能 toggle 開關（platform_admin 專用）=====
-// 控制第一層：companies.features
-function renderFeatureToggles() {
-    if (!isPlatformAdmin || window.viewAsEmployee) return;
-
-    var compFeatures = currentCompanyFeatures || {};
-
-    document.querySelectorAll('.menu-grid .menu-item[data-feature]').forEach(function(el) {
-        // 已有 toggle 就跳過
-        if (el.querySelector('.feature-toggle')) return;
-
-        var featureKeys = el.getAttribute('data-feature');
-        var firstKey = featureKeys.split(',')[0].trim();
-        // 從 companies.features 讀取，沒設定的 key 用 DEFAULT_FEATURES
-        var isOn = compFeatures[firstKey] !== undefined ? compFeatures[firstKey] : (DEFAULT_FEATURES[firstKey] || false);
-
-        var toggle = document.createElement('div');
-        toggle.className = 'feature-toggle';
-        toggle.style.cssText = 'position:absolute;top:6px;right:6px;z-index:5;';
-        toggle.innerHTML = '<label style="display:flex;align-items:center;cursor:pointer;">' +
-            '<input type="checkbox" data-feature-key="' + featureKeys + '" ' + (isOn ? 'checked' : '') +
-            ' onchange="toggleFeatureSwitch(this)" style="display:none;">' +
-            '<div style="width:36px;height:20px;background:' + (isOn ? '#22C55E' : '#CBD5E1') +
-            ';border-radius:10px;position:relative;transition:background .2s;">' +
-            '<div style="width:16px;height:16px;background:#fff;border-radius:50%;position:absolute;top:2px;' +
-            (isOn ? 'right:2px;' : 'left:2px;') + 'transition:all .2s;box-shadow:0 1px 3px rgba(0,0,0,.2);"></div>' +
-            '</div></label>';
-
-        toggle.querySelector('label').onclick = function(e) { e.stopPropagation(); };
-        el.appendChild(toggle);
-    });
-}
-
-window.toggleFeatureSwitch = async function(checkbox) {
-    var keys = checkbox.getAttribute('data-feature-key').split(',');
-    var isOn = checkbox.checked;
-
-    var companyId = currentCompanyId || currentEmployee?.company_id;
-    if (!companyId) {
-        console.warn('toggleFeatureSwitch: no companyId');
-        checkbox.checked = !isOn;
-        return;
-    }
-
-    // 更新 companies.features（第一層）
-    var features = Object.assign({}, currentCompanyFeatures || {});
-    keys.forEach(function(k) { features[k.trim()] = isOn; });
-
-    try {
-        var { error } = await sb.from('companies')
-            .update({ features: features })
-            .eq('id', companyId);
-        if (error) throw error;
-
-        // 同步更新記憶體中的 currentCompanyFeatures
-        currentCompanyFeatures = features;
-
-        // 更新 toggle 外觀
-        var track = checkbox.nextElementSibling;
-        track.style.background = isOn ? '#22C55E' : '#CBD5E1';
-        var knob = track.firstElementChild;
-        if (isOn) { knob.style.left = ''; knob.style.right = '2px'; }
-        else { knob.style.right = ''; knob.style.left = '2px'; }
-
-        // 立即重新套用顯示邏輯
-        applyFeatureVisibility();
-    } catch(e) {
-        console.error('儲存失敗:', e);
-        checkbox.checked = !isOn;
-        showToast('❌ 儲存失敗');
-    }
-};
 
 // ===== 加班申請 =====
 async function submitOvertime() {

@@ -27,13 +27,12 @@
 - booking/loyalty 格子尚未加入 index.html（待功能完成）
 - 三層 AND 邏輯：DEFAULT_FEATURES × INDUSTRY_TEMPLATES × companies.features × feature_visibility
 - `INDUSTRY_TEMPLATES` 保留在 settings.js（common.js getFeatureVisibility 需要）
-- platform_admin 在首頁每個功能格子右上角看到即時 toggle 開關（綠/灰）
+- 功能開關統一在 platform.html 控制，index.html 不再有 toggle 開關
 - 底部導航已完全移除（initBottomNav 空殼、ALL_NAV_ITEMS 已刪、CSS 已清、所有頁面呼叫已刪）
 
 ## 員工視角 (viewAsEmployee)
-- `toggleViewMode()` 切換時：隱藏 toggle 開關、管理後台入口
-- platform_admin 業主視角：所有格子都顯示，關閉的 opacity:0.4；員工視角：正常隱藏
-- 首頁 toggle 開關控制第一層 companies.features（非 feature_visibility）
+- `toggleViewMode()` 切換時：隱藏管理後台入口
+- 所有視角統一：feature 關閉 → display:none（不再有半透明顯示）
 - feature_visibility（第二層）預設全 true，業主只能關不能開
 
 ## 關鍵檔案路徑
