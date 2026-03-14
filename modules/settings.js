@@ -7,12 +7,12 @@
 
 // 產業別模板（common.js getFeatureVisibility 使用）
 export const INDUSTRY_TEMPLATES = {
-    general:       { label: '一般公司', features: { leave: true, attendance: true, schedule: true, salary: true, lunch: false, fieldwork: false, sales_target: false, store_ordering: false, qr_order: false, kds: false, booking: false, member: false, requests: true } },
-    manufacturing: { label: '製造業',   features: { leave: true, attendance: true, schedule: true, salary: true, lunch: true, fieldwork: true, sales_target: true, store_ordering: false, qr_order: false, kds: false, booking: false, member: false, requests: true } },
-    restaurant:    { label: '餐飲業',   features: { leave: true, attendance: true, schedule: true, salary: false, lunch: true, fieldwork: false, sales_target: false, store_ordering: true, qr_order: true, kds: true, booking: true, member: true, requests: true } },
-    service:       { label: '服務業',   features: { leave: true, attendance: true, schedule: true, salary: true, lunch: false, fieldwork: false, sales_target: false, store_ordering: false, qr_order: false, kds: false, booking: true, member: true, requests: true } },
-    clinic:        { label: '診所/醫療', features: { leave: true, attendance: true, schedule: true, salary: true, lunch: false, fieldwork: false, sales_target: false, store_ordering: false, qr_order: false, kds: false, booking: true, member: false, requests: true } },
-    retail:        { label: '零售業',   features: { leave: true, attendance: true, schedule: true, salary: true, lunch: false, fieldwork: false, sales_target: false, store_ordering: true, qr_order: true, kds: false, booking: false, member: true, requests: true } }
+    general:       { label: '一般公司', features: { leave: true, attendance: true, schedule: true, salary: true, lunch: false, fieldwork: false, sales_target: false, store_ordering: false, qr_order: false, kds: false, booking: false, booking_service: false, member: false, requests: true } },
+    manufacturing: { label: '製造業',   features: { leave: true, attendance: true, schedule: true, salary: true, lunch: true, fieldwork: true, sales_target: true, store_ordering: false, qr_order: false, kds: false, booking: false, booking_service: false, member: false, requests: true } },
+    restaurant:    { label: '餐飲業',   features: { leave: true, attendance: true, schedule: true, salary: false, lunch: true, fieldwork: false, sales_target: false, store_ordering: true, qr_order: true, kds: true, booking: true, booking_service: false, member: true, requests: true } },
+    service:       { label: '服務業',   features: { leave: true, attendance: true, schedule: true, salary: true, lunch: false, fieldwork: false, sales_target: false, store_ordering: false, qr_order: false, kds: false, booking: false, booking_service: true, member: true, requests: true } },
+    clinic:        { label: '診所/醫療', features: { leave: true, attendance: true, schedule: true, salary: true, lunch: false, fieldwork: false, sales_target: false, store_ordering: false, qr_order: false, kds: false, booking: false, booking_service: true, member: false, requests: true } },
+    retail:        { label: '零售業',   features: { leave: true, attendance: true, schedule: true, salary: true, lunch: false, fieldwork: false, sales_target: false, store_ordering: true, qr_order: true, kds: false, booking: false, booking_service: false, member: true, requests: true } }
 };
 
 // ===== Tab 切換 =====

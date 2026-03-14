@@ -1692,7 +1692,8 @@ const DEFAULT_FEATURES = {
     store_ordering: false,// 線上點餐（需 Platform Admin 開啟，餐飲業）
     booking: false,      // 預約系統（需 Platform Admin 開啟，餐飲業）
     loyalty: false,      // 集點會員（需 Platform Admin 開啟，付費）
-    requests: true       // 申請管理（預設開啟）
+    requests: true,      // 申請管理（預設開啟）
+    booking_service: false // 預約系統-服務業（需 Platform Admin 開啟）
 };
 
 function getFeatureVisibility() {

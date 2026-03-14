@@ -130,10 +130,11 @@
                     <!-- 功能開關 -->
                     <div style="margin-top:16px;padding:14px;background:#F8FAFC;border-radius:12px;">
                         <div style="font-weight:700;font-size:13px;margin-bottom:10px;">🎛️ 功能開關</div>
-                        <div style="display:flex;gap:6px;margin-bottom:10px;">
-                            <button type="button" onclick="applyFeaturePreset('general')" style="flex:1;padding:8px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;font-size:12px;font-weight:700;cursor:pointer;color:#4F46E5;">🏢 一般公司</button>
-                            <button type="button" onclick="applyFeaturePreset('catering')" style="flex:1;padding:8px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;font-size:12px;font-weight:700;cursor:pointer;color:#059669;">🍽️ 餐飲業</button>
-                            <button type="button" onclick="applyFeaturePreset('all')" style="flex:1;padding:8px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;font-size:12px;font-weight:700;cursor:pointer;color:#D97706;">✅ 全開</button>
+                        <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;">
+                            <button type="button" onclick="applyFeaturePreset('general')" style="flex:1;min-width:70px;padding:8px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;font-size:12px;font-weight:700;cursor:pointer;color:#4F46E5;">🏢 一般</button>
+                            <button type="button" onclick="applyFeaturePreset('catering')" style="flex:1;min-width:70px;padding:8px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;font-size:12px;font-weight:700;cursor:pointer;color:#059669;">🍽️ 餐飲</button>
+                            <button type="button" onclick="applyFeaturePreset('service')" style="flex:1;min-width:70px;padding:8px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;font-size:12px;font-weight:700;cursor:pointer;color:#7C3AED;">✂️ 服務</button>
+                            <button type="button" onclick="applyFeaturePreset('all')" style="flex:1;min-width:70px;padding:8px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;font-size:12px;font-weight:700;cursor:pointer;color:#D97706;">✅ 全開</button>
                         </div>
                         <div id="pFeatureToggles" style="display:flex;flex-direction:column;gap:8px;"></div>
                     </div>
@@ -184,17 +185,19 @@
             { key: 'fieldwork', label: '外勤/業務', icon: '📍', group: 'advanced' },
             { key: 'store_ordering', label: '線上點餐（餐飲業）', icon: '🍽️', group: 'advanced' },
             { key: 'booking', label: '預約系統（餐飲業）', icon: '📅', group: 'advanced' },
+            { key: 'booking_service', label: '預約系統（服務業）', icon: '✂️', group: 'advanced' },
             { key: 'loyalty', label: '集點會員（付費模組）', icon: '🎁', group: 'advanced' }
         ];
 
         const FEATURE_DEFAULTS = {
             leave: true, attendance: true, salary: true, requests: true,
-            lunch: false, fieldwork: false, store_ordering: false, booking: false, loyalty: false
+            lunch: false, fieldwork: false, store_ordering: false, booking: false, booking_service: false, loyalty: false
         };
 
         const FEATURE_PRESETS = {
             general:  { ...FEATURE_DEFAULTS, lunch: true, fieldwork: true },
             catering: { ...FEATURE_DEFAULTS, store_ordering: true, booking: true },
+            service:  { ...FEATURE_DEFAULTS, booking_service: true },
             all:      Object.fromEntries(FEATURE_LIST.map(f => [f.key, true]))
         };
 
@@ -227,7 +230,7 @@
                 box.style.background = on ? '#4F46E5' : '#fff';
                 box.textContent = on ? '✓' : '';
             });
-            const labels = { general: '一般公司', catering: '餐飲業', all: '全部開啟' };
+            const labels = { general: '一般公司', catering: '餐飲業', service: '服務業', all: '全部開啟' };
             showToast('✅ 已套用「' + (labels[name] || name) + '」預設');
         }
 

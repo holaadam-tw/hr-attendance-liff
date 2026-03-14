@@ -13,7 +13,9 @@
 | modules/index.js | ES module → window 綁定（所有 onclick 入口） |
 | modules/employees.js | 員工 CRUD, QR Code, 部門管理 |
 | modules/leave.js | 請假/排班/午餐管理 |
-| modules/store.js | 商店/預約/會員 |
+| modules/store.js | 商店/預約（餐飲業）/會員 |
+| booking_service.html | 消費者預約頁（服務業，不需登入，?store=company_id） |
+| booking_service_admin.html | 服務業預約後台（4 tab：預約列表/技師/服務項目/時段） |
 | modules/payroll.js | 薪資計算 |
 | modules/schedules.js | 班表管理 |
 
@@ -57,3 +59,4 @@ async function saveSetting(key, value, description) {
 - 2026-03-13: 新增申請管理入口（index.html 格子 + common.js requests:true + platform.html toggle）；admin.html 預約管理加「（餐飲業）」；修復 salary_settings employee_id=null 查詢
 - 2026-03-14: 新建 fieldwork.html（外勤打卡+業務週報+客戶管理三tab）；services.html 精簡為便當訂購；admin.html 移除客戶管理；clients 表加 employee_id/company_id
 - 2026-03-15: booking 格子連結改為 admin.html#booking；auth.js 新增 EMPLOYEE_ALLOWED_HASHES 讓一般員工可存取預約頁；名稱統一為「預約系統（餐飲業）」
+- 2026-03-15: 新建服務業預約系統（booking_service.html + booking_service_admin.html）；SQL 018_booking_service.sql；功能 key booking_service；platform.html 新增服務業 preset

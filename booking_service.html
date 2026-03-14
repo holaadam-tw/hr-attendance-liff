@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>線上預約</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:#F8FAFC; color:#1E293B; min-height:100vh; }
+
+        .container { max-width:480px; margin:0 auto; padding:16px; }
+
+        /* 頂部 */
+        .header { text-align:center; padding:24px 0 16px; }
+        .header h1 { font-size:20px; font-weight:800; }
+        .header p { font-size:13px; color:#64748B; margin-top:4px; }
+
+        /* 步驟指示 */
+        .steps { display:flex; justify-content:center; gap:8px; margin-bottom:24px; }
+        .step-dot { width:10px; height:10px; border-radius:50%; background:#E2E8F0; transition:all .3s; }
+        .step-dot.active { background:#7C3AED; transform:scale(1.3); }
+        .step-dot.done { background:#A78BFA; }
+
+        /* 步驟標題 */
+        .step-title { font-size:16px; font-weight:700; margin-bottom:16px; display:flex; align-items:center; gap:8px; }
+        .step-title .num { width:28px; height:28px; border-radius:50%; background:linear-gradient(135deg,#7C3AED,#6D28D9); color:#fff; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:800; }
+
+        /* 卡片 */
+        .card { background:#fff; border-radius:16px; padding:16px; margin-bottom:12px; box-shadow:0 1px 4px rgba(0,0,0,.06); border:2px solid transparent; cursor:pointer; transition:all .2s; }
+        .card:hover { border-color:#C4B5FD; }
+        .card.selected { border-color:#7C3AED; background:#FAF5FF; }
+        .card-title { font-size:15px; font-weight:700; }
+        .card-sub { font-size:12px; color:#64748B; margin-top:4px; }
+        .card-price { font-size:14px; font-weight:800; color:#7C3AED; margin-top:6px; }
+
+        /* 技師卡片 */
+        .staff-card { display:flex; gap:12px; align-items:center; }
+        .staff-avatar { width:56px; height:56px; border-radius:50%; background:#E2E8F0; flex-shrink:0; overflow:hidden; display:flex; align-items:center; justify-content:center; font-size:24px; }
+        .staff-avatar img { width:100%; height:100%; object-fit:cover; }
+        .staff-info { flex:1; }
+        .staff-bio { font-size:12px; color:#64748B; margin-top:2px; line-height:1.4; }
+
+        /* 日期格子 */
+        .date-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:6px; }
+        .date-cell { text-align:center; padding:10px 4px; border-radius:10px; cursor:pointer; transition:all .2s; background:#fff; border:1px solid #E2E8F0; }
+        .date-cell:hover { border-color:#C4B5FD; }
+        .date-cell.selected { background:#7C3AED; color:#fff; border-color:#7C3AED; }
+        .date-cell.disabled { opacity:.3; pointer-events:none; }
+        .date-cell .dow { font-size:10px; color:#94A3B8; font-weight:600; }
+        .date-cell.selected .dow { color:rgba(255,255,255,.7); }
+        .date-cell .day { font-size:16px; font-weight:700; margin-top:2px; }
+        .date-week-header { display:grid; grid-template-columns:repeat(7,1fr); gap:6px; margin-bottom:4px; text-align:center; font-size:11px; color:#94A3B8; font-weight:600; }
+
+        /* 時段 */
+        .slot-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+        .slot-btn { padding:14px 8px; border-radius:12px; border:1px solid #E2E8F0; background:#fff; text-align:center; cursor:pointer; transition:all .2s; font-size:15px; font-weight:600; }
+        .slot-btn:hover { border-color:#C4B5FD; }
+        .slot-btn.selected { background:#7C3AED; color:#fff; border-color:#7C3AED; }
+        .slot-btn.disabled { opacity:.3; pointer-events:none; background:#F1F5F9; }
+        .slot-btn .slot-remain { font-size:10px; color:#94A3B8; margin-top:2px; }
+        .slot-btn.selected .slot-remain { color:rgba(255,255,255,.7); }
+
+        /* 表單 */
+        .form-group { margin-bottom:14px; }
+        .form-group label { font-size:13px; font-weight:600; color:#475569; display:block; margin-bottom:6px; }
+        .form-group input, .form-group textarea { width:100%; padding:12px 14px; border:1px solid #E2E8F0; border-radius:10px; font-size:15px; outline:none; transition:border .2s; }
+        .form-group input:focus, .form-group textarea:focus { border-color:#7C3AED; }
+        .form-group textarea { resize:none; height:80px; }
+
+        /* 確認摘要 */
+        .summary-card { background:#fff; border-radius:16px; padding:20px; box-shadow:0 2px 8px rgba(0,0,0,.08); }
+        .summary-row { display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px solid #F1F5F9; font-size:14px; }
+        .summary-row:last-child { border-bottom:none; }
+        .summary-label { color:#64748B; }
+        .summary-value { font-weight:600; }
+
+        /* 按鈕 */
+        .btn { width:100%; padding:14px; border:none; border-radius:14px; font-size:16px; font-weight:700; cursor:pointer; transition:all .2s; }
+        .btn-primary { background:linear-gradient(135deg,#7C3AED,#6D28D9); color:#fff; }
+        .btn-primary:disabled { opacity:.5; cursor:not-allowed; }
+        .btn-secondary { background:#F1F5F9; color:#64748B; }
+        .btn-row { display:flex; gap:10px; margin-top:20px; }
+        .btn-row .btn { flex:1; }
+
+        /* 成功頁 */
+        .success-page { text-align:center; padding:40px 20px; }
+        .success-icon { font-size:64px; margin-bottom:16px; }
+        .success-title { font-size:22px; font-weight:800; color:#059669; }
+        .success-number { font-size:18px; font-weight:700; color:#7C3AED; margin:12px 0; padding:12px; background:#FAF5FF; border-radius:12px; }
+        .success-detail { font-size:13px; color:#64748B; line-height:1.6; margin-top:12px; }
+
+        /* 載入 */
+        .loading { text-align:center; padding:48px; color:#64748B; }
+        .spinner { width:32px; height:32px; border:3px solid #E2E8F0; border-top-color:#7C3AED; border-radius:50%; animation:spin .8s linear infinite; margin:0 auto 12px; }
+        @keyframes spin { to { transform:rotate(360deg); } }
+
+        .empty-msg { text-align:center; padding:32px; color:#94A3B8; font-size:14px; }
+
+        /* 月份導航 */
+        .month-nav { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+        .month-nav button { background:none; border:none; font-size:20px; cursor:pointer; padding:8px; color:#64748B; }
+        .month-nav .month-label { font-size:15px; font-weight:700; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1 id="storeName">線上預約</h1>
+        <p id="storeDesc">選擇服務開始預約</p>
+    </div>
+
+    <div class="steps" id="stepDots">
+        <div class="step-dot active"></div>
+        <div class="step-dot"></div>
+        <div class="step-dot"></div>
+        <div class="step-dot"></div>
+        <div class="step-dot"></div>
+        <div class="step-dot"></div>
+    </div>
+
+    <!-- Step 1: 選擇服務 -->
+    <div id="step1" class="step-panel">
+        <div class="step-title"><span class="num">1</span>選擇服務項目</div>
+        <div id="serviceList"><div class="loading"><div class="spinner"></div>載入中...</div></div>
+    </div>
+
+    <!-- Step 2: 選擇技師 -->
+    <div id="step2" class="step-panel" style="display:none;">
+        <div class="step-title"><span class="num">2</span>選擇服務人員</div>
+        <div id="staffList"></div>
+        <div class="btn-row"><button class="btn btn-secondary" onclick="goStep(1)">← 上一步</button></div>
+    </div>
+
+    <!-- Step 3: 選擇日期 -->
+    <div id="step3" class="step-panel" style="display:none;">
+        <div class="step-title"><span class="num">3</span>選擇日期</div>
+        <div class="month-nav">
+            <button onclick="changeMonth(-1)">‹</button>
+            <span class="month-label" id="monthLabel"></span>
+            <button onclick="changeMonth(1)">›</button>
+        </div>
+        <div class="date-week-header"><span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span></div>
+        <div class="date-grid" id="dateGrid"></div>
+        <div class="btn-row"><button class="btn btn-secondary" onclick="goStep(2)">← 上一步</button></div>
+    </div>
+
+    <!-- Step 4: 選擇時段 -->
+    <div id="step4" class="step-panel" style="display:none;">
+        <div class="step-title"><span class="num">4</span>選擇時段</div>
+        <div id="slotList"></div>
+        <div class="btn-row"><button class="btn btn-secondary" onclick="goStep(3)">← 上一步</button></div>
+    </div>
+
+    <!-- Step 5: 填寫資料 -->
+    <div id="step5" class="step-panel" style="display:none;">
+        <div class="step-title"><span class="num">5</span>填寫預約資料</div>
+        <div class="form-group">
+            <label>姓名 *</label>
+            <input type="text" id="custName" placeholder="請輸入姓名">
+        </div>
+        <div class="form-group">
+            <label>電話 *</label>
+            <input type="tel" id="custPhone" placeholder="請輸入手機號碼">
+        </div>
+        <div class="form-group">
+            <label>備註</label>
+            <textarea id="custNotes" placeholder="特殊需求或備註（選填）"></textarea>
+        </div>
+        <div class="btn-row">
+            <button class="btn btn-secondary" onclick="goStep(4)">← 上一步</button>
+            <button class="btn btn-primary" onclick="goStep(6)">下一步 →</button>
+        </div>
+    </div>
+
+    <!-- Step 6: 確認 -->
+    <div id="step6" class="step-panel" style="display:none;">
+        <div class="step-title"><span class="num">6</span>確認預約</div>
+        <div class="summary-card" id="summaryCard"></div>
+        <div class="btn-row" style="margin-top:16px;">
+            <button class="btn btn-secondary" onclick="goStep(5)">← 修改</button>
+            <button class="btn btn-primary" id="submitBtn" onclick="submitBooking()">確認送出</button>
+        </div>
+    </div>
+
+    <!-- 成功頁 -->
+    <div id="successPage" style="display:none;">
+        <div class="success-page">
+            <div class="success-icon">🎉</div>
+            <div class="success-title">預約成功！</div>
+            <div class="success-number" id="bookingNumberDisplay"></div>
+            <div class="success-detail" id="successDetail"></div>
+            <button class="btn btn-primary" style="margin-top:24px;" onclick="resetBooking()">再次預約</button>
+        </div>
+    </div>
+
+    <!-- 錯誤頁 -->
+    <div id="errorPage" style="display:none;">
+        <div style="text-align:center;padding:60px 20px;">
+            <div style="font-size:48px;margin-bottom:16px;">😕</div>
+            <div style="font-size:16px;font-weight:700;color:#EF4444;" id="errorMsg">無法載入預約頁面</div>
+        </div>
+    </div>
+</div>
+
+<script>
+const CONFIG = {
+    SUPABASE_URL: 'https://nssuisyvlrqnqfxupklb.supabase.co',
+    SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5zc3Vpc3l2bHJxbnFmeHVwa2xiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkyOTAwMzUsImV4cCI6MjA4NDg2NjAzNX0.q_B6v3gf1TOCuAq7z0xIw10wDueCSJn0p37VzdMfmbc'
+};
+const sb = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+
+// 從 URL 取得 company_id
+const urlParams = new URLSearchParams(window.location.search);
+const companyId = urlParams.get('store') || urlParams.get('company');
+
+let currentStep = 1;
+let selectedService = null;
+let selectedStaff = null;    // null = 不指定
+let selectedDate = null;
+let selectedSlot = null;
+let calYear, calMonth;
+let allServices = [];
+let allStaff = [];
+let allSlots = [];
+
+function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+// 台灣日期
+function localDate() {
+    return new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Taipei' }));
+}
+
+// ===== 初始化 =====
+document.addEventListener('DOMContentLoaded', async () => {
+    if (!companyId) {
+        showError('缺少商店參數，請從正確連結進入');
+        return;
+    }
+
+    const now = localDate();
+    calYear = now.getFullYear();
+    calMonth = now.getMonth();
+
+    try {
+        // 載入公司名稱
+        const { data: comp } = await sb.from('companies').select('name').eq('id', companyId).maybeSingle();
+        if (comp) {
+            document.getElementById('storeName').textContent = comp.name;
+            document.title = comp.name + ' - 線上預約';
+        }
+
+        // 載入服務項目
+        const { data: services } = await sb.from('service_items')
+            .select('*')
+            .eq('company_id', companyId)
+            .eq('is_active', true)
+            .order('sort_order');
+        allServices = services || [];
+
+        // 載入可預約技師
+        const { data: staff } = await sb.from('staff_profiles')
+            .select('*, employees(name)')
+            .eq('company_id', companyId)
+            .eq('is_bookable', true);
+        allStaff = (staff || []).map(s => ({ ...s, name: s.employees?.name || '未命名' }));
+
+        // 載入時段
+        const { data: slots } = await sb.from('service_time_slots')
+            .select('*')
+            .eq('company_id', companyId)
+            .eq('is_active', true)
+            .order('slot_time');
+        allSlots = slots || [];
+
+        renderServices();
+    } catch (e) {
+        console.error(e);
+        showError('載入失敗，請重新整理再試');
+    }
+});
+
+function showError(msg) {
+    document.getElementById('errorMsg').textContent = msg;
+    document.querySelectorAll('.step-panel').forEach(p => p.style.display = 'none');
+    document.getElementById('stepDots').style.display = 'none';
+    document.getElementById('errorPage').style.display = '';
+}
+
+// ===== 步驟切換 =====
+function goStep(n) {
+    // 驗證
+    if (n === 6) {
+        const name = document.getElementById('custName').value.trim();
+        const phone = document.getElementById('custPhone').value.trim();
+        if (!name || !phone) { alert('請填寫姓名和電話'); return; }
+    }
+
+    currentStep = n;
+    for (let i = 1; i <= 6; i++) {
+        const el = document.getElementById('step' + i);
+        if (el) el.style.display = i === n ? '' : 'none';
+    }
+    document.getElementById('successPage').style.display = 'none';
+
+    // 更新步驟點
+    document.querySelectorAll('.step-dot').forEach((dot, i) => {
+        dot.className = 'step-dot' + (i + 1 === n ? ' active' : (i + 1 < n ? ' done' : ''));
+    });
+
+    // 步驟進入時的動作
+    if (n === 3) renderCalendar();
+    if (n === 4) renderSlots();
+    if (n === 6) renderSummary();
+
+    window.scrollTo(0, 0);
+}
+
+// ===== Step 1: 服務項目 =====
+function renderServices() {
+    const el = document.getElementById('serviceList');
+    if (allServices.length === 0) {
+        el.innerHTML = '<div class="empty-msg">目前沒有開放預約的服務項目</div>';
+        return;
+    }
+    el.innerHTML = allServices.map(s => `
+        <div class="card ${selectedService?.id === s.id ? 'selected' : ''}" onclick="selectService('${s.id}')">
+            <div class="card-title">${esc(s.name)}</div>
+            ${s.description ? '<div class="card-sub">' + esc(s.description) + '</div>' : ''}
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;">
+                <div class="card-price">${s.price > 0 ? 'NT$ ' + s.price.toLocaleString() : '免費'}</div>
+                <div class="card-sub">${s.duration_minutes} 分鐘</div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function selectService(id) {
+    selectedService = allServices.find(s => s.id === id);
+    renderServices();
+    setTimeout(() => goStep(2), 200);
+}
+
+// ===== Step 2: 選擇技師 =====
+function renderStaffAfterSelect() {
+    const el = document.getElementById('staffList');
+    let html = `
+        <div class="card ${selectedStaff === null ? 'selected' : ''}" onclick="selectStaff(null)">
+            <div class="staff-card">
+                <div class="staff-avatar">🎲</div>
+                <div class="staff-info">
+                    <div class="card-title">不指定</div>
+                    <div class="staff-bio">由系統安排可用的服務人員</div>
+                </div>
+            </div>
+        </div>`;
+    allStaff.forEach(s => {
+        html += `
+        <div class="card ${selectedStaff?.id === s.id ? 'selected' : ''}" onclick="selectStaff('${s.id}')">
+            <div class="staff-card">
+                <div class="staff-avatar">${s.photo_url ? '<img src="' + esc(s.photo_url) + '">' : '👤'}</div>
+                <div class="staff-info">
+                    <div class="card-title">${esc(s.name)}</div>
+                    ${s.bio ? '<div class="staff-bio">' + esc(s.bio) + '</div>' : ''}
+                </div>
+            </div>
+        </div>`;
+    });
+    el.innerHTML = html;
+}
+
+// goStep(2) 時渲染技師列表
+const origGoStep = goStep;
+// 用事件驅動方式在 step 2 渲染
+(function() {
+    const _goStep = goStep;
+    goStep = function(n) {
+        _goStep(n);
+        if (n === 2) renderStaffAfterSelect();
+    };
+})();
+
+function selectStaff(id) {
+    selectedStaff = id ? allStaff.find(s => s.id === id) : null;
+    renderStaffAfterSelect();
+    setTimeout(() => goStep(3), 200);
+}
+
+// ===== Step 3: 日期選擇 =====
+function changeMonth(delta) {
+    calMonth += delta;
+    if (calMonth > 11) { calMonth = 0; calYear++; }
+    if (calMonth < 0) { calMonth = 11; calYear--; }
+    renderCalendar();
+}
+
+function renderCalendar() {
+    const now = localDate();
+    const today = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+
+    document.getElementById('monthLabel').textContent = calYear + '年' + (calMonth + 1) + '月';
+
+    const firstDay = new Date(calYear, calMonth, 1).getDay();
+    const lastDate = new Date(calYear, calMonth + 1, 0).getDate();
+    const grid = document.getElementById('dateGrid');
+
+    // 可預約天數限制（預設 30 天）
+    const maxDate = new Date(now);
+    maxDate.setDate(maxDate.getDate() + 30);
+
+    let html = '';
+    // 空格
+    for (let i = 0; i < firstDay; i++) html += '<div></div>';
+
+    const DOW = ['日','一','二','三','四','五','六'];
+    for (let d = 1; d <= lastDate; d++) {
+        const dateStr = calYear + '-' + String(calMonth + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+        const dateObj = new Date(calYear, calMonth, d);
+        const dow = dateObj.getDay();
+        const isPast = dateStr < today;
+        const isTooFar = dateObj > maxDate;
+
+        // 檢查該星期幾是否有時段
+        const hasSlot = allSlots.some(s => s.day_of_week === null || s.day_of_week === dow);
+        const disabled = isPast || isTooFar || !hasSlot;
+        const selected = selectedDate === dateStr;
+
+        html += `<div class="date-cell ${disabled ? 'disabled' : ''} ${selected ? 'selected' : ''}" onclick="selectDate('${dateStr}')">
+            <div class="dow">${DOW[dow]}</div>
+            <div class="day">${d}</div>
+        </div>`;
+    }
+    grid.innerHTML = html;
+}
+
+function selectDate(dateStr) {
+    selectedDate = dateStr;
+    renderCalendar();
+    setTimeout(() => goStep(4), 200);
+}
+
+// ===== Step 4: 時段選擇 =====
+async function renderSlots() {
+    const el = document.getElementById('slotList');
+    el.innerHTML = '<div class="loading"><div class="spinner"></div>查詢可用時段...</div>';
+
+    const dateObj = new Date(selectedDate);
+    const dow = dateObj.getDay();
+
+    // 取該日期的可用時段
+    const daySlots = allSlots.filter(s => s.day_of_week === null || s.day_of_week === dow);
+
+    if (daySlots.length === 0) {
+        el.innerHTML = '<div class="empty-msg">此日期沒有可預約的時段</div><div class="btn-row"><button class="btn btn-secondary" onclick="goStep(3)">← 選擇其他日期</button></div>';
+        return;
+    }
+
+    // 查已預約數量
+    let bookingQuery = sb.from('service_bookings')
+        .select('slot_time')
+        .eq('company_id', companyId)
+        .eq('booking_date', selectedDate)
+        .in('status', ['pending', 'confirmed']);
+
+    if (selectedStaff) {
+        bookingQuery = bookingQuery.eq('employee_id', selectedStaff.employee_id);
+    }
+
+    const { data: existing } = await bookingQuery;
+    const countMap = {};
+    (existing || []).forEach(b => {
+        countMap[b.slot_time] = (countMap[b.slot_time] || 0) + 1;
+    });
+
+    // 過濾已過時段（如果是今天）
+    const now = localDate();
+    const isToday = selectedDate === (now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0'));
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+
+    let html = '<div class="slot-grid">';
+    daySlots.forEach(s => {
+        const booked = countMap[s.slot_time] || 0;
+        const remain = s.max_concurrent - booked;
+        const [h, m] = s.slot_time.split(':').map(Number);
+        const slotMinutes = h * 60 + m;
+        const isPast = isToday && slotMinutes <= nowMinutes;
+        const isFull = remain <= 0;
+        const disabled = isPast || isFull;
+        const selected = selectedSlot === s.slot_time;
+
+        html += `<div class="slot-btn ${disabled ? 'disabled' : ''} ${selected ? 'selected' : ''}" onclick="selectSlot('${s.slot_time}')">
+            ${s.slot_time}
+            <div class="slot-remain">${isFull ? '已滿' : (isPast ? '已過' : '剩 ' + remain + ' 位')}</div>
+        </div>`;
+    });
+    html += '</div><div class="btn-row"><button class="btn btn-secondary" onclick="goStep(3)">← 上一步</button></div>';
+    el.innerHTML = html;
+}
+
+function selectSlot(time) {
+    selectedSlot = time;
+    goStep(5);
+}
+
+// ===== Step 6: 確認摘要 =====
+function renderSummary() {
+    const name = document.getElementById('custName').value.trim();
+    const phone = document.getElementById('custPhone').value.trim();
+    const notes = document.getElementById('custNotes').value.trim();
+
+    document.getElementById('summaryCard').innerHTML = `
+        <div class="summary-row"><span class="summary-label">服務項目</span><span class="summary-value">${esc(selectedService?.name || '')}</span></div>
+        <div class="summary-row"><span class="summary-label">服務人員</span><span class="summary-value">${selectedStaff ? esc(selectedStaff.name) : '不指定'}</span></div>
+        <div class="summary-row"><span class="summary-label">預約日期</span><span class="summary-value">${selectedDate}</span></div>
+        <div class="summary-row"><span class="summary-label">預約時段</span><span class="summary-value">${selectedSlot}</span></div>
+        <div class="summary-row"><span class="summary-label">姓名</span><span class="summary-value">${esc(name)}</span></div>
+        <div class="summary-row"><span class="summary-label">電話</span><span class="summary-value">${esc(phone)}</span></div>
+        ${notes ? '<div class="summary-row"><span class="summary-label">備註</span><span class="summary-value">' + esc(notes) + '</span></div>' : ''}
+        <div class="summary-row"><span class="summary-label">預估費用</span><span class="summary-value" style="color:#7C3AED;">${selectedService?.price > 0 ? 'NT$ ' + selectedService.price.toLocaleString() : '免費'}</span></div>
+    `;
+}
+
+// ===== 送出預約 =====
+async function submitBooking() {
+    const btn = document.getElementById('submitBtn');
+    btn.disabled = true;
+    btn.textContent = '送出中...';
+
+    try {
+        const name = document.getElementById('custName').value.trim();
+        const phone = document.getElementById('custPhone').value.trim();
+        const notes = document.getElementById('custNotes').value.trim();
+
+        // 產生預約編號
+        const now = new Date();
+        const bookingNumber = 'S' + String(now.getMonth() + 1).padStart(2, '0') + String(now.getDate()).padStart(2, '0') + '-' + String(now.getHours()).padStart(2, '0') + String(now.getMinutes()).padStart(2, '0') + String(now.getSeconds()).padStart(2, '0');
+
+        const { data, error } = await sb.from('service_bookings').insert({
+            company_id: companyId,
+            booking_date: selectedDate,
+            slot_time: selectedSlot,
+            employee_id: selectedStaff?.employee_id || null,
+            service_item_id: selectedService.id,
+            customer_name: name,
+            customer_phone: phone,
+            notes: notes || null,
+            status: 'pending',
+            booking_number: bookingNumber
+        }).select().single();
+
+        if (error) throw error;
+
+        // 顯示成功頁
+        document.querySelectorAll('.step-panel').forEach(p => p.style.display = 'none');
+        document.getElementById('stepDots').style.display = 'none';
+        document.getElementById('bookingNumberDisplay').textContent = '預約編號：' + bookingNumber;
+        document.getElementById('successDetail').innerHTML =
+            '服務：' + esc(selectedService.name) + '<br>' +
+            '日期：' + selectedDate + ' ' + selectedSlot + '<br>' +
+            '服務人員：' + (selectedStaff ? esc(selectedStaff.name) : '不指定') + '<br><br>' +
+            '<span style="color:#F59E0B;font-weight:600;">狀態：待確認</span><br>' +
+            '店家確認後將通知您';
+        document.getElementById('successPage').style.display = '';
+    } catch (e) {
+        console.error(e);
+        alert('預約失敗：' + (e.message || '請重試'));
+        btn.disabled = false;
+        btn.textContent = '確認送出';
+    }
+}
+
+// 重新預約
+function resetBooking() {
+    selectedService = null;
+    selectedStaff = null;
+    selectedDate = null;
+    selectedSlot = null;
+    document.getElementById('custName').value = '';
+    document.getElementById('custPhone').value = '';
+    document.getElementById('custNotes').value = '';
+    document.getElementById('stepDots').style.display = '';
+    document.getElementById('successPage').style.display = 'none';
+    renderServices();
+    goStep(1);
+}
+</script>
+</body>
+</html>

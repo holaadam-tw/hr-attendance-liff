@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>✂️ 預約系統（服務業）</title>
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="loadingPage" class="loading-screen">
+        <div class="spinner"></div>
+        <p>系統載入中...</p>
+    </div>
+
+    <div class="container">
+        <div id="mainPage" class="page active">
+            <button class="btn btn-secondary" onclick="window.location.href='index.html'" style="width:auto;margin-bottom:10px;">← 返回</button>
+            <div class="checkin-page">
+                <h2>✂️ 預約系統（服務業）</h2>
+
+                <!-- Tab 切換 -->
+                <div style="display:flex;gap:4px;margin-bottom:16px;background:#F1F5F9;border-radius:10px;padding:3px;">
+                    <button class="bsTab active-tab" onclick="switchBsTab('bookings',this)" style="flex:1;padding:10px;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;background:#fff;color:#4F46E5;box-shadow:0 1px 4px rgba(0,0,0,0.08);">📋 預約列表</button>
+                    <button class="bsTab" onclick="switchBsTab('staff',this)" id="tabStaff" style="flex:1;padding:10px;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;background:transparent;color:#94A3B8;">👥 技師管理</button>
+                    <button class="bsTab" onclick="switchBsTab('services',this)" id="tabServices" style="flex:1;padding:10px;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;background:transparent;color:#94A3B8;">✂️ 服務項目</button>
+                    <button class="bsTab" onclick="switchBsTab('slots',this)" id="tabSlots" style="flex:1;padding:10px;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;background:transparent;color:#94A3B8;">⏰ 時段</button>
+                </div>
+
+                <!-- Tab 1: 預約列表 -->
+                <div id="bsTabBookings">
+                    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+                        <input type="date" id="bsFilterDate" onchange="loadBookings()" style="flex:1;min-width:140px;padding:8px 10px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;">
+                        <select id="bsFilterStaff" onchange="loadBookings()" style="flex:1;min-width:100px;padding:8px 10px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;">
+                            <option value="">全部人員</option>
+                        </select>
+                        <select id="bsFilterStatus" onchange="loadBookings()" style="flex:1;min-width:90px;padding:8px 10px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;">
+                            <option value="">全部狀態</option>
+                            <option value="pending">待確認</option>
+                            <option value="confirmed">已確認</option>
+                            <option value="completed">已完成</option>
+                            <option value="cancelled">已取消</option>
+                        </select>
+                    </div>
+                    <div id="bookingList"></div>
+                </div>
+
+                <!-- Tab 2: 技師管理 -->
+                <div id="bsTabStaff" style="display:none;">
+                    <div id="staffMgrList"></div>
+                    <button class="btn btn-primary" onclick="addStaffProfile()" style="margin-top:12px;font-size:14px;padding:12px;border-radius:12px;">+ 新增技師</button>
+                </div>
+
+                <!-- Tab 3: 服務項目 -->
+                <div id="bsTabServices" style="display:none;">
+                    <div id="serviceMgrList"></div>
+                    <button class="btn btn-primary" onclick="addServiceItem()" style="margin-top:12px;font-size:14px;padding:12px;border-radius:12px;">+ 新增服務項目</button>
+                </div>
+
+                <!-- Tab 4: 時段設定 -->
+                <div id="bsTabSlots" style="display:none;">
+                    <div id="slotMgrList"></div>
+                    <button class="btn btn-primary" onclick="addTimeSlot()" style="margin-top:12px;font-size:14px;padding:12px;border-radius:12px;">+ 新增時段</button>
+
+                    <!-- 預約連結 -->
+                    <div style="margin-top:20px;padding:16px;background:#FAF5FF;border-radius:12px;border:1px solid #E9D5FF;">
+                        <div style="font-size:13px;font-weight:700;color:#7C3AED;margin-bottom:8px;">📎 消費者預約連結</div>
+                        <div id="bookingLink" style="font-size:12px;color:#64748B;word-break:break-all;line-height:1.5;"></div>
+                        <button class="btn btn-secondary" onclick="copyBookingLink()" style="margin-top:8px;font-size:13px;padding:8px;border-radius:8px;">複製連結</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="common.js"></script>
+    <script>
+    let currentEmployee = null;
+    let isAdmin = false;
+
+    function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+    function localDate() {
+        const d = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Taipei' }));
+        return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    }
+
+    // ===== Tab 切換 =====
+    function switchBsTab(tab, btn) {
+        ['bookings', 'staff', 'services', 'slots'].forEach(t => {
+            const el = document.getElementById('bsTab' + t.charAt(0).toUpperCase() + t.slice(1));
+            if (el) el.style.display = t === tab ? '' : 'none';
+        });
+        document.querySelectorAll('.bsTab').forEach(b => {
+            b.style.background = 'transparent';
+            b.style.color = '#94A3B8';
+            b.style.boxShadow = 'none';
+        });
+        if (btn) {
+            btn.style.background = '#fff';
+            btn.style.color = '#4F46E5';
+            btn.style.boxShadow = '0 1px 4px rgba(0,0,0,0.08)';
+        }
+
+        if (tab === 'bookings') loadBookings();
+        if (tab === 'staff') loadStaffProfiles();
+        if (tab === 'services') loadServiceItems();
+        if (tab === 'slots') loadTimeSlots();
+    }
+
+    // ===== 初始化 =====
+    window.addEventListener('load', async () => {
+        try {
+            const initialized = await initializeLiff();
+            const loadingPage = document.getElementById('loadingPage');
+            if (loadingPage) loadingPage.style.display = 'none';
+
+            if (!initialized) {
+                alert('LIFF 初始化失敗，請從 LINE 開啟');
+                return;
+            }
+
+            // 取得員工資料
+            const { data: emp } = await sb.from('employees')
+                .select('*')
+                .eq('line_user_id', liffProfile.userId)
+                .eq('is_active', true)
+                .maybeSingle();
+
+            if (!emp) {
+                alert('找不到員工資料');
+                window.location.href = 'index.html';
+                return;
+            }
+
+            currentEmployee = emp;
+            window.currentCompanyId = emp.company_id;
+            window.currentEmployee = emp;
+            isAdmin = (emp.role === 'admin' || emp.role === 'platform_admin');
+
+            // 非管理員隱藏管理 tab
+            if (!isAdmin) {
+                document.getElementById('tabStaff').style.display = 'none';
+                document.getElementById('tabServices').style.display = 'none';
+                document.getElementById('tabSlots').style.display = 'none';
+            }
+
+            // 初始化日期篩選
+            document.getElementById('bsFilterDate').value = localDate();
+
+            // 載入技師篩選下拉
+            await loadStaffFilter();
+            loadBookings();
+
+            // 設定預約連結
+            const link = window.location.origin + window.location.pathname.replace('booking_service_admin.html', 'booking_service.html') + '?store=' + emp.company_id;
+            document.getElementById('bookingLink').textContent = link;
+
+        } catch (e) {
+            console.error(e);
+            const loadingPage = document.getElementById('loadingPage');
+            if (loadingPage) loadingPage.style.display = 'none';
+            alert('載入失敗：' + e.message);
+        }
+    });
+
+    // ===== 預約連結 =====
+    function copyBookingLink() {
+        const link = document.getElementById('bookingLink').textContent;
+        navigator.clipboard.writeText(link).then(() => {
+            showToast('已複製預約連結');
+        }).catch(() => {
+            prompt('請手動複製：', link);
+        });
+    }
+
+    // ===== Tab 1: 預約列表 =====
+    async function loadStaffFilter() {
+        const { data: staff } = await sb.from('staff_profiles')
+            .select('employee_id, employees(name)')
+            .eq('company_id', window.currentCompanyId);
+
+        const sel = document.getElementById('bsFilterStaff');
+        (staff || []).forEach(s => {
+            const opt = document.createElement('option');
+            opt.value = s.employee_id;
+            opt.textContent = s.employees?.name || '未命名';
+            sel.appendChild(opt);
+        });
+    }
+
+    async function loadBookings() {
+        const el = document.getElementById('bookingList');
+        el.innerHTML = '<div style="text-align:center;padding:24px;color:#94A3B8;">載入中...</div>';
+
+        const date = document.getElementById('bsFilterDate').value;
+        const staffId = document.getElementById('bsFilterStaff').value;
+        const status = document.getElementById('bsFilterStatus').value;
+
+        let query = sb.from('service_bookings')
+            .select('*, service_items(name), employees(name)')
+            .eq('company_id', window.currentCompanyId)
+            .order('slot_time');
+
+        if (date) query = query.eq('booking_date', date);
+        if (staffId) query = query.eq('employee_id', staffId);
+        if (status) query = query.eq('status', status);
+
+        // 非管理員只能看自己的預約
+        if (!isAdmin) {
+            query = query.eq('employee_id', currentEmployee.id);
+        }
+
+        const { data, error } = await query;
+        if (error) {
+            el.innerHTML = '<div style="text-align:center;padding:24px;color:#EF4444;">載入失敗</div>';
+            return;
+        }
+
+        if (!data || data.length === 0) {
+            el.innerHTML = '<div style="text-align:center;padding:24px;color:#94A3B8;">沒有預約記錄</div>';
+            return;
+        }
+
+        const STATUS_MAP = { pending: { label: '待確認', color: '#F59E0B', bg: '#FEF3C7' }, confirmed: { label: '已確認', color: '#3B82F6', bg: '#DBEAFE' }, completed: { label: '已完成', color: '#10B981', bg: '#D1FAE5' }, cancelled: { label: '已取消', color: '#94A3B8', bg: '#F1F5F9' } };
+
+        el.innerHTML = data.map(b => {
+            const st = STATUS_MAP[b.status] || STATUS_MAP.pending;
+            return `<div style="background:#fff;border-radius:12px;padding:14px;margin-bottom:8px;box-shadow:0 1px 3px rgba(0,0,0,.06);">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                    <span style="font-weight:700;font-size:15px;">${b.slot_time}</span>
+                    <span style="font-size:11px;padding:3px 8px;border-radius:6px;font-weight:600;color:${st.color};background:${st.bg};">${st.label}</span>
+                </div>
+                <div style="font-size:13px;color:#475569;line-height:1.6;">
+                    <div>👤 ${esc(b.customer_name)} ${b.customer_phone ? '・' + esc(b.customer_phone) : ''}</div>
+                    <div>✂️ ${esc(b.service_items?.name || '未指定')} ${b.employees?.name ? '・' + esc(b.employees.name) : '（不指定）'}</div>
+                    ${b.notes ? '<div style="color:#94A3B8;">📝 ' + esc(b.notes) + '</div>' : ''}
+                    <div style="font-size:11px;color:#CBD5E1;">編號 ${esc(b.booking_number || '-')}</div>
+                </div>
+                ${b.status === 'pending' || b.status === 'confirmed' ? '<div style="display:flex;gap:6px;margin-top:8px;">' +
+                    (b.status === 'pending' ? '<button onclick="updateBsStatus(\'' + b.id + '\',\'confirmed\')" style="flex:1;padding:8px;border:none;border-radius:8px;background:#DBEAFE;color:#1D4ED8;font-size:12px;font-weight:600;cursor:pointer;">確認</button>' : '') +
+                    (b.status === 'confirmed' ? '<button onclick="updateBsStatus(\'' + b.id + '\',\'completed\')" style="flex:1;padding:8px;border:none;border-radius:8px;background:#D1FAE5;color:#059669;font-size:12px;font-weight:600;cursor:pointer;">完成</button>' : '') +
+                    '<button onclick="updateBsStatus(\'' + b.id + '\',\'cancelled\')" style="flex:1;padding:8px;border:none;border-radius:8px;background:#FEE2E2;color:#DC2626;font-size:12px;font-weight:600;cursor:pointer;">取消</button>' +
+                '</div>' : ''}
+            </div>`;
+        }).join('');
+    }
+
+    async function updateBsStatus(id, newStatus) {
+        if (newStatus === 'cancelled') {
+            const reason = prompt('取消原因（選填）：');
+            const update = { status: newStatus, cancelled_reason: reason || null };
+            const { error } = await sb.from('service_bookings').update(update).eq('id', id);
+            if (error) { showToast('操作失敗'); return; }
+        } else {
+            const update = { status: newStatus };
+            if (newStatus === 'confirmed') update.confirmed_at = new Date().toISOString();
+            const { error } = await sb.from('service_bookings').update(update).eq('id', id);
+            if (error) { showToast('操作失敗'); return; }
+        }
+        showToast('已更新');
+        loadBookings();
+    }
+
+    // ===== Tab 2: 技師管理 =====
+    async function loadStaffProfiles() {
+        const el = document.getElementById('staffMgrList');
+        el.innerHTML = '<div style="text-align:center;padding:24px;color:#94A3B8;">載入中...</div>';
+
+        const { data } = await sb.from('staff_profiles')
+            .select('*, employees(name)')
+            .eq('company_id', window.currentCompanyId);
+
+        if (!data || data.length === 0) {
+            el.innerHTML = '<div style="text-align:center;padding:24px;color:#94A3B8;">尚未新增技師</div>';
+            return;
+        }
+
+        el.innerHTML = data.map(s => `
+            <div style="background:#fff;border-radius:12px;padding:14px;margin-bottom:8px;box-shadow:0 1px 3px rgba(0,0,0,.06);display:flex;align-items:center;gap:12px;">
+                <div style="width:48px;height:48px;border-radius:50%;background:#E2E8F0;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">
+                    ${s.photo_url ? '<img src="' + esc(s.photo_url) + '" style="width:100%;height:100%;object-fit:cover;">' : '👤'}
+                </div>
+                <div style="flex:1;">
+                    <div style="font-weight:700;font-size:14px;">${esc(s.employees?.name || '未命名')}</div>
+                    <div style="font-size:12px;color:#64748B;margin-top:2px;">${s.bio ? esc(s.bio) : '未設定簡介'}</div>
+                    <div style="font-size:11px;margin-top:4px;">
+                        <span style="padding:2px 6px;border-radius:4px;font-weight:600;${s.is_bookable ? 'background:#D1FAE5;color:#059669;' : 'background:#FEE2E2;color:#DC2626;'}">${s.is_bookable ? '開放預約' : '暫停預約'}</span>
+                    </div>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:4px;">
+                    <button onclick="editStaffProfile('${s.id}')" style="padding:6px 10px;border:none;border-radius:6px;background:#EEF2FF;color:#4F46E5;font-size:11px;font-weight:600;cursor:pointer;">編輯</button>
+                    <button onclick="toggleStaffBookable('${s.id}',${!s.is_bookable})" style="padding:6px 10px;border:none;border-radius:6px;background:#F1F5F9;color:#64748B;font-size:11px;font-weight:600;cursor:pointer;">${s.is_bookable ? '暫停' : '開放'}</button>
+                    <button onclick="deleteStaffProfile('${s.id}')" style="padding:6px 10px;border:none;border-radius:6px;background:#FEE2E2;color:#DC2626;font-size:11px;font-weight:600;cursor:pointer;">刪除</button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    async function addStaffProfile() {
+        // 取未加入的員工
+        const { data: existing } = await sb.from('staff_profiles')
+            .select('employee_id')
+            .eq('company_id', window.currentCompanyId);
+        const existIds = (existing || []).map(e => e.employee_id);
+
+        const { data: emps } = await sb.from('employees')
+            .select('id, name')
+            .eq('company_id', window.currentCompanyId)
+            .eq('is_active', true);
+
+        const available = (emps || []).filter(e => !existIds.includes(e.id));
+        if (available.length === 0) {
+            showToast('所有員工都已加入');
+            return;
+        }
+
+        const list = available.map((e, i) => (i + 1) + '. ' + e.name).join('\n');
+        const choice = prompt('選擇員工（輸入編號）：\n' + list);
+        const idx = parseInt(choice) - 1;
+        if (isNaN(idx) || idx < 0 || idx >= available.length) return;
+
+        const emp = available[idx];
+        const bio = prompt('簡介（選填）：', '') || null;
+
+        const { error } = await sb.from('staff_profiles').insert({
+            company_id: window.currentCompanyId,
+            employee_id: emp.id,
+            bio: bio,
+            is_bookable: true
+        });
+
+        if (error) { showToast('新增失敗：' + error.message); return; }
+        showToast('已新增');
+        loadStaffProfiles();
+    }
+
+    async function editStaffProfile(id) {
+        const { data: s } = await sb.from('staff_profiles').select('*').eq('id', id).maybeSingle();
+        if (!s) return;
+        const bio = prompt('簡介：', s.bio || '');
+        if (bio === null) return;
+        const photoUrl = prompt('照片 URL（留空不改）：', s.photo_url || '');
+
+        const update = { bio: bio || null, updated_at: new Date().toISOString() };
+        if (photoUrl !== null && photoUrl !== (s.photo_url || '')) update.photo_url = photoUrl || null;
+
+        const { error } = await sb.from('staff_profiles').update(update).eq('id', id);
+        if (error) { showToast('更新失敗'); return; }
+        showToast('已更新');
+        loadStaffProfiles();
+    }
+
+    async function toggleStaffBookable(id, bookable) {
+        await sb.from('staff_profiles').update({ is_bookable: bookable, updated_at: new Date().toISOString() }).eq('id', id);
+        showToast(bookable ? '已開放預約' : '已暫停預約');
+        loadStaffProfiles();
+    }
+
+    async function deleteStaffProfile(id) {
+        if (!confirm('確定刪除此技師？')) return;
+        await sb.from('staff_profiles').delete().eq('id', id);
+        showToast('已刪除');
+        loadStaffProfiles();
+    }
+
+    // ===== Tab 3: 服務項目 =====
+    async function loadServiceItems() {
+        const el = document.getElementById('serviceMgrList');
+        el.innerHTML = '<div style="text-align:center;padding:24px;color:#94A3B8;">載入中...</div>';
+
+        const { data } = await sb.from('service_items')
+            .select('*')
+            .eq('company_id', window.currentCompanyId)
+            .order('sort_order');
+
+        if (!data || data.length === 0) {
+            el.innerHTML = '<div style="text-align:center;padding:24px;color:#94A3B8;">尚未新增服務項目</div>';
+            return;
+        }
+
+        el.innerHTML = data.map(s => `
+            <div style="background:#fff;border-radius:12px;padding:14px;margin-bottom:8px;box-shadow:0 1px 3px rgba(0,0,0,.06);">
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <div>
+                        <div style="font-weight:700;font-size:14px;">${esc(s.name)}</div>
+                        <div style="font-size:12px;color:#64748B;margin-top:2px;">${s.duration_minutes} 分鐘 ${s.description ? '・' + esc(s.description) : ''}</div>
+                    </div>
+                    <div style="text-align:right;">
+                        <div style="font-weight:700;color:#7C3AED;font-size:14px;">${s.price > 0 ? 'NT$ ' + s.price.toLocaleString() : '免費'}</div>
+                        <span style="font-size:10px;padding:2px 6px;border-radius:4px;font-weight:600;${s.is_active ? 'background:#D1FAE5;color:#059669;' : 'background:#FEE2E2;color:#DC2626;'}">${s.is_active ? '啟用' : '停用'}</span>
+                    </div>
+                </div>
+                <div style="display:flex;gap:6px;margin-top:8px;">
+                    <button onclick="editServiceItem('${s.id}')" style="flex:1;padding:6px;border:none;border-radius:6px;background:#EEF2FF;color:#4F46E5;font-size:11px;font-weight:600;cursor:pointer;">編輯</button>
+                    <button onclick="toggleServiceActive('${s.id}',${!s.is_active})" style="flex:1;padding:6px;border:none;border-radius:6px;background:#F1F5F9;color:#64748B;font-size:11px;font-weight:600;cursor:pointer;">${s.is_active ? '停用' : '啟用'}</button>
+                    <button onclick="deleteServiceItem('${s.id}')" style="flex:1;padding:6px;border:none;border-radius:6px;background:#FEE2E2;color:#DC2626;font-size:11px;font-weight:600;cursor:pointer;">刪除</button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    async function addServiceItem() {
+        const name = prompt('服務名稱：');
+        if (!name || !name.trim()) return;
+        const price = prompt('價格（0=免費）：', '0');
+        const duration = prompt('時長（分鐘）：', '60');
+        const desc = prompt('描述（選填）：', '') || null;
+
+        const { error } = await sb.from('service_items').insert({
+            company_id: window.currentCompanyId,
+            name: name.trim(),
+            price: parseInt(price) || 0,
+            duration_minutes: parseInt(duration) || 60,
+            description: desc
+        });
+
+        if (error) { showToast('新增失敗：' + error.message); return; }
+        showToast('已新增');
+        loadServiceItems();
+    }
+
+    async function editServiceItem(id) {
+        const { data: s } = await sb.from('service_items').select('*').eq('id', id).maybeSingle();
+        if (!s) return;
+        const name = prompt('服務名稱：', s.name);
+        if (!name || !name.trim()) return;
+        const price = prompt('價格：', s.price);
+        const duration = prompt('時長（分鐘）：', s.duration_minutes);
+        const desc = prompt('描述：', s.description || '');
+
+        const { error } = await sb.from('service_items').update({
+            name: name.trim(),
+            price: parseInt(price) || 0,
+            duration_minutes: parseInt(duration) || 60,
+            description: desc || null
+        }).eq('id', id);
+
+        if (error) { showToast('更新失敗'); return; }
+        showToast('已更新');
+        loadServiceItems();
+    }
+
+    async function toggleServiceActive(id, active) {
+        await sb.from('service_items').update({ is_active: active }).eq('id', id);
+        showToast(active ? '已啟用' : '已停用');
+        loadServiceItems();
+    }
+
+    async function deleteServiceItem(id) {
+        if (!confirm('確定刪除此服務項目？')) return;
+        await sb.from('service_items').delete().eq('id', id);
+        showToast('已刪除');
+        loadServiceItems();
+    }
+
+    // ===== Tab 4: 時段設定 =====
+    async function loadTimeSlots() {
+        const el = document.getElementById('slotMgrList');
+        el.innerHTML = '<div style="text-align:center;padding:24px;color:#94A3B8;">載入中...</div>';
+
+        const { data } = await sb.from('service_time_slots')
+            .select('*')
+            .eq('company_id', window.currentCompanyId)
+            .order('slot_time');
+
+        if (!data || data.length === 0) {
+            el.innerHTML = '<div style="text-align:center;padding:24px;color:#94A3B8;">尚未設定時段</div>';
+            return;
+        }
+
+        const DOW = ['日','一','二','三','四','五','六'];
+
+        el.innerHTML = data.map(s => `
+            <div style="background:#fff;border-radius:12px;padding:14px;margin-bottom:8px;box-shadow:0 1px 3px rgba(0,0,0,.06);display:flex;justify-content:space-between;align-items:center;">
+                <div>
+                    <div style="font-weight:700;font-size:16px;">${esc(s.slot_time)}</div>
+                    <div style="font-size:12px;color:#64748B;margin-top:2px;">
+                        ${s.day_of_week !== null && s.day_of_week !== undefined ? '每週' + DOW[s.day_of_week] : '每天'}
+                        ・同時 ${s.max_concurrent} 人
+                    </div>
+                </div>
+                <div style="display:flex;gap:4px;">
+                    <button onclick="editTimeSlot('${s.id}')" style="padding:6px 10px;border:none;border-radius:6px;background:#EEF2FF;color:#4F46E5;font-size:11px;font-weight:600;cursor:pointer;">編輯</button>
+                    <button onclick="deleteTimeSlot('${s.id}')" style="padding:6px 10px;border:none;border-radius:6px;background:#FEE2E2;color:#DC2626;font-size:11px;font-weight:600;cursor:pointer;">刪除</button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    async function addTimeSlot() {
+        const time = prompt('時段（HH:MM）：', '10:00');
+        if (!time || !time.trim()) return;
+        const max = prompt('同時可服務人數：', '1');
+        const dowStr = prompt('星期幾（0=日,1=一,...6=六，留空=每天）：', '');
+        const dow = dowStr !== null && dowStr.trim() !== '' ? parseInt(dowStr) : null;
+
+        const { error } = await sb.from('service_time_slots').insert({
+            company_id: window.currentCompanyId,
+            slot_time: time.trim(),
+            max_concurrent: parseInt(max) || 1,
+            day_of_week: dow,
+            is_active: true
+        });
+
+        if (error) { showToast('新增失敗：' + error.message); return; }
+        showToast('已新增');
+        loadTimeSlots();
+    }
+
+    async function editTimeSlot(id) {
+        const { data: s } = await sb.from('service_time_slots').select('*').eq('id', id).maybeSingle();
+        if (!s) return;
+        const time = prompt('時段（HH:MM）：', s.slot_time);
+        if (!time || !time.trim()) return;
+        const max = prompt('同時可服務人數：', s.max_concurrent);
+        const dowStr = prompt('星期幾（0-6，留空=每天）：', s.day_of_week !== null ? s.day_of_week : '');
+        const dow = dowStr !== null && dowStr.trim() !== '' ? parseInt(dowStr) : null;
+
+        const { error } = await sb.from('service_time_slots').update({
+            slot_time: time.trim(),
+            max_concurrent: parseInt(max) || 1,
+            day_of_week: dow
+        }).eq('id', id);
+
+        if (error) { showToast('更新失敗'); return; }
+        showToast('已更新');
+        loadTimeSlots();
+    }
+
+    async function deleteTimeSlot(id) {
+        if (!confirm('確定刪除此時段？')) return;
+        await sb.from('service_time_slots').delete().eq('id', id);
+        showToast('已刪除');
+        loadTimeSlots();
+    }
+    </script>
+</body>
+</html>

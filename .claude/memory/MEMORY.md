@@ -20,10 +20,10 @@
 
 ## 功能開關架構（2026-03-11 更新）
 - DEFAULT_FEATURES（common.js）：leave/attendance/salary/requests=true，其餘=false
-- 功能 key 清單：leave, attendance, salary, requests, lunch, fieldwork, sales_target, store_ordering, booking, loyalty
-- platform.html：FEATURE_LIST 9 項（不含 sales_target，儲存時自動跟隨 fieldwork）
-- platform.html：FEATURE_DEFAULTS + FEATURE_PRESETS（general/catering/all）
-- index.html menu-grid 9 格：leave, attendance, salary, lunch, fieldwork+sales_target, store_ordering, requests, booking, admin-only
+- 功能 key 清單：leave, attendance, salary, requests, lunch, fieldwork, sales_target, store_ordering, booking, booking_service, loyalty
+- platform.html：FEATURE_LIST 10 項（不含 sales_target，儲存時自動跟隨 fieldwork）
+- platform.html：FEATURE_DEFAULTS + FEATURE_PRESETS（general/catering/service/all）
+- index.html menu-grid 10 格：leave, attendance, salary, lunch, fieldwork+sales_target, store_ordering, requests, booking, booking_service, admin-only
 - fieldwork.html：外勤打卡 + 業務週報 + 客戶管理（三 tab），從 services.html 獨立出來
 - services.html：僅保留便當訂購 + 系統設定，舊 #fieldwork/#sales hash 自動重導 fieldwork.html
 - clients 資料表：需執行 016_clients_add_employee_company.sql 加 employee_id/company_id
@@ -31,6 +31,9 @@
 - admin.html hash 路由：HASH_PAGE_MAP（auth.js）支援 #booking, #restaurant 等直接跳轉
 - EMPLOYEE_ALLOWED_HASHES（auth.js）：一般員工可透過 hash 存取的 admin 頁面（目前僅 booking）
 - 預約系統名稱統一為「預約系統（餐飲業）」（index.html + admin.html）
+- 服務業預約系統：booking_service.html（消費者，URL ?store=company_id，不需登入）+ booking_service_admin.html（後台，LIFF 認證）
+- 服務業預約資料表：staff_profiles, service_items, service_time_slots, service_bookings（018_booking_service.sql）
+- booking_service_admin.html：一般員工只看自己預約+隱藏管理tab，admin看全部
 - 三層 AND 邏輯：DEFAULT_FEATURES × INDUSTRY_TEMPLATES × companies.features × feature_visibility
 - `INDUSTRY_TEMPLATES` 保留在 settings.js（common.js getFeatureVisibility 需要）
 - index.html 業主視角：格子上有 toggle switch，控制第二層 feature_visibility（saveSetting）
