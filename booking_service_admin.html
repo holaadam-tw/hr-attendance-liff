@@ -7,6 +7,7 @@
     <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link rel="stylesheet" href="style.css">
+    <link rel="icon" href="data:,">
 </head>
 <body>
     <div id="loadingPage" class="loading-screen">
@@ -76,7 +77,7 @@
 
     <script src="common.js"></script>
     <script>
-    let currentEmployee = null;
+    // currentEmployee, liffProfile, sb 等由 common.js 提供，不需重複宣告
     let isAdmin = false;
 
     function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
