@@ -15,6 +15,9 @@ const HASH_PAGE_MAP = {
     member: 'memberMgrPage'
 };
 
+// 一般員工（非 admin/manager）也可存取的頁面 hash
+const EMPLOYEE_ALLOWED_HASHES = ['booking'];
+
 function getHashTargetPage() {
     const hash = window.location.hash.replace('#', '').toLowerCase();
     return HASH_PAGE_MAP[hash] || null;
@@ -168,6 +171,45 @@ export async function checkAdminPermission() {
         }
 
         if (!data) {
+            // 檢查是否為員工允許存取的頁面（如 #booking）
+            const hash = window.location.hash.replace('#', '').toLowerCase();
+            if (EMPLOYEE_ALLOWED_HASHES.includes(hash)) {
+                // 以一般員工身分載入
+                const { data: empData } = await sb.from('employees')
+                    .select('*')
+                    .eq('line_user_id', liffProfile.userId)
+                    .eq('is_active', true)
+                    .maybeSingle();
+
+                if (empData) {
+                    console.log('📅 一般員工透過 #' + hash + ' 存取');
+                    currentAdminEmployee = empData;
+                    currentCompanyId = empData.company_id || null;
+                    window.currentAdminEmployee = empData;
+                    window.currentCompanyId = currentCompanyId;
+                    updateAdminInfo(empData);
+                    await loadSettings();
+
+                    if (empData.company_id) {
+                        try {
+                            const { data: compData } = await sb.from('companies')
+                                .select('name, features')
+                                .eq('id', empData.company_id)
+                                .maybeSingle();
+                            companyAllowedFeatures = compData?.features || null;
+                            window.companyAllowedFeatures = companyAllowedFeatures;
+                        } catch (e) { console.log('載入公司功能設定失敗', e); }
+                    }
+
+                    showStatus(statusEl, 'success', '✅ 驗證通過');
+                    setTimeout(() => {
+                        const hashPage = getHashTargetPage();
+                        showPage(hashPage || 'adminHomePage');
+                    }, 800);
+                    return;
+                }
+            }
+
             console.log('❌ 找不到管理員/主管資料，LINE ID:', liffProfile?.userId);
             showStatus(statusEl, 'error', '❌ 您沒有管理權限<br><small style="opacity:0.7">LINE ID: ' + escapeHTML(liffProfile?.userId || '未知') + '</small>', true);
             setTimeout(() => { window.location.href = 'index.html'; }, 5000);

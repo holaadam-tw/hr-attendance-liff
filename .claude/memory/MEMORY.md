@@ -27,7 +27,10 @@
 - fieldwork.html：外勤打卡 + 業務週報 + 客戶管理（三 tab），從 services.html 獨立出來
 - services.html：僅保留便當訂購 + 系統設定，舊 #fieldwork/#sales hash 自動重導 fieldwork.html
 - clients 資料表：需執行 016_clients_add_employee_company.sql 加 employee_id/company_id
-- booking 格子已加入 index.html（連結 booking_admin.html）；loyalty 格子尚未加入（待功能完成）
+- booking 格子已加入 index.html（連結 admin.html#booking）；loyalty 格子尚未加入（待功能完成）
+- admin.html hash 路由：HASH_PAGE_MAP（auth.js）支援 #booking, #restaurant 等直接跳轉
+- EMPLOYEE_ALLOWED_HASHES（auth.js）：一般員工可透過 hash 存取的 admin 頁面（目前僅 booking）
+- 預約系統名稱統一為「預約系統（餐飲業）」（index.html + admin.html）
 - 三層 AND 邏輯：DEFAULT_FEATURES × INDUSTRY_TEMPLATES × companies.features × feature_visibility
 - `INDUSTRY_TEMPLATES` 保留在 settings.js（common.js getFeatureVisibility 需要）
 - index.html 業主視角：格子上有 toggle switch，控制第二層 feature_visibility（saveSetting）
