@@ -226,6 +226,7 @@ async function checkUserStatus() {
                 currentCompanyFeatures = selected.features;
                 currentCompanyName = selected.name;
                 currentCompanyIndustry = selected.industry || 'general';
+                window.currentCompanyId = currentCompanyId;
                 sessionStorage.setItem('selectedCompanyId', selected.id);
             }
 
@@ -246,6 +247,7 @@ async function checkUserStatus() {
                 line_user_id: padmin.line_user_id,
                 company_id: currentCompanyId
             };
+            window.currentEmployee = currentEmployee;
 
             await loadSettings();
             if (loadingEl) loadingEl.style.display = 'none';
@@ -268,6 +270,8 @@ async function checkUserStatus() {
         if (data) {
             currentEmployee = data;
             currentCompanyId = data.company_id || null;
+            window.currentCompanyId = currentCompanyId;
+            window.currentEmployee = currentEmployee;
             // 載入公司功能設定
             if (currentCompanyId) {
                 try {
