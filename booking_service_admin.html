@@ -122,23 +122,29 @@
                 return;
             }
 
-            // 取得員工資料
-            const { data: emp } = await sb.from('employees')
-                .select('*')
-                .eq('line_user_id', liffProfile.userId)
-                .eq('is_active', true)
-                .maybeSingle();
+            // platform_admin 已由 common.js checkUserStatus 設定 currentCompanyId
+            if (window.isPlatformAdmin) {
+                isAdmin = true;
+                console.log('👑 平台管理員，當前公司:', window.currentCompanyId);
+            } else {
+                // 一般員工/管理員：用自己的 company_id
+                const { data: emp } = await sb.from('employees')
+                    .select('*')
+                    .eq('line_user_id', liffProfile.userId)
+                    .eq('is_active', true)
+                    .maybeSingle();
 
-            if (!emp) {
-                alert('找不到員工資料');
-                window.location.href = 'index.html';
-                return;
+                if (!emp) {
+                    alert('找不到員工資料');
+                    window.location.href = 'index.html';
+                    return;
+                }
+
+                currentEmployee = emp;
+                window.currentCompanyId = emp.company_id;
+                window.currentEmployee = emp;
+                isAdmin = (emp.role === 'admin');
             }
-
-            currentEmployee = emp;
-            window.currentCompanyId = emp.company_id;
-            window.currentEmployee = emp;
-            isAdmin = (emp.role === 'admin' || emp.role === 'platform_admin');
 
             // 非管理員隱藏管理 tab
             if (!isAdmin) {
