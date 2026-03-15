@@ -7,88 +7,102 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         * { margin:0; padding:0; box-sizing:border-box; }
-        body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:#F8FAFC; color:#1E293B; min-height:100vh; }
+        body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:linear-gradient(135deg, #667eea 0%, #764ba2 100%); color:#1E293B; min-height:100vh; }
 
-        .container { max-width:480px; margin:0 auto; padding:16px; }
+        .container { max-width:480px; margin:0 auto; padding:20px 16px 32px; }
 
         /* 頂部 */
-        .header { text-align:center; padding:24px 0 16px; }
-        .header h1 { font-size:20px; font-weight:800; }
-        .header p { font-size:13px; color:#64748B; margin-top:4px; }
+        .header { text-align:center; padding:32px 0 20px; }
+        .header h1 { font-size:24px; font-weight:800; color:#fff; text-shadow:0 2px 8px rgba(0,0,0,.15); }
+        .header p { font-size:14px; color:rgba(255,255,255,.75); margin-top:6px; }
 
-        /* 步驟指示 */
-        .steps { display:flex; justify-content:center; gap:8px; margin-bottom:24px; }
-        .step-dot { width:10px; height:10px; border-radius:50%; background:#E2E8F0; transition:all .3s; }
-        .step-dot.active { background:#7C3AED; transform:scale(1.3); }
-        .step-dot.done { background:#A78BFA; }
+        /* 步驟指示（橫線式） */
+        .steps { display:flex; align-items:center; justify-content:center; gap:0; margin-bottom:24px; padding:0 32px; }
+        .step-dot { width:12px; height:12px; border-radius:50%; background:rgba(255,255,255,.3); transition:all .3s; flex-shrink:0; }
+        .step-dot.active { background:#fff; transform:scale(1.4); box-shadow:0 0 12px rgba(255,255,255,.5); }
+        .step-dot.done { background:rgba(255,255,255,.7); }
+        .step-line { flex:1; height:2px; background:rgba(255,255,255,.2); }
+        .step-line.done { background:rgba(255,255,255,.6); }
+
+        /* 內容卡片容器 */
+        .content-card { background:#fff; border-radius:24px; padding:24px 20px; box-shadow:0 8px 32px rgba(0,0,0,.12); }
 
         /* 步驟標題 */
-        .step-title { font-size:16px; font-weight:700; margin-bottom:16px; display:flex; align-items:center; gap:8px; }
-        .step-title .num { width:28px; height:28px; border-radius:50%; background:linear-gradient(135deg,#7C3AED,#6D28D9); color:#fff; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:800; }
+        .step-title { font-size:18px; font-weight:800; margin-bottom:20px; display:flex; align-items:center; gap:10px; }
+        .step-title .num { width:32px; height:32px; border-radius:50%; background:linear-gradient(135deg,#7C3AED,#6D28D9); color:#fff; display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:800; flex-shrink:0; box-shadow:0 2px 8px rgba(124,58,237,.3); }
 
         /* 卡片 */
-        .card { background:#fff; border-radius:16px; padding:16px; margin-bottom:12px; box-shadow:0 1px 4px rgba(0,0,0,.06); border:2px solid transparent; cursor:pointer; transition:all .2s; }
-        .card:hover { border-color:#C4B5FD; }
-        .card.selected { border-color:#7C3AED; background:#FAF5FF; }
-        .card-title { font-size:15px; font-weight:700; }
-        .card-sub { font-size:12px; color:#64748B; margin-top:4px; }
-        .card-price { font-size:14px; font-weight:800; color:#7C3AED; margin-top:6px; }
+        .card { background:#fff; border-radius:16px; padding:16px; margin-bottom:12px; box-shadow:0 2px 8px rgba(0,0,0,.04); border:2px solid #F1F5F9; cursor:pointer; transition:all .25s ease; display:flex; align-items:center; gap:14px; }
+        .card:hover { border-color:#C4B5FD; transform:translateY(-1px); box-shadow:0 4px 16px rgba(124,58,237,.1); }
+        .card.selected { border-color:#7C3AED; background:#FAF5FF; box-shadow:0 4px 16px rgba(124,58,237,.15); }
+        .card-icon { width:48px; height:48px; border-radius:14px; background:linear-gradient(135deg,#EDE9FE,#F5F3FF); display:flex; align-items:center; justify-content:center; font-size:22px; flex-shrink:0; }
+        .card.selected .card-icon { background:linear-gradient(135deg,#7C3AED,#6D28D9); }
+        .card-body { flex:1; min-width:0; }
+        .card-title { font-size:16px; font-weight:700; }
+        .card-sub { font-size:12px; color:#64748B; margin-top:3px; line-height:1.4; }
+        .card-meta { display:flex; align-items:center; gap:8px; margin-top:6px; }
+        .card-price { font-size:15px; font-weight:800; color:#7C3AED; }
+        .card-duration { font-size:11px; font-weight:600; color:#64748B; background:#F1F5F9; padding:3px 8px; border-radius:6px; }
+        .card-arrow { color:#C4B5FD; font-size:18px; flex-shrink:0; transition:transform .2s; }
+        .card:hover .card-arrow { transform:translateX(2px); color:#7C3AED; }
 
         /* 技師卡片 */
-        .staff-card { display:flex; gap:12px; align-items:center; }
-        .staff-avatar { width:56px; height:56px; border-radius:50%; background:#E2E8F0; flex-shrink:0; overflow:hidden; display:flex; align-items:center; justify-content:center; font-size:24px; }
+        .staff-card { display:flex; gap:14px; align-items:center; width:100%; }
+        .staff-avatar { width:56px; height:56px; border-radius:50%; background:#E2E8F0; flex-shrink:0; overflow:hidden; display:flex; align-items:center; justify-content:center; font-size:24px; box-shadow:0 2px 8px rgba(0,0,0,.08); }
         .staff-avatar img { width:100%; height:100%; object-fit:cover; }
         .staff-info { flex:1; }
         .staff-bio { font-size:12px; color:#64748B; margin-top:2px; line-height:1.4; }
 
         /* 日期格子 */
         .date-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:6px; }
-        .date-cell { text-align:center; padding:10px 4px; border-radius:10px; cursor:pointer; transition:all .2s; background:#fff; border:1px solid #E2E8F0; }
-        .date-cell:hover { border-color:#C4B5FD; }
-        .date-cell.selected { background:#7C3AED; color:#fff; border-color:#7C3AED; }
-        .date-cell.disabled { opacity:.3; pointer-events:none; }
+        .date-cell { text-align:center; padding:12px 4px; border-radius:12px; cursor:pointer; transition:all .2s; background:#FAFAFA; border:1px solid #F1F5F9; }
+        .date-cell:hover { border-color:#C4B5FD; background:#FAF5FF; }
+        .date-cell.selected { background:linear-gradient(135deg,#7C3AED,#6D28D9); color:#fff; border-color:transparent; box-shadow:0 4px 12px rgba(124,58,237,.3); }
+        .date-cell.disabled { opacity:.25; pointer-events:none; }
         .date-cell .dow { font-size:10px; color:#94A3B8; font-weight:600; }
         .date-cell.selected .dow { color:rgba(255,255,255,.7); }
         .date-cell .day { font-size:16px; font-weight:700; margin-top:2px; }
-        .date-week-header { display:grid; grid-template-columns:repeat(7,1fr); gap:6px; margin-bottom:4px; text-align:center; font-size:11px; color:#94A3B8; font-weight:600; }
+        .date-week-header { display:grid; grid-template-columns:repeat(7,1fr); gap:6px; margin-bottom:6px; text-align:center; font-size:11px; color:#94A3B8; font-weight:700; }
 
         /* 時段 */
-        .slot-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
-        .slot-btn { padding:14px 8px; border-radius:12px; border:1px solid #E2E8F0; background:#fff; text-align:center; cursor:pointer; transition:all .2s; font-size:15px; font-weight:600; }
-        .slot-btn:hover { border-color:#C4B5FD; }
-        .slot-btn.selected { background:#7C3AED; color:#fff; border-color:#7C3AED; }
-        .slot-btn.disabled { opacity:.3; pointer-events:none; background:#F1F5F9; }
-        .slot-btn .slot-remain { font-size:10px; color:#94A3B8; margin-top:2px; }
+        .slot-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+        .slot-btn { padding:16px 8px; border-radius:14px; border:1px solid #F1F5F9; background:#FAFAFA; text-align:center; cursor:pointer; transition:all .2s; font-size:16px; font-weight:700; }
+        .slot-btn:hover { border-color:#C4B5FD; background:#FAF5FF; }
+        .slot-btn.selected { background:linear-gradient(135deg,#7C3AED,#6D28D9); color:#fff; border-color:transparent; box-shadow:0 4px 12px rgba(124,58,237,.3); }
+        .slot-btn.disabled { opacity:.25; pointer-events:none; background:#F8FAFC; }
+        .slot-btn .slot-remain { font-size:10px; color:#94A3B8; margin-top:3px; font-weight:500; }
         .slot-btn.selected .slot-remain { color:rgba(255,255,255,.7); }
 
         /* 表單 */
-        .form-group { margin-bottom:14px; }
-        .form-group label { font-size:13px; font-weight:600; color:#475569; display:block; margin-bottom:6px; }
-        .form-group input, .form-group textarea { width:100%; padding:12px 14px; border:1px solid #E2E8F0; border-radius:10px; font-size:15px; outline:none; transition:border .2s; }
-        .form-group input:focus, .form-group textarea:focus { border-color:#7C3AED; }
-        .form-group textarea { resize:none; height:80px; }
+        .form-group { margin-bottom:16px; }
+        .form-group label { font-size:13px; font-weight:700; color:#475569; display:block; margin-bottom:8px; }
+        .form-group input, .form-group textarea { width:100%; padding:14px 16px; border:1.5px solid #E2E8F0; border-radius:12px; font-size:15px; outline:none; transition:all .2s; background:#FAFAFA; }
+        .form-group input:focus, .form-group textarea:focus { border-color:#7C3AED; background:#fff; box-shadow:0 0 0 3px rgba(124,58,237,.1); }
+        .form-group textarea { resize:none; height:88px; }
 
         /* 確認摘要 */
-        .summary-card { background:#fff; border-radius:16px; padding:20px; box-shadow:0 2px 8px rgba(0,0,0,.08); }
-        .summary-row { display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px solid #F1F5F9; font-size:14px; }
+        .summary-card { background:#FAFAFA; border-radius:16px; padding:20px; border:1px solid #F1F5F9; }
+        .summary-row { display:flex; justify-content:space-between; padding:11px 0; border-bottom:1px solid #F1F5F9; font-size:14px; }
         .summary-row:last-child { border-bottom:none; }
-        .summary-label { color:#64748B; }
-        .summary-value { font-weight:600; }
+        .summary-label { color:#64748B; font-weight:500; }
+        .summary-value { font-weight:700; }
 
         /* 按鈕 */
-        .btn { width:100%; padding:14px; border:none; border-radius:14px; font-size:16px; font-weight:700; cursor:pointer; transition:all .2s; }
-        .btn-primary { background:linear-gradient(135deg,#7C3AED,#6D28D9); color:#fff; }
-        .btn-primary:disabled { opacity:.5; cursor:not-allowed; }
+        .btn { width:100%; padding:16px; border:none; border-radius:14px; font-size:16px; font-weight:700; cursor:pointer; transition:all .2s; }
+        .btn-primary { background:linear-gradient(135deg,#7C3AED,#6D28D9); color:#fff; box-shadow:0 4px 16px rgba(124,58,237,.3); }
+        .btn-primary:hover { transform:translateY(-1px); box-shadow:0 6px 20px rgba(124,58,237,.4); }
+        .btn-primary:disabled { opacity:.5; cursor:not-allowed; transform:none; box-shadow:none; }
         .btn-secondary { background:#F1F5F9; color:#64748B; }
-        .btn-row { display:flex; gap:10px; margin-top:20px; }
+        .btn-secondary:hover { background:#E2E8F0; }
+        .btn-row { display:flex; gap:10px; margin-top:24px; }
         .btn-row .btn { flex:1; }
 
         /* 成功頁 */
         .success-page { text-align:center; padding:40px 20px; }
         .success-icon { font-size:64px; margin-bottom:16px; }
-        .success-title { font-size:22px; font-weight:800; color:#059669; }
-        .success-number { font-size:18px; font-weight:700; color:#7C3AED; margin:12px 0; padding:12px; background:#FAF5FF; border-radius:12px; }
-        .success-detail { font-size:13px; color:#64748B; line-height:1.6; margin-top:12px; }
+        .success-title { font-size:24px; font-weight:800; color:#059669; }
+        .success-number { font-size:18px; font-weight:700; color:#7C3AED; margin:16px 0; padding:14px; background:linear-gradient(135deg,#FAF5FF,#EDE9FE); border-radius:14px; border:1px solid #E9D5FF; }
+        .success-detail { font-size:13px; color:#64748B; line-height:1.7; margin-top:12px; }
 
         /* 載入 */
         .loading { text-align:center; padding:48px; color:#64748B; }
@@ -98,9 +112,10 @@
         .empty-msg { text-align:center; padding:32px; color:#94A3B8; font-size:14px; }
 
         /* 月份導航 */
-        .month-nav { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
-        .month-nav button { background:none; border:none; font-size:20px; cursor:pointer; padding:8px; color:#64748B; }
-        .month-nav .month-label { font-size:15px; font-weight:700; }
+        .month-nav { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; background:#FAFAFA; border-radius:12px; padding:4px; }
+        .month-nav button { background:none; border:none; font-size:22px; cursor:pointer; padding:10px 14px; color:#64748B; border-radius:8px; transition:background .2s; }
+        .month-nav button:hover { background:#E2E8F0; }
+        .month-nav .month-label { font-size:16px; font-weight:800; }
     </style>
 </head>
 <body>
@@ -111,94 +126,96 @@
     </div>
 
     <div class="steps" id="stepDots">
-        <div class="step-dot active"></div>
+        <div class="step-dot active"></div><div class="step-line"></div>
+        <div class="step-dot"></div><div class="step-line"></div>
+        <div class="step-dot"></div><div class="step-line"></div>
+        <div class="step-dot"></div><div class="step-line"></div>
+        <div class="step-dot"></div><div class="step-line"></div>
         <div class="step-dot"></div>
-        <div class="step-dot"></div>
-        <div class="step-dot"></div>
-        <div class="step-dot"></div>
-        <div class="step-dot"></div>
     </div>
 
-    <!-- Step 1: 選擇服務 -->
-    <div id="step1" class="step-panel">
-        <div class="step-title"><span class="num">1</span>選擇服務項目</div>
-        <div id="serviceList"><div class="loading"><div class="spinner"></div>載入中...</div></div>
-    </div>
-
-    <!-- Step 2: 選擇技師 -->
-    <div id="step2" class="step-panel" style="display:none;">
-        <div class="step-title"><span class="num">2</span>選擇服務人員</div>
-        <div id="staffList"></div>
-        <div class="btn-row"><button class="btn btn-secondary" onclick="goStep(1)">← 上一步</button></div>
-    </div>
-
-    <!-- Step 3: 選擇日期 -->
-    <div id="step3" class="step-panel" style="display:none;">
-        <div class="step-title"><span class="num">3</span>選擇日期</div>
-        <div class="month-nav">
-            <button onclick="changeMonth(-1)">‹</button>
-            <span class="month-label" id="monthLabel"></span>
-            <button onclick="changeMonth(1)">›</button>
+    <div class="content-card">
+        <!-- Step 1: 選擇服務 -->
+        <div id="step1" class="step-panel">
+            <div class="step-title"><span class="num">1</span>選擇服務項目</div>
+            <div id="serviceList"><div class="loading"><div class="spinner"></div>載入中...</div></div>
         </div>
-        <div class="date-week-header"><span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span></div>
-        <div class="date-grid" id="dateGrid"></div>
-        <div class="btn-row"><button class="btn btn-secondary" onclick="goStep(2)">← 上一步</button></div>
-    </div>
 
-    <!-- Step 4: 選擇時段 -->
-    <div id="step4" class="step-panel" style="display:none;">
-        <div class="step-title"><span class="num">4</span>選擇時段</div>
-        <div id="slotList"></div>
-        <div class="btn-row"><button class="btn btn-secondary" onclick="goStep(3)">← 上一步</button></div>
-    </div>
+        <!-- Step 2: 選擇技師 -->
+        <div id="step2" class="step-panel" style="display:none;">
+            <div class="step-title"><span class="num">2</span>選擇服務人員</div>
+            <div id="staffList"></div>
+            <div class="btn-row"><button class="btn btn-secondary" onclick="goStep(1)">← 上一步</button></div>
+        </div>
 
-    <!-- Step 5: 填寫資料 -->
-    <div id="step5" class="step-panel" style="display:none;">
-        <div class="step-title"><span class="num">5</span>填寫預約資料</div>
-        <div class="form-group">
-            <label>姓名 *</label>
-            <input type="text" id="custName" placeholder="請輸入姓名">
+        <!-- Step 3: 選擇日期 -->
+        <div id="step3" class="step-panel" style="display:none;">
+            <div class="step-title"><span class="num">3</span>選擇日期</div>
+            <div class="month-nav">
+                <button onclick="changeMonth(-1)">‹</button>
+                <span class="month-label" id="monthLabel"></span>
+                <button onclick="changeMonth(1)">›</button>
+            </div>
+            <div class="date-week-header"><span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span></div>
+            <div class="date-grid" id="dateGrid"></div>
+            <div class="btn-row"><button class="btn btn-secondary" onclick="goStep(2)">← 上一步</button></div>
         </div>
-        <div class="form-group">
-            <label>電話 *</label>
-            <input type="tel" id="custPhone" placeholder="請輸入手機號碼">
-        </div>
-        <div class="form-group">
-            <label>備註</label>
-            <textarea id="custNotes" placeholder="特殊需求或備註（選填）"></textarea>
-        </div>
-        <div class="btn-row">
-            <button class="btn btn-secondary" onclick="goStep(4)">← 上一步</button>
-            <button class="btn btn-primary" onclick="goStep(6)">下一步 →</button>
-        </div>
-    </div>
 
-    <!-- Step 6: 確認 -->
-    <div id="step6" class="step-panel" style="display:none;">
-        <div class="step-title"><span class="num">6</span>確認預約</div>
-        <div class="summary-card" id="summaryCard"></div>
-        <div class="btn-row" style="margin-top:16px;">
-            <button class="btn btn-secondary" onclick="goStep(5)">← 修改</button>
-            <button class="btn btn-primary" id="submitBtn" onclick="submitBooking()">確認送出</button>
+        <!-- Step 4: 選擇時段 -->
+        <div id="step4" class="step-panel" style="display:none;">
+            <div class="step-title"><span class="num">4</span>選擇時段</div>
+            <div id="slotList"></div>
+            <div class="btn-row"><button class="btn btn-secondary" onclick="goStep(3)">← 上一步</button></div>
         </div>
-    </div>
 
-    <!-- 成功頁 -->
-    <div id="successPage" style="display:none;">
-        <div class="success-page">
-            <div class="success-icon">🎉</div>
-            <div class="success-title">預約成功！</div>
-            <div class="success-number" id="bookingNumberDisplay"></div>
-            <div class="success-detail" id="successDetail"></div>
-            <button class="btn btn-primary" style="margin-top:24px;" onclick="resetBooking()">再次預約</button>
+        <!-- Step 5: 填寫資料 -->
+        <div id="step5" class="step-panel" style="display:none;">
+            <div class="step-title"><span class="num">5</span>填寫預約資料</div>
+            <div class="form-group">
+                <label>姓名 *</label>
+                <input type="text" id="custName" placeholder="請輸入姓名">
+            </div>
+            <div class="form-group">
+                <label>電話 *</label>
+                <input type="tel" id="custPhone" placeholder="請輸入手機號碼">
+            </div>
+            <div class="form-group">
+                <label>備註</label>
+                <textarea id="custNotes" placeholder="特殊需求或備註（選填）"></textarea>
+            </div>
+            <div class="btn-row">
+                <button class="btn btn-secondary" onclick="goStep(4)">← 上一步</button>
+                <button class="btn btn-primary" onclick="goStep(6)">下一步 →</button>
+            </div>
         </div>
-    </div>
 
-    <!-- 錯誤頁 -->
-    <div id="errorPage" style="display:none;">
-        <div style="text-align:center;padding:60px 20px;">
-            <div style="font-size:48px;margin-bottom:16px;">😕</div>
-            <div style="font-size:16px;font-weight:700;color:#EF4444;" id="errorMsg">無法載入預約頁面</div>
+        <!-- Step 6: 確認 -->
+        <div id="step6" class="step-panel" style="display:none;">
+            <div class="step-title"><span class="num">6</span>確認預約</div>
+            <div class="summary-card" id="summaryCard"></div>
+            <div class="btn-row" style="margin-top:16px;">
+                <button class="btn btn-secondary" onclick="goStep(5)">← 修改</button>
+                <button class="btn btn-primary" id="submitBtn" onclick="submitBooking()">確認送出</button>
+            </div>
+        </div>
+
+        <!-- 成功頁 -->
+        <div id="successPage" style="display:none;">
+            <div class="success-page">
+                <div class="success-icon">🎉</div>
+                <div class="success-title">預約成功！</div>
+                <div class="success-number" id="bookingNumberDisplay"></div>
+                <div class="success-detail" id="successDetail"></div>
+                <button class="btn btn-primary" style="margin-top:24px;" onclick="resetBooking()">再次預約</button>
+            </div>
+        </div>
+
+        <!-- 錯誤頁 -->
+        <div id="errorPage" style="display:none;">
+            <div style="text-align:center;padding:60px 20px;">
+                <div style="font-size:48px;margin-bottom:16px;">😕</div>
+                <div style="font-size:16px;font-weight:700;color:#EF4444;" id="errorMsg">無法載入預約頁面</div>
+            </div>
         </div>
     </div>
 </div>
@@ -303,9 +320,14 @@ function goStep(n) {
     }
     document.getElementById('successPage').style.display = 'none';
 
-    // 更新步驟點
-    document.querySelectorAll('.step-dot').forEach((dot, i) => {
+    // 更新步驟點和連線
+    const dots = document.querySelectorAll('.step-dot');
+    const lines = document.querySelectorAll('.step-line');
+    dots.forEach((dot, i) => {
         dot.className = 'step-dot' + (i + 1 === n ? ' active' : (i + 1 < n ? ' done' : ''));
+    });
+    lines.forEach((line, i) => {
+        line.className = 'step-line' + (i + 1 < n ? ' done' : '');
     });
 
     // 步驟進入時的動作
@@ -325,12 +347,16 @@ function renderServices() {
     }
     el.innerHTML = allServices.map(s => `
         <div class="card ${selectedService?.id === s.id ? 'selected' : ''}" onclick="selectService('${s.id}')">
-            <div class="card-title">${esc(s.name)}</div>
-            ${s.description ? '<div class="card-sub">' + esc(s.description) + '</div>' : ''}
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;">
-                <div class="card-price">${s.price > 0 ? 'NT$ ' + s.price.toLocaleString() : '免費'}</div>
-                <div class="card-sub">${s.duration_minutes} 分鐘</div>
+            <div class="card-icon">✂️</div>
+            <div class="card-body">
+                <div class="card-title">${esc(s.name)}</div>
+                ${s.description ? '<div class="card-sub">' + esc(s.description) + '</div>' : ''}
+                <div class="card-meta">
+                    <span class="card-price">${s.price > 0 ? 'NT$ ' + s.price.toLocaleString() : '免費'}</span>
+                    <span class="card-duration">${s.duration_minutes} 分鐘</span>
+                </div>
             </div>
+            <span class="card-arrow">›</span>
         </div>
     `).join('');
 }
