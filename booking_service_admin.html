@@ -154,8 +154,9 @@
             await loadStaffFilter();
             loadBookings();
 
-            // 設定預約連結
-            const link = window.location.origin + window.location.pathname.replace('booking_service_admin.html', 'booking_service.html') + '?store=' + emp.company_id;
+            // 設定預約連結（使用 GitHub Pages 固定網址）
+            const baseUrl = 'https://holaadam-tw.github.io/hr-attendance-liff';
+            const link = baseUrl + '/booking_service.html?store=' + window.currentCompanyId;
             document.getElementById('bookingLink').textContent = link;
 
         } catch (e) {
