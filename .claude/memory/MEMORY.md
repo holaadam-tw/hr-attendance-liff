@@ -4,6 +4,7 @@
 - 純前端靜態站：GitHub Pages + Supabase + LINE LIFF
 - 根目錄：`D:\hr-attendance-liff-main\hr-attendance-liff-main\`
 - Git remote: `https://github.com/holaadam-tw/hr-attendance-liff.git` (main branch)
+- 本地分支：master；推送指令：`git push origin master:main`（不要直接 `git push`）
 - 部署：push to main → GitHub Pages 自動部署（1-2 分鐘）
 
 ## 核心規則
