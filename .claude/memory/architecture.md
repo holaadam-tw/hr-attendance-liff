@@ -63,3 +63,4 @@ async function saveSetting(key, value, description) {
 - 2026-03-14: 新建 fieldwork.html（外勤打卡+業務週報+客戶管理三tab）；services.html 精簡為便當訂購；admin.html 移除客戶管理；clients 表加 employee_id/company_id
 - 2026-03-15: booking 格子連結改為 admin.html#booking；auth.js 新增 EMPLOYEE_ALLOWED_HASHES 讓一般員工可存取預約頁；名稱統一為「預約系統（餐飲業）」
 - 2026-03-15: 新建服務業預約系統（booking_service.html + booking_service_admin.html）；SQL 018_booking_service.sql；功能 key booking_service；platform.html 新增服務業 preset
+- 2026-03-15: booking_service_admin.html 預約列表預設顯示今天起7天；日期篩選改為 from/to 雙欄；卡片顯示 booking_date+slot_time；新增 localDateOffset(days) 函數
