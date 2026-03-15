@@ -23,6 +23,11 @@
 - 實際執行輸出（非預期中的結果要解釋原因）
 - 若無法在 bash 執行（例如前端 LIFF 頁面），明確說明並改用 code review + logic walkthrough 替代
 
+## Git 規則
+- 永遠推到 main 分支：`git push origin master:main`
+- 不要直接 `git push`（會推到 master）
+- GitHub Pages 部署來源是 main 分支
+
 ### 衝突變數檢查（每次修改 HTML 檔案必做）
 修改任何 HTML 頁面後，執行：
 grep -n "^let \|^const \|^var " 檔案名.html
