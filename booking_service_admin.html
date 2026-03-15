@@ -118,8 +118,16 @@
                 return;
             }
 
-            // 使用 common.js 標準流程：initializeLiff + checkUserStatus
-            // checkUserStatus 會設定 currentEmployee, currentCompanyId 等全域變數
+            // 1. 先初始化 LIFF（取得 liffProfile）
+            const initialized = await initializeLiff();
+            if (!initialized) {
+                const loadingPage = document.getElementById('loadingPage');
+                if (loadingPage) loadingPage.style.display = 'none';
+                alert('LIFF 初始化失敗，請從 LINE 開啟');
+                return;
+            }
+
+            // 2. 再執行 checkUserStatus（設定 currentEmployee, currentCompanyId 等）
             const isLoggedIn = await checkUserStatus();
             const loadingPage = document.getElementById('loadingPage');
             if (loadingPage) loadingPage.style.display = 'none';
