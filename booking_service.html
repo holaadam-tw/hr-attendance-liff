@@ -420,8 +420,12 @@ function renderCalendar() {
         const isPast = dateStr < today;
         const isTooFar = dateObj > maxDate;
 
-        // 檢查該星期幾是否有時段
-        const hasSlot = allSlots.some(s => s.day_of_week === null || s.day_of_week === dow);
+        // 檢查該星期幾是否有時段（day_of_week: null=每天, JSON陣列="[1,3]", 舊格式=單一數字）
+        const hasSlot = allSlots.some(s => {
+            if (!s.day_of_week) return true;
+            try { return JSON.parse(s.day_of_week).includes(dow); } catch(e) {}
+            return parseInt(s.day_of_week) === dow;
+        });
         const disabled = isPast || isTooFar || !hasSlot;
         const selected = selectedDate === dateStr;
 
@@ -447,8 +451,12 @@ async function renderSlots() {
     const dateObj = new Date(selectedDate);
     const dow = dateObj.getDay();
 
-    // 取該日期的可用時段
-    const daySlots = allSlots.filter(s => s.day_of_week === null || s.day_of_week === dow);
+    // 取該日期的可用時段（day_of_week: null=每天, JSON陣列, 舊格式=單一數字）
+    const daySlots = allSlots.filter(s => {
+        if (!s.day_of_week) return true;
+        try { return JSON.parse(s.day_of_week).includes(dow); } catch(e) {}
+        return parseInt(s.day_of_week) === dow;
+    });
 
     if (daySlots.length === 0) {
         el.innerHTML = '<div class="empty-msg">此日期沒有可預約的時段</div><div class="btn-row"><button class="btn btn-secondary" onclick="goStep(3)">← 選擇其他日期</button></div>';
