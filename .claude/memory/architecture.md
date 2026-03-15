@@ -36,6 +36,9 @@ async function saveSetting(key, value, description) {
 5. `applyFeatureVisibility()` — DOM 顯示/隱藏
 
 ## 常見陷阱
+- 獨立頁面初始化必須先 `initializeLiff()` 再 `checkUserStatus()`，順序不能反
+- `checkUserStatus()` 依賴 `liffProfile`（由 `initializeLiff()` 設定），不能直接呼叫
+- 獨立頁面不要自行查 employees 覆蓋 `currentCompanyId`，用 `checkUserStatus()` 統一設定
 - `toISOString()` 會轉 UTC，台灣 UTC+8 日期會偏移
 - system_settings company_id 是 NOT NULL
 - sessionStorage 快取需手動清除
