@@ -191,24 +191,43 @@
                     }
                 };
             } catch(e) {
-                console.error('相機錯誤', e);
-                const statusBox = document.getElementById('checkInStatus');
-                if (e.name === 'NotAllowedError') {
-                    statusBox.className = 'status-box show';
-                    statusBox.innerHTML = '<div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:12px;padding:16px;margin:0;">' +
-                        '<p style="color:#DC2626;font-weight:700;margin:0 0 8px;">❌ 相機權限未開啟</p>' +
-                        '<p style="color:#7F1D1D;font-size:13px;line-height:1.6;margin:0 0 12px;">' +
-                        '請依照以下步驟開啟：<br>' +
-                        '1. 手機「設定」→「應用程式」→「LINE」<br>' +
-                        '2. 點選「權限」→ 開啟「相機」<br>' +
-                        '3. 回到 LINE 重新開啟打卡</p>' +
-                        '<p style="color:#991B1B;font-size:12px;margin:0;">若問題持續，請聯絡管理員。</p>' +
-                        '</div>';
-                } else {
-                    let msg = '無法啟動相機';
-                    if (e.name === 'NotFoundError') msg = '找不到相機裝置';
-                    showStatus(statusBox, 'error', '❌ ' + msg);
-                }
+                console.error('📷 相機錯誤類型:', e.name);
+                console.error('📷 相機錯誤訊息:', e.message);
+                console.error('📷 完整錯誤:', e);
+                showCameraError(e);
+            }
+        }
+
+        function showCameraError(err) {
+            const statusBox = document.getElementById('checkInStatus');
+            statusBox.className = 'status-box show';
+            const errorInfo = '<p style="color:#94A3B8;font-size:11px;margin:8px 0 0;font-family:monospace;">錯誤代碼: ' + (err.name || 'Unknown') + '<br>詳情: ' + (err.message || '無') + '</p>';
+
+            if (err.name === 'NotAllowedError') {
+                statusBox.innerHTML = '<div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:12px;padding:16px;margin:0;">' +
+                    '<p style="color:#DC2626;font-weight:700;margin:0 0 8px;">❌ 相機權限未開啟</p>' +
+                    '<p style="color:#7F1D1D;font-size:13px;line-height:1.6;margin:0 0 12px;">' +
+                    '請依照以下步驟開啟：<br>' +
+                    '1. 手機「設定」→「應用程式」→「LINE」<br>' +
+                    '2. 點選「權限」→ 開啟「相機」<br>' +
+                    '3. 回到 LINE 重新開啟打卡</p>' +
+                    '<p style="color:#991B1B;font-size:12px;margin:0;">若問題持續，請聯絡管理員。</p>' +
+                    errorInfo + '</div>';
+            } else if (err.name === 'NotFoundError') {
+                statusBox.innerHTML = '<div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:12px;padding:16px;margin:0;">' +
+                    '<p style="color:#DC2626;font-weight:700;margin:0 0 8px;">❌ 找不到相機設備</p>' +
+                    '<p style="color:#7F1D1D;font-size:13px;line-height:1.6;margin:0;">請確認手機有前置相機。</p>' +
+                    errorInfo + '</div>';
+            } else if (err.name === 'NotReadableError') {
+                statusBox.innerHTML = '<div style="background:#FFF7ED;border:1px solid #FED7AA;border-radius:12px;padding:16px;margin:0;">' +
+                    '<p style="color:#C2410C;font-weight:700;margin:0 0 8px;">⚠️ 相機被佔用</p>' +
+                    '<p style="color:#7C2D12;font-size:13px;line-height:1.6;margin:0;">相機被其他應用程式佔用，<br>請關閉其他相機 app 後重試。</p>' +
+                    errorInfo + '</div>';
+            } else {
+                statusBox.innerHTML = '<div style="background:#FEF2F2;border:1px solid #FECACA;border-radius:12px;padding:16px;margin:0;">' +
+                    '<p style="color:#DC2626;font-weight:700;margin:0 0 8px;">❌ 相機啟動失敗</p>' +
+                    '<p style="color:#7F1D1D;font-size:13px;line-height:1.6;margin:0;">' + (err.message || '未知錯誤') + '</p>' +
+                    errorInfo + '</div>';
             }
         }
 
