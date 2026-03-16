@@ -207,16 +207,7 @@
             const titleEl = document.getElementById('checkInTitle');
             if (titleEl) titleEl.textContent = currentCheckInType === 'in' ? '📍 上班打卡' : '👋 下班打卡';
 
-            const initialized = await initializeLiff();
-            if (initialized) {
-                const isLoggedIn = await checkUserStatus();
-                if (isLoggedIn) {
-                    openCamera();
-                    return;
-                }
-            }
-
-            // 外部瀏覽器：LIFF 無法登入，改用 URL 參數載入員工資料
+            // 外部瀏覽器模式：有 eid + cid 參數 → 跳過 LIFF，直接用 URL 參數
             const eid = urlParams.get('eid');
             const cid = urlParams.get('cid');
             if (eid && cid) {
@@ -225,10 +216,7 @@
                     const { data: emp } = await sb.from('employees').select('*').eq('id', eid).eq('company_id', cid).single();
                     if (emp) {
                         currentEmployee = emp;
-                        // 建立最小 liffProfile 供 quick_check_in 使用
-                        if (!liffProfile || !liffProfile.userId) {
-                            liffProfile = { userId: emp.line_user_id };
-                        }
+                        liffProfile = { userId: emp.line_user_id };
                         openCamera();
                     } else {
                         showStatus(document.getElementById('checkInStatus'), 'error', '❌ 無法載入員工資料');
@@ -237,8 +225,18 @@
                     console.error('外部瀏覽器載入失敗:', e);
                     showStatus(document.getElementById('checkInStatus'), 'error', '❌ 載入失敗: ' + e.message);
                 }
-            } else {
-                window.location.href = 'index.html';
+                return;
+            }
+
+            // LIFF 模式：正常 init → login → checkUserStatus
+            const initialized = await initializeLiff();
+            if (initialized) {
+                const isLoggedIn = await checkUserStatus();
+                if (isLoggedIn) {
+                    openCamera();
+                } else {
+                    window.location.href = 'index.html';
+                }
             }
         });
 
