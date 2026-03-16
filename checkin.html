@@ -44,6 +44,28 @@
         </div>
     </div>
 
+    <!-- 相機權限說明 Modal -->
+    <div id="cameraPermModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9999;align-items:center;justify-content:center;padding:20px;">
+        <div style="background:#fff;border-radius:20px;padding:28px;max-width:320px;width:100%;">
+            <div style="font-size:48px;text-align:center;margin-bottom:16px;">📷</div>
+            <h3 style="text-align:center;margin:0 0 12px;font-size:18px;">需要相機權限</h3>
+            <p style="font-size:14px;color:#666;line-height:1.6;margin-bottom:8px;">
+                RunPiston 需要使用相機來：
+            </p>
+            <ul style="font-size:14px;color:#666;line-height:1.8;margin:0 0 20px;padding-left:20px;">
+                <li>拍攝打卡照片作為出勤記錄</li>
+                <li>確保打卡本人在場</li>
+            </ul>
+            <p style="font-size:13px;color:#999;margin-bottom:20px;">
+                請在下一步點擊「允許」以完成打卡。
+            </p>
+            <div style="display:flex;gap:10px;">
+                <button onclick="closeCameraPermModal()" style="flex:1;padding:12px;border:1px solid #ddd;border-radius:12px;background:#fff;font-size:15px;cursor:pointer;">取消</button>
+                <button onclick="confirmCameraPermission()" style="flex:1;padding:12px;border:none;border-radius:12px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;font-size:15px;font-weight:700;cursor:pointer;">允許相機</button>
+            </div>
+        </div>
+    </div>
+
     <script src="common.js"></script>
     <script>
         let currentCheckInType = 'in';
@@ -136,6 +158,17 @@
             }
         }
 
+        function showCameraPermModal() {
+            document.getElementById('cameraPermModal').style.display = 'flex';
+        }
+        function closeCameraPermModal() {
+            document.getElementById('cameraPermModal').style.display = 'none';
+        }
+        function confirmCameraPermission() {
+            closeCameraPermModal();
+            openCamera();
+        }
+
         async function openCamera() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
@@ -179,7 +212,7 @@
             if (initialized) {
                 const isLoggedIn = await checkUserStatus();
                 if (isLoggedIn) {
-                    openCamera();
+                    showCameraPermModal();
                 } else {
                     window.location.href = 'index.html';
                 }
