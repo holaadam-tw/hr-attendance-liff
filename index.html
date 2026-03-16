@@ -188,11 +188,24 @@
             window.location.href = url;
         }
 
-        function startCheckIn() { 
+        function openCheckinExternal(type) {
+            const baseUrl = window.location.origin + window.location.pathname.replace(/[^/]*$/, '') + 'checkin.html';
+            const eid = currentEmployee?.id || '';
+            const cid = window.currentCompanyId || '';
+            const url = `${baseUrl}?type=${type}&eid=${encodeURIComponent(eid)}&cid=${encodeURIComponent(cid)}`;
+
+            if (typeof liff !== 'undefined' && liff.isInClient && liff.isInClient()) {
+                liff.openWindow({ url: url, external: true });
+            } else {
+                window.location.href = url;
+            }
+        }
+
+        function startCheckIn() {
             if (document.getElementById('checkInBtn')?.classList.contains('disabled')) return;
             if (isProcessing) return;
             isProcessing = true;
-            window.location.href = 'checkin.html?type=in';
+            openCheckinExternal('in');
             setTimeout(() => isProcessing = false, 1000);
         }
 
@@ -200,7 +213,7 @@
             if (document.getElementById('checkOutBtn')?.classList.contains('disabled')) return;
             if (isProcessing) return;
             isProcessing = true;
-            window.location.href = 'checkin.html?type=out';
+            openCheckinExternal('out');
             setTimeout(() => isProcessing = false, 1000);
         }
 
