@@ -40,6 +40,7 @@
                 </div>
 
                 <button class="btn btn-primary" id="captureBtn" onclick="captureAndCheckIn()" disabled style="font-size:16px;padding:16px;border-radius:16px;">📸 拍照並打卡</button>
+                <input type="file" id="captureInput" accept="image/*" capture="user" style="display:none" onchange="handleCapturePhoto(this)">
             </div>
         </div>
     </div>
@@ -59,6 +60,12 @@
         updateClock();
 
         async function captureAndCheckIn() {
+            // capture input 模式 → 觸發系統相機
+            if (useCaptureInput) {
+                document.getElementById('captureInput').click();
+                return;
+            }
+
             if (!currentEmployee) { showToast('❌ 員工資料未載入'); return; }
 
             const btn = document.getElementById('captureBtn');
@@ -136,6 +143,8 @@
             }
         }
 
+        let useCaptureInput = false; // true = file input 模式（Android LINE）
+
         async function openCamera() {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
@@ -147,22 +156,98 @@
                     document.getElementById('cameraContainer').classList.add('show');
                     document.getElementById('captureBtn').disabled = false;
                     document.getElementById('checkInStatus').textContent = '✅ 相機就緒';
-                    
-                    // 顯示 overlay
+
                     const overlay = document.getElementById('cameraOverlay');
                     if (overlay) overlay.style.display = 'flex';
-                    
+
                     const lastLoc = localStorage.getItem('last_location');
                     if (lastLoc) {
                         document.getElementById('overlayLocation').textContent = `📍 ${lastLoc}`;
                     }
                 };
             } catch(e) {
-                console.error('📷 相機錯誤類型:', e.name);
-                console.error('📷 相機錯誤訊息:', e.message);
-                console.error('📷 完整錯誤:', e);
-                showCameraError(e);
+                console.log('📷 getUserMedia 失敗，改用 capture input:', e.name, e.message);
+                // fallback → 系統相機拍照模式
+                useCaptureInput = true;
+                document.getElementById('cameraContainer').style.display = 'none';
+                document.getElementById('checkInStatus').innerHTML =
+                    '<div style="background:#DBEAFE;border:1px solid #93C5FD;border-radius:12px;padding:16px;text-align:center;">' +
+                    '<p style="color:#1E40AF;font-weight:700;margin:0 0 8px;">📸 請點擊下方按鈕拍照打卡</p>' +
+                    '<p style="color:#1E40AF;font-size:13px;margin:0;">系統將開啟相機 App 拍攝</p></div>';
+                document.getElementById('captureBtn').disabled = false;
+                document.getElementById('captureBtn').textContent = '📸 開啟相機拍照';
             }
+        }
+
+        function handleCapturePhoto(input) {
+            if (!input.files || !input.files[0]) return;
+            if (!currentEmployee) { showToast('❌ 員工資料未載入'); return; }
+
+            const file = input.files[0];
+            const statusBox = document.getElementById('checkInStatus');
+            const btn = document.getElementById('captureBtn');
+            btn.disabled = true; btn.textContent = '處理中...';
+
+            // 壓縮圖片後上傳打卡
+            const img = new Image();
+            img.onload = async () => {
+                try {
+                    const canvas = document.getElementById('canvas');
+                    const MAX_W = 800, MAX_H = 600;
+                    let cw = img.width, ch = img.height;
+                    if (cw > MAX_W) { ch = Math.round(ch * MAX_W / cw); cw = MAX_W; }
+                    if (ch > MAX_H) { cw = Math.round(cw * MAX_H / ch); ch = MAX_H; }
+                    canvas.width = cw; canvas.height = ch;
+                    canvas.getContext('2d').drawImage(img, 0, 0, cw, ch);
+                    const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.6));
+                    console.log(`📸 capture 壓縮: ${img.width}x${img.height} → ${cw}x${ch}, ${(blob.size/1024).toFixed(0)}KB`);
+
+                    showStatus(statusBox, 'info', '☁️ 上傳中...');
+                    const fileName = `${currentEmployee.employee_number}_${Date.now()}.jpg`;
+                    const { error: uploadError } = await sb.storage.from(CONFIG.BUCKET).upload(fileName, blob);
+                    if (uploadError) throw uploadError;
+
+                    const { data: urlData } = sb.storage.from(CONFIG.BUCKET).getPublicUrl(fileName);
+                    const publicUrl = urlData?.publicUrl || urlData?.publicURL;
+                    if (!publicUrl) throw new Error('無法取得照片網址');
+
+                    showStatus(statusBox, 'info', '📍 定位中...');
+                    let loc = cachedLocation || await getGPS();
+                    if (loc.accuracy !== undefined) {
+                        if (loc.accuracy < 5) {
+                            showStatus(statusBox, 'warning', '⚠️ GPS 精度異常（過於精確），請關閉模擬定位 App 後重試');
+                            btn.disabled = false; btn.textContent = '📸 開啟相機拍照'; return;
+                        }
+                        if (loc.accuracy > 500) {
+                            showStatus(statusBox, 'warning', '⚠️ GPS 訊號太弱（精度 >500m），請到戶外或窗邊重試');
+                            btn.disabled = false; btn.textContent = '📸 開啟相機拍照'; return;
+                        }
+                    }
+
+                    const { data: rpcData, error: rpcError } = await sb.rpc('quick_check_in', {
+                        p_line_user_id: liffProfile.userId,
+                        p_latitude: loc.latitude, p_longitude: loc.longitude,
+                        p_photo_url: publicUrl, p_device_id: navigator.userAgent
+                    });
+                    if (rpcError) throw rpcError;
+                    if (!rpcData.success) throw new Error(rpcData.error);
+
+                    if (rpcData.location_name) localStorage.setItem('last_location', rpcData.location_name);
+                    const typeText = currentCheckInType === 'in' ? '上班' : '下班';
+                    showToast(`✅ ${typeText}成功！@${rpcData.location_name || '公司'}`);
+
+                    if (currentCheckInType === 'in' && new Date().getHours() < 9) {
+                        showLunchPopup();
+                    } else {
+                        setTimeout(() => { window.location.href = 'index.html'; }, 1500);
+                    }
+                } catch(err) {
+                    console.error(err);
+                    showStatus(statusBox, 'error', `❌ 失敗: ${friendlyError(err)}`);
+                    btn.disabled = false; btn.textContent = '📸 開啟相機拍照';
+                }
+            };
+            img.src = URL.createObjectURL(file);
         }
 
         function showCameraError(err) {
@@ -207,28 +292,6 @@
             const titleEl = document.getElementById('checkInTitle');
             if (titleEl) titleEl.textContent = currentCheckInType === 'in' ? '📍 上班打卡' : '👋 下班打卡';
 
-            // 外部瀏覽器模式：有 eid + cid 參數 → 跳過 LIFF，直接用 URL 參數
-            const eid = urlParams.get('eid');
-            const cid = urlParams.get('cid');
-            if (eid && cid) {
-                try {
-                    window.currentCompanyId = cid;
-                    const { data: emp } = await sb.from('employees').select('*').eq('id', eid).eq('company_id', cid).single();
-                    if (emp) {
-                        currentEmployee = emp;
-                        liffProfile = { userId: emp.line_user_id };
-                        openCamera();
-                    } else {
-                        showStatus(document.getElementById('checkInStatus'), 'error', '❌ 無法載入員工資料');
-                    }
-                } catch(e) {
-                    console.error('外部瀏覽器載入失敗:', e);
-                    showStatus(document.getElementById('checkInStatus'), 'error', '❌ 載入失敗: ' + e.message);
-                }
-                return;
-            }
-
-            // LIFF 模式：正常 init → login → checkUserStatus
             const initialized = await initializeLiff();
             if (initialized) {
                 const isLoggedIn = await checkUserStatus();

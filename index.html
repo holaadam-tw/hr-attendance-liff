@@ -188,21 +188,11 @@
             window.location.href = url;
         }
 
-        function openCheckinExternal(type) {
-            const base = 'https://holaadam-tw.github.io/hr-attendance-liff/checkin.html';
-            const eid = encodeURIComponent(currentEmployee?.id || '');
-            const cid = encodeURIComponent(window.currentCompanyId || '');
-            const url = `${base}?type=${type}&eid=${eid}&cid=${cid}`;
-
-            // 用原生方式開啟，不經過 liff.openWindow
-            window.open(url, '_blank');
-        }
-
         function startCheckIn() {
             if (document.getElementById('checkInBtn')?.classList.contains('disabled')) return;
             if (isProcessing) return;
             isProcessing = true;
-            openCheckinExternal('in');
+            window.location.href = 'checkin.html?type=in';
             setTimeout(() => isProcessing = false, 1000);
         }
 
@@ -210,7 +200,7 @@
             if (document.getElementById('checkOutBtn')?.classList.contains('disabled')) return;
             if (isProcessing) return;
             isProcessing = true;
-            openCheckinExternal('out');
+            window.location.href = 'checkin.html?type=out';
             setTimeout(() => isProcessing = false, 1000);
         }
 
