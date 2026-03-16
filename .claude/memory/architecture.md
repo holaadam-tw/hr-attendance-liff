@@ -66,4 +66,4 @@ async function saveSetting(key, value, description) {
 - 2026-03-15: booking_service_admin.html 預約列表 UI 改為餐飲業同風格（日期橫向捲軸+統計卡片+狀態膠囊+時間軸分組卡片）；loadBookings 一次抓15天→renderBookingList 前端切換；移除舊 from/to input
 - 2026-03-15: booking_service_admin.html 時段設定 tab 改為三區塊（基本設定/時段管理/預約連結+QR Code）；基本設定存 system_settings key=booking_service_settings（interval_minutes, advance_days, auto_confirm）；時段卡片含星期格子+啟停用
 - 2026-03-16: checkin.html 相機錯誤分類（showCameraError：NotAllowedError/NotFoundError/NotReadableError 各自 UI 卡片+錯誤代碼）
-- 2026-03-16: 打卡改用外部瀏覽器開啟；index.html 新增 openCheckinExternal() 用 liff.openWindow({external:true})；checkin.html 支援 eid/cid URL 參數 fallback（外部瀏覽器無 LIFF 時用 URL 參數查員工）
+- 2026-03-16: 打卡改用外部瀏覽器開啟；index.html openCheckinExternal() 用 window.open(_blank)（不用 liff.openWindow 避免 OAuth 400）；checkin.html 有 eid+cid URL 參數時完全跳過 LIFF init，直接查 Supabase
