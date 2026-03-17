@@ -282,15 +282,16 @@ async function checkUserStatus() {
             window.currentEmployee = currentEmployee;
             // 並行載入公司設定、system_settings、今日考勤
             if (currentCompanyId) {
-                const [companyResult] = await Promise.all([
-                    Promise.resolve(sb.from('companies').select('name, features, status, industry').eq('id', currentCompanyId).maybeSingle()).catch(e => ({ data: null })),
-                    loadSettings(),
-                    checkTodayAttendance()
-                ]);
-                const company = companyResult?.data;
-                currentCompanyFeatures = company?.features || null;
-                currentCompanyName = company?.name || null;
-                currentCompanyIndustry = company?.industry || 'general';
+                try {
+                    const { data: company } = await sb.from('companies')
+                        .select('name, features, status, industry')
+                        .eq('id', currentCompanyId)
+                        .maybeSingle();
+                    currentCompanyFeatures = company?.features || null;
+                    currentCompanyName = company?.name || null;
+                    currentCompanyIndustry = company?.industry || 'general';
+                } catch(e) { console.log('載入公司資料失敗', e); }
+                await Promise.all([loadSettings(), checkTodayAttendance()]);
             }
             updateUserInfo(data);
             return true;
