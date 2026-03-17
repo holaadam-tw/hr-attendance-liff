@@ -439,11 +439,12 @@
         }
 
         window.addEventListener('load', async () => {
+            alert('v5fb2051 載入中...'); // 暫時：確認是否為最新版
             if (typeof initializeLiff === 'undefined') {
-                console.error('common.js 未正確載入');
+                alert('❌ common.js 未載入');
                 return;
             }
-            
+
             const initialized = await initializeLiff();
             if (initialized) {
                 checkLiffParams();
