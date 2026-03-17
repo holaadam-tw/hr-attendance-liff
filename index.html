@@ -9,6 +9,11 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+    <!-- 暫時 debug：固定顯示在畫面最上方 -->
+    <div id="topDebug" style="position:fixed;top:0;left:0;right:0;z-index:99999;background:#FEF3C7;border-bottom:2px solid #F59E0B;padding:8px 12px;font-size:11px;color:#92400E;word-break:break-all;">
+        ⏳ 等待 LIFF 初始化...
+    </div>
+
     <div id="loadingPage" class="loading-screen">
         <div class="spinner"></div>
         <p>系統載入中...</p>
@@ -41,7 +46,6 @@
                     <h2>員工身份綁定</h2>
                     <p>初次使用請驗證身份</p>
                 </div>
-                <div id="bindDebugInfo" style="display:none;margin-bottom:12px;padding:10px;background:#FEF3C7;border:1px solid #F59E0B;border-radius:8px;font-size:11px;color:#92400E;word-break:break-all;"></div>
                 <div class="tabs">
                     <button class="tab-btn active" id="tabIdCard" onclick="switchBindMode('id_card')">身份證驗證</button>
                     <button class="tab-btn inactive" id="tabCode" onclick="switchBindMode('code')">驗證碼驗證</button>
@@ -440,12 +444,17 @@
         }
 
         window.addEventListener('load', async () => {
+            const _td = document.getElementById('topDebug');
+            const _tlog = (msg) => { if(_td) _td.innerHTML += '<br>' + msg; };
+
             if (typeof initializeLiff === 'undefined') {
-                console.error('common.js 未正確載入');
+                _tlog('❌ common.js 未載入');
                 return;
             }
 
+            _tlog('1️⃣ LIFF 初始化中...');
             const initialized = await initializeLiff();
+            _tlog('2️⃣ LIFF: ' + (initialized ? '✅' : '❌') + (typeof liffProfile !== 'undefined' && liffProfile ? ' userId=' + liffProfile.userId : ''));
             if (initialized) {
                 checkLiffParams();
 
@@ -455,10 +464,13 @@
                 if (loadingEl) loadingEl.style.display = 'none';
                 if (skeleton) skeleton.style.display = '';
 
+                _tlog('3️⃣ checkUserStatus 中...');
                 const isLoggedIn = await checkUserStatus();
+                _tlog('4️⃣ isLoggedIn=' + isLoggedIn);
                 if (isLoggedIn) {
                     // 立即顯示首頁（不等次要資料）
                     if (skeleton) skeleton.style.display = 'none';
+                    if (_td) _td.style.display = 'none'; // 成功登入，隱藏 debug
                     showPage('homePage');
 
                     updateTodayInfo();
@@ -504,14 +516,6 @@
                     // 未綁定：隱藏 skeleton，直接顯示綁定頁面
                     if (skeleton) skeleton.style.display = 'none';
                     showPage('bindPage');
-                    // 顯示 debug 資訊幫助診斷
-                    const dbgEl = document.getElementById('bindDebugInfo');
-                    if (dbgEl && typeof liffProfile !== 'undefined' && liffProfile) {
-                        dbgEl.style.display = '';
-                        dbgEl.innerHTML = '🔍 <b>LIFF userId:</b> ' + liffProfile.userId +
-                            '<br><b>DB 已綁定:</b> U1d89ced4bc8ebca5b9e7a5108de4c7b5 (mina)' +
-                            '<br><b>是否一致:</b> ' + (liffProfile.userId === 'U1d89ced4bc8ebca5b9e7a5108de4c7b5' ? '✅ 一致' : '❌ 不一致！');
-                    }
                 }
             } else {
                 // 無 LIFF 環境（電腦瀏覽器直開）：仍載入設定並套用格子顯示
