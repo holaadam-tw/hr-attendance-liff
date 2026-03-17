@@ -448,14 +448,17 @@
             if (initialized) {
                 checkLiffParams();
 
-                const isLoggedIn = await checkUserStatus();
-                // checkUserStatus 已隱藏 loadingPage，立即控制下一步顯示
+                // LIFF 初始化完成後立即顯示骨架屏（比 checkUserStatus 快）
                 const skeleton = document.getElementById('skeletonScreen');
                 const loadingEl = document.getElementById('loadingPage');
+                if (loadingEl) loadingEl.style.display = 'none';
+                if (skeleton) skeleton.style.display = '';
+
+                const isLoggedIn = await checkUserStatus();
                 if (isLoggedIn) {
-                    // 已綁定：顯示骨架屏等待資料載入
-                    if (loadingEl) loadingEl.style.display = 'none';
-                    if (skeleton) skeleton.style.display = '';
+                    // 立即顯示首頁（不等次要資料）
+                    if (skeleton) skeleton.style.display = 'none';
+                    showPage('homePage');
 
                     updateTodayInfo();
 
@@ -474,23 +477,6 @@
                     // [優化] loadTodayStatus 直接使用已取得的 todayAttendance，不再額外查詢
                     loadTodayStatus();
 
-                    // [優化] 平行發送所有獨立的 API 請求
-                    const tasks = [
-                        loadEmployeeType(),
-                        loadAnnouncements(),
-                        checkForcedAnnouncements(),
-                        loadWeather()
-                    ];
-                    // 管理員載入目前訂單
-                    if (currentEmployee.role === 'admin' || currentEmployee.role === 'manager') {
-                        tasks.push(loadActiveOrders());
-                    }
-                    await Promise.all(tasks.map(p => Promise.resolve(p).catch(e => console.error(e))));
-
-                    // 隱藏骨架屏，顯示真實內容
-                    if (skeleton) skeleton.style.display = 'none';
-                    showPage('homePage');
-
                     if (window.isPlatformAdmin) {
                         var vt = document.getElementById('viewToggle');
                         if (vt) vt.style.display = '';
@@ -500,11 +486,22 @@
                     const menuGrid = document.getElementById('smartMenuGrid');
                     if (menuGrid) menuGrid.style.opacity = '1';
                     if (typeof updatePageTitle === 'function') updatePageTitle();
-                    preloadGPS();
+
+                    // [優化] 次要資料背景載入（不阻擋首頁顯示）
+                    const tasks = [
+                        loadEmployeeType(),
+                        loadAnnouncements(),
+                        checkForcedAnnouncements(),
+                        loadWeather(),
+                        preloadGPS()
+                    ];
+                    if (currentEmployee.role === 'admin' || currentEmployee.role === 'manager') {
+                        tasks.push(loadActiveOrders());
+                    }
+                    Promise.all(tasks.map(p => Promise.resolve(p).catch(e => console.error(e))));
                 } else {
-                    // 未綁定：確保隱藏 skeleton，直接顯示綁定頁面
+                    // 未綁定：隱藏 skeleton，直接顯示綁定頁面
                     if (skeleton) skeleton.style.display = 'none';
-                    if (loadingEl) loadingEl.style.display = 'none';
                     showPage('bindPage');
                 }
             } else {

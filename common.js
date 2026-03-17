@@ -249,13 +249,15 @@ async function checkUserStatus() {
             };
             window.currentEmployee = currentEmployee;
 
-            await loadSettings();
+            // 並行載入設定和考勤
+            const parallelTasks = [loadSettings()];
+            if (currentEmployee.id) parallelTasks.push(checkTodayAttendance());
+            await Promise.all(parallelTasks);
             if (loadingEl) loadingEl.style.display = 'none';
             updateUserInfo(currentEmployee);
             // 顯示公司名稱
             const hcn = document.getElementById('homeCompanyName');
             if (hcn && currentCompanyName) { hcn.textContent = currentCompanyName; hcn.style.display = 'block'; }
-            if (currentEmployee.id) await checkTodayAttendance();
             return true;
         }
 
@@ -272,22 +274,19 @@ async function checkUserStatus() {
             currentCompanyId = data.company_id || null;
             window.currentCompanyId = currentCompanyId;
             window.currentEmployee = currentEmployee;
-            // 載入公司功能設定
+            // 並行載入公司設定、system_settings、今日考勤
             if (currentCompanyId) {
-                try {
-                    const { data: company } = await sb.from('companies')
-                        .select('name, features, status, industry')
-                        .eq('id', currentCompanyId)
-                        .maybeSingle();
-                    currentCompanyFeatures = company?.features || null;
-                    currentCompanyName = company?.name || null;
-                    currentCompanyIndustry = company?.industry || 'general';
-                } catch(e) { console.log('載入公司功能設定失敗', e); }
+                const [companyResult] = await Promise.all([
+                    sb.from('companies').select('name, features, status, industry').eq('id', currentCompanyId).maybeSingle().catch(e => ({ data: null })),
+                    loadSettings(),
+                    checkTodayAttendance()
+                ]);
+                const company = companyResult?.data;
+                currentCompanyFeatures = company?.features || null;
+                currentCompanyName = company?.name || null;
+                currentCompanyIndustry = company?.industry || 'general';
             }
-            // loadSettings 必須在 currentCompanyId 設定後才呼叫
-            await loadSettings();
             updateUserInfo(data);
-            await checkTodayAttendance();
             return true;
         } else {
             return false;
