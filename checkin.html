@@ -150,40 +150,56 @@
             }
         }
 
-        let useCaptureInput = false; // true = file input 模式（Android LINE）
+        let useCaptureInput = false;
+
+        function onCameraReady(stream) {
+            const video = document.getElementById('video');
+            video.srcObject = stream;
+            videoStream = stream;
+            video.onloadedmetadata = () => {
+                video.play();
+                document.getElementById('cameraContainer').classList.add('show');
+                document.getElementById('captureBtn').disabled = false;
+                document.getElementById('checkInStatus').textContent = '✅ 相機就緒';
+                const overlay = document.getElementById('cameraOverlay');
+                if (overlay) overlay.style.display = 'flex';
+                const lastLoc = localStorage.getItem('last_location');
+                if (lastLoc) {
+                    document.getElementById('overlayLocation').textContent = `📍 ${lastLoc}`;
+                }
+            };
+        }
 
         async function openCamera() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
-                const video = document.getElementById('video');
-                video.srcObject = stream;
-                videoStream = stream;
-                video.onloadedmetadata = () => {
-                    video.play();
-                    document.getElementById('cameraContainer').classList.add('show');
-                    document.getElementById('captureBtn').disabled = false;
-                    document.getElementById('checkInStatus').textContent = '✅ 相機就緒';
+            const attempts = [
+                { video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } } },
+                { video: { facingMode: 'user' } },
+                { video: { facingMode: { ideal: 'user' } } },
+                { video: true }
+            ];
 
-                    const overlay = document.getElementById('cameraOverlay');
-                    if (overlay) overlay.style.display = 'flex';
-
-                    const lastLoc = localStorage.getItem('last_location');
-                    if (lastLoc) {
-                        document.getElementById('overlayLocation').textContent = `📍 ${lastLoc}`;
-                    }
-                };
-            } catch(e) {
-                console.log('📷 getUserMedia 失敗，改用 capture input:', e.name, e.message);
-                // fallback → 系統相機拍照模式
-                useCaptureInput = true;
-                document.getElementById('cameraContainer').style.display = 'none';
-                document.getElementById('checkInStatus').innerHTML =
-                    '<div style="background:#DBEAFE;border:1px solid #93C5FD;border-radius:12px;padding:16px;text-align:center;">' +
-                    '<p style="color:#1E40AF;font-weight:700;margin:0 0 8px;">📸 請點擊下方按鈕拍照打卡</p>' +
-                    '<p style="color:#1E40AF;font-size:13px;margin:0;">系統將開啟相機 App 拍攝</p></div>';
-                document.getElementById('captureBtn').disabled = false;
-                document.getElementById('captureBtn').textContent = '📸 開啟相機拍照';
+            for (const constraints of attempts) {
+                try {
+                    if (!navigator.mediaDevices?.getUserMedia) break;
+                    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                    onCameraReady(stream);
+                    console.log('📷 getUserMedia 成功:', JSON.stringify(constraints));
+                    return;
+                } catch(e) {
+                    console.log('📷 嘗試失敗:', JSON.stringify(constraints), e.name);
+                }
             }
+
+            // 所有 getUserMedia 都失敗 → capture input fallback
+            console.log('📷 所有 getUserMedia 失敗，使用 capture input');
+            useCaptureInput = true;
+            document.getElementById('cameraContainer').style.display = 'none';
+            document.getElementById('checkInStatus').innerHTML =
+                '<div style="background:#DBEAFE;border:1px solid #93C5FD;border-radius:12px;padding:16px;text-align:center;">' +
+                '<p style="color:#1E40AF;font-weight:700;margin:0 0 8px;">📸 請點擊下方按鈕拍照打卡</p>' +
+                '<p style="color:#1E40AF;font-size:13px;margin:0;">點擊後請選擇「相機」拍攝（非相簿）</p></div>';
+            document.getElementById('captureBtn').disabled = false;
+            document.getElementById('captureBtn').textContent = '📸 開啟相機拍照';
         }
 
         function handleCapturePhoto(input) {
