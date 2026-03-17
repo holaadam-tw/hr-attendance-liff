@@ -185,16 +185,13 @@ async function checkUserStatus() {
     const loadingEl = document.getElementById('loadingPage');
     if (loadingEl) loadingEl.style.display = 'flex';
 
-    const _dbg = []; // 頁面 debug 用，暫時
     try {
-        _dbg.push('userId: ' + (liffProfile?.userId || 'null'));
         // === 先檢查是否為平台管理員 ===
         const { data: padmin } = await sb.from('platform_admins')
             .select('*')
             .eq('line_user_id', liffProfile.userId)
             .eq('is_active', true)
             .maybeSingle();
-        _dbg.push('platform_admin: ' + (padmin ? '是(' + padmin.name + ')' : '否'));
 
         if (padmin) {
             isPlatformAdmin = true;
@@ -219,11 +216,8 @@ async function checkUserStatus() {
             const selected = savedCompany || managedCompanies[0];
 
             if (!selected) {
-                _dbg.push('❌ platform_admin 但無關聯公司');
                 if (loadingEl) loadingEl.style.display = 'none';
-                alert('🔍 診斷\n' + _dbg.join('\n'));
                 showToast('⚠️ 尚無可管理的公司');
-                window._checkStatusDebug = _dbg;
                 return false;
             }
 
@@ -272,8 +266,6 @@ async function checkUserStatus() {
             .select('*')
             .eq('line_user_id', liffProfile.userId)
             .maybeSingle();
-        _dbg.push('員工查詢: ' + (data ? '找到(' + data.name + ')' : 'null'));
-        if (error) _dbg.push('錯誤: ' + error.message);
 
         if (loadingEl) loadingEl.style.display = 'none';
 
@@ -295,16 +287,11 @@ async function checkUserStatus() {
                 currentCompanyIndustry = company?.industry || 'general';
             }
             updateUserInfo(data);
-            window._checkStatusDebug = _dbg;
             return true;
         } else {
-            _dbg.push('❌ 員工未找到 → 顯示綁定頁');
-            window._checkStatusDebug = _dbg;
-            alert('🔍 診斷\n' + _dbg.join('\n'));
             return false;
         }
     } catch (err) {
-        alert('❌ checkUserStatus 錯誤:\n' + err.message);
         console.error('檢查用戶狀態失敗:', err);
         if (loadingEl) loadingEl.style.display = 'none';
         return false;
