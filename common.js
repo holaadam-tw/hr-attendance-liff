@@ -283,7 +283,7 @@ async function checkUserStatus() {
             // 並行載入公司設定、system_settings、今日考勤
             if (currentCompanyId) {
                 const [companyResult] = await Promise.all([
-                    sb.from('companies').select('name, features, status, industry').eq('id', currentCompanyId).maybeSingle().catch(e => ({ data: null })),
+                    Promise.resolve(sb.from('companies').select('name, features, status, industry').eq('id', currentCompanyId).maybeSingle()).catch(e => ({ data: null })),
                     loadSettings(),
                     checkTodayAttendance()
                 ]);
