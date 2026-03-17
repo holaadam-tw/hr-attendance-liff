@@ -40,7 +40,7 @@
                 </div>
 
                 <button class="btn btn-primary" id="captureBtn" onclick="captureAndCheckIn()" disabled style="font-size:16px;padding:16px;border-radius:16px;">📸 拍照並打卡</button>
-                <input type="file" id="captureInput" accept="image/*" capture="environment" style="display:none" onchange="handleCapturePhoto(this)">
+                <input type="file" id="captureInput" accept="image/jpeg,image/png" capture="user" style="display:none" onchange="handleCapturePhoto(this)">
             </div>
         </div>
     </div>
@@ -60,8 +60,9 @@
         updateClock();
 
         async function captureAndCheckIn() {
-            // capture input 模式 → 觸發系統相機（capture="environment" 直接開相機）
+            // capture input 模式 → 觸發系統相機
             if (useCaptureInput) {
+                showToast('📷 若出現相簿，請點選畫面中的「相機」圖示拍照');
                 document.getElementById('captureInput').click();
                 return;
             }
