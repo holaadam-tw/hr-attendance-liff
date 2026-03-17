@@ -186,12 +186,15 @@ async function checkUserStatus() {
     if (loadingEl) loadingEl.style.display = 'flex';
 
     try {
+        const _td0 = document.getElementById('topDebug');
+        if (_td0) _td0.innerHTML += '<br>🅰️ try 開始';
         // === 先檢查是否為平台管理員 ===
-        const { data: padmin } = await sb.from('platform_admins')
+        const { data: padmin, error: padminErr } = await sb.from('platform_admins')
             .select('*')
             .eq('line_user_id', liffProfile.userId)
             .eq('is_active', true)
             .maybeSingle();
+        if (_td0) _td0.innerHTML += '<br>🅱️ padmin=' + (padmin ? padmin.name : 'null') + ' err=' + (padminErr ? padminErr.message : 'null');
 
         if (padmin) {
             isPlatformAdmin = true;
