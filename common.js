@@ -262,10 +262,12 @@ async function checkUserStatus() {
         }
 
         // === 一般員工流程（原邏輯）===
+        console.log('🔍 查詢 line_user_id:', liffProfile?.userId);
         const { data, error } = await sb.from('employees')
             .select('*')
             .eq('line_user_id', liffProfile.userId)
             .maybeSingle();
+        console.log('🔍 查詢結果:', data, '錯誤:', error);
 
         if (loadingEl) loadingEl.style.display = 'none';
 
