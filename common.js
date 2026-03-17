@@ -185,15 +185,16 @@ async function checkUserStatus() {
     const loadingEl = document.getElementById('loadingPage');
     if (loadingEl) loadingEl.style.display = 'flex';
 
+    const _dbg = []; // 頁面 debug 用，暫時
     try {
-        console.log('🔑 LIFF userId:', liffProfile?.userId);
+        _dbg.push('userId: ' + (liffProfile?.userId || 'null'));
         // === 先檢查是否為平台管理員 ===
         const { data: padmin } = await sb.from('platform_admins')
             .select('*')
             .eq('line_user_id', liffProfile.userId)
             .eq('is_active', true)
             .maybeSingle();
-        console.log('🔑 platform_admin 查詢:', padmin ? '是 (' + padmin.name + ')' : '否');
+        _dbg.push('platform_admin: ' + (padmin ? '是(' + padmin.name + ')' : '否'));
 
         if (padmin) {
             isPlatformAdmin = true;
@@ -218,9 +219,10 @@ async function checkUserStatus() {
             const selected = savedCompany || managedCompanies[0];
 
             if (!selected) {
-                console.log('🔑 platform_admin 但無可管理公司 → return false（會顯示綁定頁）');
+                _dbg.push('❌ platform_admin 但無關聯公司');
                 if (loadingEl) loadingEl.style.display = 'none';
                 showToast('⚠️ 尚無可管理的公司');
+                window._checkStatusDebug = _dbg;
                 return false;
             }
 
@@ -265,12 +267,12 @@ async function checkUserStatus() {
         }
 
         // === 一般員工流程（原邏輯）===
-        console.log('🔍 查詢 line_user_id:', liffProfile?.userId);
         const { data, error } = await sb.from('employees')
             .select('*')
             .eq('line_user_id', liffProfile.userId)
             .maybeSingle();
-        console.log('🔍 查詢結果:', data, '錯誤:', error);
+        _dbg.push('員工查詢: ' + (data ? '找到(' + data.name + ')' : 'null'));
+        if (error) _dbg.push('錯誤: ' + error.message);
 
         if (loadingEl) loadingEl.style.display = 'none';
 
@@ -292,8 +294,11 @@ async function checkUserStatus() {
                 currentCompanyIndustry = company?.industry || 'general';
             }
             updateUserInfo(data);
+            window._checkStatusDebug = _dbg;
             return true;
         } else {
+            _dbg.push('❌ 員工未找到 → 顯示綁定頁');
+            window._checkStatusDebug = _dbg;
             return false;
         }
     } catch (err) {
