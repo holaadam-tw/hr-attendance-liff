@@ -40,7 +40,7 @@
                 </div>
 
                 <button class="btn btn-primary" id="captureBtn" onclick="captureAndCheckIn()" disabled style="font-size:16px;padding:16px;border-radius:16px;">📸 拍照並打卡</button>
-                <input type="file" id="captureInput" accept="image/*" style="display:none" onchange="handleCapturePhoto(this)">
+                <input type="file" id="captureInput" accept="image/*" capture="environment" style="display:none" onchange="handleCapturePhoto(this)">
             </div>
         </div>
     </div>
@@ -60,9 +60,8 @@
         updateClock();
 
         async function captureAndCheckIn() {
-            // capture input 模式 → 觸發系統相機
+            // capture input 模式 → 觸發系統相機（capture="environment" 直接開相機）
             if (useCaptureInput) {
-                showToast('📷 請選擇「拍照」來完成打卡');
                 document.getElementById('captureInput').click();
                 return;
             }
@@ -101,8 +100,15 @@
 
                 // ===== GPS 精度檢查 =====
                 showStatus(statusBox, 'info', '📍 定位中...');
-                let loc = cachedLocation || await getGPS();
-                
+                let loc;
+                try {
+                    loc = cachedLocation || await getGPS();
+                } catch(gpsErr) {
+                    showGPSWarning(statusBox);
+                    btn.disabled = false; btn.textContent = '📸 重試';
+                    return;
+                }
+
                 if (loc.accuracy !== undefined) {
                     if (loc.accuracy < 5) {
                         showStatus(statusBox, 'warning', '⚠️ GPS 精度異常（過於精確），請關閉模擬定位 App 後重試');
@@ -213,7 +219,14 @@
                     if (!publicUrl) throw new Error('無法取得照片網址');
 
                     showStatus(statusBox, 'info', '📍 定位中...');
-                    let loc = cachedLocation || await getGPS();
+                    let loc;
+                    try {
+                        loc = cachedLocation || await getGPS();
+                    } catch(gpsErr) {
+                        showGPSWarning(statusBox);
+                        btn.disabled = false; btn.textContent = '📸 開啟相機拍照';
+                        return;
+                    }
                     if (loc.accuracy !== undefined) {
                         if (loc.accuracy < 5) {
                             showStatus(statusBox, 'warning', '⚠️ GPS 精度異常（過於精確），請關閉模擬定位 App 後重試');
@@ -284,6 +297,48 @@
             }
         }
 
+        // GPS 定位權限檢查
+        async function checkGPSPermission() {
+            const statusBox = document.getElementById('checkInStatus');
+            // 嘗試 Permissions API（部分瀏覽器支援）
+            if (navigator.permissions) {
+                try {
+                    const result = await navigator.permissions.query({ name: 'geolocation' });
+                    if (result.state === 'denied') {
+                        showGPSWarning(statusBox);
+                        return;
+                    }
+                } catch(e) { /* 部分瀏覽器不支援，忽略 */ }
+            }
+            // 預先取得定位（快取供打卡使用）
+            navigator.geolocation.getCurrentPosition(
+                p => {
+                    cachedLocation = { latitude: p.coords.latitude, longitude: p.coords.longitude, accuracy: p.coords.accuracy };
+                    const overlay = document.getElementById('overlayLocation');
+                    if (overlay) overlay.textContent = '📍 定位成功';
+                },
+                e => {
+                    showGPSWarning(statusBox);
+                },
+                { enableHighAccuracy: true, timeout: 10000 }
+            );
+        }
+
+        function showGPSWarning(statusBox) {
+            const el = document.getElementById('gpsWarning');
+            if (el) { el.style.display = ''; return; }
+            const warning = document.createElement('div');
+            warning.id = 'gpsWarning';
+            warning.style.cssText = 'background:#FEF2F2;border:1px solid #FECACA;border-radius:12px;padding:14px;margin:8px 0;';
+            warning.innerHTML =
+                '<p style="color:#DC2626;font-weight:700;margin:0 0 6px;">📍 定位未開啟</p>' +
+                '<p style="color:#7F1D1D;font-size:13px;line-height:1.6;margin:0;">' +
+                '打卡需要定位資訊，請開啟定位：<br>' +
+                '• iPhone：設定 → 隱私權 → 定位服務 → LINE<br>' +
+                '• Android：設定 → 應用程式 → LINE → 權限 → 位置</p>';
+            statusBox.parentNode.insertBefore(warning, statusBox.nextSibling);
+        }
+
         window.addEventListener('load', async () => {
             if (typeof initializeLiff === 'undefined') return;
 
@@ -297,6 +352,7 @@
             if (initialized) {
                 const isLoggedIn = await checkUserStatus();
                 if (isLoggedIn) {
+                    checkGPSPermission();
                     openCamera();
                 } else {
                     window.location.href = 'index.html';
