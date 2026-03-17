@@ -221,6 +221,7 @@ async function checkUserStatus() {
             if (!selected) {
                 _dbg.push('❌ platform_admin 但無關聯公司');
                 if (loadingEl) loadingEl.style.display = 'none';
+                alert('🔍 診斷\n' + _dbg.join('\n'));
                 showToast('⚠️ 尚無可管理的公司');
                 window._checkStatusDebug = _dbg;
                 return false;
@@ -299,9 +300,11 @@ async function checkUserStatus() {
         } else {
             _dbg.push('❌ 員工未找到 → 顯示綁定頁');
             window._checkStatusDebug = _dbg;
+            alert('🔍 診斷\n' + _dbg.join('\n'));
             return false;
         }
     } catch (err) {
+        alert('❌ checkUserStatus 錯誤:\n' + err.message);
         console.error('檢查用戶狀態失敗:', err);
         if (loadingEl) loadingEl.style.display = 'none';
         return false;
