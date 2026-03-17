@@ -449,9 +449,12 @@
                 checkLiffParams();
 
                 const isLoggedIn = await checkUserStatus();
+                // checkUserStatus 已隱藏 loadingPage，立即控制下一步顯示
+                const skeleton = document.getElementById('skeletonScreen');
+                const loadingEl = document.getElementById('loadingPage');
                 if (isLoggedIn) {
-                    // 顯示骨架屏，讓使用者知道正在載入
-                    const skeleton = document.getElementById('skeletonScreen');
+                    // 已綁定：顯示骨架屏等待資料載入
+                    if (loadingEl) loadingEl.style.display = 'none';
                     if (skeleton) skeleton.style.display = '';
 
                     updateTodayInfo();
@@ -499,6 +502,9 @@
                     if (typeof updatePageTitle === 'function') updatePageTitle();
                     preloadGPS();
                 } else {
+                    // 未綁定：確保隱藏 skeleton，直接顯示綁定頁面
+                    if (skeleton) skeleton.style.display = 'none';
+                    if (loadingEl) loadingEl.style.display = 'none';
                     showPage('bindPage');
                 }
             } else {
