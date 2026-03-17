@@ -240,23 +240,37 @@
         // ===== 便當訂購 =====
         let selectedLunchType = null;
         let myCurrentOrder = null;
-        const LUNCH_DEADLINE_HOUR = 9; // 9:00 截止
+
+        function getLunchDeadline() {
+            const val = getCachedSetting('lunch_deadline') || '10:00';
+            const [dh, dm] = val.split(':').map(Number);
+            return { hour: dh, minute: dm, display: val };
+        }
+
+        function isPastLunchDeadline() {
+            const { hour: dh, minute: dm } = getLunchDeadline();
+            const now = new Date(new Date().toLocaleString('en-US', {timeZone:'Asia/Taipei'}));
+            return now.getHours() > dh || (now.getHours() === dh && now.getMinutes() >= dm);
+        }
 
         function checkDeadline() {
             const el = document.getElementById('lunchDeadline');
-            const now = new Date();
-            const h = now.getHours();
-            if (h >= LUNCH_DEADLINE_HOUR) {
+            const { display } = getLunchDeadline();
+            const now = new Date(new Date().toLocaleString('en-US', {timeZone:'Asia/Taipei'}));
+            if (isPastLunchDeadline()) {
                 el.style.background = '#FEF2F2'; el.style.color = '#DC2626';
-                el.innerHTML = `⏰ 今日訂購已截止（${LUNCH_DEADLINE_HOUR}:00 前可訂購）<br><span style="font-size:11px;opacity:0.7;">明日訂單請明天再來</span>`;
-                // 鎖定表單
+                el.innerHTML = `⏰ 今日訂購已截止（${display} 前可訂購）<br><span style="font-size:11px;opacity:0.7;">明日訂單請明天再來</span>`;
                 document.getElementById('lunchForm').style.opacity = '0.4';
                 document.getElementById('lunchForm').style.pointerEvents = 'none';
             } else {
-                const remain = LUNCH_DEADLINE_HOUR - h - 1;
-                const mins = 60 - now.getMinutes();
+                const { hour: dh, minute: dm } = getLunchDeadline();
+                const deadlineMin = dh * 60 + dm;
+                const nowMin = now.getHours() * 60 + now.getMinutes();
+                const remain = deadlineMin - nowMin;
+                const rh = Math.floor(remain / 60);
+                const rm = remain % 60;
                 el.style.background = '#ECFDF5'; el.style.color = '#059669';
-                el.innerHTML = `✅ 訂購中 — 截止時間 ${LUNCH_DEADLINE_HOUR}:00（剩 ${remain > 0 ? remain + '小時' : ''}${mins}分鐘）`;
+                el.innerHTML = `✅ 訂購中 — 截止時間 ${display}（剩 ${rh > 0 ? rh + '小時' : ''}${rm}分鐘）`;
                 document.getElementById('lunchForm').style.opacity = '1';
                 document.getElementById('lunchForm').style.pointerEvents = 'auto';
             }
@@ -298,8 +312,7 @@
                 `;
                 
                 // 截止前可修改
-                const now = new Date();
-                if (now.getHours() < LUNCH_DEADLINE_HOUR) {
+                if (!isPastLunchDeadline()) {
                     actions.innerHTML = `
                         <button class="modify-btn" onclick="modifyLunchOrder('vegetarian')" style="border-color:#059669;background:#ECFDF5;color:#059669;">🥗 改素食</button>
                         <button class="modify-btn" onclick="modifyLunchOrder('regular')" style="border-color:#2563EB;background:#EFF6FF;color:#2563EB;">🍖 改葷食</button>

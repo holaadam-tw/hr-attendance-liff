@@ -49,7 +49,7 @@ function _doShowPage(id) {
     if (id === 'announcementPage') window.loadAnnouncementList?.();
     if (id === 'featurePage') { window.switchSysTab?.('setting', document.querySelector('.sysTab')); }
     if (id === 'staffMgrPage') { window.loadShiftMgr?.(); window.loadMaxLeaveSetting?.(); window.loadStaffOverview?.(); window.loadSchedulingMode?.(); }
-    if (id === 'lunchMgrPage') { window.loadLunchManagers?.(); window.loadAdminLunchStats?.(); }
+    if (id === 'lunchMgrPage') { window.loadLunchManagers?.(); window.loadAdminLunchStats?.(); window.loadLunchDeadline?.(); }
     if (id === 'payrollPage') { window.switchPayTab?.('payroll', document.querySelector('.payTab')); }
     if (id === 'clientPage') { window.loadClientList?.(); window.loadServiceItemList?.(); }
     if (id === 'fieldSalesAdminPage') { window.switchFieldSalesAdmin?.('approval', document.querySelector('.fsaTab')); }

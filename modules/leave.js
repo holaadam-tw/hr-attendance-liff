@@ -306,6 +306,22 @@ async function saveLunchManagers() {
     } catch (e) { showToast('❌ 儲存失敗'); }
 }
 
+// ===== 訂餐截止時間設定 =====
+export async function saveLunchDeadline() {
+    const time = document.getElementById('lunchDeadlineTime').value;
+    if (!time) return showToast('請選擇時間');
+    await saveSetting('lunch_deadline', time, '訂餐截止時間');
+    showToast('✅ 截止時間已儲存：' + time);
+}
+
+export async function loadLunchDeadline() {
+    const val = getCachedSetting('lunch_deadline');
+    if (val) {
+        const el = document.getElementById('lunchDeadlineTime');
+        if (el) el.value = val;
+    }
+}
+
 export async function loadAdminLunchStats() {
     const el = document.getElementById('adminLunchStats');
     if (!el) return;

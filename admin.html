@@ -556,6 +556,16 @@
                 </div>
 
                 <div style="background:#fff;border-radius:14px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,0.08);margin-bottom:16px;">
+                    <div style="font-size:14px;font-weight:800;color:#0F172A;margin-bottom:8px;">⏰ 訂餐截止時間</div>
+                    <p style="font-size:13px;color:#666;margin-bottom:12px;">每日幾點前可以訂餐，超過時間當日訂餐自動關閉</p>
+                    <div style="display:flex;align-items:center;gap:12px;">
+                        <input type="time" id="lunchDeadlineTime" value="10:00" style="padding:10px;border:1px solid #E2E8F0;border-radius:10px;font-size:16px;">
+                        <span style="font-size:14px;color:#666;">以前可訂餐</span>
+                    </div>
+                    <button onclick="saveLunchDeadline()" style="margin-top:12px;width:100%;padding:12px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;border:none;border-radius:10px;font-weight:700;cursor:pointer;">💾 儲存截止時間</button>
+                </div>
+
+                <div style="background:#fff;border-radius:14px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,0.08);margin-bottom:16px;">
                     <div style="font-size:14px;font-weight:800;color:#0F172A;margin-bottom:12px;">📊 今日便當統計</div>
                     <div id="adminLunchStats" style="font-size:13px;color:#64748B;">載入中...</div>
                 </div>
