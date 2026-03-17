@@ -186,12 +186,14 @@ async function checkUserStatus() {
     if (loadingEl) loadingEl.style.display = 'flex';
 
     try {
+        console.log('🔑 LIFF userId:', liffProfile?.userId);
         // === 先檢查是否為平台管理員 ===
         const { data: padmin } = await sb.from('platform_admins')
             .select('*')
             .eq('line_user_id', liffProfile.userId)
             .eq('is_active', true)
             .maybeSingle();
+        console.log('🔑 platform_admin 查詢:', padmin ? '是 (' + padmin.name + ')' : '否');
 
         if (padmin) {
             isPlatformAdmin = true;
@@ -216,6 +218,7 @@ async function checkUserStatus() {
             const selected = savedCompany || managedCompanies[0];
 
             if (!selected) {
+                console.log('🔑 platform_admin 但無可管理公司 → return false（會顯示綁定頁）');
                 if (loadingEl) loadingEl.style.display = 'none';
                 showToast('⚠️ 尚無可管理的公司');
                 return false;
