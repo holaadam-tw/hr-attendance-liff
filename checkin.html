@@ -40,7 +40,7 @@
                 </div>
 
                 <button class="btn btn-primary" id="captureBtn" onclick="captureAndCheckIn()" disabled style="font-size:16px;padding:16px;border-radius:16px;">📸 拍照並打卡</button>
-                <input type="file" id="captureInput" accept="image/*" capture="user" style="display:none" onchange="handleCapturePhoto(this)">
+                <input type="file" id="captureInput" accept="image/*" style="display:none" onchange="handleCapturePhoto(this)">
             </div>
         </div>
     </div>
@@ -62,6 +62,7 @@
         async function captureAndCheckIn() {
             // capture input 模式 → 觸發系統相機
             if (useCaptureInput) {
+                showToast('📷 請選擇「拍照」來完成打卡');
                 document.getElementById('captureInput').click();
                 return;
             }

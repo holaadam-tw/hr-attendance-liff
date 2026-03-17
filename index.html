@@ -14,6 +14,24 @@
         <p>系統載入中...</p>
     </div>
 
+    <style>
+        @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.5; } }
+        .skeleton-block { background:#E5E7EB; border-radius:16px; animation:pulse 1.5s infinite; }
+    </style>
+    <div id="skeletonScreen" class="container" style="display:none;padding-top:20px;">
+        <div class="skeleton-block" style="height:100px;margin-bottom:12px;"></div>
+        <div class="skeleton-block" style="height:60px;margin-bottom:12px;"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+            <div class="skeleton-block" style="height:80px;"></div>
+            <div class="skeleton-block" style="height:80px;"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+            <div class="skeleton-block" style="height:100px;"></div>
+            <div class="skeleton-block" style="height:100px;"></div>
+            <div class="skeleton-block" style="height:100px;"></div>
+        </div>
+    </div>
+
     <div class="container">
         <!-- 綁定頁面 -->
         <div id="bindPage" class="page active">
@@ -432,7 +450,10 @@
 
                 const isLoggedIn = await checkUserStatus();
                 if (isLoggedIn) {
-                    showPage('homePage');
+                    // 顯示骨架屏，讓使用者知道正在載入
+                    const skeleton = document.getElementById('skeletonScreen');
+                    if (skeleton) skeleton.style.display = '';
+
                     updateTodayInfo();
 
                     // 顯示公司名稱
@@ -462,6 +483,11 @@
                         tasks.push(loadActiveOrders());
                     }
                     await Promise.all(tasks.map(p => Promise.resolve(p).catch(e => console.error(e))));
+
+                    // 隱藏骨架屏，顯示真實內容
+                    if (skeleton) skeleton.style.display = 'none';
+                    showPage('homePage');
+
                     if (window.isPlatformAdmin) {
                         var vt = document.getElementById('viewToggle');
                         if (vt) vt.style.display = '';
