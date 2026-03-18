@@ -83,6 +83,21 @@
 <body>
     <div id="loadingPage" class="loading-screen"><div class="spinner"></div><p>系統載入中...</p></div>
 
+    <!-- 薪資密碼驗證 modal -->
+    <div id="payrollPasswordModal" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9999;display:none;align-items:center;justify-content:center;padding:20px;">
+        <div style="background:#fff;border-radius:20px;padding:28px;max-width:320px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+            <div style="font-size:48px;text-align:center;margin-bottom:16px;">🔒</div>
+            <h3 style="text-align:center;margin:0 0 8px;font-size:18px;font-weight:800;">薪資查詢</h3>
+            <p style="text-align:center;font-size:13px;color:#666;margin-bottom:20px;">請輸入薪資查詢密碼</p>
+            <input type="password" id="payrollPasswordInput" placeholder="請輸入密碼" style="width:100%;padding:12px;border:1.5px solid #E2E8F0;border-radius:10px;font-size:16px;margin-bottom:12px;box-sizing:border-box;text-align:center;" onkeydown="if(event.key==='Enter') submitPayrollPassword()">
+            <p id="payrollPasswordError" style="color:#EF4444;font-size:13px;text-align:center;margin-bottom:12px;display:none;">密碼錯誤，請重試</p>
+            <div style="display:flex;gap:10px;">
+                <button onclick="history.back()" style="flex:1;padding:12px;border:1px solid #ddd;border-radius:10px;background:#fff;font-size:15px;cursor:pointer;">返回</button>
+                <button onclick="submitPayrollPassword()" style="flex:1;padding:12px;border:none;border-radius:10px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;font-size:15px;font-weight:700;cursor:pointer;">確認</button>
+            </div>
+        </div>
+    </div>
+
     <div class="container">
         <div id="salaryPage" class="page active">
             <div class="card" style="padding:16px;">
@@ -642,6 +657,38 @@
         }
 
         // ===== Init =====
+        // ===== 薪資密碼驗證 =====
+        let _pwResolve = null;
+
+        function checkPayrollPassword() {
+            if (sessionStorage.getItem('payroll_unlocked') === 'true') return Promise.resolve(true);
+            const setting = getCachedSetting('payroll_password');
+            const pw = (setting && setting.password) ? setting.password : null;
+            if (!pw) return Promise.resolve(true);
+
+            return new Promise(resolve => {
+                _pwResolve = resolve;
+                const modal = document.getElementById('payrollPasswordModal');
+                modal.style.display = 'flex';
+                setTimeout(() => document.getElementById('payrollPasswordInput')?.focus(), 100);
+            });
+        }
+
+        window.submitPayrollPassword = function() {
+            const input = document.getElementById('payrollPasswordInput').value;
+            const setting = getCachedSetting('payroll_password');
+            const correctPw = (setting && setting.password) ? setting.password : '0000';
+            if (input === correctPw) {
+                sessionStorage.setItem('payroll_unlocked', 'true');
+                document.getElementById('payrollPasswordModal').style.display = 'none';
+                if (_pwResolve) _pwResolve(true);
+            } else {
+                document.getElementById('payrollPasswordError').style.display = 'block';
+                document.getElementById('payrollPasswordInput').value = '';
+                document.getElementById('payrollPasswordInput').focus();
+            }
+        };
+
         window.addEventListener('load', async () => {
             // 載入上月的固定/按天設定
             try {
@@ -667,6 +714,11 @@
                 const ok = await checkUserStatus();
                 if (ok) {
                     document.getElementById('loadingPage').style.display = 'none';
+
+                    // 薪資密碼驗證
+                    const pwPassed = await checkPayrollPassword();
+                    if (!pwPassed) return;
+
                     loadInsuranceBrackets(); // 預載勞健保級距表
                     loadSalary();
 
