@@ -660,8 +660,16 @@
         // ===== 薪資密碼驗證 =====
         let _pwResolve = null;
 
+        function isPayrollUnlocked() {
+            const saved = localStorage.getItem('payroll_unlocked');
+            if (!saved) return false;
+            // 當日有效（隔天需重新輸入）
+            const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' });
+            return saved === today;
+        }
+
         function checkPayrollPassword() {
-            if (sessionStorage.getItem('payroll_unlocked') === 'true') return Promise.resolve(true);
+            if (isPayrollUnlocked()) return Promise.resolve(true);
             const setting = getCachedSetting('payroll_password');
             const pw = (setting && setting.password) ? setting.password : null;
             if (!pw) return Promise.resolve(true);
@@ -679,7 +687,8 @@
             const setting = getCachedSetting('payroll_password');
             const correctPw = (setting && setting.password) ? setting.password : '0000';
             if (input === correctPw) {
-                sessionStorage.setItem('payroll_unlocked', 'true');
+                const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' });
+                localStorage.setItem('payroll_unlocked', today);
                 document.getElementById('payrollPasswordModal').style.display = 'none';
                 if (_pwResolve) _pwResolve(true);
             } else {
