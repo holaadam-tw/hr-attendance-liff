@@ -443,6 +443,24 @@
             if (company) sessionStorage.setItem('company_code', company);
         }
 
+        function handleGotoParam() {
+            const goto = new URLSearchParams(window.location.search).get('goto');
+            if (!goto) return false;
+            const pages = {
+                'records': 'records.html',
+                'leave': 'records.html#leave',
+                'attendance': 'records.html#attendance',
+                'requests': 'requests.html',
+                'salary': 'salary.html',
+                'checkin': 'checkin.html',
+                'services': 'services.html',
+                'fieldwork': 'fieldwork.html',
+                'admin': 'admin.html'
+            };
+            if (pages[goto]) { window.location.href = pages[goto]; return true; }
+            return false;
+        }
+
         window.addEventListener('load', async () => {
             const _td = document.getElementById('topDebug');
             const _tlog = (msg) => { if(_td) _td.innerHTML += '<br>' + msg; };
@@ -468,6 +486,9 @@
                 const isLoggedIn = await checkUserStatus();
                 _tlog('4️⃣ isLoggedIn=' + isLoggedIn);
                 if (isLoggedIn) {
+                    // URL 參數跳轉（Rich Menu 用）
+                    if (handleGotoParam()) return;
+
                     // 立即顯示首頁（不等次要資料）
                     if (skeleton) skeleton.style.display = 'none';
                     if (_td) _td.style.display = 'none'; // 成功登入，隱藏 debug
