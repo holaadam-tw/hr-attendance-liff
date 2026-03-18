@@ -587,114 +587,95 @@
         let html = '';
 
         // ══════════════════════════════════════
-        // 區塊一：⚙️ 基本設定
+        // 區塊一：🕐 時段管理（最上方）
         // ══════════════════════════════════════
-        html += '<div style="margin-bottom:24px;">';
-        html += '<div style="font-size:16px;font-weight:800;margin-bottom:12px;">⚙️ 基本設定</div>';
-
-        // 預約間隔
-        html += '<div style="background:#fff;border:1px solid #E2E8F0;border-radius:12px;padding:16px;margin-bottom:10px;">';
-        html += '<div style="font-size:14px;font-weight:700;margin-bottom:8px;">⏱ 預約間隔</div>';
-        html += '<div style="display:flex;gap:8px;flex-wrap:wrap;">';
-        [15,30,60,90].forEach(function(m) {
-            var isActive = bsSettings.interval_minutes === m;
-            html += '<div onclick="setBsInterval(' + m + ')" style="padding:10px 20px;border-radius:10px;border:2px solid ' + (isActive ? '#6366F1' : '#E2E8F0') + ';background:' + (isActive ? '#EEF2FF' : '#fff') + ';color:' + (isActive ? '#6366F1' : '#475569') + ';font-size:14px;font-weight:700;cursor:pointer;">' + m + ' 分鐘</div>';
-        });
-        html += '</div></div>';
-
-        // 開放預約天數
-        html += '<div style="background:#fff;border:1px solid #E2E8F0;border-radius:12px;padding:16px;margin-bottom:10px;">';
-        html += '<div style="font-size:14px;font-weight:700;margin-bottom:8px;">📅 開放預約天數</div>';
-        html += '<div style="display:flex;align-items:center;gap:8px;">';
-        html += '<span style="font-size:14px;color:#475569;">未來</span>';
-        html += '<input type="number" id="bsAdvanceDays" value="' + (bsSettings.advance_days || 14) + '" min="1" max="60" style="width:70px;padding:8px 12px;border:2px solid #E2E8F0;border-radius:8px;font-size:16px;font-weight:700;text-align:center;font-family:inherit;">';
-        html += '<span style="font-size:14px;color:#475569;">天可預約</span>';
-        html += '</div></div>';
-
-        // 需要人工確認
-        var mcChecked = !bsSettings.auto_confirm;
-        html += '<div style="background:#fff;border:1px solid #E2E8F0;border-radius:12px;padding:16px;margin-bottom:10px;">';
-        html += '<div style="display:flex;justify-content:space-between;align-items:center;">';
-        html += '<div>';
-        html += '<div style="font-size:14px;font-weight:700;">🔔 需要人工確認</div>';
-        html += '<div style="font-size:12px;color:#94A3B8;margin-top:2px;">關閉後預約自動確認</div>';
-        html += '</div>';
-        html += '<label style="position:relative;display:inline-block;width:48px;height:26px;cursor:pointer;">';
-        html += '<input type="checkbox" id="bsManualConfirm" ' + (mcChecked ? 'checked' : '') + ' style="opacity:0;width:0;height:0;" onchange="toggleBsManualConfirm(this)">';
-        html += '<span id="bsToggleTrack" style="position:absolute;top:0;left:0;right:0;bottom:0;background:' + (mcChecked ? '#10B981' : '#CBD5E1') + ';border-radius:13px;transition:.3s;"></span>';
-        html += '<span id="bsToggleThumb" style="position:absolute;top:2px;left:' + (mcChecked ? '24' : '2') + 'px;width:22px;height:22px;background:#fff;border-radius:50%;transition:.3s;box-shadow:0 1px 3px rgba(0,0,0,.1);"></span>';
-        html += '</label>';
-        html += '</div></div>';
-
-        // 儲存按鈕
-        html += '<button onclick="saveBsSettings()" style="width:100%;padding:14px;background:linear-gradient(135deg,#4F46E5,#6D28D9);color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:4px;box-shadow:0 4px 12px rgba(99,102,241,.25);">💾 儲存設定</button>';
-        html += '</div>';
-
-        // ══════════════════════════════════════
-        // 區塊二：🕐 時段管理
-        // ══════════════════════════════════════
-        html += '<div style="margin-bottom:24px;">';
-        html += '<div style="font-size:16px;font-weight:800;margin-bottom:12px;">🕐 時段管理</div>';
+        html += '<div style="margin-bottom:20px;">';
+        html += '<div style="font-size:16px;font-weight:800;margin-bottom:10px;">🕐 時段管理</div>';
 
         if (!slots || slots.length === 0) {
-            html += '<div style="text-align:center;padding:32px 20px;color:#94A3B8;">';
-            html += '<div style="font-size:40px;margin-bottom:8px;">🕐</div>';
-            html += '<div style="font-size:14px;font-weight:600;color:#64748B;">尚未設定時段</div>';
-            html += '<div style="font-size:12px;color:#94A3B8;margin-top:4px;">點擊下方按鈕新增</div>';
+            html += '<div style="text-align:center;padding:24px 16px;color:#94A3B8;">';
+            html += '<div style="font-size:36px;margin-bottom:6px;">🕐</div>';
+            html += '<div style="font-size:13px;font-weight:600;color:#64748B;">尚未設定時段</div>';
             html += '</div>';
         } else {
             slots.forEach(function(s) {
-                let dayLabel = '每天';
-                if (s.day_of_week) {
-                    try {
-                        var days = JSON.parse(s.day_of_week);
-                        dayLabel = days.map(function(d) { return '週' + DOW[d]; }).join('、');
-                    } catch(e) {
-                        dayLabel = '週' + (DOW[parseInt(s.day_of_week)] || '?');
-                    }
-                }
-                html += '<div style="background:#fff;border:1px solid #F1F5F9;border-radius:12px;padding:14px;margin-bottom:8px;box-shadow:0 1px 3px rgba(0,0,0,.06);">';
-                html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">';
-                html += '<div style="font-size:18px;font-weight:800;color:#1E293B;">' + esc(s.slot_time) + (s.slot_end_time ? ' ～ ' + esc(s.slot_end_time) : '') + '</div>';
-                html += '<span style="font-size:11px;padding:3px 8px;border-radius:6px;font-weight:600;' + (s.is_active ? 'background:#D1FAE5;color:#059669;' : 'background:#FEE2E2;color:#DC2626;') + '">' + (s.is_active ? '啟用' : '停用') + '</span>';
-                html += '</div>';
-
-                // 星期格子
-                html += '<div style="display:flex;gap:4px;margin-bottom:8px;">';
+                html += '<div style="background:#fff;border:1px solid #F1F5F9;border-radius:10px;padding:12px;margin-bottom:6px;box-shadow:0 1px 2px rgba(0,0,0,.04);">';
+                // 星期格子在上
+                html += '<div style="display:flex;gap:3px;margin-bottom:6px;">';
                 DOW.forEach(function(dName, idx) {
                     var isOn = false;
                     if (!s.day_of_week) { isOn = true; }
-                    else {
-                        try { isOn = JSON.parse(s.day_of_week).includes(idx); } catch(e) { isOn = parseInt(s.day_of_week) === idx; }
-                    }
-                    html += '<div style="width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;' + (isOn ? 'background:#7C3AED;color:#fff;' : 'background:#F1F5F9;color:#CBD5E1;') + '">' + dName + '</div>';
+                    else { try { isOn = JSON.parse(s.day_of_week).includes(idx); } catch(e) { isOn = parseInt(s.day_of_week) === idx; } }
+                    html += '<div style="flex:1;height:24px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;' + (isOn ? 'background:#7C3AED;color:#fff;' : 'background:#F1F5F9;color:#CBD5E1;') + '">' + dName + '</div>';
                 });
                 html += '</div>';
-
-                html += '<div style="font-size:12px;color:#64748B;margin-bottom:8px;">同時可服務 <b>' + s.max_concurrent + '</b> 人</div>';
-
-                // 按鈕列
-                html += '<div style="display:flex;gap:6px;">';
-                html += '<button onclick="editTimeSlot(\'' + s.id + '\')" style="flex:1;padding:6px;border:none;border-radius:6px;background:#EEF2FF;color:#4F46E5;font-size:11px;font-weight:600;cursor:pointer;">編輯</button>';
-                html += '<button onclick="toggleSlotActive(\'' + s.id + '\',' + !s.is_active + ')" style="flex:1;padding:6px;border:none;border-radius:6px;background:#F1F5F9;color:#64748B;font-size:11px;font-weight:600;cursor:pointer;">' + (s.is_active ? '停用' : '啟用') + '</button>';
-                html += '<button onclick="deleteTimeSlot(\'' + s.id + '\')" style="flex:1;padding:6px;border:none;border-radius:6px;background:#FEE2E2;color:#DC2626;font-size:11px;font-weight:600;cursor:pointer;">刪除</button>';
+                // 時間 + 狀態
+                html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">';
+                html += '<div style="font-size:16px;font-weight:800;color:#1E293B;">' + esc(s.slot_time) + (s.slot_end_time ? ' ～ ' + esc(s.slot_end_time) : '') + '</div>';
+                html += '<span style="font-size:10px;padding:2px 6px;border-radius:4px;font-weight:600;' + (s.is_active ? 'background:#D1FAE5;color:#059669;' : 'background:#FEE2E2;color:#DC2626;') + '">' + (s.is_active ? '啟用' : '停用') + '</span>';
                 html += '</div>';
+                // 人數 + 按鈕列
+                html += '<div style="display:flex;justify-content:space-between;align-items:center;">';
+                html += '<div style="font-size:11px;color:#64748B;">可服務 <b>' + s.max_concurrent + '</b> 人</div>';
+                html += '<div style="display:flex;gap:4px;">';
+                html += '<button onclick="editTimeSlot(\'' + s.id + '\')" style="padding:4px 10px;border:none;border-radius:4px;background:#EEF2FF;color:#4F46E5;font-size:10px;font-weight:600;cursor:pointer;">編輯</button>';
+                html += '<button onclick="toggleSlotActive(\'' + s.id + '\',' + !s.is_active + ')" style="padding:4px 10px;border:none;border-radius:4px;background:#F1F5F9;color:#64748B;font-size:10px;font-weight:600;cursor:pointer;">' + (s.is_active ? '停用' : '啟用') + '</button>';
+                html += '<button onclick="deleteTimeSlot(\'' + s.id + '\')" style="padding:4px 10px;border:none;border-radius:4px;background:#FEE2E2;color:#DC2626;font-size:10px;font-weight:600;cursor:pointer;">刪除</button>';
+                html += '</div></div>';
                 html += '</div>';
             });
         }
-        html += '<button onclick="addTimeSlot()" style="width:100%;padding:12px;background:linear-gradient(135deg,#7C3AED,#6D28D9);color:#fff;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:4px;">+ 新增時段</button>';
+        html += '<button onclick="addTimeSlot()" style="width:100%;padding:10px;background:linear-gradient(135deg,#7C3AED,#6D28D9);color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:2px;">+ 新增時段</button>';
+        html += '</div>';
+
+        // ══════════════════════════════════════
+        // 區塊二：⚙️ 基本設定
+        // ══════════════════════════════════════
+        html += '<div style="margin-bottom:20px;">';
+        html += '<div style="font-size:16px;font-weight:800;margin-bottom:10px;">⚙️ 基本設定</div>';
+
+        // 預約間隔（膠囊）
+        html += '<div style="background:#fff;border:1px solid #E2E8F0;border-radius:10px;padding:12px;margin-bottom:8px;">';
+        html += '<div style="font-size:13px;font-weight:700;margin-bottom:6px;">⏱ 預約間隔</div>';
+        html += '<div style="display:flex;gap:6px;">';
+        [15,30,60,90].forEach(function(m) {
+            var isActive = bsSettings.interval_minutes === m;
+            html += '<div onclick="setBsInterval(' + m + ')" style="flex:1;text-align:center;padding:8px;border-radius:8px;border:2px solid ' + (isActive ? '#6366F1' : '#E2E8F0') + ';background:' + (isActive ? '#EEF2FF' : '#fff') + ';color:' + (isActive ? '#6366F1' : '#475569') + ';font-size:12px;font-weight:700;cursor:pointer;">' + m + '分</div>';
+        });
+        html += '</div></div>';
+
+        // 天數 + 人工確認（同一行）
+        var mcChecked = !bsSettings.auto_confirm;
+        html += '<div style="background:#fff;border:1px solid #E2E8F0;border-radius:10px;padding:12px;margin-bottom:8px;">';
+        html += '<div style="display:flex;gap:12px;align-items:center;">';
+        html += '<div style="flex:1;display:flex;align-items:center;gap:4px;">';
+        html += '<span style="font-size:12px;color:#475569;white-space:nowrap;">📅 未來</span>';
+        html += '<input type="number" id="bsAdvanceDays" value="' + (bsSettings.advance_days || 14) + '" min="1" max="60" style="width:48px;padding:6px;border:1.5px solid #E2E8F0;border-radius:6px;font-size:14px;font-weight:700;text-align:center;font-family:inherit;">';
+        html += '<span style="font-size:12px;color:#475569;">天</span>';
+        html += '</div>';
+        html += '<div style="display:flex;align-items:center;gap:6px;">';
+        html += '<span style="font-size:12px;color:#475569;white-space:nowrap;">🔔 人工確認</span>';
+        html += '<label style="position:relative;display:inline-block;width:44px;height:24px;cursor:pointer;">';
+        html += '<input type="checkbox" id="bsManualConfirm" ' + (mcChecked ? 'checked' : '') + ' style="opacity:0;width:0;height:0;" onchange="toggleBsManualConfirm(this)">';
+        html += '<span id="bsToggleTrack" style="position:absolute;top:0;left:0;right:0;bottom:0;background:' + (mcChecked ? '#10B981' : '#CBD5E1') + ';border-radius:12px;transition:.3s;"></span>';
+        html += '<span id="bsToggleThumb" style="position:absolute;top:2px;left:' + (mcChecked ? '22' : '2') + 'px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.3s;box-shadow:0 1px 3px rgba(0,0,0,.1);"></span>';
+        html += '</label>';
+        html += '</div></div></div>';
+
+        // 儲存
+        html += '<button onclick="saveBsSettings()" style="width:100%;padding:10px;background:linear-gradient(135deg,#4F46E5,#6D28D9);color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;box-shadow:0 4px 12px rgba(99,102,241,.25);">💾 儲存設定</button>';
         html += '</div>';
 
         // ══════════════════════════════════════
         // 區塊三：🔗 消費者預約連結
         // ══════════════════════════════════════
-        html += '<div style="margin-bottom:24px;">';
-        html += '<div style="font-size:16px;font-weight:800;margin-bottom:12px;">🔗 消費者預約連結</div>';
-        html += '<div style="background:#F5F3FF;border:1.5px solid #DDD6FE;border-radius:12px;padding:16px;">';
-        html += '<div style="font-size:12px;color:#5B21B6;word-break:break-all;margin-bottom:12px;padding:8px 10px;background:#fff;border-radius:8px;border:1px solid #DDD6FE;" id="bookingLinkText">' + bookingUrl + '</div>';
-        html += '<div style="display:flex;gap:8px;">';
-        html += '<button onclick="copyBsBookingLink()" style="flex:1;padding:10px;border:1.5px solid #7C3AED;border-radius:8px;background:#fff;color:#7C3AED;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">📋 複製連結</button>';
-        html += '<button onclick="showBsQR()" style="flex:1;padding:10px;border:none;border-radius:8px;background:linear-gradient(135deg,#7C3AED,#6D28D9);color:#fff;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">📱 QR Code</button>';
+        html += '<div style="margin-bottom:20px;">';
+        html += '<div style="font-size:16px;font-weight:800;margin-bottom:10px;">🔗 消費者預約連結</div>';
+        html += '<div style="background:#F5F3FF;border:1.5px solid #DDD6FE;border-radius:10px;padding:12px;">';
+        html += '<div style="font-size:11px;color:#5B21B6;word-break:break-all;margin-bottom:10px;padding:6px 8px;background:#fff;border-radius:6px;border:1px solid #DDD6FE;" id="bookingLinkText">' + bookingUrl + '</div>';
+        html += '<div style="display:flex;gap:6px;">';
+        html += '<button onclick="copyBsBookingLink()" style="flex:1;padding:8px;border:1.5px solid #7C3AED;border-radius:8px;background:#fff;color:#7C3AED;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">📋 複製</button>';
+        html += '<button onclick="showBsQR()" style="flex:1;padding:8px;border:none;border-radius:8px;background:linear-gradient(135deg,#7C3AED,#6D28D9);color:#fff;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;">📱 QR Code</button>';
         html += '</div>';
         html += '</div></div>';
 
@@ -786,32 +767,32 @@
         const overlay = document.createElement('div');
         overlay.id = 'slotModal';
         overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:9999;padding:16px;';
-        overlay.innerHTML = '<div style="background:#fff;border-radius:16px;padding:20px;width:100%;max-width:360px;box-shadow:0 20px 60px rgba(0,0,0,.2);">' +
-            '<h3 style="font-size:16px;font-weight:700;margin-bottom:16px;">' + (id ? '編輯時段' : '新增時段') + '</h3>' +
-            '<div style="margin-bottom:12px;">' +
-                '<label style="font-size:13px;color:#666;display:block;margin-bottom:4px;">開始時間</label>' +
-                '<input type="time" id="slotTimeInput" value="' + (slotTime || '10:00') + '" style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:8px;font-size:15px;">' +
+        overlay.innerHTML = '<div style="background:#fff;border-radius:14px;padding:16px;width:100%;max-width:340px;box-shadow:0 20px 60px rgba(0,0,0,.2);">' +
+            '<h3 style="font-size:15px;font-weight:700;margin-bottom:12px;">' + (id ? '編輯時段' : '新增時段') + '</h3>' +
+            '<div style="margin-bottom:10px;">' +
+                '<label style="font-size:12px;color:#666;display:block;margin-bottom:4px;">時間範圍</label>' +
+                '<div style="display:flex;align-items:center;gap:6px;">' +
+                    '<input type="time" id="slotTimeInput" value="' + (slotTime || '10:00') + '" style="flex:1;padding:8px;border:1px solid #E2E8F0;border-radius:6px;font-size:14px;">' +
+                    '<span style="color:#94A3B8;font-size:12px;">～</span>' +
+                    '<input type="time" id="slotEndTimeInput" value="' + (slotEndTime || '') + '" placeholder="可選" style="flex:1;padding:8px;border:1px solid #E2E8F0;border-radius:6px;font-size:14px;">' +
+                '</div>' +
             '</div>' +
-            '<div style="margin-bottom:12px;">' +
-                '<label style="font-size:13px;color:#666;display:block;margin-bottom:4px;">結束時間（可選）</label>' +
-                '<input type="time" id="slotEndTimeInput" value="' + (slotEndTime || '') + '" style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:8px;font-size:15px;">' +
-            '</div>' +
-            '<div style="margin-bottom:12px;">' +
-                '<label style="font-size:13px;color:#666;display:block;margin-bottom:4px;">同時可服務人數</label>' +
-                '<input type="number" id="slotMaxInput" value="' + (maxConcurrent || 1) + '" min="1" style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:8px;font-size:15px;">' +
-            '</div>' +
-            '<div style="margin-bottom:16px;">' +
-                '<label style="font-size:13px;color:#666;display:block;margin-bottom:8px;">開放星期（不選 = 每天）</label>' +
-                '<div style="display:flex;gap:6px;flex-wrap:wrap;" id="daySelector">' +
-                    DOW_LABELS.map(function(label, i) {
+            '<div style="margin-bottom:10px;">' +
+                '<label style="font-size:12px;color:#666;display:block;margin-bottom:6px;">開放星期 <span style="color:#94A3B8;">不選=每天</span></label>' +
+                '<div style="display:flex;gap:3px;" id="daySelector">' +
+                    ['日','一','二','三','四','五','六'].map(function(label, i) {
                         var sel = selectedDays.includes(i);
-                        return '<button type="button" class="day-btn" data-day="' + i + '" onclick="toggleDayBtn(this)" style="padding:8px 12px;border:1px solid ' + (sel ? '#7C3AED' : '#E2E8F0') + ';border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;background:' + (sel ? '#7C3AED' : '#fff') + ';color:' + (sel ? '#fff' : '#64748B') + ';">' + label + '</button>';
+                        return '<button type="button" class="day-btn" data-day="' + i + '" onclick="toggleDayBtn(this)" style="flex:1;padding:6px 0;border:1px solid ' + (sel ? '#7C3AED' : '#E2E8F0') + ';border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;background:' + (sel ? '#7C3AED' : '#fff') + ';color:' + (sel ? '#fff' : '#64748B') + ';">' + label + '</button>';
                     }).join('') +
                 '</div>' +
             '</div>' +
-            '<div style="display:flex;gap:8px;">' +
-                '<button onclick="closeSlotModal()" style="flex:1;padding:10px;border:1px solid #E2E8F0;border-radius:10px;background:#fff;font-size:14px;font-weight:600;cursor:pointer;color:#64748B;">取消</button>' +
-                '<button onclick="saveSlotModal()" style="flex:1;padding:10px;border:none;border-radius:10px;background:linear-gradient(135deg,#7C3AED,#6D28D9);color:#fff;font-size:14px;font-weight:600;cursor:pointer;">儲存</button>' +
+            '<div style="margin-bottom:12px;">' +
+                '<label style="font-size:12px;color:#666;display:block;margin-bottom:4px;">同時可服務人數</label>' +
+                '<input type="number" id="slotMaxInput" value="' + (maxConcurrent || 1) + '" min="1" style="width:100%;padding:8px;border:1px solid #E2E8F0;border-radius:6px;font-size:14px;">' +
+            '</div>' +
+            '<div style="display:flex;gap:6px;">' +
+                '<button onclick="closeSlotModal()" style="flex:1;padding:10px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;font-size:13px;font-weight:600;cursor:pointer;color:#64748B;">取消</button>' +
+                '<button onclick="saveSlotModal()" style="flex:1;padding:10px;border:none;border-radius:8px;background:linear-gradient(135deg,#7C3AED,#6D28D9);color:#fff;font-size:13px;font-weight:600;cursor:pointer;">儲存</button>' +
             '</div>' +
         '</div>';
         document.body.appendChild(overlay);
