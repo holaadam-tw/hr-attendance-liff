@@ -998,6 +998,25 @@
                         <div id="schedModeSaveStatus" style="margin-top:8px;text-align:center;font-size:13px;display:none;"></div>
                     </div>
 
+                    <div style="background:#fff;border-radius:14px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,0.08);margin-bottom:16px;">
+                        <div style="font-size:14px;font-weight:800;color:#0F172A;margin-bottom:8px;">⏰ 考勤設定</div>
+                        <p style="font-size:12px;color:#94A3B8;margin-bottom:14px;">影響打卡遲到判定，未排班員工以預設上班時間為準</p>
+                        <div style="margin-bottom:14px;">
+                            <label style="font-size:12px;font-weight:700;color:#4b5563;display:block;margin-bottom:6px;">預設上班時間</label>
+                            <input type="time" id="defaultWorkStart" value="08:00" style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;font-weight:700;">
+                            <p style="font-size:11px;color:#94A3B8;margin:4px 0 0;">員工未排班時，以此時間判定是否遲到</p>
+                        </div>
+                        <div style="margin-bottom:14px;">
+                            <label style="font-size:12px;font-weight:700;color:#4b5563;display:block;margin-bottom:6px;">遲到容忍分鐘</label>
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <input type="number" id="lateThresholdMinutes" value="5" min="0" max="60" style="flex:1;padding:10px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;font-weight:700;">
+                                <span style="font-size:13px;color:#64748B;white-space:nowrap;">分鐘</span>
+                            </div>
+                            <p style="font-size:11px;color:#94A3B8;margin:4px 0 0;">0 = 準時到就算遲到，5 = 超過5分鐘才算</p>
+                        </div>
+                        <button onclick="saveAttendanceSettings()" style="width:100%;padding:12px;border:none;border-radius:10px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;font-weight:700;font-size:14px;cursor:pointer;">💾 儲存考勤設定</button>
+                    </div>
+
                     <div style="background:#fff;border-radius:14px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,0.08);margin-top:16px;">
                         <div style="font-size:14px;font-weight:800;color:#0F172A;margin-bottom:12px;">📊 目前人力概況</div>
                         <div id="staffOverview" style="font-size:13px;color:#64748B;line-height:1.8;">載入中...</div>

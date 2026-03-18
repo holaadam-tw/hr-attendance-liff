@@ -322,6 +322,25 @@ export async function loadLunchDeadline() {
     }
 }
 
+// ===== 考勤設定 =====
+export async function saveAttendanceSettings() {
+    const start = document.getElementById('defaultWorkStart').value;
+    const threshold = document.getElementById('lateThresholdMinutes').value;
+    if (!start) return showToast('請選擇上班時間');
+    await saveSetting('default_work_start', start, '預設上班時間');
+    await saveSetting('late_threshold_minutes', parseInt(threshold) || 5, '遲到容忍分鐘');
+    showToast('✅ 考勤設定已儲存');
+}
+
+export async function loadAttendanceSettings() {
+    const start = getCachedSetting('default_work_start');
+    const threshold = getCachedSetting('late_threshold_minutes');
+    const el1 = document.getElementById('defaultWorkStart');
+    const el2 = document.getElementById('lateThresholdMinutes');
+    if (start && el1) el1.value = start;
+    if (threshold !== null && threshold !== undefined && el2) el2.value = threshold;
+}
+
 export async function loadAdminLunchStats() {
     const el = document.getElementById('adminLunchStats');
     if (!el) return;

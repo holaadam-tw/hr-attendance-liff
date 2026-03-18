@@ -28,6 +28,7 @@ import {
     loadSchedulingMode, selectSchedulingMode, setFixedPreset,
     applySchedulingModeUI, applyShiftTabMode, saveSchedulingMode,
     loadLunchManagers, addLunchManager, removeLunchManager, saveLunchDeadline, loadLunchDeadline,
+    saveAttendanceSettings, loadAttendanceSettings,
     loadAdminLunchStats, loadStaffOverview, changeLeaveCal,
     resetLeaveCal, loadLeaveCal
 } from './leave.js';
@@ -148,6 +149,8 @@ window.addLunchManager = addLunchManager;
 window.removeLunchManager = removeLunchManager;
 window.saveLunchDeadline = saveLunchDeadline;
 window.loadLunchDeadline = loadLunchDeadline;
+window.saveAttendanceSettings = saveAttendanceSettings;
+window.loadAttendanceSettings = loadAttendanceSettings;
 window.loadAdminLunchStats = loadAdminLunchStats;
 window.loadStaffOverview = loadStaffOverview;
 window.changeLeaveCal = changeLeaveCal;
