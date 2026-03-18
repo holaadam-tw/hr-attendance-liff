@@ -2394,6 +2394,18 @@ export async function loadBookingForStore() {
         html += '</label>';
         html += '</div></div>';
 
+        // 開放星期
+        var openDays = bookingSettings.openDays_week || [];
+        html += '<div style="background:#fff;border:1px solid #E2E8F0;border-radius:12px;padding:16px;margin-bottom:10px;">';
+        html += '<div style="font-size:14px;font-weight:700;margin-bottom:8px;">📅 開放預約星期</div>';
+        html += '<div style="font-size:12px;color:#94A3B8;margin-bottom:10px;">不選 = 每天都可預約</div>';
+        html += '<div style="display:flex;gap:6px;flex-wrap:wrap;" id="bookingDaySelector">';
+        ['週日','週一','週二','週三','週四','週五','週六'].forEach(function(label, i) {
+            var sel = openDays.includes(i);
+            html += '<button type="button" class="bk-day-btn" data-day="' + i + '" onclick="toggleBkDayBtn(this)" style="padding:8px 12px;border:1px solid ' + (sel ? '#7C3AED' : '#E2E8F0') + ';border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;background:' + (sel ? '#7C3AED' : '#fff') + ';color:' + (sel ? '#fff' : '#64748B') + ';">' + label + '</button>';
+        });
+        html += '</div></div>';
+
         // 儲存按鈕
         html += '<button onclick="saveBookingSettings(\'' + storeId + '\')" style="width:100%;padding:14px;background:linear-gradient(135deg,#4F46E5,#6D28D9);color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:4px;box-shadow:0 4px 12px rgba(99,102,241,.25);">💾 儲存設定</button>';
         html += '</div>';
@@ -2657,7 +2669,14 @@ window.toggleManualConfirm = function(checked) {
 };
 
 // 儲存全部預約設定
-window.saveBookingSettings = function(storeId) {
+window.toggleBkDayBtn = function(btn) {
+    var isOn = btn.style.background === 'rgb(124, 58, 237)';
+    btn.style.background = isOn ? '#fff' : '#7C3AED';
+    btn.style.color = isOn ? '#64748B' : '#fff';
+    btn.style.borderColor = isOn ? '#E2E8F0' : '#7C3AED';
+};
+
+window.saveBookingSettings = async function(storeId) {
     bookingSettings.lunchStart = document.getElementById('bkLunchStart')?.value || '11:00';
     bookingSettings.lunchEnd = document.getElementById('bkLunchEnd')?.value || '14:00';
     bookingSettings.dinnerStart = document.getElementById('bkDinnerStart')?.value || '17:00';
@@ -2666,9 +2685,25 @@ window.saveBookingSettings = function(storeId) {
     bookingSettings.openDays = parseInt(document.getElementById('bkOpenDays')?.value) || 14;
     bookingSettings.maxPerSlot = parseInt(document.getElementById('bkMaxPerSlot')?.value) || 5;
     bookingSettings.manualConfirm = document.getElementById('bkManualConfirm')?.checked ?? true;
+
+    // 讀取星期格子
+    var selectedDays = [];
+    document.querySelectorAll('#bookingDaySelector .bk-day-btn').forEach(function(btn) {
+        if (btn.style.background === 'rgb(124, 58, 237)') {
+            selectedDays.push(parseInt(btn.dataset.day));
+        }
+    });
+    bookingSettings.openDays_week = selectedDays;
+
     localStorage.setItem('bk_settings', JSON.stringify(bookingSettings));
     localStorage.setItem('bk_interval', bookingInterval);
-    showToast('設定已儲存');
+
+    // 同步儲存 open_days 到 Supabase（供消費者頁面讀取）
+    try {
+        await saveSetting('booking_open_days', selectedDays, '預約開放星期');
+    } catch(e) { console.log('儲存 open_days 到 DB 失敗', e); }
+
+    showToast('✅ 設定已儲存');
 };
 
 

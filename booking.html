@@ -268,6 +268,7 @@ var SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI
 var storeId=null, slug=null;
 var party=2, selDate=null, selTime=null, mealFilter='lunch';
 var custTitle='先生', selTags=[];
+var bookingOpenDays=null; // null=每天, []=每天, [1,2,3]=只有這些星期
 var services=[], staffList=[];
 
 function esc(s){return s==null?'':String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
@@ -295,6 +296,14 @@ async function init(){
     document.getElementById('heroImg').src=s.cover_url||s.logo_url;
   }
   document.title=(s.store_name||'訂位')+' - 線上訂位';
+
+  // 載入開放星期設定
+  try {
+    var odRows = await api('system_settings?company_id=eq.'+s.company_id+'&key=eq.booking_open_days&select=value');
+    if(odRows && odRows[0] && Array.isArray(odRows[0].value) && odRows[0].value.length > 0) {
+      bookingOpenDays = odRows[0].value;
+    }
+  } catch(e) {}
 
   // 載入服務
   services = await api('booking_services?store_id=eq.'+storeId+'&is_active=eq.true&order=sort_order');
@@ -340,11 +349,21 @@ function renderDates(){
     var d=new Date();d.setDate(d.getDate()+i);
     var ds=d.toISOString().split('T')[0];
     var isToday=i===0;
-    html+='<div class="date-card'+(selDate===ds?' selected':'')+'" id="d_'+ds+'" onclick="pickDate(\''+ds+'\')">';
-    html+='<div class="d-sub">週'+dn[d.getDay()]+'</div>';
-    html+='<div class="d-num">'+(isToday?'今天':d.getDate())+'</div>';
-    html+='<div class="d-sub">'+(d.getMonth()+1)+'月</div>';
-    html+='</div>';
+    var dow=d.getDay();
+    var isClosed=bookingOpenDays && bookingOpenDays.length>0 && !bookingOpenDays.includes(dow);
+    if(isClosed){
+      html+='<div class="date-card" style="opacity:0.35;pointer-events:none;background:#F1F5F9;">';
+      html+='<div class="d-sub">週'+dn[dow]+'</div>';
+      html+='<div class="d-num" style="color:#94A3B8;">'+d.getDate()+'</div>';
+      html+='<div class="d-sub" style="color:#CBD5E1;">休</div>';
+      html+='</div>';
+    } else {
+      html+='<div class="date-card'+(selDate===ds?' selected':'')+'" id="d_'+ds+'" onclick="pickDate(\''+ds+'\')">';
+      html+='<div class="d-sub">週'+dn[dow]+'</div>';
+      html+='<div class="d-num">'+(isToday?'今天':d.getDate())+'</div>';
+      html+='<div class="d-sub">'+(d.getMonth()+1)+'月</div>';
+      html+='</div>';
+    }
   }
   el.innerHTML=html;
 }
