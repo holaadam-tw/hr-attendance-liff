@@ -325,13 +325,18 @@
             const ld = new Date(attYear, attMonth+1, 0).getDate();
             const me = `${attYear}-${String(attMonth+1).padStart(2,'0')}-${ld}`;
 
-            // [優化] 兩個 API 並行查詢，減少等待時間
-            const [attResult, lvResult] = await Promise.all([
-                sb.rpc('get_monthly_attendance', { p_line_user_id: liffProfile.userId, p_year: attYear, p_month: attMonth+1 }).catch(() => ({ data: null })),
-                sb.from('leave_requests').select('*').eq('employee_id', currentEmployee.id).eq('status','approved').gte('start_date', ms).lte('start_date', me).catch(() => ({ data: null }))
-            ]);
+            // [優化] 兩個 API 並行查詢
+            console.log('考勤查詢參數:', { line_user_id: liffProfile?.userId, year: attYear, month: attMonth+1 });
+            let attResult, lvResult;
+            try {
+                [attResult, lvResult] = await Promise.all([
+                    sb.rpc('get_monthly_attendance', { p_line_user_id: liffProfile.userId, p_year: attYear, p_month: attMonth+1 }),
+                    sb.from('leave_requests').select('*').eq('employee_id', currentEmployee.id).eq('status','approved').gte('start_date', ms).lte('start_date', me)
+                ]);
+            } catch(e) { console.error('考勤查詢錯誤:', e); attResult = { data: null }; lvResult = { data: null }; }
+            console.log('考勤查詢結果:', attResult.data, '錯誤:', attResult.error);
             attData = attResult.data || [];
-            lvData = lvResult.data || [];
+            lvData = lvResult?.data || [];
 
             renderAttCal();
         }
