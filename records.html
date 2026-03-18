@@ -354,10 +354,16 @@
                 return { s: 'leave', l: m[lv.leave_type] || '假', lv };
             }
             if (att) {
+                if (att.is_late && att.is_early_leave) {
+                    return { s: 'late', l: '遲+早', att };
+                }
                 if (att.is_late) {
                     let min = '';
                     try { const t = new Date(att.check_in_time); const sc = new Date(t); sc.setHours(8,0,0,0); const df = Math.round((t-sc)/60000); if(df>0) min = df+'分'; } catch(e){}
                     return { s: 'late', l: '遲'+(min||'到'), att };
+                }
+                if (att.is_early_leave) {
+                    return { s: 'early', l: '早退', att };
                 }
                 return { s: 'ok', l: '✓', att };
             }
@@ -384,6 +390,7 @@
                 let cls = 'att-day';
                 if (info.s==='ok') { cls+=' s-ok'; cOk++; }
                 else if (info.s==='late') { cls+=' s-late'; cLate++; cOk++; }
+                else if (info.s==='early') { cls+=' s-late'; cLate++; cOk++; }
                 else if (info.s==='leave') { cls+=' s-leave'; cLv++; }
                 else if (info.s==='absent') { cls+=' s-absent'; cAb++; }
                 else if (info.s==='off') cls+=' s-off';
@@ -393,7 +400,7 @@
 
                 if (info.att) tH += parseFloat(info.att.total_work_hours) || 0;
 
-                const bc = {ok:'background:#D1FAE5;color:#059669;',late:'background:#FFEDD5;color:#EA580C;',leave:'background:#DBEAFE;color:#2563EB;',absent:'background:#FEE2E2;color:#DC2626;',off:'color:#94A3B8;'}[info.s] || '';
+                const bc = {ok:'background:#D1FAE5;color:#059669;',late:'background:#FFEDD5;color:#EA580C;',early:'background:#FFEDD5;color:#EA580C;',leave:'background:#DBEAFE;color:#2563EB;',absent:'background:#FEE2E2;color:#DC2626;',off:'color:#94A3B8;'}[info.s] || '';
                 el.innerHTML = `<span class="day-num">${d}</span>${info.l?`<span class="day-badge" style="${bc}">${info.l}</span>`:''}${info.att&&info.att.total_work_hours?`<span class="day-sub">${parseFloat(info.att.total_work_hours).toFixed(1)}h</span>`:''}`;
 
                 if (info.s!=='future' && info.s!=='off') el.onclick = () => showDetail(ds, info);
@@ -413,7 +420,7 @@
             const dd = new Date(ds);
             document.getElementById('adTitle').textContent = `${ds} 週${wd[dd.getDay()]}`;
 
-            const sm = {ok:'<span style="color:#059669;font-weight:700;">✅ 正常出勤</span>',late:'<span style="color:#EA580C;font-weight:700;">⚠️ 遲到</span>',leave:'<span style="color:#2563EB;font-weight:700;">📝 請假</span>',absent:'<span style="color:#DC2626;font-weight:700;">❌ 缺勤</span>'};
+            const sm = {ok:'<span style="color:#059669;font-weight:700;">✅ 正常出勤</span>',late:'<span style="color:#EA580C;font-weight:700;">⚠️ 遲到</span>',early:'<span style="color:#EA580C;font-weight:700;">⚠️ 早退</span>',leave:'<span style="color:#2563EB;font-weight:700;">📝 請假</span>',absent:'<span style="color:#DC2626;font-weight:700;">❌ 缺勤</span>'};
             document.getElementById('adBadge').innerHTML = sm[info.s] || '';
 
             let r = '';
@@ -428,6 +435,9 @@
                 if (info.att.total_work_hours) r += `<div class="adr"><span style="color:var(--gray)">工作時數</span><b>${parseFloat(info.att.total_work_hours).toFixed(1)} 小時</b></div>`;
                 if (info.att.is_late) {
                     try { const t=new Date(info.att.check_in_time),sc=new Date(t);sc.setHours(8,0,0,0);const df=Math.round((t-sc)/60000);if(df>0) r+=`<div class="adr"><span style="color:#EA580C">遲到時間</span><b style="color:#EA580C">${df} 分鐘</b></div>`; } catch(e){}
+                }
+                if (info.att.is_early_leave) {
+                    r += `<div class="adr"><span style="color:#EA580C">早退</span><b style="color:#EA580C">⚠️ 早退</b></div>`;
                 }
                 if (info.att.check_in_location) r += `<div class="adr"><span style="color:var(--gray)">打卡地點</span><b>${escapeHTML(info.att.check_in_location)}</b></div>`;
                 if (info.att.photo_url) r += `<div class="adr"><span style="color:var(--gray)">打卡照片</span><a href="${escapeHTML(info.att.photo_url)}" target="_blank" rel="noopener" style="color:var(--primary);font-weight:700;">📷 查看</a></div>`;

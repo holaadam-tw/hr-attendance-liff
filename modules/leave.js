@@ -325,20 +325,31 @@ export async function loadLunchDeadline() {
 // ===== 考勤設定 =====
 export async function saveAttendanceSettings() {
     const start = document.getElementById('defaultWorkStart').value;
-    const threshold = document.getElementById('lateThresholdMinutes').value;
+    const end = document.getElementById('defaultWorkEnd').value;
+    const lateThreshold = document.getElementById('lateThresholdMinutes').value;
+    const earlyThreshold = document.getElementById('earlyLeaveThreshold').value;
     if (!start) return showToast('請選擇上班時間');
+    if (!end) return showToast('請選擇下班時間');
     await saveSetting('default_work_start', start, '預設上班時間');
-    await saveSetting('late_threshold_minutes', parseInt(threshold) || 5, '遲到容忍分鐘');
+    await saveSetting('default_work_end', end, '預設下班時間');
+    await saveSetting('late_threshold_minutes', parseInt(lateThreshold) || 5, '遲到容忍分鐘');
+    await saveSetting('early_leave_threshold_minutes', parseInt(earlyThreshold) || 0, '早退容忍分鐘');
     showToast('✅ 考勤設定已儲存');
 }
 
 export async function loadAttendanceSettings() {
     const start = getCachedSetting('default_work_start');
-    const threshold = getCachedSetting('late_threshold_minutes');
+    const end = getCachedSetting('default_work_end');
+    const lateThreshold = getCachedSetting('late_threshold_minutes');
+    const earlyThreshold = getCachedSetting('early_leave_threshold_minutes');
     const el1 = document.getElementById('defaultWorkStart');
     const el2 = document.getElementById('lateThresholdMinutes');
+    const el3 = document.getElementById('defaultWorkEnd');
+    const el4 = document.getElementById('earlyLeaveThreshold');
     if (start && el1) el1.value = start;
-    if (threshold !== null && threshold !== undefined && el2) el2.value = threshold;
+    if (end && el3) el3.value = end;
+    if (lateThreshold !== null && lateThreshold !== undefined && el2) el2.value = lateThreshold;
+    if (earlyThreshold !== null && earlyThreshold !== undefined && el4) el4.value = earlyThreshold;
 }
 
 export async function loadAdminLunchStats() {

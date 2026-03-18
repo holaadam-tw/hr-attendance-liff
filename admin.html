@@ -1014,6 +1014,20 @@
                             </div>
                             <p style="font-size:11px;color:#94A3B8;margin:4px 0 0;">0 = 準時到就算遲到，5 = 超過5分鐘才算</p>
                         </div>
+                        <hr style="border:none;border-top:1px solid #E2E8F0;margin:14px 0;">
+                        <div style="margin-bottom:14px;">
+                            <label style="font-size:12px;font-weight:700;color:#4b5563;display:block;margin-bottom:6px;">預設下班時間</label>
+                            <input type="time" id="defaultWorkEnd" value="17:00" style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;font-weight:700;">
+                            <p style="font-size:11px;color:#94A3B8;margin:4px 0 0;">員工未排班時，以此時間判定是否早退</p>
+                        </div>
+                        <div style="margin-bottom:14px;">
+                            <label style="font-size:12px;font-weight:700;color:#4b5563;display:block;margin-bottom:6px;">早退容忍分鐘</label>
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <input type="number" id="earlyLeaveThreshold" value="0" min="0" max="60" style="flex:1;padding:10px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;font-weight:700;">
+                                <span style="font-size:13px;color:#64748B;white-space:nowrap;">分鐘</span>
+                            </div>
+                            <p style="font-size:11px;color:#94A3B8;margin:4px 0 0;">0 = 提早一分鐘即算早退</p>
+                        </div>
                         <button onclick="saveAttendanceSettings()" style="width:100%;padding:12px;border:none;border-radius:10px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;font-weight:700;font-size:14px;cursor:pointer;">💾 儲存考勤設定</button>
                     </div>
 
