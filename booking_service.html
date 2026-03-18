@@ -165,7 +165,6 @@
         <div id="step4" class="step-panel" style="display:none;">
             <div class="step-title"><span class="num">4</span>選擇時段</div>
             <div id="slotList"></div>
-            <div class="btn-row"><button class="btn btn-secondary" onclick="goStep(3)">← 上一步</button></div>
         </div>
 
         <!-- Step 5: 填寫資料 -->
@@ -240,6 +239,7 @@ let calYear, calMonth;
 let allServices = [];
 let allStaff = [];
 let allSlots = [];
+let bsSettings = { interval_minutes: 60, advance_days: 14, auto_confirm: false };
 
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
@@ -289,6 +289,18 @@ document.addEventListener('DOMContentLoaded', async () => {
             .eq('is_active', true)
             .order('slot_time');
         allSlots = slots || [];
+
+        // 載入預約設定（interval_minutes）
+        try {
+            const { data: settingsRow } = await sb.from('system_settings')
+                .select('value')
+                .eq('company_id', companyId)
+                .eq('key', 'booking_service_settings')
+                .maybeSingle();
+            if (settingsRow && settingsRow.value) {
+                bsSettings = { ...bsSettings, ...(typeof settingsRow.value === 'string' ? JSON.parse(settingsRow.value) : settingsRow.value) };
+            }
+        } catch(e) { console.log('載入預約設定失敗', e); }
 
         renderServices();
     } catch (e) {
@@ -470,6 +482,29 @@ function selectDate(dateStr) {
 }
 
 // ===== Step 4: 時段選擇 =====
+function parseTimeToMin(t) { const [h, m] = (t || '0:0').split(':').map(Number); return h * 60 + m; }
+function minToTime(m) { return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); }
+
+function expandSlots(daySlots) {
+    const interval = bsSettings.interval_minutes || 60;
+    const expanded = [];
+    daySlots.forEach(s => {
+        if (s.slot_end_time) {
+            // 有結束時間 → 按 interval 切割
+            let cur = parseTimeToMin(s.slot_time);
+            const end = parseTimeToMin(s.slot_end_time);
+            while (cur + interval <= end) {
+                expanded.push({ start: minToTime(cur), end: minToTime(cur + interval), max_concurrent: s.max_concurrent });
+                cur += interval;
+            }
+        } else {
+            // 無結束時間 → 單一時段
+            expanded.push({ start: s.slot_time, end: null, max_concurrent: s.max_concurrent });
+        }
+    });
+    return expanded;
+}
+
 async function renderSlots() {
     const el = document.getElementById('slotList');
     el.innerHTML = '<div class="loading"><div class="spinner"></div>查詢可用時段...</div>';
@@ -477,7 +512,7 @@ async function renderSlots() {
     const dateObj = new Date(selectedDate);
     const dow = dateObj.getDay();
 
-    // 取該日期的可用時段（day_of_week: null=每天, JSON陣列, 舊格式=單一數字）
+    // 取該日期的可用時段
     const daySlots = allSlots.filter(s => {
         if (!s.day_of_week) return true;
         try { return JSON.parse(s.day_of_week).includes(dow); } catch(e) {}
@@ -489,41 +524,41 @@ async function renderSlots() {
         return;
     }
 
+    // 展開時段
+    const expanded = expandSlots(daySlots);
+
     // 查已預約數量
     let bookingQuery = sb.from('service_bookings')
         .select('slot_time')
         .eq('company_id', companyId)
         .eq('booking_date', selectedDate)
         .in('status', ['pending', 'confirmed']);
-
     if (selectedStaff) {
         bookingQuery = bookingQuery.eq('employee_id', selectedStaff.employee_id);
     }
-
     const { data: existing } = await bookingQuery;
     const countMap = {};
     (existing || []).forEach(b => {
         countMap[b.slot_time] = (countMap[b.slot_time] || 0) + 1;
     });
 
-    // 過濾已過時段（如果是今天）
+    // 過濾已過時段
     const now = localDate();
     const isToday = selectedDate === (now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0'));
     const nowMinutes = now.getHours() * 60 + now.getMinutes();
 
     let html = '<div class="slot-grid">';
-    daySlots.forEach(s => {
-        const booked = countMap[s.slot_time] || 0;
+    expanded.forEach(s => {
+        const booked = countMap[s.start] || 0;
         const remain = s.max_concurrent - booked;
-        const [h, m] = s.slot_time.split(':').map(Number);
-        const slotMinutes = h * 60 + m;
+        const slotMinutes = parseTimeToMin(s.start);
         const isPast = isToday && slotMinutes <= nowMinutes;
         const isFull = remain <= 0;
         const disabled = isPast || isFull;
-        const selected = selectedSlot === s.slot_time;
+        const selected = selectedSlot === s.start;
+        const slotLabel = s.end ? s.start + ' ～ ' + s.end : s.start;
 
-        const slotLabel = s.slot_end_time ? s.slot_time + ' ～ ' + s.slot_end_time : s.slot_time;
-        html += `<div class="slot-btn ${disabled ? 'disabled' : ''} ${selected ? 'selected' : ''}" onclick="selectSlot('${s.slot_time}')">
+        html += `<div class="slot-btn ${disabled ? 'disabled' : ''} ${selected ? 'selected' : ''}" onclick="selectSlot('${s.start}')">
             ${slotLabel}
             <div class="slot-remain">${isFull ? '已滿' : (isPast ? '已過' : '剩 ' + remain + ' 位')}</div>
         </div>`;
