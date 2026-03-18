@@ -186,15 +186,12 @@ async function checkUserStatus() {
     if (loadingEl) loadingEl.style.display = 'flex';
 
     try {
-        const _td0 = document.getElementById('topDebug');
-        if (_td0) _td0.innerHTML += '<br>🅰️ try 開始';
         // === 先檢查是否為平台管理員 ===
-        const { data: padmin, error: padminErr } = await sb.from('platform_admins')
+        const { data: padmin } = await sb.from('platform_admins')
             .select('*')
             .eq('line_user_id', liffProfile.userId)
             .eq('is_active', true)
             .maybeSingle();
-        if (_td0) _td0.innerHTML += '<br>🅱️ padmin=' + (padmin ? padmin.name : 'null') + ' err=' + (padminErr ? padminErr.message : 'null');
 
         if (padmin) {
             isPlatformAdmin = true;
@@ -265,13 +262,10 @@ async function checkUserStatus() {
         }
 
         // === 一般員工流程（原邏輯）===
-        const _td = document.getElementById('topDebug');
-        if (_td) _td.innerHTML += '<br>🔍 查詢 employees by uid=' + liffProfile.userId;
         const { data, error } = await sb.from('employees')
             .select('*')
             .eq('line_user_id', liffProfile.userId)
             .maybeSingle();
-        if (_td) _td.innerHTML += '<br>📋 data=' + (data ? data.name : 'null') + ' error=' + (error ? error.message : 'null');
 
         if (loadingEl) loadingEl.style.display = 'none';
 
@@ -300,8 +294,6 @@ async function checkUserStatus() {
         }
     } catch (err) {
         console.error('檢查用戶狀態失敗:', err);
-        const _td2 = document.getElementById('topDebug');
-        if (_td2) _td2.innerHTML += '<br>💥 catch: ' + err.message;
         if (loadingEl) loadingEl.style.display = 'none';
         return false;
     }
