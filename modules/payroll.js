@@ -74,9 +74,9 @@ export async function loadHybridBonusData() {
     try {
         const [empRes, salaryRes, attRes, leaveRes] = await Promise.all([
             sb.from('employees').select('id, name, employee_number, department, hire_date').eq('company_id', window.currentCompanyId).eq('is_active', true).order('department').order('name'),
-            sb.from('salary_settings').select('employee_id, base_salary').eq('is_current', true),
-            sb.from('attendance').select('employee_id, is_late').gte('date', `${year}-01-01`).lte('date', `${year}-12-31`),
-            sb.from('leave_requests').select('employee_id, days').eq('status', 'approved').gte('start_date', `${year}-01-01`).lte('start_date', `${year}-12-31`)
+            sb.from('salary_settings').select('employee_id, base_salary, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).eq('is_current', true),
+            sb.from('attendance').select('employee_id, is_late, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).gte('date', `${year}-01-01`).lte('date', `${year}-12-31`),
+            sb.from('leave_requests').select('employee_id, days, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).eq('status', 'approved').gte('start_date', `${year}-01-01`).lte('start_date', `${year}-12-31`)
         ]);
         if (empRes.error) throw empRes.error;
 
@@ -393,10 +393,10 @@ export async function loadPayrollData() {
     try {
         const [empRes, salaryRes, attRes, leaveRes, otRes, existRes, bracketRes] = await Promise.all([
             sb.from('employees').select('id, name, employee_number, department, is_active').eq('company_id', window.currentCompanyId).eq('is_active', true),
-            sb.from('salary_settings').select('*').eq('is_current', true),
-            sb.from('attendance').select('employee_id, date, is_late, total_work_hours, overtime_hours, check_in_time, check_out_time').gte('date', startDate).lte('date', endDate),
-            sb.from('leave_requests').select('employee_id, days, leave_type').eq('status', 'approved').gte('start_date', startDate).lte('end_date', endDate),
-            sb.from('overtime_requests').select('employee_id, hours, ot_date').eq('status', 'approved').gte('ot_date', startDate).lte('ot_date', endDate).then(r => r).catch(() => ({ data: [] })),
+            sb.from('salary_settings').select('*, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).eq('is_current', true),
+            sb.from('attendance').select('employee_id, date, is_late, total_work_hours, overtime_hours, check_in_time, check_out_time, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).gte('date', startDate).lte('date', endDate),
+            sb.from('leave_requests').select('employee_id, days, leave_type, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).eq('status', 'approved').gte('start_date', startDate).lte('end_date', endDate),
+            sb.from('overtime_requests').select('employee_id, hours, ot_date, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).eq('status', 'approved').gte('ot_date', startDate).lte('ot_date', endDate).then(r => r).catch(() => ({ data: [] })),
             sb.from('payroll').select('*').eq('year', year).eq('month', month),
             sb.from('insurance_brackets').select('*').eq('is_active', true).order('salary_min').then(r => r).catch(() => ({ data: [] }))
         ]);
