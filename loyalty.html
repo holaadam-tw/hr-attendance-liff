@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>🎁 集點會員 - 員工服務中心</title>
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="loadingPage" class="loading-screen">
+        <div class="spinner"></div>
+        <p>系統載入中...</p>
+    </div>
+
+    <div class="container">
+        <div id="loyaltyPage" class="page active">
+            <button class="btn btn-secondary btn-auto-mb" onclick="window.location.href='index.html'">← 返回</button>
+
+            <!-- 會員卡片 -->
+            <div class="card" style="padding:20px;text-align:center;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;border-radius:20px;margin-bottom:16px;">
+                <div style="font-size:48px;margin-bottom:8px;">🎁</div>
+                <div id="loyaltyName" style="font-size:18px;font-weight:800;margin-bottom:4px;">載入中...</div>
+                <div style="font-size:12px;opacity:0.8;margin-bottom:16px;">集點會員</div>
+                <div style="background:rgba(255,255,255,0.2);border-radius:16px;padding:16px;">
+                    <div style="font-size:36px;font-weight:900;" id="loyaltyPoints">0</div>
+                    <div style="font-size:13px;opacity:0.9;">目前點數</div>
+                </div>
+            </div>
+
+            <!-- 點數記錄 -->
+            <div class="card" style="padding:16px;">
+                <h3 style="font-size:15px;font-weight:800;margin-bottom:12px;">📋 點數記錄</h3>
+                <div id="loyaltyHistory" style="font-size:13px;color:#64748B;">載入中...</div>
+            </div>
+
+            <!-- 兌換功能 -->
+            <div class="card" style="padding:16px;margin-top:12px;">
+                <h3 style="font-size:15px;font-weight:800;margin-bottom:8px;">🎁 點數兌換</h3>
+                <div style="text-align:center;padding:24px 16px;color:#94A3B8;">
+                    <div style="font-size:36px;margin-bottom:8px;">🔮</div>
+                    <div style="font-size:14px;font-weight:600;color:#64748B;">即將推出</div>
+                    <div style="font-size:12px;margin-top:4px;">點數兌換功能開發中，敬請期待</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="common.js"></script>
+    <script>
+        async function loadLoyaltyData() {
+            if (!currentEmployee) return;
+            document.getElementById('loyaltyName').textContent = currentEmployee.name || '會員';
+
+            // 查詢點數（從 loyalty_points 或 member_transactions）
+            try {
+                const { data: txns } = await sb.from('member_transactions')
+                    .select('*')
+                    .eq('company_id', window.currentCompanyId)
+                    .eq('line_user_id', liffProfile.userId)
+                    .order('created_at', { ascending: false })
+                    .limit(20);
+
+                let total = 0;
+                const historyEl = document.getElementById('loyaltyHistory');
+
+                if (!txns || txns.length === 0) {
+                    historyEl.innerHTML = '<div style="text-align:center;padding:16px;color:#94A3B8;">尚無點數記錄</div>';
+                } else {
+                    let html = '';
+                    txns.forEach(t => {
+                        const isAdd = t.points > 0;
+                        total += t.points || 0;
+                        const date = (t.created_at || '').substring(0, 10);
+                        html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #F1F5F9;">';
+                        html += '<div>';
+                        html += '<div style="font-size:13px;font-weight:600;color:#1F2937;">' + (t.description || (isAdd ? '獲得點數' : '使用點數')) + '</div>';
+                        html += '<div style="font-size:11px;color:#94A3B8;">' + date + '</div>';
+                        html += '</div>';
+                        html += '<div style="font-size:14px;font-weight:800;color:' + (isAdd ? '#059669' : '#DC2626') + ';">' + (isAdd ? '+' : '') + t.points + '</div>';
+                        html += '</div>';
+                    });
+                    historyEl.innerHTML = html;
+                }
+
+                document.getElementById('loyaltyPoints').textContent = total;
+            } catch(e) {
+                console.log('載入點數失敗', e);
+                document.getElementById('loyaltyHistory').innerHTML = '<div style="text-align:center;padding:16px;color:#94A3B8;">尚無點數記錄</div>';
+            }
+        }
+
+        window.addEventListener('load', async () => {
+            if (typeof initializeLiff === 'undefined') return;
+            const init = await initializeLiff();
+            if (init) {
+                const ok = await checkUserStatus();
+                if (ok) {
+                    document.getElementById('loadingPage').style.display = 'none';
+                    loadLoyaltyData();
+                } else {
+                    window.location.href = 'index.html';
+                }
+            }
+        });
+    </script>
+</body>
+</html>

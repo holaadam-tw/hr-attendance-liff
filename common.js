@@ -1689,7 +1689,7 @@ async function updateRequestStatus(id, status) {
 const DEFAULT_FEATURES = {
     leave: true,         // 我要請假（預設開啟）
     attendance: true,    // 考勤查詢（預設開啟）
-    salary: true,        // 薪資查詢（預設開啟）
+    salary: false,       // 薪資查詢（移至 admin.html，預設關閉）
     lunch: false,        // 便當訂購（需 Platform Admin 開啟）
     fieldwork: false,    // 外勤/業務（需 Platform Admin 開啟）
     sales_target: false, // 業務目標（需 Platform Admin 開啟）
