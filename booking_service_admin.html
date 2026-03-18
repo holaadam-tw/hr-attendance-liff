@@ -317,7 +317,7 @@
 
                     // Row 1: time + status badge
                     html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">';
-                    html += '<div style="font-size:18px;font-weight:800;color:#1E293B;letter-spacing:-.5px;">' + ((b.slot_time || '').substring(0,5) || '--:--') + '</div>';
+                    html += '<div style="font-size:18px;font-weight:800;color:#1E293B;letter-spacing:-.5px;">' + ((b.slot_time || '').substring(0,5) || '--:--') + (b.slot_end_time ? ' ～ ' + b.slot_end_time.substring(0,5) : '') + '</div>';
                     html += '<span style="padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;color:#fff;background:' + sc + ';">' + sl + '</span>';
                     html += '</div>';
 
@@ -655,7 +655,7 @@
                 }
                 html += '<div style="background:#fff;border:1px solid #F1F5F9;border-radius:12px;padding:14px;margin-bottom:8px;box-shadow:0 1px 3px rgba(0,0,0,.06);">';
                 html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">';
-                html += '<div style="font-size:18px;font-weight:800;color:#1E293B;">' + esc(s.slot_time) + '</div>';
+                html += '<div style="font-size:18px;font-weight:800;color:#1E293B;">' + esc(s.slot_time) + (s.slot_end_time ? ' ～ ' + esc(s.slot_end_time) : '') + '</div>';
                 html += '<span style="font-size:11px;padding:3px 8px;border-radius:6px;font-weight:600;' + (s.is_active ? 'background:#D1FAE5;color:#059669;' : 'background:#FEE2E2;color:#DC2626;') + '">' + (s.is_active ? '啟用' : '停用') + '</span>';
                 html += '</div>';
 
@@ -772,7 +772,7 @@
     // 時段編輯 modal
     let slotEditId = null;
 
-    function showSlotModal(id, slotTime, maxConcurrent, dayOfWeek) {
+    function showSlotModal(id, slotTime, maxConcurrent, dayOfWeek, slotEndTime) {
         slotEditId = id || null;
         const DOW_LABELS = ['週日','週一','週二','週三','週四','週五','週六'];
         let selectedDays = [];
@@ -789,8 +789,12 @@
         overlay.innerHTML = '<div style="background:#fff;border-radius:16px;padding:20px;width:100%;max-width:360px;box-shadow:0 20px 60px rgba(0,0,0,.2);">' +
             '<h3 style="font-size:16px;font-weight:700;margin-bottom:16px;">' + (id ? '編輯時段' : '新增時段') + '</h3>' +
             '<div style="margin-bottom:12px;">' +
-                '<label style="font-size:13px;color:#666;display:block;margin-bottom:4px;">時段（HH:MM）</label>' +
+                '<label style="font-size:13px;color:#666;display:block;margin-bottom:4px;">開始時間</label>' +
                 '<input type="time" id="slotTimeInput" value="' + (slotTime || '10:00') + '" style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:8px;font-size:15px;">' +
+            '</div>' +
+            '<div style="margin-bottom:12px;">' +
+                '<label style="font-size:13px;color:#666;display:block;margin-bottom:4px;">結束時間（可選）</label>' +
+                '<input type="time" id="slotEndTimeInput" value="' + (slotEndTime || '') + '" style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:8px;font-size:15px;">' +
             '</div>' +
             '<div style="margin-bottom:12px;">' +
                 '<label style="font-size:13px;color:#666;display:block;margin-bottom:4px;">同時可服務人數</label>' +
@@ -827,7 +831,8 @@
 
     async function saveSlotModal() {
         const time = document.getElementById('slotTimeInput').value;
-        if (!time) { showToast('請輸入時段'); return; }
+        if (!time) { showToast('請輸入開始時間'); return; }
+        const endTime = document.getElementById('slotEndTimeInput').value || null;
         const max = parseInt(document.getElementById('slotMaxInput').value) || 1;
 
         const selectedDays = [];
@@ -840,14 +845,14 @@
 
         if (slotEditId) {
             const { error } = await sb.from('service_time_slots').update({
-                slot_time: time, max_concurrent: max, day_of_week: dow
+                slot_time: time, slot_end_time: endTime, max_concurrent: max, day_of_week: dow
             }).eq('id', slotEditId);
             if (error) { showToast('更新失敗'); return; }
             showToast('已更新');
         } else {
             const { error } = await sb.from('service_time_slots').insert({
                 company_id: window.currentCompanyId,
-                slot_time: time, max_concurrent: max, day_of_week: dow, is_active: true
+                slot_time: time, slot_end_time: endTime, max_concurrent: max, day_of_week: dow, is_active: true
             });
             if (error) { showToast('新增失敗：' + error.message); return; }
             showToast('已新增');
@@ -857,13 +862,13 @@
     }
 
     function addTimeSlot() {
-        showSlotModal(null, '10:00', 1, null);
+        showSlotModal(null, '10:00', 1, null, '');
     }
 
     async function editTimeSlot(id) {
         const { data: s } = await sb.from('service_time_slots').select('*').eq('id', id).maybeSingle();
         if (!s) return;
-        showSlotModal(s.id, s.slot_time, s.max_concurrent, s.day_of_week);
+        showSlotModal(s.id, s.slot_time, s.max_concurrent, s.day_of_week, s.slot_end_time);
     }
 
     async function deleteTimeSlot(id) {

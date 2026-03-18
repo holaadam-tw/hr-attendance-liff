@@ -522,8 +522,9 @@ async function renderSlots() {
         const disabled = isPast || isFull;
         const selected = selectedSlot === s.slot_time;
 
+        const slotLabel = s.slot_end_time ? s.slot_time + ' ～ ' + s.slot_end_time : s.slot_time;
         html += `<div class="slot-btn ${disabled ? 'disabled' : ''} ${selected ? 'selected' : ''}" onclick="selectSlot('${s.slot_time}')">
-            ${s.slot_time}
+            ${slotLabel}
             <div class="slot-remain">${isFull ? '已滿' : (isPast ? '已過' : '剩 ' + remain + ' 位')}</div>
         </div>`;
     });
@@ -546,7 +547,7 @@ function renderSummary() {
         <div class="summary-row"><span class="summary-label">服務項目</span><span class="summary-value">${esc(selectedService?.name || '')}</span></div>
         <div class="summary-row"><span class="summary-label">服務人員</span><span class="summary-value">${selectedStaff ? esc(selectedStaff.name) : '不指定'}</span></div>
         <div class="summary-row"><span class="summary-label">預約日期</span><span class="summary-value">${selectedDate}</span></div>
-        <div class="summary-row"><span class="summary-label">預約時段</span><span class="summary-value">${selectedSlot}</span></div>
+        <div class="summary-row"><span class="summary-label">預約時段</span><span class="summary-value">${(() => { const s = (allSlots || []).find(x => x.slot_time === selectedSlot); return s && s.slot_end_time ? selectedSlot + ' ～ ' + s.slot_end_time : selectedSlot; })()}</span></div>
         <div class="summary-row"><span class="summary-label">姓名</span><span class="summary-value">${esc(name)}</span></div>
         <div class="summary-row"><span class="summary-label">電話</span><span class="summary-value">${esc(phone)}</span></div>
         ${notes ? '<div class="summary-row"><span class="summary-label">備註</span><span class="summary-value">' + esc(notes) + '</span></div>' : ''}
