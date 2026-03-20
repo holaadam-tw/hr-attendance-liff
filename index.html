@@ -293,7 +293,7 @@
 
             if (data?.check_in_time) {
                 const inTime = new Date(data.check_in_time);
-                const timeStr = `${String(inTime.getHours()).padStart(2,'0')}:${String(inTime.getMinutes()).padStart(2,'0')}`;
+                const timeStr = inTime.toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', hour12: false });
                 document.getElementById('todayCheckinTime').textContent = timeStr;
 
                 const isLate = data.is_late || data.status === 'late';
@@ -316,7 +316,7 @@
 
             if (data?.check_out_time) {
                 const outTime = new Date(data.check_out_time);
-                const timeStr = `${String(outTime.getHours()).padStart(2,'0')}:${String(outTime.getMinutes()).padStart(2,'0')}`;
+                const timeStr = outTime.toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', hour12: false });
                 document.getElementById('todayCheckoutTime').textContent = timeStr;
                 document.getElementById('todayCheckoutStatus').textContent = '✅ 已下班';
             }
