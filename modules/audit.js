@@ -19,7 +19,7 @@ export async function loadAuditLogs(more = false) {
             <div style="padding:8px 0;border-bottom:1px solid #F1F5F9;font-size:13px;">
                 <div style="display:flex;justify-content:space-between;">
                     <span>${ai[r.action] || '📝'} <b>${escapeHTML(r.actor_name || '?')}</b> ${al[r.action] || r.action} <span style="color:#7C3AED;">${escapeHTML(r.target_table || '')}</span></span>
-                    <span style="font-size:10px;color:#94A3B8;">${r.created_at ? new Date(r.created_at).toLocaleString('zh-TW') : ''}</span>
+                    <span style="font-size:10px;color:#94A3B8;">${r.created_at ? new Date(r.created_at).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' }) : ''}</span>
                 </div>
                 ${r.target_name ? `<div style="font-size:11px;color:#64748B;margin-top:2px;">對象：${escapeHTML(r.target_name)}</div>` : ''}
             </div>
@@ -38,7 +38,7 @@ export async function exportReport(type) {
         if (type === 'attendance') {
             const { data } = await sb.from('attendance').select('*, employees!inner(name, employee_number, department, company_id)').eq('employees.company_id', window.currentCompanyId).gte('date', ms + '-01').lte('date', ms + '-31').order('date');
             rows.push(['日期', '工號', '姓名', '部門', '上班', '下班', '狀態', '遲到(分)', '補卡', '備註']);
-            (data || []).forEach(r => rows.push([r.date, r.employees?.employee_number, r.employees?.name, r.employees?.department, r.check_in_time?.split('T')[1]?.substring(0, 5) || '', r.check_out_time?.split('T')[1]?.substring(0, 5) || '', r.status, r.late_minutes || 0, r.is_manual ? '是' : '', r.notes || '']));
+            (data || []).forEach(r => rows.push([r.date, r.employees?.employee_number, r.employees?.name, r.employees?.department, r.check_in_time ? new Date(r.check_in_time).toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', hour12: false }) : '', r.check_out_time ? new Date(r.check_out_time).toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', hour12: false }) : '', r.status, r.late_minutes || 0, r.is_manual ? '是' : '', r.notes || '']));
             fn = `出勤報表_${ms}.csv`;
         } else if (type === 'leave') {
             const { data } = await sb.from('leave_requests').select('*, employees!inner(name, employee_number, department, company_id)').eq('employees.company_id', window.currentCompanyId).order('created_at', { ascending: false }).limit(200);

@@ -171,7 +171,7 @@ export async function loadAnnouncementList() {
                 '<button onclick="deleteAnnouncement(\'' + a.id + '\')" style="background:none;border:none;font-size:14px;cursor:pointer;padding:4px;">🗑️</button>' +
                 '</div></div>' +
                 (a.content ? '<div style="font-size:12px;color:#64748B;margin-bottom:4px;">' + escapeHTML(a.content) + '</div>' : '') +
-                '<div style="font-size:10px;color:#94A3B8;">' + popupLabel + expireStr + ' · ' + (a.created_at ? new Date(a.created_at).toLocaleDateString() : '') + '</div>' +
+                '<div style="font-size:10px;color:#94A3B8;">' + popupLabel + expireStr + ' · ' + (a.created_at ? new Date(a.created_at).toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei' }) : '') + '</div>' +
             '</div>';
         }).join('');
     } catch(e) { el.innerHTML = '<p style="text-align:center;color:#ef4444;">載入失敗</p>'; }
@@ -422,8 +422,8 @@ function renderFieldWorkApprovals() {
         const empName = log.employees?.name || '?';
         const clientName = log.clients?.company_name || '-';
         const serviceName = log.service_items?.name || '';
-        const arriveT = log.arrive_time ? new Date(log.arrive_time).toLocaleTimeString('zh-TW', { hour:'2-digit', minute:'2-digit' }) : '--:--';
-        const leaveT = log.leave_time ? new Date(log.leave_time).toLocaleTimeString('zh-TW', { hour:'2-digit', minute:'2-digit' }) : '--:--';
+        const arriveT = log.arrive_time ? new Date(log.arrive_time).toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour:'2-digit', minute:'2-digit', hour12: false }) : '--:--';
+        const leaveT = log.leave_time ? new Date(log.leave_time).toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour:'2-digit', minute:'2-digit', hour12: false }) : '--:--';
         const hours = log.work_hours ? log.work_hours.toFixed(1) + 'h' : '';
 
         return `<div style="background:#fff;border:1px solid #E2E8F0;border-radius:12px;padding:14px;margin-bottom:8px;cursor:pointer;" onclick="showFwaDetail('${log.id}')">

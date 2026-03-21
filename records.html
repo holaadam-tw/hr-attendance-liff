@@ -359,7 +359,7 @@
                 }
                 if (att.is_late) {
                     let min = '';
-                    try { const t = new Date(att.check_in_time); const sc = new Date(t); sc.setHours(8,0,0,0); const df = Math.round((t-sc)/60000); if(df>0) min = df+'分'; } catch(e){}
+                    try { const t = new Date(att.check_in_time); const hm = t.toLocaleTimeString('zh-TW',{timeZone:'Asia/Taipei',hour:'2-digit',minute:'2-digit',hour12:false}).split(':'); const df = (parseInt(hm[0])*60+parseInt(hm[1])) - 8*60; if(df>0) min = df+'分'; } catch(e){}
                     return { s: 'late', l: '遲'+(min||'到'), att };
                 }
                 if (att.is_early_leave) {
@@ -427,14 +427,14 @@
             if (info.att) {
                 let ci='-', co='-';
                 try {
-                    if(info.att.check_in_time){const p=info.att.check_in_time.split(' ');ci=p.length>1?p[1].substring(0,5):info.att.check_in_time.substring(0,5);}
-                    if(info.att.check_out_time){const p=info.att.check_out_time.split(' ');co=p.length>1?p[1].substring(0,5):info.att.check_out_time.substring(0,5);}
+                    if(info.att.check_in_time){ci=new Date(info.att.check_in_time).toLocaleTimeString('zh-TW',{timeZone:'Asia/Taipei',hour:'2-digit',minute:'2-digit',hour12:false});}
+                    if(info.att.check_out_time){co=new Date(info.att.check_out_time).toLocaleTimeString('zh-TW',{timeZone:'Asia/Taipei',hour:'2-digit',minute:'2-digit',hour12:false});}
                 } catch(e){}
                 r += `<div class="adr"><span style="color:var(--gray)">上班打卡</span><b>${ci}</b></div>`;
                 r += `<div class="adr"><span style="color:var(--gray)">下班打卡</span><b>${co}</b></div>`;
                 if (info.att.total_work_hours) r += `<div class="adr"><span style="color:var(--gray)">工作時數</span><b>${parseFloat(info.att.total_work_hours).toFixed(1)} 小時</b></div>`;
                 if (info.att.is_late) {
-                    try { const t=new Date(info.att.check_in_time),sc=new Date(t);sc.setHours(8,0,0,0);const df=Math.round((t-sc)/60000);if(df>0) r+=`<div class="adr"><span style="color:#EA580C">遲到時間</span><b style="color:#EA580C">${df} 分鐘</b></div>`; } catch(e){}
+                    try { const t=new Date(info.att.check_in_time);const hm=t.toLocaleTimeString('zh-TW',{timeZone:'Asia/Taipei',hour:'2-digit',minute:'2-digit',hour12:false}).split(':');const df=(parseInt(hm[0])*60+parseInt(hm[1]))-8*60;if(df>0) r+=`<div class="adr"><span style="color:#EA580C">遲到時間</span><b style="color:#EA580C">${df} 分鐘</b></div>`; } catch(e){}
                 }
                 if (info.att.is_early_leave) {
                     r += `<div class="adr"><span style="color:#EA580C">早退</span><b style="color:#EA580C">⚠️ 早退</b></div>`;

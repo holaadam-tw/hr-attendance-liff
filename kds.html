@@ -383,7 +383,7 @@ function updateClock() {
     var now = new Date();
     var days = ['日','一','二','三','四','五','六'];
     var el = document.getElementById('kdsClock');
-    if (el) el.textContent = (now.getMonth()+1) + '/' + now.getDate() + ' 週' + days[now.getDay()] + ' ' + now.toLocaleTimeString('zh-TW', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    if (el) el.textContent = (now.getMonth()+1) + '/' + now.getDate() + ' 週' + days[now.getDay()] + ' ' + now.toLocaleTimeString('zh-TW', {timeZone:'Asia/Taipei',hour:'2-digit',minute:'2-digit',second:'2-digit'});
 }
 
 // ===== RENDER =====
@@ -411,7 +411,7 @@ function renderOrders() {
         const elapsed = getElapsed(o.created_at);
         const urgentLevel = o.status === 'ready' || o.status === 'cancelled' ? 'none' : elapsed.minutes >= 20 ? 'critical' : elapsed.minutes >= 10 ? 'warning' : 'normal';
         const items = o.items || [];
-        const orderTime = o.created_at ? new Date(o.created_at).toLocaleTimeString('zh-TW', { hour:'2-digit', minute:'2-digit' }) : '';
+        const orderTime = o.created_at ? new Date(o.created_at).toLocaleTimeString('zh-TW', { timeZone:'Asia/Taipei', hour:'2-digit', minute:'2-digit', hour12: false }) : '';
         const orderTotal = o.total || items.reduce((s, i) => s + (i.subtotal || i.unit_price * i.qty || 0), 0);
         const isRushed = o.rush_count > 0;
 

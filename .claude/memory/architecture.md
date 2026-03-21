@@ -40,10 +40,12 @@ async function saveSetting(key, value, description) {
 - `checkUserStatus()` 依賴 `liffProfile`（由 `initializeLiff()` 設定），不能直接呼叫
 - 獨立頁面不要自行查 employees 覆蓋 `currentCompanyId`，用 `checkUserStatus()` 統一設定
 - `toISOString()` 會轉 UTC，台灣 UTC+8 日期會偏移
+- SQL RPC 存入 TIMESTAMPTZ 欄位時必須用 `now()`（UTC），不能用 `now() AT TIME ZONE 'Asia/Taipei'`（會變無時區 TIMESTAMP 被當 UTC 存入，導致 +8 偏移）；日期/時間判定另用 `(now() AT TIME ZONE 'Asia/Taipei')::date/::time`
 - system_settings company_id 是 NOT NULL
 - sessionStorage 快取需手動清除
 - CORS：瀏覽器不能直接呼叫 LINE API，需 Edge Function
 - admin.html 系統設定 tab 名稱是 'setting'（不是 'feature'）
+- Supabase JS 的 `.maybeSingle()` 回傳 PromiseLike（非標準 Promise），不能直接 `.catch()`，必須用 try/catch 或 `Promise.resolve()` 包裝
 
 ## 最近修改記錄
 - 2026-03-10: 權限分級 + 薪酬密碼鎖
@@ -65,5 +67,13 @@ async function saveSetting(key, value, description) {
 - 2026-03-15: 新建服務業預約系統（booking_service.html + booking_service_admin.html）；SQL 018_booking_service.sql；功能 key booking_service；platform.html 新增服務業 preset
 - 2026-03-15: booking_service_admin.html 預約列表 UI 改為餐飲業同風格（日期橫向捲軸+統計卡片+狀態膠囊+時間軸分組卡片）；loadBookings 一次抓15天→renderBookingList 前端切換；移除舊 from/to input
 - 2026-03-15: booking_service_admin.html 時段設定 tab 改為三區塊（基本設定/時段管理/預約連結+QR Code）；基本設定存 system_settings key=booking_service_settings（interval_minutes, advance_days, auto_confirm）；時段卡片含星期格子+啟停用
+- 2026-03-18: service_time_slots 加 slot_end_time（023_service_time_slots_range.sql）；消費者端 expandSlots() 依 interval_minutes 自動切割區間時段；後台 modal 加結束時間 input
+- 2026-03-18: 餐飲業預約管理加開放星期格子（store.js toggleBkDayBtn）；儲存到 localStorage + system_settings key=booking_open_days；booking.html 消費者頁讀取後非開放星期灰底不可點
+- 2026-03-18: 薪資查詢從 index.html 移至 admin.html（DEFAULT_FEATURES salary=false）；platform.html 移除 salary toggle；新建 loyalty.html（集點會員：點數卡片+記錄+兌換即將推出）；index.html 加 loyalty 格子
 - 2026-03-16: checkin.html 相機錯誤分類（showCameraError：NotAllowedError/NotFoundError/NotReadableError 各自 UI 卡片+錯誤代碼）
 - 2026-03-16: 打卡改為 LIFF 內雙模式：openCamera() 先試 getUserMedia（電腦/iOS），失敗 fallback 到 input[capture="user"] 觸發系統相機（Android LINE）；handleCapturePhoto() 壓縮+上傳+GPS+RPC；移除外部瀏覽器方案（liff.openWindow/window.open/eid+cid 全移除）
+- 2026-03-17: admin.html 便當管理新增「訂餐截止時間」設定（system_settings key=lunch_deadline）；services.html 改用動態截止時間取代寫死 LUNCH_DEADLINE_HOUR=9；saveLunchDeadline/loadLunchDeadline 在 modules/leave.js
+- 2026-03-17: checkin.html 相機多重 getUserMedia 重試（4 種 constraints）；captureInput fallback 改 accept="image/jpeg,image/png" capture="user" + showToast 提示；進入打卡頁即檢查 GPS 權限，未開啟顯示步驟提示
+- 2026-03-18: quick_check_in RPC 遲到+早退判定（021→022_add_early_leave.sql）：上班→is_late（排班/default_work_start/late_threshold_minutes）；下班→is_early_leave（排班/default_work_end/early_leave_threshold_minutes）；admin.html 考勤設定卡片含上下班時間+遲到早退容忍分鐘；records.html 月曆顯示早退標記
+- 2026-03-18: index.html 加入 ?goto= URL 參數跳轉（handleGotoParam），支援 Rich Menu 直接跳轉到 records/leave/attendance/requests/salary/checkin/services/fieldwork/admin
+- 2026-03-17: index.html 骨架屏 + 載入優化 + ?goto= URL 跳轉：skeleton 在 LIFF init 後立即顯示；首頁不等天氣/公告載完就顯示；bindPage 預設不加 active；handleGotoParam() 支援 Rich Menu 直接跳轉（records/leave/attendance/requests/salary/checkin/services/fieldwork/admin）

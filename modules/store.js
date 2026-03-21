@@ -285,7 +285,7 @@ function renderStoreOrderList() {
     };
     el.innerHTML = rdOrders.map(o => {
         const st = statusMap[o.status] || { label:o.status, color:'#64748B', bg:'#F1F5F9' };
-        const time = o.created_at ? new Date(o.created_at).toLocaleString('zh-TW', { hour:'2-digit', minute:'2-digit' }) : '';
+        const time = o.created_at ? new Date(o.created_at).toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour:'2-digit', minute:'2-digit', hour12: false }) : '';
         const itemCount = (o.items || []).reduce((s, i) => s + (i.qty || 1), 0);
         const pickup = o.pickup_number ? '#' + String(o.pickup_number).padStart(3, '0') + ' ' : '';
         const typeLabel = { dine_in:'內用', takeout:'外帶', delivery:'外送' };
@@ -1583,7 +1583,7 @@ function renderHourlyChart(orders) {
     const hourly = Array(24).fill(0);
     orders.forEach(o => {
         if (!o.created_at) return;
-        const h = new Date(o.created_at).getHours();
+        const h = parseInt(new Date(o.created_at).toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', hour12: false }));
         hourly[h] += (parseFloat(o.total) || 0);
     });
     const ctx = document.getElementById('hourlyChart');
@@ -1663,7 +1663,7 @@ export function exportSalesCSV() {
     _reportOrders.forEach(o => {
         const dt = o.created_at ? new Date(o.created_at) : null;
         const dateStr = dt ? fmtDate(dt) : '';
-        const timeStr = dt ? dt.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' }) : '';
+        const timeStr = dt ? dt.toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', hour12: false }) : '';
         const typeLabel = { dine_in: '內用', takeout: '外帶', delivery: '外送' };
         const items = (o.items || []).map(i => i.name + 'x' + (i.qty || 1)).join('; ');
         rows.push([o.order_number || '', dateStr, timeStr, typeLabel[o.order_type] || o.order_type || '', items, o.total || 0, o.status || '']);
@@ -2043,7 +2043,7 @@ const TX_TYPE_MAP = {
 function renderTxRow(tx) {
     const t = TX_TYPE_MAP[tx.type] || { label: tx.type, icon: '📝', color: '#64748B' };
     const d = new Date(tx.created_at);
-    const dateStr = (d.getMonth()+1) + '/' + d.getDate() + ' ' + String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+    const dateStr = d.toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei', month: 'numeric', day: 'numeric' }) + ' ' + d.toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', hour12: false });
     const ptsStr = tx.points > 0 ? '+' + tx.points : String(tx.points);
 
     return '<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #F1F5F9;font-size:12px;">' +
@@ -2976,7 +2976,7 @@ export async function loadMembersForStore(storeId, skipLoading) {
 
                 if (transactions && transactions.length > 0) {
                     transactions.forEach(function(t) {
-                        const dateStr = new Date(t.created_at).toLocaleString('zh-TW', {month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
+                        const dateStr = new Date(t.created_at).toLocaleString('zh-TW', {timeZone:'Asia/Taipei',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'});
                         const icon = t.type === 'earn' ? '🟢 +' : '🔴 -';
                         const color = t.type === 'earn' ? '#059669' : '#EF4444';
 
@@ -3214,7 +3214,7 @@ window.toggleMemberOrders = async function(phone, storeId, cardEl) {
 
         let ohtml = '<div style="font-size:12px;font-weight:700;color:#64748B;margin-bottom:6px;">📦 最近訂單</div>';
         orders.forEach(function(o) {
-            const dateStr = new Date(o.created_at).toLocaleString('zh-TW', {month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit'});
+            const dateStr = new Date(o.created_at).toLocaleString('zh-TW', {timeZone:'Asia/Taipei', month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit'});
             const statusMap = {pending:'⏳待處理', confirmed:'✅已確認', preparing:'🔥製作中', ready:'📦可取餐', completed:'✅已完成', cancelled:'❌已取消'};
             const statusText = statusMap[o.status] || o.status;
             const typeText = o.order_type === 'takeout' ? '外帶' : '內用';
