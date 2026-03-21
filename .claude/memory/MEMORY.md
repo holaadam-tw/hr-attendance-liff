@@ -50,6 +50,8 @@
 ## 重要 Bug 紀錄
 - loadSettings() 必須在 currentCompanyId 和 currentCompanyFeatures 設定完成後才呼叫，否則因 companyId 為空直接 return，導致 _settingsCache 為空，feature_visibility 讀不到
 - feature_visibility 不應寫入 sessionStorage 快取，必須每次從 DB 讀取，確保跨裝置即時同步
+- `toLocaleTimeString('zh-TW', {...})` 不加 `timeZone: 'Asia/Taipei'` 會用瀏覽器本地時區，非台灣用戶看到錯誤時間
+- loyalty.html 目前使用 LIFF 認證（initializeLiff + checkUserStatus），但設計上應為消費者頁面（待重構）
 
 ## 關鍵檔案路徑
 - [專案指南](../../hr-attendance-liff-main/PROJECT_GUIDE.md)
