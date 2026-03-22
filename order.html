@@ -1938,8 +1938,10 @@ async function initApp() {
 async function loadStoreFromSupabase(slug) {
   const headers = { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' };
 
-  // 1. 查找商店
-  const storeRes = await fetch(SUPABASE_URL + '/rest/v1/store_profiles?store_slug=eq.' + encodeURIComponent(slug) + '&limit=1', { headers });
+  // 1. 查找商店（支援 UUID company_id 或 store_slug）
+  var isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(slug);
+  var queryField = isUUID ? 'company_id' : 'store_slug';
+  const storeRes = await fetch(SUPABASE_URL + '/rest/v1/store_profiles?' + queryField + '=eq.' + encodeURIComponent(slug) + '&limit=1', { headers });
   const storeData = await storeRes.json();
   if (!storeData || storeData.length === 0) throw new Error('Store not found: ' + slug);
 
