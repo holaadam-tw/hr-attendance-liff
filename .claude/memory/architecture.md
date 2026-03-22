@@ -92,3 +92,4 @@ async function saveSetting(key, value, description) {
 - 2026-03-21: order.html 加 LIFF SDK（可選 LINE 登入集點）+ awardLoyaltyPoints 改用 line_user_id + system_settings order_mode=dine_in_only 支援；index.html 線上點餐連結加 ?store=currentCompanyId
 - 2026-03-21: order.html loadStoreFromSupabase 支援 UUID(company_id) 和 store_slug 雙格式查詢（isUUID 偵測）
 - 2026-03-21: admin.html 餐飲設定新增點餐模式（all/dine_in_only/takeout_only）+ 集點開關 + 幾元得1點；儲存到 system_settings key=order_mode/loyalty_enabled/loyalty_points_per_amount；order.html 支援三種模式
+- 2026-03-21: admin.html 餐飲設定 tab 重排：營業時間獨立卡片 → 點餐設定合併卡片（模式+桌號QR+集點）→ LINE群組；外帶模式自動隱藏桌號區塊；QR Code URL 改用 company_id 優先
