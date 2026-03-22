@@ -6,6 +6,7 @@
     <title>🎁 集點會員管理</title>
     <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -88,10 +89,12 @@
                     <div style="font-size:11px;color:#94A3B8;margin-top:4px;">0 = 永不過期</div>
                 </div>
 
-                <!-- 消費者頁面連結 -->
+                <!-- 消費者頁面連結 + QR Code -->
                 <div style="background:#F8FAFC;border-radius:12px;padding:14px;margin-bottom:16px;">
                     <div style="font-size:13px;font-weight:600;color:#64748B;margin-bottom:6px;">📱 消費者集點頁面</div>
-                    <div id="loyaltyLink" style="font-size:12px;color:#7C3AED;word-break:break-all;"></div>
+                    <div id="loyaltyLink" style="font-size:12px;color:#7C3AED;word-break:break-all;margin-bottom:12px;"></div>
+                    <div id="loyaltyQR" style="display:flex;justify-content:center;margin-bottom:10px;"></div>
+                    <button onclick="printLoyaltyQR()" style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:10px;background:#fff;font-size:13px;cursor:pointer;">🖨️ 列印 QR Code</button>
                 </div>
 
                 <button class="btn btn-primary" onclick="saveLoyaltySettings()">💾 儲存設定</button>
@@ -362,9 +365,32 @@
             }
         } catch(e) { console.warn(e); }
 
-        // 消費者連結
+        // 消費者連結 + QR Code
         var baseUrl = window.location.origin + window.location.pathname.replace('loyalty_admin.html', '');
-        document.getElementById('loyaltyLink').textContent = baseUrl + 'loyalty.html?store=' + window.currentCompanyId;
+        var loyaltyUrl = baseUrl + 'loyalty.html?store=' + window.currentCompanyId;
+        document.getElementById('loyaltyLink').textContent = loyaltyUrl;
+        var qrEl = document.getElementById('loyaltyQR');
+        qrEl.innerHTML = '';
+        if (typeof QRCode !== 'undefined') {
+            new QRCode(qrEl, { text: loyaltyUrl, width: 200, height: 200 });
+        }
+    }
+
+    function printLoyaltyQR() {
+        var qrEl = document.getElementById('loyaltyQR');
+        var img = qrEl.querySelector('img') || qrEl.querySelector('canvas');
+        if (!img) { showToast('QR Code 未產生'); return; }
+        var src = img.tagName === 'CANVAS' ? img.toDataURL() : img.src;
+        var url = document.getElementById('loyaltyLink').textContent;
+        var w = window.open('', '_blank');
+        w.document.write('<html><head><title>集點會員 QR Code</title></head><body style="text-align:center;padding:40px;font-family:-apple-system,sans-serif;">' +
+            '<h2 style="margin-bottom:8px;">🎁 集點會員</h2>' +
+            '<p style="color:#666;margin-bottom:20px;">掃描 QR Code 查看點數</p>' +
+            '<img src="' + src + '" style="width:250px;height:250px;">' +
+            '<p style="font-size:12px;color:#999;margin-top:16px;word-break:break-all;">' + url + '</p>' +
+            '<script>setTimeout(function(){window.print();},500);<\/script>' +
+            '</body></html>');
+        w.document.close();
     }
 
     async function saveLoyaltySettings() {
