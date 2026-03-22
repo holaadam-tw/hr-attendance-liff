@@ -48,10 +48,11 @@ async function saveSetting(key, value, description) {
 - admin.html 系統設定 tab 名稱是 'setting'（不是 'feature'）
 - Supabase JS 的 `.maybeSingle()` 回傳 PromiseLike（非標準 Promise），不能直接 `.catch()`，必須用 try/catch 或 `Promise.resolve()` 包裝
 - **時區規則**：所有 `toLocaleTimeString` / `toLocaleString` / `toLocaleDateString` 必須加 `timeZone: 'Asia/Taipei'`；不能用 `getHours()`/`getMinutes()` 處理 DB 回傳的時間（只有顯示「現在時間」的即時時鐘例外）
-- **LIFF 環境檢查 — 頁面三分類**：
-  - 員工頁面（index/checkin/records/requests/fieldwork/salary/services/schedule/loyalty/booking_service_admin）：`initializeLiff({ requireLineApp: true })` → 非 LINE 顯示「請從 LINE 開啟」
-  - 管理頁面（admin via auth.js `checkAdminPermission()`、platform）：`initializeLiff()` 不帶參數 → 允許瀏覽器 LINE OAuth
-  - 消費者頁面（booking/booking_service/order）：完全不走 LIFF
+- **LIFF 環境檢查 — 頁面四分類**：
+  - 員工頁面（index/checkin/records/requests/fieldwork/salary/services/schedule/booking_service_admin）：`initializeLiff({ requireLineApp: true })`
+  - 管理頁面（admin via auth.js/platform）：`initializeLiff()` 不帶參數 → 允許瀏覽器 OAuth
+  - 消費者頁面（booking/booking_service/order/loyalty）：完全不走 LIFF SDK
+  - **loyalty.html 特殊**：不載入 LIFF SDK，LINE 登入改跳 `liff.line.me/{LIFF_ID}?goto=loyalty&store={id}` → index.html handleGotoParam 存 userId 到 sessionStorage → 跳回 loyalty.html 讀取
 - **LIFF OAuth 跳轉**：`liff.login()` 不帶 `redirectUri`（避免非 endpoint URL 被 LINE 拒絕 400）；非 index.html 頁面登入前存 `sessionStorage('liff_redirect_page')`，登入成功後自動跳回
 - **QA 腳本**：`bash scripts/qa_check.sh`（7 項檢查），commit 前必跑，FAIL 必修
 - **回歸測試清單**：CLAUDE.md 末尾有核心頁面開啟測試 + 修改影響範圍對照表，commit 前必確認
