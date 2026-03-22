@@ -103,4 +103,5 @@ async function saveSetting(key, value, description) {
 - 2026-03-21: loyalty_admin.html 會員詳細 modal（showMemberDetail）：LINE 綁定狀態+手機可編輯+點數+日期+最近記錄
 - 2026-03-21: loyalty_admin.html 設定頁加 QR Code（qrcode.min.js）+ 列印功能（printLoyaltyQR）
 - 2026-03-21: salary.html 從 2 tab 改 3 tab（明細/試算/年終）；年終 tab 改為內嵌（import payroll.js）；platform_admin 直接通過密碼驗證
-- 2026-03-21: loyalty.html liff.login() 移除 redirectUri 改 sessionStorage 跳轉（同 admin.html 400 修法）
+- 2026-03-21: loyalty.html 移除 LIFF SDK，LINE 登入改跳 liff.line.me URL → index.html handleGotoParam(loyalty) 存 userId 到 sessionStorage → 跳回 loyalty.html 讀取
+- 2026-03-21: 030_loyalty_phone_nullable.sql — phone DROP NOT NULL（LINE 會員不一定有手機）；loadLineMember 加 null 防護
