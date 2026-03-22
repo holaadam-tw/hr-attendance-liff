@@ -490,7 +490,7 @@
                 return;
             }
 
-            const initialized = await initializeLiff();
+            const initialized = await initializeLiff({ requireLineApp: true });
             if (initialized) {
                 const isLoggedIn = await checkUserStatus();
                 if (isLoggedIn) {

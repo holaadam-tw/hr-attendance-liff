@@ -93,7 +93,7 @@
 
         window.addEventListener('load', async () => {
             if (typeof initializeLiff === 'undefined') return;
-            const init = await initializeLiff();
+            const init = await initializeLiff({ requireLineApp: true });
             if (init) {
                 const ok = await checkUserStatus();
                 if (ok) {

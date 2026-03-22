@@ -365,7 +365,7 @@
             const titleEl = document.getElementById('checkInTitle');
             if (titleEl) titleEl.textContent = currentCheckInType === 'in' ? '📍 上班打卡' : '👋 下班打卡';
 
-            const initialized = await initializeLiff();
+            const initialized = await initializeLiff({ requireLineApp: true });
             if (initialized) {
                 const isLoggedIn = await checkUserStatus();
                 if (isLoggedIn) {

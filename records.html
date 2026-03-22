@@ -516,7 +516,7 @@
             if (typeof initializeLiff === 'undefined') return;
             const hash = window.location.hash || '#leave';
             let pid = hash==='#attendance'?'attendancePage':hash==='#salary'?'salaryPage':hash==='#makeup'?'makeupPunchPage':hash==='#overtime'?'overtimePage':'leavePage';
-            const ok = await initializeLiff();
+            const ok = await initializeLiff({ requireLineApp: true });
             if (ok) { const li = await checkUserStatus(); if(li){populateYearSelect('salaryYear');showPage(pid);}else window.location.href='index.html'; }
         });
     </script>

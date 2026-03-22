@@ -26,13 +26,15 @@ let officeLocations = [];
 let isProcessing = false;
 
 // ===== 初始化 LIFF =====
-async function initializeLiff() {
+async function initializeLiff(options) {
+    var opts = options || {};
     try {
         console.log('🚀 系統初始化...');
         await liff.init({ liffId: CONFIG.LIFF_ID });
         if (!liff.isLoggedIn()) {
-            // 非 LIFF 環境（一般瀏覽器直接開啟），顯示提示而非跳 LINE OAuth
-            if (!liff.isInClient()) {
+            // requireLineApp: 員工頁面（index/checkin）必須從 LINE 開啟
+            // 其他頁面（admin/platform）允許瀏覽器 LINE OAuth 登入
+            if (opts.requireLineApp && !liff.isInClient()) {
                 document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;text-align:center;padding:20px;font-family:-apple-system,BlinkMacSystemFont,sans-serif;"><div><div style="font-size:48px;margin-bottom:16px;">📱</div><h2 style="margin:0 0 12px;color:#1E293B;">請從 LINE 開啟</h2><p style="color:#64748B;line-height:1.6;">此頁面需要透過 LINE 應用程式開啟，<br>請回到 LINE 點選連結使用。</p></div></div>';
                 return false;
             }

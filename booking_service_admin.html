@@ -108,7 +108,7 @@
                 return;
             }
 
-            const initialized = await initializeLiff();
+            const initialized = await initializeLiff({ requireLineApp: true });
             if (!initialized) {
                 const loadingPage = document.getElementById('loadingPage');
                 if (loadingPage) loadingPage.style.display = 'none';

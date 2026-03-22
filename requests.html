@@ -260,7 +260,7 @@
 
         window.addEventListener('load', async function() {
             if (typeof initializeLiff === 'undefined') return;
-            var ok = await initializeLiff();
+            var ok = await initializeLiff({ requireLineApp: true });
             if (ok) {
                 var li = await checkUserStatus();
                 if (li) {

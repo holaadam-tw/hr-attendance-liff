@@ -463,7 +463,7 @@
                 return;
             }
 
-            const initialized = await initializeLiff();
+            const initialized = await initializeLiff({ requireLineApp: true });
             if (initialized) {
                 checkLiffParams();
 

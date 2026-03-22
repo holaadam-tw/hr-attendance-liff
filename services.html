@@ -504,7 +504,7 @@
             let pageId = 'lunchPage';
             if (hash === '#settings') pageId = 'settingsPage';
 
-            const initialized = await initializeLiff();
+            const initialized = await initializeLiff({ requireLineApp: true });
             if (initialized) {
                 const isLoggedIn = await checkUserStatus();
                 if (isLoggedIn) {

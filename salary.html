@@ -719,7 +719,7 @@
             } catch(e) {}
 
             if (typeof initializeLiff === 'undefined') { loadSalary(); calculateSalary(); return; }
-            const init = await initializeLiff();
+            const init = await initializeLiff({ requireLineApp: true });
             if (init) {
                 const ok = await checkUserStatus();
                 if (ok) {
