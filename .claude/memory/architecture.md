@@ -101,4 +101,5 @@ async function saveSetting(key, value, description) {
 - 2026-03-21: 預約集點：餐飲 updateBookingStatus completed→awardBookingLoyalty；服務業 updateBsStatus completed→awardServiceBookingLoyalty；system_settings key=booking_loyalty_points；報表匯出加集點會員+集點異動 CSV
 - 2026-03-21: loyalty_admin.html 會員詳細 modal（showMemberDetail）：LINE 綁定狀態+手機可編輯+點數+日期+最近記錄
 - 2026-03-21: loyalty_admin.html 設定頁加 QR Code（qrcode.min.js）+ 列印功能（printLoyaltyQR）
-- 2026-03-21: salary.html 從 2 tab 改 3 tab（明細/試算/年終），年終 tab 連結 admin.html#payroll
+- 2026-03-21: salary.html 從 2 tab 改 3 tab（明細/試算/年終）；年終 tab 改為內嵌（import payroll.js）；platform_admin 直接通過密碼驗證
+- 2026-03-21: loyalty.html liff.login() 移除 redirectUri 改 sessionStorage 跳轉（同 admin.html 400 修法）
