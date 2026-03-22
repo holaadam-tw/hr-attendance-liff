@@ -147,7 +147,11 @@
         document.getElementById('loginView').style.display = 'block';
     });
 
-    function loginWithLine() { liff.login({ redirectUri: window.location.href }); }
+    function loginWithLine() {
+        // 記錄目標頁面，登入後跳回
+        sessionStorage.setItem('liff_redirect_page', 'loyalty.html?store=' + companyId);
+        liff.login();
+    }
 
     function switchToLogin() {
         document.getElementById('phoneView').style.display = 'none';
