@@ -375,8 +375,40 @@
             const { error } = await sb.from('service_bookings').update(update).eq('id', id);
             if (error) { showToast('操作失敗'); return; }
         }
+        // 完成 → 自動集點
+        if (newStatus === 'completed') {
+            try {
+                var { data: bk } = await sb.from('service_bookings').select('customer_phone').eq('id', id).single();
+                if (bk?.customer_phone && window.currentCompanyId) {
+                    await awardServiceBookingLoyalty(id, bk.customer_phone, window.currentCompanyId);
+                }
+            } catch(e2) { console.warn('預約集點失敗:', e2); }
+        }
         showToast('已更新');
         loadBookings();
+    }
+
+    // 服務業預約完成 → 集點
+    async function awardServiceBookingLoyalty(bookingId, phone, companyId) {
+        var bkPts = 10;
+        try {
+            var { data: ss } = await sb.from('system_settings').select('value').eq('company_id', companyId).eq('key', 'booking_loyalty_points').maybeSingle();
+            if (ss?.value) bkPts = parseInt(ss.value) || 10;
+        } catch(e) {}
+        try {
+            var { data: member } = await sb.from('loyalty_members').select('*').eq('company_id', companyId).eq('phone', phone).maybeSingle();
+            if (!member) {
+                var welcomePts = 0;
+                try { var { data: ls } = await sb.from('loyalty_settings').select('welcome_points').eq('company_id', companyId).maybeSingle(); if (ls) welcomePts = ls.welcome_points || 0; } catch(e) {}
+                var { data: newM } = await sb.from('loyalty_members').insert({ company_id: companyId, phone: phone, total_points: welcomePts }).select().single();
+                member = newM;
+                if (welcomePts > 0 && member) { await sb.from('loyalty_transactions').insert({ company_id: companyId, member_id: member.id, type: 'earn', points: welcomePts, source: 'manual', note: '新會員歡迎禮' }); }
+            }
+            if (!member) return;
+            await sb.from('loyalty_members').update({ total_points: (member.total_points || 0) + bkPts, last_visit: new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' }) }).eq('id', member.id);
+            await sb.from('loyalty_transactions').insert({ company_id: companyId, member_id: member.id, type: 'earn', points: bkPts, source: 'booking_service', source_id: bookingId, note: '預約完成集點 +' + bkPts });
+            showToast('🎁 已送出 ' + bkPts + ' 點');
+        } catch(e) { console.warn('Service booking loyalty error:', e); }
     }
 
     // ===== Tab 2: 技師管理 =====

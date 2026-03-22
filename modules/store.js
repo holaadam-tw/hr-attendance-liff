@@ -2549,6 +2549,16 @@ window.updateBookingStatus = async function(id, newStatus) {
     try {
         const { error } = await sb.from('bookings').update({ status: newStatus, updated_at: new Date().toISOString() }).eq('id', id);
         if (error) throw error;
+        // 完成結帳 → 自動集點
+        if (newStatus === 'completed') {
+            try {
+                const { data: bk } = await sb.from('bookings').select('customer_phone, store_id').eq('id', id).single();
+                if (bk?.customer_phone) {
+                    const { data: sp } = await sb.from('store_profiles').select('company_id').eq('id', bk.store_id).maybeSingle();
+                    if (sp?.company_id) await awardBookingLoyalty(id, bk.customer_phone, sp.company_id, 'booking');
+                }
+            } catch(e2) { console.warn('預約集點失敗（不影響狀態）:', e2); }
+        }
         showToast('已更新狀態');
         await loadBookingForStore();
     } catch(e) {
@@ -2556,6 +2566,52 @@ window.updateBookingStatus = async function(id, newStatus) {
         showToast('操作失敗');
     }
 };
+
+// 預約/訂位到店集點
+async function awardBookingLoyalty(bookingId, phone, companyId, source) {
+    if (!phone || !companyId) return;
+    try {
+        // 讀取集點設定
+        var { data: ls } = await sb.from('loyalty_settings').select('points_per_amount, welcome_points').eq('company_id', companyId).maybeSingle();
+        // 讀取 booking_loyalty_points（預設 10）
+        var bkPts = 10;
+        try {
+            var { data: ss } = await sb.from('system_settings').select('value').eq('company_id', companyId).eq('key', 'booking_loyalty_points').maybeSingle();
+            if (ss?.value) bkPts = parseInt(ss.value) || 10;
+        } catch(e) {}
+
+        // 查詢/建立會員
+        var { data: member } = await sb.from('loyalty_members').select('*').eq('company_id', companyId).eq('phone', phone).maybeSingle();
+        if (!member) {
+            var welcomePts = ls?.welcome_points || 0;
+            var { data: newM } = await sb.from('loyalty_members').insert({
+                company_id: companyId, phone: phone, total_points: welcomePts
+            }).select().single();
+            member = newM;
+            if (welcomePts > 0 && member) {
+                await sb.from('loyalty_transactions').insert({
+                    company_id: companyId, member_id: member.id, type: 'earn',
+                    points: welcomePts, source: 'manual', note: '新會員歡迎禮'
+                });
+            }
+        }
+        if (!member) return;
+
+        // 送點
+        await sb.from('loyalty_members').update({
+            total_points: (member.total_points || 0) + bkPts,
+            last_visit: new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' })
+        }).eq('id', member.id);
+
+        await sb.from('loyalty_transactions').insert({
+            company_id: companyId, member_id: member.id, type: 'earn',
+            points: bkPts, source: source || 'booking', source_id: bookingId,
+            note: (source === 'booking_service' ? '預約完成集點' : '訂位到店集點') + ' +' + bkPts
+        });
+
+        showToast('🎁 已送出 ' + bkPts + ' 點給 ' + phone);
+    } catch(e) { console.warn('awardBookingLoyalty error:', e); }
+}
 
 // 手動新增預約（含 party_size）
 window.manualAddBooking = async function(storeId) {

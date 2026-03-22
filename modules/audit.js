@@ -86,6 +86,23 @@ export async function exportReport(type) {
                 rows.push([o.order_number, o.store_profiles?.store_name || '', o.pickup_number || '', o.customer_name || '', o.customer_phone || '', typeLabel[o.order_type] || o.order_type || '', itemStr, o.total, stLabel[o.status] || o.status, o.created_at?.substring(0, 16).replace('T', ' ') || '']);
             });
             fn = `訂單報表_${ms}.csv`;
+        } else if (type === 'loyalty') {
+            const { data: members } = await sb.from('loyalty_members').select('*').eq('company_id', window.currentCompanyId).order('created_at', { ascending: false });
+            rows.push(['姓名', '手機', 'LINE', '總點數', '已使用', '可用點數', '加入日期', '最後消費']);
+            (members || []).forEach(m => rows.push([m.name || '', m.phone || '', m.line_user_id ? '是' : '否', m.total_points || 0, m.used_points || 0, m.available_points || 0, m.member_since || '', m.last_visit || '']));
+            fn = `集點會員報表_${ms}.csv`;
+        } else if (type === 'loyalty_transactions') {
+            const threeMonthsAgo = new Date();
+            threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+            const since = threeMonthsAgo.toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' });
+            const { data: txns } = await sb.from('loyalty_transactions').select('*, loyalty_members(name, phone)').eq('company_id', window.currentCompanyId).gte('created_at', since + 'T00:00:00').order('created_at', { ascending: false });
+            const srcLabel = { order: '消費', booking: '訂位', booking_service: '服務預約', manual: '手動' };
+            rows.push(['日期', '會員', '手機', '類型', '點數', '金額', '來源', '說明']);
+            (txns || []).forEach(t => {
+                const dateStr = t.created_at ? new Date(t.created_at).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+                rows.push([dateStr, t.loyalty_members?.name || '', t.loyalty_members?.phone || '', t.type === 'earn' ? '集點' : '兌換', t.points, t.amount || '', srcLabel[t.source] || t.source || '', t.note || '']);
+            });
+            fn = `集點異動報表_${ms}.csv`;
         }
 
         if (rows.length <= 1) { showToast('⚠️ 無資料'); return; }
