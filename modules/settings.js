@@ -160,7 +160,7 @@ export async function loadAnnouncementList() {
         const typeBg = { info:'#EFF6FF', important:'#FFF7ED', urgent:'#FEF2F2' };
 
         el.innerHTML = items.map(a => {
-            var expireStr = a.expire_at ? '到期：' + new Date(a.expire_at).toLocaleDateString() : '永久';
+            var expireStr = a.expire_at ? '到期：' + new Date(a.expire_at).toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei' }) : '永久';
             var activeLabel = a.is_active ? '' : ' <span style="color:#EF4444;">（已停用）</span>';
             var popupLabel = a.is_popup ? '🔔 彈窗 · ' : '';
             return '<div style="background:' + (typeBg[a.type] || '#F1F5F9') + ';border-radius:12px;padding:14px;margin-bottom:10px;' + (!a.is_active ? 'opacity:.5;' : '') + '">' +
@@ -454,8 +454,8 @@ export function showFwaDetail(logId) {
     const empNo = log.employees?.employee_number || '';
     const clientName = log.clients?.company_name || '-';
     const serviceName = log.service_items?.name || '-';
-    const arriveT = log.arrive_time ? new Date(log.arrive_time).toLocaleString('zh-TW') : '-';
-    const leaveT = log.leave_time ? new Date(log.leave_time).toLocaleString('zh-TW') : '-';
+    const arriveT = log.arrive_time ? new Date(log.arrive_time).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' }) : '-';
+    const leaveT = log.leave_time ? new Date(log.leave_time).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' }) : '-';
 
     let photosHtml = '';
     if (log.photo_urls && log.photo_urls.length > 0) {
@@ -547,8 +547,8 @@ export function exportFieldWorkCSV() {
             l.employees?.name || '',
             l.clients?.company_name || '',
             l.service_items?.name || '',
-            l.arrive_time ? new Date(l.arrive_time).toLocaleString('zh-TW') : '',
-            l.leave_time ? new Date(l.leave_time).toLocaleString('zh-TW') : '',
+            l.arrive_time ? new Date(l.arrive_time).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' }) : '',
+            l.leave_time ? new Date(l.leave_time).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' }) : '',
             l.work_hours || 0,
             l.mileage || 0,
             l.work_content || '',

@@ -28,8 +28,18 @@
 - 不要直接 `git push`（會推到 master）
 - GitHub Pages 部署來源是 main 分支
 
-### 衝突變數檢查（每次修改 HTML 檔案必做）
-修改任何 HTML 頁面後，執行：
-grep -n "^let \|^const \|^var " 檔案名.html
-確認沒有與 common.js 重複宣告的全域變數：
-currentEmployee, currentCompanyId, liffProfile, sb, officeLocations
+### QA 自動檢查（每次修改程式碼後必做）
+每次修改完程式碼，commit 前必須執行：
+```bash
+bash scripts/qa_check.sh
+```
+檢查項目：
+1. 全域變數衝突（HTML 與 common.js）
+2. maybeSingle().catch() 陷阱
+3. 時區問題（toLocale* 缺少 timeZone: 'Asia/Taipei'）
+4. getHours/getMinutes 用於 DB 時間
+5. 多租戶隔離（查詢缺 company_id）
+6. 子頁面返回按鍵
+7. 消費者頁面不應有 LIFF
+
+**FAIL 必須修正才能 commit，WARN 需確認是否為預期行為。**

@@ -4212,7 +4212,7 @@ function renderMyOrders() {
   var sorted = window._myOrders.slice().reverse();
   list.innerHTML = sorted.map(function(o) {
     var s = ORDER_STATUS_MAP[o.status] || ORDER_STATUS_MAP.pending;
-    var timeStr = o.time ? new Date(o.time).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' }) : '';
+    var timeStr = o.time ? new Date(o.time).toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', hour12: false }) : '';
     var isActive = o.status !== 'completed' && o.status !== 'cancelled';
     return '<div style="background:' + s.bg + ';border-radius:14px;padding:16px;margin-bottom:10px;' + (isActive ? 'border:2px solid ' + s.color + ';' : 'opacity:0.7;') + '">' +
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">' +

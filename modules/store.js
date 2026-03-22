@@ -1821,7 +1821,7 @@ function renderMemberList(searchQuery) {
         if (isBlack) tags.push('<span style="background:#FEE2E2;color:#991B1B;padding:2px 6px;border-radius:4px;font-size:10px;">🚫 黑名單</span>');
         if (c.no_show_count > 0 && !isBlack) tags.push('<span style="background:#FEF3C7;color:#92400E;padding:2px 6px;border-radius:4px;font-size:10px;">⚠️ 未取餐x' + c.no_show_count + '</span>');
 
-        const lastDate = c.updated_at ? new Date(c.updated_at).toLocaleDateString('zh-TW') : '-';
+        const lastDate = c.updated_at ? new Date(c.updated_at).toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei' }) : '-';
 
         return '<div onclick="openMemberDetail(\'' + esc(c.phone).replace(/'/g, "\\'") + '\')" style="display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid #F1F5F9;cursor:pointer;transition:background 0.15s;' + (isBlack ? 'opacity:0.6;' : '') + '" onmouseover="this.style.background=\'#F8FAFC\'" onmouseout="this.style.background=\'\'">' +
             '<div style="width:40px;height:40px;border-radius:50%;background:#EEF2FF;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">' + (isBlack ? '🚫' : (isVip ? '⭐' : '👤')) + '</div>' +
@@ -2891,8 +2891,8 @@ export async function loadMembersForStore(storeId, skipLoading) {
         } else {
             html += '<div id="memberListContainer">';
             customers.forEach(function(c) {
-                const joinDate = c.created_at ? new Date(c.created_at).toLocaleDateString('zh-TW') : '-';
-                const lastDate = c.updated_at ? new Date(c.updated_at).toLocaleDateString('zh-TW') : '-';
+                const joinDate = c.created_at ? new Date(c.created_at).toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei' }) : '-';
+                const lastDate = c.updated_at ? new Date(c.updated_at).toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei' }) : '-';
                 const isVip = (c.total_orders || 0) >= vipThreshold;
 
                 html += '<div class="member-card" data-name="' + esc(c.name || '') + '" data-phone="' + esc(c.phone || '') + '" onclick="toggleMemberOrders(\'' + esc(c.phone) + '\', \'' + storeId + '\', this)" style="cursor:pointer;padding:14px;background:#fff;border:1px solid ' + (isVip ? '#F97316' : '#E2E8F0') + ';border-radius:12px;margin-bottom:8px;' + (isVip ? 'box-shadow:0 0 0 1px #FED7AA;' : '') + '">';
