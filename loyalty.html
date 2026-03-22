@@ -66,6 +66,16 @@
                 <div class="label">可用點數</div>
                 <div style="font-size:11px;opacity:0.7;margin-top:8px;" id="memberSince"></div>
             </div>
+            <!-- 綁定手機（LINE 登入後，若 phone 為空） -->
+            <div id="bindPhoneCard" class="card" style="display:none;">
+                <div style="font-size:13px;color:#64748B;margin-bottom:10px;">綁定手機號碼，方便店員查詢您的點數</div>
+                <div style="display:flex;gap:8px;">
+                    <input type="tel" id="bindPhoneInput" placeholder="0912345678" maxlength="10"
+                        style="flex:1;padding:10px 12px;border:2px solid #E2E8F0;border-radius:10px;font-size:14px;">
+                    <button onclick="bindPhone()" style="padding:10px 16px;border:none;border-radius:10px;background:#6366F1;color:#fff;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;">綁定</button>
+                    <button onclick="document.getElementById('bindPhoneCard').style.display='none'" style="padding:10px 12px;border:1px solid #E2E8F0;border-radius:10px;background:#fff;font-size:13px;cursor:pointer;">略過</button>
+                </div>
+            </div>
             <div class="card">
                 <div class="section-title">🎁 兌換商品</div>
                 <div id="rewardsList"></div>
@@ -178,6 +188,11 @@
             document.getElementById('memberPoints').textContent = member.available_points || 0;
             if (member.member_since) document.getElementById('memberSince').textContent = '會員自 ' + member.member_since;
 
+            // 若 phone 為空，顯示綁定手機
+            if (!member.phone) {
+                document.getElementById('bindPhoneCard').style.display = '';
+            }
+
             loadTransactions('txHistory');
             loadRewards();
         } catch(e) {
@@ -271,6 +286,19 @@
             loadTransactions('txHistory');
             loadRewards();
         } catch(e) { showToast('❌ 兌換失敗'); }
+    }
+
+    // ===== 綁定手機 =====
+    async function bindPhone() {
+        var phone = document.getElementById('bindPhoneInput').value.trim();
+        if (!phone || phone.length < 9) { showToast('請輸入正確的手機號碼'); return; }
+        if (!currentMember) return;
+        try {
+            await sb.from('loyalty_members').update({ phone: phone }).eq('id', currentMember.id);
+            currentMember.phone = phone;
+            document.getElementById('bindPhoneCard').style.display = 'none';
+            showToast('✅ 手機號碼已綁定');
+        } catch(e) { showToast('❌ 綁定失敗'); }
     }
     </script>
 </body>

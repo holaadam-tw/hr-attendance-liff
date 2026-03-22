@@ -164,10 +164,16 @@
         list.forEach(function(m) {
             var joinDate = m.member_since || '';
             html += '<div class="member-row">';
-            html += '<div class="avatar">👤</div>';
+            var hasLine = !!m.line_user_id;
+            var hasPhone = !!m.phone;
+            html += '<div class="avatar">' + (hasLine ? '🟢' : '👤') + '</div>';
             html += '<div style="flex:1;min-width:0;">';
-            html += '<div style="font-size:14px;font-weight:700;">' + escapeHTML(m.name || m.phone) + '</div>';
-            html += '<div style="font-size:12px;color:#64748B;">' + escapeHTML(m.phone) + ' · 加入 ' + joinDate + '</div>';
+            html += '<div style="font-size:14px;font-weight:700;">' + escapeHTML(m.name || m.phone || 'LINE 會員') + '</div>';
+            html += '<div style="font-size:12px;color:#64748B;">';
+            if (hasPhone) html += '📱 ' + escapeHTML(m.phone);
+            if (hasLine && hasPhone) html += ' · ';
+            if (hasLine) html += '🟢 LINE';
+            html += ' · 加入 ' + joinDate + '</div>';
             html += '</div>';
             html += '<div style="text-align:right;">';
             html += '<div style="font-size:16px;font-weight:800;color:#7C3AED;">' + (m.available_points || 0) + '</div>';
@@ -182,7 +188,7 @@
         var q = document.getElementById('memberSearch').value.trim().toLowerCase();
         if (!q) { renderMembers(allMembers); return; }
         var filtered = allMembers.filter(function(m) {
-            return (m.phone || '').includes(q) || (m.name || '').toLowerCase().includes(q);
+            return (m.phone || '').includes(q) || (m.name || '').toLowerCase().includes(q) || (m.line_user_id || '').includes(q);
         });
         renderMembers(filtered);
     }
