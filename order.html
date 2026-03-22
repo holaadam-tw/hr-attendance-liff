@@ -1866,6 +1866,11 @@ async function initApp() {
       console.log('LINE 已登入:', _lineProfile.displayName);
     }
   } catch(e) { console.log('LIFF init skipped:', e.message); }
+  // Fallback: 從 sessionStorage 讀取 LINE userId（LIFF URL 跳轉回來時）
+  if (!_lineUserId && storeSlug) {
+    var savedUid = sessionStorage.getItem('loyalty_line_user_id_' + storeSlug);
+    if (savedUid) { _lineUserId = savedUid; console.log('LINE userId from session:', savedUid); }
+  }
 
   // 先設定模式，讓 applyStoreThemeColor 知道是否為消費者模式
   const mode = params.get('mode');   // 'dine-in' | 'takeout'
@@ -4445,11 +4450,12 @@ async function awardLoyaltyPoints(orderTotal, orderId) {
   } catch(e) { console.warn('Award points error:', e); return 0; }
 }
 
-// LINE 登入集點（可選按鈕）
+// LINE 登入集點（可選按鈕）— 跳轉 LIFF URL 方式
 function loginLineForLoyalty() {
-  if (typeof liff !== 'undefined' && liff.isLoggedIn && !liff.isLoggedIn()) {
-    liff.login({ redirectUri: window.location.href });
-  }
+  var storeParam = new URLSearchParams(window.location.search).get('store') || '';
+  var currentUrl = window.location.pathname.split('/').pop() + window.location.search;
+  sessionStorage.setItem('liff_redirect_page', currentUrl);
+  window.location.href = 'https://liff.line.me/2008962829-bnsS1bbB?goto=order&store=' + storeParam;
 }
 
 // ===== 確認頁手機輸入 =====

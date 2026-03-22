@@ -453,14 +453,21 @@
                 'fieldwork': 'fieldwork.html',
                 'admin': 'admin.html'
             };
-            // loyalty 特殊處理：傳遞 LINE userId 到 loyalty.html
-            if (goto === 'loyalty') {
+            // loyalty/order 特殊處理：傳遞 LINE userId 到目標頁
+            if (goto === 'loyalty' || goto === 'order') {
                 var store = new URLSearchParams(window.location.search).get('store') || window.currentCompanyId || '';
                 if (liffProfile && liffProfile.userId) {
                     sessionStorage.setItem('loyalty_line_user_id_' + store, liffProfile.userId);
                     sessionStorage.setItem('loyalty_line_name_' + store, liffProfile.displayName || '');
                 }
-                window.location.href = 'loyalty.html?store=' + store;
+                // 檢查是否有之前存的完整 redirect URL
+                var pending = sessionStorage.getItem('liff_redirect_page');
+                if (pending && goto === 'order') {
+                    sessionStorage.removeItem('liff_redirect_page');
+                    window.location.href = pending;
+                    return true;
+                }
+                window.location.href = (goto === 'loyalty' ? 'loyalty.html' : 'order.html') + '?store=' + store;
                 return true;
             }
             if (pages[goto]) { window.location.href = pages[goto]; return true; }
