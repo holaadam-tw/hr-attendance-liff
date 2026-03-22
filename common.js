@@ -38,12 +38,24 @@ async function initializeLiff(options) {
                 document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;text-align:center;padding:20px;font-family:-apple-system,BlinkMacSystemFont,sans-serif;"><div><div style="font-size:48px;margin-bottom:16px;">📱</div><h2 style="margin:0 0 12px;color:#1E293B;">請從 LINE 開啟</h2><p style="color:#64748B;line-height:1.6;">此頁面需要透過 LINE 應用程式開啟，<br>請回到 LINE 點選連結使用。</p></div></div>';
                 return false;
             }
-            // [BUG FIX] 登入後導回當前頁面，而非只回 index.html
-            liff.login({ redirectUri: window.location.href });
+            // 儲存目標頁面（非 index.html 時），登入後自動跳回
+            var targetPage = window.location.pathname.split('/').pop();
+            if (targetPage && targetPage !== 'index.html' && targetPage !== '') {
+                sessionStorage.setItem('liff_redirect_page', targetPage + window.location.hash);
+            }
+            // 不帶 redirectUri → 使用 LIFF endpoint URL，避免 LINE OAuth 400 錯誤
+            liff.login();
             return false;
         }
-        
+
         liffProfile = await liff.getProfile();
+        // 登入後跳轉到原始目標頁面（從 admin.html 等頁面觸發的登入）
+        var pendingPage = sessionStorage.getItem('liff_redirect_page');
+        if (pendingPage) {
+            sessionStorage.removeItem('liff_redirect_page');
+            window.location.href = pendingPage;
+            return false;
+        }
         return true;
     } catch (error) {
         console.error('LIFF 初始化失敗:', error);
