@@ -1153,10 +1153,6 @@ function loadStoreSettings() {
         </div>`;
     }).join('');
     document.getElementById('rdLineGroupId').value = s.line_group_id || '';
-    const lc = s.loyalty_config || {};
-    document.getElementById('rdLoyaltySpend').value = lc.spend_per_point || '';
-    document.getElementById('rdLoyaltyPoints').value = lc.points_to_redeem || '';
-    document.getElementById('rdLoyaltyDiscount').value = lc.discount_amount || '';
     // 載入點餐模式 + 集點設定（from system_settings）
     loadOrderModeAndLoyalty();
 }

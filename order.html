@@ -1947,6 +1947,7 @@ async function loadStoreFromSupabase(slug) {
 
   const store = storeData[0];
   currentStoreId = store.id;
+  window._storeCompanyId = store.company_id || store.id;
 
   // 更新商店 header
   shopInfo = {
@@ -2021,7 +2022,7 @@ async function loadStoreFromSupabase(slug) {
 
   // order_mode 設定（dine_in_only / takeout_only / all）
   try {
-    var omRes = await fetch(SUPABASE_URL + '/rest/v1/system_settings?company_id=eq.' + currentStoreId + '&key=eq.order_mode&limit=1', { headers });
+    var omRes = await fetch(SUPABASE_URL + '/rest/v1/system_settings?company_id=eq.' + (window._storeCompanyId || currentStoreId) + '&key=eq.order_mode&limit=1', { headers });
     var omData = await omRes.json();
     var orderMode = (omData && omData.length > 0) ? omData[0].value : 'all';
     if (orderMode === 'dine_in_only') {
@@ -4384,7 +4385,7 @@ async function awardLoyaltyPoints(orderTotal, orderId) {
   // 讀取 loyalty_settings
   var spendPer = (loyaltyConfig && loyaltyConfig.spend_per_point) || 50;
   try {
-    var settingsResp = await fetch(SUPABASE_URL + '/rest/v1/loyalty_settings?company_id=eq.' + currentStoreId + '&limit=1', {
+    var settingsResp = await fetch(SUPABASE_URL + '/rest/v1/loyalty_settings?company_id=eq.' + (window._storeCompanyId || currentStoreId) + '&limit=1', {
       headers: { 'apikey': SUPABASE_KEY }
     });
     var settingsArr = await settingsResp.json();
@@ -4400,26 +4401,26 @@ async function awardLoyaltyPoints(orderTotal, orderId) {
 
     // 查詢會員：LINE userId 優先
     if (lineUid) {
-      var resp = await fetch(SUPABASE_URL + '/rest/v1/loyalty_members?company_id=eq.' + currentStoreId + '&line_user_id=eq.' + encodeURIComponent(lineUid) + '&limit=1', { headers: headers });
+      var resp = await fetch(SUPABASE_URL + '/rest/v1/loyalty_members?company_id=eq.' + (window._storeCompanyId || currentStoreId) + '&line_user_id=eq.' + encodeURIComponent(lineUid) + '&limit=1', { headers: headers });
       var arr = await resp.json();
       member = arr && arr.length > 0 ? arr[0] : null;
       if (!member) {
         var cr = await fetch(SUPABASE_URL + '/rest/v1/loyalty_members', {
           method: 'POST', headers: { ...headers, 'Prefer': 'return=representation' },
-          body: JSON.stringify({ company_id: currentStoreId, line_user_id: lineUid, name: _lineProfile?.displayName || null, phone: phone || null, total_points: 0 })
+          body: JSON.stringify({ company_id: (window._storeCompanyId || currentStoreId), line_user_id: lineUid, name: _lineProfile?.displayName || null, phone: phone || null, total_points: 0 })
         });
         var created = await cr.json();
         member = Array.isArray(created) ? created[0] : created;
       }
     } else if (phone) {
       // Fallback: 手機號碼
-      var resp2 = await fetch(SUPABASE_URL + '/rest/v1/loyalty_members?company_id=eq.' + currentStoreId + '&phone=eq.' + encodeURIComponent(phone) + '&limit=1', { headers: headers });
+      var resp2 = await fetch(SUPABASE_URL + '/rest/v1/loyalty_members?company_id=eq.' + (window._storeCompanyId || currentStoreId) + '&phone=eq.' + encodeURIComponent(phone) + '&limit=1', { headers: headers });
       var arr2 = await resp2.json();
       member = arr2 && arr2.length > 0 ? arr2[0] : null;
       if (!member) {
         var cr2 = await fetch(SUPABASE_URL + '/rest/v1/loyalty_members', {
           method: 'POST', headers: { ...headers, 'Prefer': 'return=representation' },
-          body: JSON.stringify({ company_id: currentStoreId, phone: phone, total_points: 0 })
+          body: JSON.stringify({ company_id: (window._storeCompanyId || currentStoreId), phone: phone, total_points: 0 })
         });
         var created2 = await cr2.json();
         member = Array.isArray(created2) ? created2[0] : created2;
@@ -4437,7 +4438,7 @@ async function awardLoyaltyPoints(orderTotal, orderId) {
     // 寫入 loyalty_transactions
     await fetch(SUPABASE_URL + '/rest/v1/loyalty_transactions', {
       method: 'POST', headers: { ...headers, 'Prefer': 'return=minimal' },
-      body: JSON.stringify({ company_id: currentStoreId, member_id: member.id, type: 'earn', points: earnedPoints, amount: orderTotal, source: 'order', source_id: orderId || null, note: '消費 $' + orderTotal + ' 集點' })
+      body: JSON.stringify({ company_id: (window._storeCompanyId || currentStoreId), member_id: member.id, type: 'earn', points: earnedPoints, amount: orderTotal, source: 'order', source_id: orderId || null, note: '消費 $' + orderTotal + ' 集點' })
     });
 
     return earnedPoints;
