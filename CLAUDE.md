@@ -43,3 +43,47 @@ bash scripts/qa_check.sh
 7. 消費者頁面不應有 LIFF
 
 **FAIL 必須修正才能 commit，WARN 需確認是否為預期行為。**
+
+---
+
+## 回歸測試清單（每次 commit 前必須確認）
+
+### 核心頁面可開啟測試
+修改任何 common.js / modules/auth.js / modules/*.js 後，必須確認：
+
+| 頁面 | 開啟方式 | 預期結果 |
+|------|---------|---------|
+| admin.html | 瀏覽器直接開啟 | LINE 登入頁（不出現 400） |
+| platform.html | 瀏覽器直接開啟 | LINE 登入頁（不出現 400） |
+| index.html | 瀏覽器直接開啟 | 顯示「請從 LINE 開啟」 |
+| index.html | LINE LIFF 開啟 | 正常顯示員工首頁 |
+| booking.html | 瀏覽器直接開啟 | 正常顯示訂位頁 |
+| booking_service.html | 瀏覽器直接開啟 | 正常顯示預約頁 |
+| order.html | 瀏覽器直接開啟 | 正常顯示點餐頁 |
+
+### 功能開關測試
+修改 common.js DEFAULT_FEATURES / getFeatureVisibility 後：
+- [ ] platform.html 開關儲存後 index.html 格子正確顯示/隱藏
+- [ ] 業主第二層開關正確覆蓋（只能關不能開）
+
+### 打卡測試
+修改 checkin.html / common.js 打卡相關後：
+- [ ] 從 liff.line.me 進入相機正常
+- [ ] GPS 定位正常
+- [ ] 打卡時間顯示台灣時間（不是 UTC）
+
+### 多租戶測試
+修改任何查詢後：
+- [ ] 本米資料不會出現在大正科技
+- [ ] 大正科技資料不會出現在本米
+
+### 修改影響範圍對照表
+| 修改檔案 | 必須測試的頁面 |
+|---------|--------------|
+| common.js | 所有頁面 |
+| modules/auth.js | admin.html, platform.html, index.html |
+| modules/store.js | booking.html, booking_service.html, order.html |
+| modules/leave.js | records.html, services.html |
+| modules/payroll.js | salary.html, admin.html |
+| index.html | index.html, checkin.html |
+| admin.html | admin.html |
