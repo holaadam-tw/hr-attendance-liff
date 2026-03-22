@@ -40,6 +40,7 @@ async function saveSetting(key, value, description) {
 - `checkUserStatus()` 依賴 `liffProfile`（由 `initializeLiff()` 設定），不能直接呼叫
 - 獨立頁面不要自行查 employees 覆蓋 `currentCompanyId`，用 `checkUserStatus()` 統一設定
 - `toISOString()` 會轉 UTC，台灣 UTC+8 日期會偏移
+- **order.html currentStoreId vs company_id**：`currentStoreId` = `store_profiles.id`，但 `system_settings`/`loyalty_*` 表用 `companies.id`。須用 `window._storeCompanyId`（= `store.company_id`）查詢這些表
 - SQL RPC 存入 TIMESTAMPTZ 欄位時必須用 `now()`（UTC），不能用 `now() AT TIME ZONE 'Asia/Taipei'`（會變無時區 TIMESTAMP 被當 UTC 存入，導致 +8 偏移）；日期/時間判定另用 `(now() AT TIME ZONE 'Asia/Taipei')::date/::time`
 - system_settings company_id 是 NOT NULL
 - sessionStorage 快取需手動清除
