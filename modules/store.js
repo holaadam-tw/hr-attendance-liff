@@ -1155,6 +1155,65 @@ function loadStoreSettings() {
     document.getElementById('rdLoyaltySpend').value = lc.spend_per_point || '';
     document.getElementById('rdLoyaltyPoints').value = lc.points_to_redeem || '';
     document.getElementById('rdLoyaltyDiscount').value = lc.discount_amount || '';
+    // 載入點餐模式 + 集點設定（from system_settings）
+    loadOrderModeAndLoyalty();
+}
+
+async function loadOrderModeAndLoyalty() {
+    var cid = window.currentCompanyId;
+    if (!cid) return;
+    try {
+        var { data } = await sb.from('system_settings').select('key, value').eq('company_id', cid).in('key', ['order_mode', 'loyalty_enabled', 'loyalty_points_per_amount']);
+        var settings = {};
+        (data || []).forEach(function(r) { settings[r.key] = r.value; });
+        // 點餐模式
+        var mode = settings['order_mode'] || 'all';
+        document.querySelectorAll('.order-mode-btn').forEach(function(btn) {
+            var isActive = btn.dataset.mode === mode;
+            btn.style.borderColor = isActive ? '#4F46E5' : '#E2E8F0';
+            btn.style.background = isActive ? '#EEF2FF' : '#fff';
+            btn.style.color = isActive ? '#4F46E5' : '#1E293B';
+        });
+        // 集點開關
+        var loyaltyEl = document.getElementById('rdLoyaltyEnabled');
+        var loyaltyBlock = document.getElementById('rdLoyaltySettingsBlock');
+        if (loyaltyEl) {
+            loyaltyEl.checked = settings['loyalty_enabled'] === 'true';
+            if (loyaltyBlock) loyaltyBlock.style.display = loyaltyEl.checked ? '' : 'none';
+        }
+        var ppaEl = document.getElementById('rdPointsPerAmount');
+        if (ppaEl && settings['loyalty_points_per_amount']) ppaEl.value = settings['loyalty_points_per_amount'];
+    } catch(e) { console.warn('loadOrderModeAndLoyalty:', e); }
+}
+
+export async function setOrderMode(mode) {
+    try {
+        await saveSetting('order_mode', mode, '點餐模式');
+        document.querySelectorAll('.order-mode-btn').forEach(function(btn) {
+            var isActive = btn.dataset.mode === mode;
+            btn.style.borderColor = isActive ? '#4F46E5' : '#E2E8F0';
+            btn.style.background = isActive ? '#EEF2FF' : '#fff';
+            btn.style.color = isActive ? '#4F46E5' : '#1E293B';
+        });
+        showToast('✅ 點餐模式已更新');
+    } catch(e) { showToast('❌ 儲存失敗'); }
+}
+
+export async function saveRdLoyaltyEnabled(enabled) {
+    try {
+        await saveSetting('loyalty_enabled', enabled ? 'true' : 'false', '集點功能開關');
+        var block = document.getElementById('rdLoyaltySettingsBlock');
+        if (block) block.style.display = enabled ? '' : 'none';
+        showToast(enabled ? '✅ 集點已開啟' : '已關閉集點');
+    } catch(e) { showToast('❌ 儲存失敗'); }
+}
+
+export async function saveRdPointsPerAmount() {
+    var val = document.getElementById('rdPointsPerAmount')?.value || '50';
+    try {
+        await saveSetting('loyalty_points_per_amount', val, '集點規則：幾元得1點');
+        showToast('✅ 集點規則已儲存');
+    } catch(e) { showToast('❌ 儲存失敗'); }
 }
 
 export async function saveBusinessHours() {

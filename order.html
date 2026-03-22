@@ -2019,18 +2019,28 @@ async function loadStoreFromSupabase(slug) {
     }
   }
 
-  // order_mode 設定（dine_in_only → 強制隱藏外帶選項）
+  // order_mode 設定（dine_in_only / takeout_only / all）
   try {
     var omRes = await fetch(SUPABASE_URL + '/rest/v1/system_settings?company_id=eq.' + currentStoreId + '&key=eq.order_mode&limit=1', { headers });
     var omData = await omRes.json();
-    if (omData && omData.length > 0 && omData[0].value === 'dine_in_only') {
+    var orderMode = (omData && omData.length > 0) ? omData[0].value : 'all';
+    if (orderMode === 'dine_in_only') {
       window._dineInOnly = true;
-      // 強制覆蓋外帶模式 → 內用
       if (window._orderMode === 'takeout') {
         window._orderMode = null;
         var tsel = document.getElementById('tableSelector');
         if (tsel) tsel.style.display = '';
       }
+    } else if (orderMode === 'takeout_only') {
+      window._takeoutOnly = true;
+      window._orderMode = 'takeout';
+      var tsel2 = document.getElementById('tableSelector');
+      if (tsel2) tsel2.style.display = 'none';
+      document.getElementById('menuContainer').style.height = 'calc(100dvh - 170px)';
+      var badge = document.createElement('div');
+      badge.style.cssText = 'text-align:center;padding:8px;margin:8px 16px;background:#FEF3C7;border-radius:10px;font-size:13px;font-weight:700;color:#B45309;';
+      badge.textContent = '\u{1F6CD}\u{FE0F} 外帶點餐';
+      if (tsel2) tsel2.parentNode.insertBefore(badge, tsel2);
     }
   } catch(e) {}
 

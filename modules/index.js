@@ -68,6 +68,7 @@ import {
     removeOptionGroup, addOptionChoice, removeOptionChoice,
     toggleOptionType, toggleOptionReq, addComboGroup, removeComboGroup,
     saveBusinessHours, saveLineGroupId, saveLoyaltyConfig,
+    setOrderMode, saveRdLoyaltyEnabled, saveRdPointsPerAmount,
     generateTableQRCodes, printTableQRCodes,
     handleMenuPhotoUpload, analyzeMenuPhoto, confirmAIMenu, cancelAIMenu,
     showCopyMenuModal, closeCopyMenuModal, executeCopyMenu,
@@ -258,6 +259,9 @@ window.removeComboGroup = removeComboGroup;
 window.saveBusinessHours = saveBusinessHours;
 window.saveLineGroupId = saveLineGroupId;
 window.saveLoyaltyConfig = saveLoyaltyConfig;
+window.setOrderMode = setOrderMode;
+window.saveRdLoyaltyEnabled = saveRdLoyaltyEnabled;
+window.saveRdPointsPerAmount = saveRdPointsPerAmount;
 window.generateTableQRCodes = generateTableQRCodes;
 window.printTableQRCodes = printTableQRCodes;
 window.handleMenuPhotoUpload = handleMenuPhotoUpload;

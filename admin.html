@@ -1461,6 +1461,32 @@
                             <div id="rdTableQRGrid" style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;"></div>
                         </div>
                     </div>
+                    <!-- 點餐模式設定 -->
+                    <div style="background:#F8FAFC;border-radius:12px;padding:14px;margin-bottom:14px;">
+                        <div style="font-weight:700;font-size:14px;margin-bottom:10px;">⚙️ 點餐模式</div>
+                        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+                            <button class="order-mode-btn" data-mode="all" onclick="setOrderMode('all')" style="padding:10px 16px;border:2px solid #E2E8F0;border-radius:10px;background:#fff;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s;">🍽️ 內用+外帶</button>
+                            <button class="order-mode-btn" data-mode="dine_in_only" onclick="setOrderMode('dine_in_only')" style="padding:10px 16px;border:2px solid #E2E8F0;border-radius:10px;background:#fff;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s;">🪑 只限內用</button>
+                            <button class="order-mode-btn" data-mode="takeout_only" onclick="setOrderMode('takeout_only')" style="padding:10px 16px;border:2px solid #E2E8F0;border-radius:10px;background:#fff;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s;">🥡 只限外帶</button>
+                        </div>
+                        <p style="font-size:11px;color:#94A3B8;">內用：現場掃 QR Code 選桌號點餐 / 外帶：線上下單取餐號碼</p>
+                    </div>
+                    <!-- 集點功能 -->
+                    <div style="background:#F8FAFC;border-radius:12px;padding:14px;margin-bottom:14px;">
+                        <div style="font-weight:700;font-size:14px;margin-bottom:10px;">⭐ 集點功能</div>
+                        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+                            <label style="font-size:13px;font-weight:600;">點餐完成後自動集點</label>
+                            <input type="checkbox" id="rdLoyaltyEnabled" onchange="saveRdLoyaltyEnabled(this.checked)" style="width:18px;height:18px;cursor:pointer;">
+                        </div>
+                        <div id="rdLoyaltySettingsBlock" style="display:none;">
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <span style="font-size:13px;">消費</span>
+                                <input type="number" id="rdPointsPerAmount" value="50" min="1" style="width:70px;padding:8px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;text-align:center;">
+                                <span style="font-size:13px;">元得 1 點</span>
+                                <button onclick="saveRdPointsPerAmount()" style="padding:6px 12px;border:none;border-radius:8px;background:#4F46E5;color:#fff;font-size:12px;cursor:pointer;">💾</button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
             </div>
