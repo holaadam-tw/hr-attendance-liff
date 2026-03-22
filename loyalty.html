@@ -164,27 +164,42 @@
     async function loadLineMember(displayName) {
         try {
             var res = await sb.from('loyalty_members').select('*').eq('company_id', companyId).eq('line_user_id', lineUserId).maybeSingle();
-            var member = res.data;
+            var member = (res && !res.error) ? res.data : null;
 
             if (!member) {
+                // 新會員 → 自動建立
                 var welcomePoints = 0;
                 try {
                     var sr = await sb.from('loyalty_settings').select('welcome_points').eq('company_id', companyId).maybeSingle();
-                    if (sr.data) welcomePoints = sr.data.welcome_points || 0;
+                    if (sr && sr.data) welcomePoints = sr.data.welcome_points || 0;
                 } catch(e) {}
 
-                var ir = await sb.from('loyalty_members')
-                    .insert({ company_id: companyId, line_user_id: lineUserId, name: displayName || null, total_points: welcomePoints })
-                    .select().single();
-                member = ir.data;
-
-                if (welcomePoints > 0 && member) {
-                    await sb.from('loyalty_transactions').insert({
-                        company_id: companyId, member_id: member.id, type: 'earn',
-                        points: welcomePoints, source: 'manual', note: '新會員歡迎禮'
-                    });
+                try {
+                    var ir = await sb.from('loyalty_members')
+                        .insert({ company_id: companyId, line_user_id: lineUserId, name: displayName || null, total_points: welcomePoints })
+                        .select().single();
+                    if (ir.error) { console.error('Insert member error:', ir.error); }
+                    member = ir.data;
+                } catch(insertErr) {
+                    console.error('Insert member failed:', insertErr);
                 }
-                showToast('🎉 歡迎加入！' + (welcomePoints > 0 ? ' 獲得 ' + welcomePoints + ' 點' : ''));
+
+                if (member && welcomePoints > 0) {
+                    try {
+                        await sb.from('loyalty_transactions').insert({
+                            company_id: companyId, member_id: member.id, type: 'earn',
+                            points: welcomePoints, source: 'manual', note: '新會員歡迎禮'
+                        });
+                    } catch(e) {}
+                }
+                if (member) showToast('🎉 歡迎加入！' + (welcomePoints > 0 ? ' 獲得 ' + welcomePoints + ' 點' : ''));
+            }
+
+            // member 仍然可能是 null（DB 錯誤）
+            if (!member) {
+                showToast('無法載入會員資料，請重試');
+                document.getElementById('loginView').style.display = 'block';
+                return;
             }
 
             currentMember = member;
