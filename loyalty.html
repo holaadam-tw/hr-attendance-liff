@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>集點會員</title>
-    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         * { margin:0; padding:0; box-sizing:border-box; }
@@ -127,30 +126,33 @@
         companyId = params.get('store') || params.get('company');
         if (!companyId) { document.getElementById('storeName').textContent = '缺少商店參數'; return; }
 
+        // 檢查是否從 LIFF 跳轉回來（帶有 line_user_id）
+        var savedLineId = sessionStorage.getItem('loyalty_line_user_id_' + companyId);
+        var savedLineName = sessionStorage.getItem('loyalty_line_name_' + companyId);
+        if (savedLineId) {
+            lineUserId = savedLineId;
+            isLineLoggedIn = true;
+            await loadLineMember(savedLineName || '會員');
+            // 載入商店名稱（背景）
+            try { var res = await sb.from('companies').select('name').eq('id', companyId).maybeSingle(); if (res.data) document.getElementById('storeName').textContent = res.data.name; } catch(e) {}
+            return;
+        }
+
         try {
             var res = await sb.from('companies').select('name').eq('id', companyId).maybeSingle();
             if (res.data) document.getElementById('storeName').textContent = res.data.name;
         } catch(e) {}
 
-        // LIFF 初始化（不強制）
-        try {
-            await liff.init({ liffId: LIFF_ID });
-            if (liff.isLoggedIn()) {
-                var profile = await liff.getProfile();
-                lineUserId = profile.userId;
-                isLineLoggedIn = true;
-                await loadLineMember(profile.displayName);
-                return;
-            }
-        } catch(e) { console.log('LIFF init:', e.message); }
-
+        // 不使用 LIFF（loyalty.html 不在 LIFF endpoint URL 範圍）
+        // 直接顯示登入畫面
         document.getElementById('loginView').style.display = 'block';
     });
 
+    // LINE 登入：跳轉到 LIFF URL，由 index.html handleGotoParam 處理後跳回
     function loginWithLine() {
-        // 記錄目標頁面，登入後跳回
-        sessionStorage.setItem('liff_redirect_page', 'loyalty.html?store=' + companyId);
-        liff.login();
+        // 存 store 參數，LIFF 登入後 index.html 會讀取並跳回
+        sessionStorage.setItem('loyalty_pending_store', companyId);
+        window.location.href = 'https://liff.line.me/' + LIFF_ID + '?goto=loyalty&store=' + companyId;
     }
 
     function switchToLogin() {
