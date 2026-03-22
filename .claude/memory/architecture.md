@@ -94,3 +94,8 @@ async function saveSetting(key, value, description) {
 - 2026-03-21: order.html loadStoreFromSupabase 支援 UUID(company_id) 和 store_slug 雙格式查詢（isUUID 偵測）
 - 2026-03-21: admin.html 餐飲設定新增點餐模式（all/dine_in_only/takeout_only）+ 集點開關 + 幾元得1點；儲存到 system_settings key=order_mode/loyalty_enabled/loyalty_points_per_amount；order.html 支援三種模式
 - 2026-03-21: admin.html 餐飲設定 tab 重排 → 再改為 5 tab（訂單/菜單/報表/🕐營業/⚙️設定）；營業時間獨立 rdHoursTab；設定 tab 保留點餐設定+LINE群組+基本資料；外帶模式隱藏桌號；QR URL 用 company_id
+- 2026-03-21: store.js 移除不存在的 rdLoyalty* DOM 引用；order.html 新增 _storeCompanyId（store.company_id）用於 system_settings/loyalty 查詢
+- 2026-03-21: loyalty.html 改為 LINE 登入為主+手機查詢為輔（三 view：loginView/memberView 含兌換碼/phoneView 唯讀）；兌換碼 6 碼數字 24h 有效
+- 2026-03-21: 統一集點設定（餐飲設定只保留開關+連結到 loyalty_admin）；loyalty_members 支援 LINE+手機雙識別；LINE 登入後可綁定手機
+- 2026-03-21: 028_loyalty_redemptions.sql + 029_loyalty_consolidated.sql（整合 phone/expiry_date/redemptions/trigger）；兌換碼系統（pending→used→expired）+ 店員核銷
+- 2026-03-21: 預約集點：餐飲 updateBookingStatus completed→awardBookingLoyalty；服務業 updateBsStatus completed→awardServiceBookingLoyalty；system_settings key=booking_loyalty_points；報表匯出加集點會員+集點異動 CSV
