@@ -1174,6 +1174,9 @@ async function loadOrderModeAndLoyalty() {
             btn.style.background = isActive ? '#EEF2FF' : '#fff';
             btn.style.color = isActive ? '#4F46E5' : '#1E293B';
         });
+        // 桌號區塊：外帶模式隱藏
+        var tableSec = document.getElementById('rdTableSection');
+        if (tableSec) tableSec.style.display = mode === 'takeout_only' ? 'none' : '';
         // 集點開關
         var loyaltyEl = document.getElementById('rdLoyaltyEnabled');
         var loyaltyBlock = document.getElementById('rdLoyaltySettingsBlock');
@@ -1195,6 +1198,9 @@ export async function setOrderMode(mode) {
             btn.style.background = isActive ? '#EEF2FF' : '#fff';
             btn.style.color = isActive ? '#4F46E5' : '#1E293B';
         });
+        // 桌號區塊：外帶模式隱藏
+        var tableSec = document.getElementById('rdTableSection');
+        if (tableSec) tableSec.style.display = mode === 'takeout_only' ? 'none' : '';
         showToast('✅ 點餐模式已更新');
     } catch(e) { showToast('❌ 儲存失敗'); }
 }
@@ -1274,7 +1280,7 @@ export function generateTableQRCodes() {
     const count = parseInt(document.getElementById('rdTableCount').value) || 6;
     if (count < 1 || count > 50) return showToast('桌數請輸入 1~50');
 
-    const baseUrl = getStoreOrderUrl(s).split('?')[0] + '?store=' + (s.store_slug || s.id);
+    const baseUrl = getStoreOrderUrl(s).split('?')[0] + '?store=' + (s.company_id || s.store_slug || s.id);
     const grid = document.getElementById('rdTableQRGrid');
     grid.innerHTML = '';
     document.getElementById('rdTableQRList').style.display = 'block';
