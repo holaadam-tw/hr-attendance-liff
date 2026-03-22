@@ -1429,6 +1429,11 @@
                 <!-- 營業時間 Tab -->
                 <div id="rdHoursTab" style="display:none;">
                     <div style="background:#F8FAFC;border-radius:12px;padding:14px;margin-bottom:14px;">
+                        <div style="font-weight:700;font-size:14px;margin-bottom:10px;">📋 基本資料</div>
+                        <div id="rdStoreInfo" style="font-size:13px;color:#64748B;"></div>
+                        <button onclick="editStore(rdCurrentStoreId)" style="margin-top:8px;padding:8px 16px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;font-size:12px;cursor:pointer;">📝 編輯基本資料</button>
+                    </div>
+                    <div style="background:#F8FAFC;border-radius:12px;padding:14px;margin-bottom:14px;">
                         <div style="font-weight:700;font-size:14px;margin-bottom:10px;">🕐 營業時間</div>
                         <div id="rdBusinessHours"></div>
                         <button onclick="saveBusinessHours()" class="btn btn-success" style="margin-top:10px;font-size:13px;padding:10px 20px;">💾 儲存營業時間</button>
@@ -1493,12 +1498,6 @@
                         <p style="font-size:11px;color:#94A3B8;margin-bottom:8px;">將 Bot 加入群組後，在群組中輸入 /groupid 取得群組 ID</p>
                         <input type="text" id="rdLineGroupId" placeholder="LINE Group ID" style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:8px;font-size:13px;box-sizing:border-box;">
                         <button onclick="saveLineGroupId()" class="btn btn-success" style="margin-top:8px;font-size:13px;padding:10px 20px;">💾 儲存</button>
-                    </div>
-                    <!-- 📋 基本資料 -->
-                    <div style="background:#F8FAFC;border-radius:12px;padding:14px;margin-bottom:14px;">
-                        <div style="font-weight:700;font-size:14px;margin-bottom:10px;">📋 基本資料</div>
-                        <div id="rdStoreInfo" style="font-size:13px;color:#64748B;"></div>
-                        <button onclick="editStore(rdCurrentStoreId)" style="margin-top:8px;padding:8px 16px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;font-size:12px;cursor:pointer;">📝 編輯基本資料</button>
                     </div>
                 </div>
 
