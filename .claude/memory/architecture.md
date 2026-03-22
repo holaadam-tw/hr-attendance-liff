@@ -47,7 +47,11 @@ async function saveSetting(key, value, description) {
 - admin.html 系統設定 tab 名稱是 'setting'（不是 'feature'）
 - Supabase JS 的 `.maybeSingle()` 回傳 PromiseLike（非標準 Promise），不能直接 `.catch()`，必須用 try/catch 或 `Promise.resolve()` 包裝
 - **時區規則**：所有 `toLocaleTimeString` / `toLocaleString` / `toLocaleDateString` 必須加 `timeZone: 'Asia/Taipei'`；不能用 `getHours()`/`getMinutes()` 處理 DB 回傳的時間（只有顯示「現在時間」的即時時鐘例外）
-- **LIFF 環境檢查**：`initializeLiff()` (common.js) 已加入 `liff.isInClient()` 判斷，非 LINE 環境顯示「請從 LINE 開啟」而非跳 OAuth；消費者頁面（booking/booking_service/order）不走 LIFF
+- **LIFF 環境檢查 — 頁面三分類**：
+  - 員工頁面（index/checkin/records/requests/fieldwork/salary/services/schedule/loyalty/booking_service_admin）：`initializeLiff({ requireLineApp: true })` → 非 LINE 顯示「請從 LINE 開啟」
+  - 管理頁面（admin via auth.js `checkAdminPermission()`、platform）：`initializeLiff()` 不帶參數 → 允許瀏覽器 LINE OAuth
+  - 消費者頁面（booking/booking_service/order）：完全不走 LIFF
+- **QA 腳本**：`bash scripts/qa_check.sh`（7 項檢查），commit 前必跑，FAIL 必修
 
 ## 最近修改記錄
 - 2026-03-10: 權限分級 + 薪酬密碼鎖
@@ -79,4 +83,4 @@ async function saveSetting(key, value, description) {
 - 2026-03-18: quick_check_in RPC 遲到+早退判定（021→022_add_early_leave.sql）：上班→is_late（排班/default_work_start/late_threshold_minutes）；下班→is_early_leave（排班/default_work_end/early_leave_threshold_minutes）；admin.html 考勤設定卡片含上下班時間+遲到早退容忍分鐘；records.html 月曆顯示早退標記
 - 2026-03-18: index.html 加入 ?goto= URL 參數跳轉（handleGotoParam），支援 Rich Menu 直接跳轉到 records/leave/attendance/requests/salary/checkin/services/fieldwork/admin
 - 2026-03-17: index.html 骨架屏 + 載入優化 + ?goto= URL 跳轉：skeleton 在 LIFF init 後立即顯示；首頁不等天氣/公告載完就顯示；bindPage 預設不加 active；handleGotoParam() 支援 Rich Menu 直接跳轉（records/leave/attendance/requests/salary/checkin/services/fieldwork/admin）
-- 2026-03-21: 全頁面時區修正（9 檔 toLocaleTimeString 加 timeZone:'Asia/Taipei'）+ 非 LIFF 環境 fallback（common.js initializeLiff 加 isInClient 檢查）
+- 2026-03-21: 全頁面時區修正（toLocaleTimeString 加 timeZone:'Asia/Taipei'）+ initializeLiff 改為 requireLineApp 參數控制（員工頁面擋非 LINE，管理頁面允許瀏覽器 OAuth）+ 新增 scripts/qa_check.sh（7 項自動檢查）
