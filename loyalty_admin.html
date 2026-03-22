@@ -123,6 +123,17 @@
         </div>
     </div>
 
+    <!-- 會員詳細 Modal -->
+    <div id="memberDetailModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:999;padding:20px;overflow-y:auto;">
+        <div style="max-width:420px;margin:40px auto;background:#fff;border-radius:20px;padding:24px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+                <h3 style="font-size:16px;font-weight:800;margin:0;">👤 會員詳細資料</h3>
+                <button onclick="closeMemberDetailModal()" style="border:none;background:none;font-size:20px;cursor:pointer;">✕</button>
+            </div>
+            <div id="memberDetailContent"></div>
+        </div>
+    </div>
+
     <style>
         .la-tab { padding:10px 16px; border:none; border-radius:10px; font-size:13px; font-weight:600; cursor:pointer; background:#F1F5F9; color:#64748B; white-space:nowrap; font-family:inherit; transition:all .2s; }
         .la-tab.active { background:#7C3AED; color:#fff; }
@@ -185,9 +196,9 @@
             if (hasLine) html += '🟢 LINE';
             html += ' · 加入 ' + joinDate + '</div>';
             html += '</div>';
-            html += '<div style="text-align:right;">';
+            html += '<div style="text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:4px;">';
             html += '<div style="font-size:16px;font-weight:800;color:#7C3AED;">' + (m.available_points || 0) + '</div>';
-            html += '<div style="font-size:10px;color:#94A3B8;">可用點數</div>';
+            html += '<button onclick="event.stopPropagation();showMemberDetail(\'' + m.id + '\')" style="padding:4px 10px;border:1px solid #E2E8F0;border-radius:6px;background:#fff;font-size:11px;cursor:pointer;color:#64748B;">查看</button>';
             html += '</div>';
             html += '</div>';
         });
@@ -444,6 +455,108 @@
         } catch(e) {
             showToast('❌ 核銷失敗');
         }
+    }
+
+    // ===== 會員詳細 Modal =====
+    var _detailMemberId = null;
+
+    async function showMemberDetail(memberId) {
+        _detailMemberId = memberId;
+        var m = allMembers.find(function(x) { return x.id === memberId; });
+        if (!m) return;
+
+        var hasLine = !!m.line_user_id;
+        var hasPhone = !!m.phone;
+
+        var html = '';
+        // LINE 狀態
+        html += '<div style="background:#F8FAFC;border-radius:12px;padding:14px;margin-bottom:12px;">';
+        html += '<div style="font-size:12px;font-weight:700;color:#64748B;margin-bottom:6px;">LINE 綁定</div>';
+        html += hasLine
+            ? '<div style="font-size:14px;color:#059669;font-weight:600;">🟢 已綁定' + (m.name ? '（' + escapeHTML(m.name) + '）' : '') + '</div>'
+            : '<div style="font-size:14px;color:#94A3B8;">⚪ 未綁定</div>';
+        html += '</div>';
+
+        // 手機號碼（可編輯）
+        html += '<div style="background:#F8FAFC;border-radius:12px;padding:14px;margin-bottom:12px;">';
+        html += '<div style="font-size:12px;font-weight:700;color:#64748B;margin-bottom:6px;">手機號碼</div>';
+        html += '<div id="mdPhoneDisplay" style="display:flex;align-items:center;gap:8px;">';
+        html += '<span style="font-size:14px;font-weight:600;">' + (hasPhone ? escapeHTML(m.phone) : '未填寫') + '</span>';
+        html += '<button onclick="editMemberPhone()" style="padding:4px 10px;border:1px solid #E2E8F0;border-radius:6px;background:#fff;font-size:11px;cursor:pointer;">編輯</button>';
+        html += '</div>';
+        html += '<div id="mdPhoneEdit" style="display:none;display:none;gap:8px;">';
+        html += '<input type="tel" id="mdPhoneInput" value="' + escapeHTML(m.phone || '') + '" placeholder="0912345678" maxlength="10" style="flex:1;padding:8px 10px;border:1px solid #E2E8F0;border-radius:8px;font-size:14px;">';
+        html += '<button onclick="saveMemberPhone()" style="padding:8px 12px;border:none;border-radius:8px;background:#4F46E5;color:#fff;font-size:12px;cursor:pointer;">儲存</button>';
+        html += '<button onclick="cancelEditPhone()" style="padding:8px 10px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;font-size:12px;cursor:pointer;">取消</button>';
+        html += '</div>';
+        html += '</div>';
+
+        // 點數資訊
+        html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">';
+        html += '<div style="background:#EDE9FE;border-radius:12px;padding:14px;text-align:center;"><div style="font-size:20px;font-weight:900;color:#7C3AED;">' + (m.available_points || 0) + '</div><div style="font-size:11px;color:#7C3AED;">可用點數</div></div>';
+        html += '<div style="background:#F0FDF4;border-radius:12px;padding:14px;text-align:center;"><div style="font-size:20px;font-weight:900;color:#059669;">' + (m.total_points || 0) + '</div><div style="font-size:11px;color:#059669;">累計點數</div></div>';
+        html += '</div>';
+
+        // 日期資訊
+        html += '<div style="background:#F8FAFC;border-radius:12px;padding:14px;margin-bottom:16px;font-size:13px;color:#64748B;">';
+        html += '<div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>加入日期</span><span style="color:#1E293B;font-weight:600;">' + (m.member_since || '-') + '</span></div>';
+        html += '<div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>最後消費</span><span style="color:#1E293B;font-weight:600;">' + (m.last_visit || '-') + '</span></div>';
+        html += '<div style="display:flex;justify-content:space-between;"><span>點數到期</span><span style="color:#1E293B;font-weight:600;">' + (m.expiry_date || '永不過期') + '</span></div>';
+        html += '</div>';
+
+        // 最近記錄
+        html += '<div style="margin-bottom:16px;">';
+        html += '<div style="font-size:13px;font-weight:700;margin-bottom:8px;">最近記錄</div>';
+        html += '<div id="mdTxList" style="font-size:12px;color:#94A3B8;">載入中...</div>';
+        html += '</div>';
+
+        document.getElementById('memberDetailContent').innerHTML = html;
+        document.getElementById('memberDetailModal').style.display = 'block';
+
+        // 載入最近記錄
+        try {
+            var { data: txns } = await sb.from('loyalty_transactions').select('*').eq('member_id', memberId).order('created_at', { ascending: false }).limit(5);
+            var txEl = document.getElementById('mdTxList');
+            if (!txns || txns.length === 0) { txEl.textContent = '尚無記錄'; return; }
+            var txHtml = '';
+            txns.forEach(function(t) {
+                var isEarn = t.type === 'earn';
+                var dateStr = t.created_at ? new Date(t.created_at).toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei', month: 'numeric', day: 'numeric' }) : '';
+                txHtml += '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #F1F5F9;">';
+                txHtml += '<span>' + escapeHTML(t.note || (isEarn ? '集點' : '兌換')) + ' · ' + dateStr + '</span>';
+                txHtml += '<span style="font-weight:700;color:' + (isEarn ? '#059669' : '#DC2626') + ';">' + (isEarn ? '+' : '') + t.points + '</span>';
+                txHtml += '</div>';
+            });
+            txEl.innerHTML = txHtml;
+        } catch(e) { document.getElementById('mdTxList').textContent = '載入失敗'; }
+    }
+
+    function closeMemberDetailModal() { document.getElementById('memberDetailModal').style.display = 'none'; }
+
+    function editMemberPhone() {
+        document.getElementById('mdPhoneDisplay').style.display = 'none';
+        var editEl = document.getElementById('mdPhoneEdit');
+        editEl.style.display = 'flex';
+    }
+
+    function cancelEditPhone() {
+        document.getElementById('mdPhoneEdit').style.display = 'none';
+        document.getElementById('mdPhoneDisplay').style.display = 'flex';
+    }
+
+    async function saveMemberPhone() {
+        var phone = document.getElementById('mdPhoneInput').value.trim();
+        if (!phone || phone.length < 9) { showToast('請輸入正確手機號碼'); return; }
+        if (!_detailMemberId) return;
+        try {
+            await sb.from('loyalty_members').update({ phone: phone }).eq('id', _detailMemberId);
+            // 更新本地資料
+            var m = allMembers.find(function(x) { return x.id === _detailMemberId; });
+            if (m) m.phone = phone;
+            showToast('✅ 手機號碼已更新');
+            closeMemberDetailModal();
+            renderMembers(allMembers);
+        } catch(e) { showToast('❌ 更新失敗'); }
     }
 
     // ===== 初始化 =====
