@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>🎁 集點會員</title>
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         * { margin:0; padding:0; box-sizing:border-box; }
@@ -16,9 +17,9 @@
         .btn { display:block; width:100%; padding:14px; border:none; border-radius:14px; font-size:15px; font-weight:700; cursor:pointer; font-family:inherit; transition:all .2s; }
         .btn-primary { background:linear-gradient(135deg,#7C3AED,#6D28D9); color:#fff; box-shadow:0 4px 16px rgba(124,58,237,.3); }
         .btn-primary:active { transform:scale(0.98); }
+        .btn-line { background:#06C755; color:#fff; box-shadow:0 4px 16px rgba(6,199,85,.3); }
+        .btn-line:active { transform:scale(0.98); }
         .btn-outline { background:#fff; color:#7C3AED; border:2px solid #7C3AED; }
-        input[type=text], input[type=tel] { width:100%; padding:14px 16px; border:2px solid #E2E8F0; border-radius:14px; font-size:15px; font-family:inherit; transition:border-color .2s; }
-        input:focus { outline:none; border-color:#7C3AED; }
         .point-card { background:linear-gradient(135deg,#667eea 0%,#764ba2 100%); color:#fff; border-radius:20px; padding:24px; text-align:center; margin-bottom:20px; }
         .point-card .pts { font-size:48px; font-weight:900; margin:12px 0 4px; }
         .point-card .label { font-size:13px; opacity:0.85; }
@@ -43,11 +44,13 @@
 
         <!-- 登入 View -->
         <div id="loginView">
-            <div class="content-card">
-                <div class="section-title">📱 輸入手機號碼</div>
-                <p style="font-size:13px;color:#64748B;margin-bottom:16px;">輸入手機號碼查詢您的集點或加入會員</p>
-                <input type="tel" id="phoneInput" placeholder="0912345678" maxlength="10" style="margin-bottom:14px;">
-                <button class="btn btn-primary" onclick="lookupMember()">查詢 / 加入會員</button>
+            <div class="content-card" style="text-align:center;">
+                <div style="font-size:48px;margin-bottom:16px;">🎁</div>
+                <h2 style="font-size:18px;font-weight:800;margin-bottom:8px;">查看您的集點</h2>
+                <p style="font-size:13px;color:#64748B;margin-bottom:20px;">使用 LINE 帳號登入，查看點數餘額、兌換商品</p>
+                <button class="btn btn-line" onclick="loginWithLine()">
+                    LINE 登入查看點數
+                </button>
             </div>
         </div>
 
@@ -69,20 +72,20 @@
                 <div class="section-title">🎁 兌換商品</div>
                 <div id="rewardsList"></div>
             </div>
-
-            <button class="btn btn-outline" onclick="switchToLogin()" style="margin-top:12px;">🔄 切換帳號</button>
         </div>
     </div>
 
     <div class="toast" id="toast"></div>
 
     <script>
-    const SUPABASE_URL = 'https://nssuisyvlrqnqfxupklb.supabase.co';
-    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5zc3Vpc3l2bHJxbnFmeHVwa2xiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkyOTAwMzUsImV4cCI6MjA4NDg2NjAzNX0.q_B6v3gf1TOCuAq7z0xIw10wDueCSJn0p37VzdMfmbc';
-    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    var SUPABASE_URL = 'https://nssuisyvlrqnqfxupklb.supabase.co';
+    var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5zc3Vpc3l2bHJxbnFmeHVwa2xiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkyOTAwMzUsImV4cCI6MjA4NDg2NjAzNX0.q_B6v3gf1TOCuAq7z0xIw10wDueCSJn0p37VzdMfmbc';
+    var LIFF_ID = '2008962829-bnsS1bbB';
+    var sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     var companyId = '';
     var currentMember = null;
+    var lineUserId = null;
 
     function showToast(msg) {
         var el = document.getElementById('toast');
@@ -90,7 +93,6 @@
         el.style.display = 'block';
         setTimeout(function() { el.style.display = 'none'; }, 2500);
     }
-
     function escapeHTML(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
     // ===== 初始化 =====
@@ -104,121 +106,100 @@
 
         // 載入商店名稱
         try {
-            var { data: co } = await sb.from('companies').select('name').eq('id', companyId).maybeSingle();
-            if (co) document.getElementById('storeName').textContent = co.name;
-            else document.getElementById('storeName').textContent = '商店不存在';
-        } catch(e) { console.warn(e); }
+            var res = await sb.from('companies').select('name').eq('id', companyId).maybeSingle();
+            if (res.data) document.getElementById('storeName').textContent = res.data.name;
+        } catch(e) {}
 
-        // 檢查 sessionStorage 是否有記住的手機
-        var savedPhone = sessionStorage.getItem('loyalty_phone_' + companyId);
-        if (savedPhone) {
-            document.getElementById('phoneInput').value = savedPhone;
-            await lookupMember();
-        } else {
-            document.getElementById('loginView').style.display = 'block';
-        }
+        // LIFF 初始化
+        try {
+            await liff.init({ liffId: LIFF_ID });
+            if (liff.isLoggedIn()) {
+                var profile = await liff.getProfile();
+                lineUserId = profile.userId;
+                await loadMember(profile.displayName);
+                return;
+            }
+        } catch(e) { console.log('LIFF init:', e.message); }
+
+        // 未登入 → 顯示登入按鈕
+        document.getElementById('loginView').style.display = 'block';
     });
 
-    // ===== 查詢/加入會員 =====
-    async function lookupMember() {
-        var phone = document.getElementById('phoneInput').value.trim();
-        if (!phone || phone.length < 9) {
-            showToast('請輸入正確的手機號碼');
-            return;
-        }
+    // ===== LINE 登入 =====
+    function loginWithLine() {
+        liff.login({ redirectUri: window.location.href });
+    }
 
+    // ===== 載入會員資料 =====
+    async function loadMember(displayName) {
         try {
-            // 查詢現有會員
-            var { data: member } = await sb.from('loyalty_members')
+            var res = await sb.from('loyalty_members')
                 .select('*')
                 .eq('company_id', companyId)
-                .eq('phone', phone)
+                .eq('line_user_id', lineUserId)
                 .maybeSingle();
 
+            var member = res.data;
+
             if (!member) {
-                // 查詢歡迎點數設定
+                // 查歡迎點數
                 var welcomePoints = 0;
                 try {
-                    var { data: settings } = await sb.from('loyalty_settings')
-                        .select('welcome_points')
-                        .eq('company_id', companyId)
-                        .maybeSingle();
-                    if (settings) welcomePoints = settings.welcome_points || 0;
+                    var sr = await sb.from('loyalty_settings').select('welcome_points').eq('company_id', companyId).maybeSingle();
+                    if (sr.data) welcomePoints = sr.data.welcome_points || 0;
                 } catch(e) {}
 
                 // 新增會員
-                var { data: newMember, error } = await sb.from('loyalty_members')
-                    .insert({
-                        company_id: companyId,
-                        phone: phone,
-                        total_points: welcomePoints,
-                        used_points: 0
-                    })
-                    .select()
-                    .single();
+                var ir = await sb.from('loyalty_members')
+                    .insert({ company_id: companyId, line_user_id: lineUserId, name: displayName || null, total_points: welcomePoints })
+                    .select().single();
+                member = ir.data;
 
-                if (error) throw error;
-                member = newMember;
-
-                // 記錄歡迎點數
-                if (welcomePoints > 0) {
+                if (welcomePoints > 0 && member) {
                     await sb.from('loyalty_transactions').insert({
-                        company_id: companyId,
-                        member_id: member.id,
-                        type: 'earn',
-                        points: welcomePoints,
-                        source: 'manual',
-                        note: '新會員歡迎禮'
+                        company_id: companyId, member_id: member.id, type: 'earn',
+                        points: welcomePoints, source: 'manual', note: '新會員歡迎禮'
                     });
                 }
-
-                showToast('🎉 歡迎加入會員！' + (welcomePoints > 0 ? ' 獲得 ' + welcomePoints + ' 點' : ''));
+                showToast('🎉 歡迎加入！' + (welcomePoints > 0 ? ' 獲得 ' + welcomePoints + ' 點' : ''));
             }
 
             currentMember = member;
-            sessionStorage.setItem('loyalty_phone_' + companyId, phone);
-            showMemberView();
+            document.getElementById('loginView').style.display = 'none';
+            document.getElementById('memberView').style.display = 'block';
+            document.getElementById('memberName').textContent = member.name || displayName || '會員';
+            document.getElementById('memberPoints').textContent = member.available_points || 0;
+            if (member.member_since) document.getElementById('memberSince').textContent = '會員自 ' + member.member_since;
+
+            loadTransactions();
+            loadRewards();
         } catch(e) {
             console.error(e);
-            showToast('❌ 查詢失敗，請重試');
+            showToast('載入失敗，請重試');
+            document.getElementById('loginView').style.display = 'block';
         }
-    }
-
-    // ===== 顯示會員頁面 =====
-    async function showMemberView() {
-        document.getElementById('loginView').style.display = 'none';
-        document.getElementById('memberView').style.display = 'block';
-
-        document.getElementById('memberName').textContent = currentMember.name || currentMember.phone;
-        document.getElementById('memberPoints').textContent = currentMember.available_points || 0;
-        if (currentMember.member_since) {
-            document.getElementById('memberSince').textContent = '會員自 ' + currentMember.member_since;
-        }
-
-        loadTransactions();
-        loadRewards();
     }
 
     // ===== 載入點數記錄 =====
     async function loadTransactions() {
         var el = document.getElementById('txHistory');
         try {
-            var { data: txns } = await sb.from('loyalty_transactions')
+            var res = await sb.from('loyalty_transactions')
                 .select('*')
                 .eq('member_id', currentMember.id)
                 .order('created_at', { ascending: false })
                 .limit(10);
 
-            if (!txns || txns.length === 0) {
+            if (!res.data || res.data.length === 0) {
                 el.innerHTML = '<div style="text-align:center;padding:16px;color:#94A3B8;">尚無點數記錄</div>';
                 return;
             }
 
             var html = '';
-            txns.forEach(function(t) {
+            res.data.forEach(function(t) {
                 var isEarn = t.type === 'earn';
                 var dateStr = t.created_at ? new Date(t.created_at).toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei', month: 'numeric', day: 'numeric' }) : '';
-                var sourceLabel = { order: '🛒 消費集點', booking: '📅 預約集點', manual: '🎁 手動' }[t.source] || t.source || '';
+                var sourceLabel = { order: '🛒 消費集點', booking: '📅 預約集點', manual: '🎁 手動' }[t.source] || '';
                 html += '<div class="tx-row">';
                 html += '<div>';
                 html += '<div style="font-size:13px;font-weight:600;">' + escapeHTML(t.note || sourceLabel || (isEarn ? '獲得點數' : '兌換商品')) + '</div>';
@@ -237,20 +218,20 @@
     async function loadRewards() {
         var el = document.getElementById('rewardsList');
         try {
-            var { data: rewards } = await sb.from('loyalty_rewards')
+            var res = await sb.from('loyalty_rewards')
                 .select('*')
                 .eq('company_id', companyId)
                 .eq('is_active', true)
                 .order('sort_order');
 
-            if (!rewards || rewards.length === 0) {
+            if (!res.data || res.data.length === 0) {
                 el.innerHTML = '<div style="text-align:center;padding:16px;color:#94A3B8;">目前沒有兌換商品</div>';
                 return;
             }
 
             var pts = currentMember.available_points || 0;
             var html = '';
-            rewards.forEach(function(r) {
+            res.data.forEach(function(r) {
                 var canRedeem = pts >= r.points_required;
                 html += '<div class="reward-card" style="' + (canRedeem ? '' : 'opacity:0.5;') + '" onclick="' + (canRedeem ? "redeemReward('" + r.id + "'," + r.points_required + ",'" + escapeHTML(r.name).replace(/'/g, "\\'") + "')" : '') + '">';
                 html += '<div style="font-size:28px;">🎁</div>';
@@ -267,57 +248,27 @@
         }
     }
 
-    // ===== 兌換商品 =====
+    // ===== 兌換 =====
     async function redeemReward(rewardId, pointsRequired, rewardName) {
         if (!currentMember) return;
         if (!confirm('確定要兌換「' + rewardName + '」（' + pointsRequired + '點）？')) return;
-
         try {
-            // 重新讀取最新點數（避免重複兌換）
-            var { data: fresh } = await sb.from('loyalty_members')
-                .select('available_points, total_points, used_points')
-                .eq('id', currentMember.id)
-                .single();
+            var res = await sb.from('loyalty_members').select('available_points, total_points, used_points').eq('id', currentMember.id).single();
+            if (!res.data || res.data.available_points < pointsRequired) { showToast('❌ 點數不足'); return; }
 
-            if (!fresh || fresh.available_points < pointsRequired) {
-                showToast('❌ 點數不足');
-                return;
-            }
-
-            // 更新 used_points
-            await sb.from('loyalty_members')
-                .update({ used_points: fresh.used_points + pointsRequired })
-                .eq('id', currentMember.id);
-
-            // 記錄兌換交易
+            await sb.from('loyalty_members').update({ used_points: res.data.used_points + pointsRequired }).eq('id', currentMember.id);
             await sb.from('loyalty_transactions').insert({
-                company_id: companyId,
-                member_id: currentMember.id,
-                type: 'redeem',
-                points: -pointsRequired,
-                source: 'manual',
-                note: '兌換：' + rewardName
+                company_id: companyId, member_id: currentMember.id, type: 'redeem',
+                points: -pointsRequired, source: 'manual', note: '兌換：' + rewardName
             });
 
-            // 更新 UI
-            currentMember.used_points = fresh.used_points + pointsRequired;
-            currentMember.available_points = fresh.available_points - pointsRequired;
+            currentMember.used_points = res.data.used_points + pointsRequired;
+            currentMember.available_points = res.data.available_points - pointsRequired;
             document.getElementById('memberPoints').textContent = currentMember.available_points;
             showToast('🎉 兌換成功！請向店員出示');
             loadTransactions();
             loadRewards();
-        } catch(e) {
-            console.error(e);
-            showToast('❌ 兌換失敗');
-        }
-    }
-
-    function switchToLogin() {
-        currentMember = null;
-        sessionStorage.removeItem('loyalty_phone_' + companyId);
-        document.getElementById('memberView').style.display = 'none';
-        document.getElementById('loginView').style.display = 'block';
-        document.getElementById('phoneInput').value = '';
+        } catch(e) { showToast('❌ 兌換失敗'); }
     }
     </script>
 </body>

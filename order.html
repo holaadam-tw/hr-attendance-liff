@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#E8430A">
 <title>掃碼點餐</title>
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;600;700;900&display=swap" rel="stylesheet">
 <style>
@@ -1775,6 +1776,8 @@ let isScrollingByClick = false;
 let loyaltyConfig = null;
 let memberPointsData = null;
 let _toastTimer = null;
+let _lineUserId = null;  // LINE 登入後取得的 userId（集點用）
+let _lineProfile = null; // LINE profile（集點用）
 
 // ===== EMOJI ICONS (ES6 \u{} safe encoding) =====
 const ICONS = {
@@ -1853,6 +1856,16 @@ document.addEventListener('DOMContentLoaded', () => { initApp(); });
 async function initApp() {
   const params = new URLSearchParams(window.location.search);
   const storeSlug = params.get('store');
+
+  // LINE LIFF 初始化（可選，用於集點）
+  try {
+    await liff.init({ liffId: '2008962829-bnsS1bbB' });
+    if (liff.isLoggedIn()) {
+      _lineProfile = await liff.getProfile();
+      _lineUserId = _lineProfile.userId;
+      console.log('LINE 已登入:', _lineProfile.displayName);
+    }
+  } catch(e) { console.log('LIFF init skipped:', e.message); }
 
   // 先設定模式，讓 applyStoreThemeColor 知道是否為消費者模式
   const mode = params.get('mode');   // 'dine-in' | 'takeout'
@@ -2003,6 +2016,21 @@ async function loadStoreFromSupabase(slug) {
       checkMemberPoints();
     }
   }
+
+  // order_mode 設定（dine_in_only → 強制隱藏外帶選項）
+  try {
+    var omRes = await fetch(SUPABASE_URL + '/rest/v1/system_settings?company_id=eq.' + currentStoreId + '&key=eq.order_mode&limit=1', { headers });
+    var omData = await omRes.json();
+    if (omData && omData.length > 0 && omData[0].value === 'dine_in_only') {
+      window._dineInOnly = true;
+      // 強制覆蓋外帶模式 → 內用
+      if (window._orderMode === 'takeout') {
+        window._orderMode = null;
+        var tsel = document.getElementById('tableSelector');
+        if (tsel) tsel.style.display = '';
+      }
+    }
+  } catch(e) {}
 
   // 2. 載入分類
   const catRes = await fetch(SUPABASE_URL + '/rest/v1/menu_categories?store_id=eq.' + currentStoreId + '&is_active=eq.true&order=sort_order', { headers });
@@ -4335,11 +4363,14 @@ async function checkMemberPoints() {
 }
 
 async function awardLoyaltyPoints(orderTotal, orderId) {
+  // LINE userId 集點（優先），fallback 到手機號碼
+  var lineUid = _lineUserId;
   var phone = document.getElementById('memberPhone')?.value?.trim();
-  if (!phone || phone.length < 9 || !loyaltyConfig || !window._loyaltyEnabled) return 0;
+  if (!lineUid && (!phone || phone.length < 9)) return 0;
+  if (!window._loyaltyEnabled) return 0;
 
-  // 讀取 loyalty_settings（新表），fallback 到 store_profiles.loyalty_config
-  var spendPer = loyaltyConfig.spend_per_point || 50;
+  // 讀取 loyalty_settings
+  var spendPer = (loyaltyConfig && loyaltyConfig.spend_per_point) || 50;
   try {
     var settingsResp = await fetch(SUPABASE_URL + '/rest/v1/loyalty_settings?company_id=eq.' + currentStoreId + '&limit=1', {
       headers: { 'apikey': SUPABASE_KEY }
@@ -4352,65 +4383,60 @@ async function awardLoyaltyPoints(orderTotal, orderId) {
   if (earnedPoints <= 0) return 0;
 
   try {
-    // 查詢/建立 loyalty_members
-    var memberResp = await fetch(SUPABASE_URL + '/rest/v1/loyalty_members?company_id=eq.' + currentStoreId + '&phone=eq.' + encodeURIComponent(phone) + '&limit=1', {
-      headers: { 'apikey': SUPABASE_KEY }
-    });
-    var members = await memberResp.json();
-    var member = members && members.length > 0 ? members[0] : null;
+    var member = null;
+    var headers = { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' };
 
-    if (!member) {
-      // 新增會員
-      var createResp = await fetch(SUPABASE_URL + '/rest/v1/loyalty_members', {
-        method: 'POST',
-        headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=representation' },
-        body: JSON.stringify({ company_id: currentStoreId, phone: phone, total_points: 0 })
-      });
-      var created = await createResp.json();
-      member = Array.isArray(created) ? created[0] : created;
+    // 查詢會員：LINE userId 優先
+    if (lineUid) {
+      var resp = await fetch(SUPABASE_URL + '/rest/v1/loyalty_members?company_id=eq.' + currentStoreId + '&line_user_id=eq.' + encodeURIComponent(lineUid) + '&limit=1', { headers: headers });
+      var arr = await resp.json();
+      member = arr && arr.length > 0 ? arr[0] : null;
+      if (!member) {
+        var cr = await fetch(SUPABASE_URL + '/rest/v1/loyalty_members', {
+          method: 'POST', headers: { ...headers, 'Prefer': 'return=representation' },
+          body: JSON.stringify({ company_id: currentStoreId, line_user_id: lineUid, name: _lineProfile?.displayName || null, phone: phone || null, total_points: 0 })
+        });
+        var created = await cr.json();
+        member = Array.isArray(created) ? created[0] : created;
+      }
+    } else if (phone) {
+      // Fallback: 手機號碼
+      var resp2 = await fetch(SUPABASE_URL + '/rest/v1/loyalty_members?company_id=eq.' + currentStoreId + '&phone=eq.' + encodeURIComponent(phone) + '&limit=1', { headers: headers });
+      var arr2 = await resp2.json();
+      member = arr2 && arr2.length > 0 ? arr2[0] : null;
+      if (!member) {
+        var cr2 = await fetch(SUPABASE_URL + '/rest/v1/loyalty_members', {
+          method: 'POST', headers: { ...headers, 'Prefer': 'return=representation' },
+          body: JSON.stringify({ company_id: currentStoreId, phone: phone, total_points: 0 })
+        });
+        var created2 = await cr2.json();
+        member = Array.isArray(created2) ? created2[0] : created2;
+      }
     }
 
     if (!member || !member.id) return 0;
 
     // 更新 total_points + last_visit
     await fetch(SUPABASE_URL + '/rest/v1/loyalty_members?id=eq.' + member.id, {
-      method: 'PATCH',
-      headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
-      body: JSON.stringify({
-        total_points: (member.total_points || 0) + earnedPoints,
-        last_visit: new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' })
-      })
+      method: 'PATCH', headers: { ...headers, 'Prefer': 'return=minimal' },
+      body: JSON.stringify({ total_points: (member.total_points || 0) + earnedPoints, last_visit: new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' }) })
     });
 
     // 寫入 loyalty_transactions
     await fetch(SUPABASE_URL + '/rest/v1/loyalty_transactions', {
-      method: 'POST',
-      headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
-      body: JSON.stringify({
-        company_id: currentStoreId,
-        member_id: member.id,
-        type: 'earn',
-        points: earnedPoints,
-        amount: orderTotal,
-        source: 'order',
-        source_id: orderId || null,
-        note: '消費 $' + orderTotal + ' 集點'
-      })
+      method: 'POST', headers: { ...headers, 'Prefer': 'return=minimal' },
+      body: JSON.stringify({ company_id: currentStoreId, member_id: member.id, type: 'earn', points: earnedPoints, amount: orderTotal, source: 'order', source_id: orderId || null, note: '消費 $' + orderTotal + ' 集點' })
     });
-
-    // 同步舊表（向下相容）
-    try {
-      if (memberPointsData) {
-        await fetch(SUPABASE_URL + '/rest/v1/loyalty_points?id=eq.' + memberPointsData.id, {
-          method: 'PATCH',
-          headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
-          body: JSON.stringify({ points: (memberPointsData.points || 0) + earnedPoints, total_earned: (memberPointsData.total_earned || 0) + earnedPoints })
-        });
-      }
-    } catch(e2) {}
 
     return earnedPoints;
   } catch(e) { console.warn('Award points error:', e); return 0; }
+}
+
+// LINE 登入集點（可選按鈕）
+function loginLineForLoyalty() {
+  if (typeof liff !== 'undefined' && liff.isLoggedIn && !liff.isLoggedIn()) {
+    liff.login({ redirectUri: window.location.href });
+  }
 }
 
 // ===== 確認頁手機輸入 =====
