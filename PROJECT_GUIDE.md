@@ -46,26 +46,49 @@
 | admin.html | 管理後台 | 管理員 |
 | platform.html | 平台管理 | platform_admin |
 | order.html | 消費者點餐 | 消費者（掃碼） |
-| booking.html | 消費者訂位 | 消費者（掃碼） |
+| booking.html | 消費者訂位（餐飲業） | 消費者（掃碼） |
+| booking_service.html | 消費者預約（服務業） | 消費者（?store=company_id） |
+| booking_service_admin.html | 服務業預約後台 | 管理員（LIFF） |
+| loyalty.html | 集點會員（消費者） | 消費者（LINE 登入/手機查詢） |
+| loyalty_admin.html | 集點會員後台 | 管理員（LIFF） |
+| fieldwork.html | 外勤打卡/業務週報 | 所有員工 |
+| services.html | 便當訂購 | 所有員工 |
+| kds.html | 廚房顯示系統 | 廚房（獨立） |
 | common.js | 共用函數 | 所有頁面 |
-| modules/auth.js | 登入驗證 | |
-| modules/index.js | 首頁邏輯 | |
+| modules/auth.js | 登入驗證、頁面路由 | |
+| modules/index.js | ES module → window 綁定 | |
 | modules/employees.js | 員工管理 | |
-| modules/store.js | 商店/預約/會員管理 | |
-| modules/settings.js | 系統設定/公告 | |
-| modules/leave.js | 請假/排班 | |
+| modules/store.js | 商店/預約/會員/集點 | |
+| modules/settings.js | 系統設定/公告/外勤 | |
+| modules/leave.js | 請假/排班/午餐 | |
 | modules/payroll.js | 薪資計算 | |
 | modules/schedules.js | 班表管理 | |
+| modules/audit.js | 稽核日誌/報表匯出 | |
+
+## 頁面認證分類
+| 分類 | 頁面 | 認證方式 |
+|------|------|---------|
+| 員工頁面 | index/checkin/records/requests/fieldwork/salary/services/schedule | `initializeLiff({ requireLineApp: true })` |
+| 管理頁面 | admin/platform | `initializeLiff()` 允許瀏覽器 OAuth |
+| 消費者頁面 | order/booking/booking_service/loyalty | 不走 LIFF（loyalty 可選 LINE 登入） |
+| 後台頁面 | loyalty_admin/booking_service_admin | `initializeLiff({ requireLineApp: true })` |
+
+## 集點會員系統
+- **識別方式**：LINE userId（主要）+ 手機號碼（備用查詢）
+- **資料表**：loyalty_members / loyalty_transactions / loyalty_rewards / loyalty_settings / loyalty_redemptions
+- **集點來源**：order（消費）、booking（餐飲訂位）、booking_service（服務預約）、manual（手動）
+- **兌換碼**：6 碼數字，24h 有效，店員核銷（loyalty_admin.html）
+- **設定統一在 loyalty_settings 表**（不用 system_settings）；餐飲設定只保留開關
 
 ## 常見陷阱 ⚠️
-1. **時區**：`toISOString()` 會轉 UTC，台灣 UTC+8 日期會偏移。用本地格式化：
-   `d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')`
+1. **時區**：所有 `toLocaleTimeString/toLocaleString/toLocaleDateString` 必須加 `timeZone: 'Asia/Taipei'`
 2. **全域變數**：跨函數共用變數必須掛 `window`，不能用 module scope 的 `let/const`
 3. **sessionStorage 快取**：修改 system_settings 後要清快取：
-   `sessionStorage.removeItem('system_settings_cache'); await loadSettings();`
-4. **localStorage 是瀏覽器獨立的**：跨裝置設定必須存 Supabase
+   `invalidateSettingsCache(); await loadSettings(true);`
+4. **order.html ID 問題**：`currentStoreId` = store_profiles.id，`_storeCompanyId` = companies.id，查 system_settings/loyalty 用後者
 5. **CORS**：瀏覽器不能直接呼叫 LINE API，必須透過 Edge Function
-6. **GitHub Pages 部署**：push 後可能需要 1-2 分鐘，有時需空 commit 觸發
+6. **GitHub Pages 部署**：push 後 1-2 分鐘
+7. **QA 腳本**：commit 前必跑 `bash scripts/qa_check.sh`，FAIL 必修
 
 ## 權限分級
 | 角色 | 首頁功能 | 管理頁面 | 薪酬 |
