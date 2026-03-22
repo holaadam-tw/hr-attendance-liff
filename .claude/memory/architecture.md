@@ -87,3 +87,6 @@ async function saveSetting(key, value, description) {
 - 2026-03-17: index.html 骨架屏 + 載入優化 + ?goto= URL 跳轉：skeleton 在 LIFF init 後立即顯示；首頁不等天氣/公告載完就顯示；bindPage 預設不加 active；handleGotoParam() 支援 Rich Menu 直接跳轉（records/leave/attendance/requests/salary/checkin/services/fieldwork/admin）
 - 2026-03-21: 全頁面時區修正 + initializeLiff requireLineApp 參數 + scripts/qa_check.sh + liff.login() 移除 redirectUri 改 sessionStorage 跳轉（修 admin.html 400）+ CLAUDE.md 回歸測試清單
 - 2026-03-21: 025_loyalty.sql — 集點會員系統 4 表（loyalty_members/transactions/rewards/settings）；members: company_id+phone UNIQUE, available_points GENERATED；transactions: source(order/booking/manual)+source_id
+- 2026-03-21: loyalty.html 消費者頁（LINE 登入查點數/兌換）+ loyalty_admin.html 後台（4 tab：會員/送點/商品/設定）+ admin.html 加集點格子
+- 2026-03-21: 026_loyalty_line_user.sql — loyalty_members 加 line_user_id + UNIQUE(company_id, line_user_id)；識別改用 LINE userId（取代手機）
+- 2026-03-21: order.html 加 LIFF SDK（可選 LINE 登入集點）+ awardLoyaltyPoints 改用 line_user_id + system_settings order_mode=dine_in_only 支援；index.html 線上點餐連結加 ?store=currentCompanyId
