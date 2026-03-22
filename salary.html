@@ -104,8 +104,9 @@
             <div class="card" style="padding:16px;">
                 <h2 style="text-align:center;font-size:18px;font-weight:800;color:var(--dark);margin-bottom:16px;">💰 薪資中心</h2>
                 <div class="salary-tabs">
-                    <button class="salary-tab active" onclick="switchSalaryView('detail')">📋 薪資明細</button>
-                    <button class="salary-tab" onclick="switchSalaryView('calc')">🧮 薪資試算</button>
+                    <button class="salary-tab active" onclick="switchSalaryView('detail')">📋 明細</button>
+                    <button class="salary-tab" onclick="switchSalaryView('calc')">🧮 試算</button>
+                    <button class="salary-tab" onclick="switchSalaryView('bonus')">🎁 年終</button>
                 </div>
             </div>
 
@@ -310,6 +311,18 @@
                     </div>
                 </div>
             </div>
+
+            <!-- ====== 年終獎金 ====== -->
+            <div id="salaryBonusView" class="salary-view">
+                <div class="card" style="padding:20px;text-align:center;">
+                    <div style="font-size:48px;margin-bottom:12px;">🎁</div>
+                    <h3 style="font-size:18px;font-weight:800;margin-bottom:8px;">年終獎金試算</h3>
+                    <p style="font-size:13px;color:#64748B;margin-bottom:20px;">年終獎金試算功能在管理後台，<br>包含出勤率、考績、年資等精算項目。</p>
+                    <button onclick="window.location.href='admin.html#payroll'" style="width:100%;padding:14px;border:none;border-radius:14px;background:linear-gradient(135deg,#F59E0B,#D97706);color:#fff;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 4px 16px rgba(245,158,11,.3);">
+                        前往年終獎金試算 →
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -326,9 +339,12 @@
 
         // ===== Tab Switch =====
         function switchSalaryView(view) {
-            document.querySelectorAll('.salary-tab').forEach((t,i) => t.classList.toggle('active', (view==='detail' ? i===0 : i===1)));
+            var tabIdx = { detail: 0, calc: 1, bonus: 2 };
+            document.querySelectorAll('.salary-tab').forEach((t, i) => t.classList.toggle('active', i === tabIdx[view]));
             document.querySelectorAll('.salary-view').forEach(v => v.classList.remove('active'));
-            document.getElementById(view === 'detail' ? 'salaryDetailView' : 'salaryCalcView').classList.add('active');
+            var viewMap = { detail: 'salaryDetailView', calc: 'salaryCalcView', bonus: 'salaryBonusView' };
+            var el = document.getElementById(viewMap[view]);
+            if (el) el.classList.add('active');
             if (view === 'calc') calculateSalary();
         }
 
