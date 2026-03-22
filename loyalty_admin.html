@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>🎁 集點會員管理</title>
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="loadingPage" class="loading-screen">
+        <div class="spinner"></div>
+        <p>系統載入中...</p>
+    </div>
+
+    <div class="container">
+        <button class="btn btn-secondary btn-auto-mb" onclick="history.back()">← 返回</button>
+        <h2 style="font-size:20px;font-weight:800;margin-bottom:16px;">🎁 集點會員管理</h2>
+
+        <!-- Tabs -->
+        <div style="display:flex;gap:4px;margin-bottom:16px;overflow-x:auto;" id="laTabBar">
+            <button class="la-tab active" onclick="switchLaTab('members')">📊 會員</button>
+            <button class="la-tab" onclick="switchLaTab('award')">🎁 送點</button>
+            <button class="la-tab" onclick="switchLaTab('rewards')">🏆 商品</button>
+            <button class="la-tab" onclick="switchLaTab('settings')">⚙️ 設定</button>
+        </div>
+
+        <!-- Tab: 會員列表 -->
+        <div id="tab-members" class="la-panel">
+            <div style="margin-bottom:12px;">
+                <input type="text" id="memberSearch" placeholder="搜尋手機或姓名..." oninput="searchMembers()" style="width:100%;padding:12px 14px;border:1px solid #E2E8F0;border-radius:12px;font-size:14px;">
+            </div>
+            <div id="memberListEl" style="font-size:13px;color:#94A3B8;">載入中...</div>
+        </div>
+
+        <!-- Tab: 手動送點 -->
+        <div id="tab-award" class="la-panel" style="display:none;">
+            <div class="card" style="padding:20px;">
+                <h3 style="font-size:15px;font-weight:700;margin-bottom:16px;">🎁 手動送點</h3>
+                <div style="margin-bottom:12px;">
+                    <label style="font-size:13px;font-weight:600;color:#64748B;">手機號碼</label>
+                    <input type="tel" id="awardPhone" placeholder="0912345678" maxlength="10" style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:10px;margin-top:4px;font-size:14px;">
+                </div>
+                <div style="margin-bottom:12px;">
+                    <label style="font-size:13px;font-weight:600;color:#64748B;">點數</label>
+                    <input type="number" id="awardPoints" placeholder="100" min="1" style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:10px;margin-top:4px;font-size:14px;">
+                </div>
+                <div style="margin-bottom:16px;">
+                    <label style="font-size:13px;font-weight:600;color:#64748B;">說明</label>
+                    <input type="text" id="awardNote" placeholder="活動贈點、補償等" style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:10px;margin-top:4px;font-size:14px;">
+                </div>
+                <button class="btn btn-primary" onclick="doAwardPoints()">確認送點</button>
+            </div>
+        </div>
+
+        <!-- Tab: 兌換商品管理 -->
+        <div id="tab-rewards" class="la-panel" style="display:none;">
+            <button class="btn btn-primary" onclick="showRewardModal()" style="margin-bottom:12px;">+ 新增兌換商品</button>
+            <div id="rewardsListEl" style="font-size:13px;color:#94A3B8;">載入中...</div>
+        </div>
+
+        <!-- Tab: 集點設定 -->
+        <div id="tab-settings" class="la-panel" style="display:none;">
+            <div class="card" style="padding:20px;">
+                <h3 style="font-size:15px;font-weight:700;margin-bottom:16px;">⚙️ 集點規則設定</h3>
+                <div style="margin-bottom:12px;">
+                    <label style="font-size:13px;font-weight:600;color:#64748B;">消費多少元得 1 點</label>
+                    <input type="number" id="setPointsPerAmount" value="50" min="1" style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:10px;margin-top:4px;font-size:14px;">
+                </div>
+                <div style="margin-bottom:12px;">
+                    <label style="font-size:13px;font-weight:600;color:#64748B;">新會員歡迎點數</label>
+                    <input type="number" id="setWelcomePoints" value="0" min="0" style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:10px;margin-top:4px;font-size:14px;">
+                </div>
+                <div style="margin-bottom:16px;">
+                    <label style="font-size:13px;font-weight:600;color:#64748B;">點數有效期（月）</label>
+                    <input type="number" id="setExpiryMonths" value="0" min="0" style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:10px;margin-top:4px;font-size:14px;">
+                    <div style="font-size:11px;color:#94A3B8;margin-top:4px;">0 = 永不過期</div>
+                </div>
+
+                <!-- 消費者頁面連結 -->
+                <div style="background:#F8FAFC;border-radius:12px;padding:14px;margin-bottom:16px;">
+                    <div style="font-size:13px;font-weight:600;color:#64748B;margin-bottom:6px;">📱 消費者集點頁面</div>
+                    <div id="loyaltyLink" style="font-size:12px;color:#7C3AED;word-break:break-all;"></div>
+                </div>
+
+                <button class="btn btn-primary" onclick="saveLoyaltySettings()">💾 儲存設定</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 商品 Modal -->
+    <div id="rewardModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:999;padding:20px;">
+        <div style="max-width:400px;margin:60px auto;background:#fff;border-radius:20px;padding:24px;">
+            <h3 style="font-size:16px;font-weight:800;margin-bottom:16px;" id="rewardModalTitle">新增兌換商品</h3>
+            <input type="hidden" id="rewardEditId">
+            <div style="margin-bottom:12px;">
+                <label style="font-size:13px;font-weight:600;color:#64748B;">商品名稱</label>
+                <input type="text" id="rewardName" placeholder="拿鐵咖啡兌換券" style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:10px;margin-top:4px;font-size:14px;">
+            </div>
+            <div style="margin-bottom:12px;">
+                <label style="font-size:13px;font-weight:600;color:#64748B;">說明</label>
+                <input type="text" id="rewardDesc" placeholder="可兌換中杯拿鐵一杯" style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:10px;margin-top:4px;font-size:14px;">
+            </div>
+            <div style="margin-bottom:16px;">
+                <label style="font-size:13px;font-weight:600;color:#64748B;">所需點數</label>
+                <input type="number" id="rewardPts" placeholder="100" min="1" style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:10px;margin-top:4px;font-size:14px;">
+            </div>
+            <div style="display:flex;gap:8px;">
+                <button class="btn btn-secondary" onclick="closeRewardModal()" style="flex:1;">取消</button>
+                <button class="btn btn-primary" onclick="saveReward()" style="flex:1;">儲存</button>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .la-tab { padding:10px 16px; border:none; border-radius:10px; font-size:13px; font-weight:600; cursor:pointer; background:#F1F5F9; color:#64748B; white-space:nowrap; font-family:inherit; transition:all .2s; }
+        .la-tab.active { background:#7C3AED; color:#fff; }
+        .member-row { display:flex; align-items:center; gap:12px; padding:12px; background:#fff; border:1px solid #E2E8F0; border-radius:12px; margin-bottom:8px; }
+        .member-row .avatar { width:40px; height:40px; border-radius:50%; background:#EDE9FE; display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0; }
+        .reward-admin-row { display:flex; align-items:center; gap:12px; padding:14px; background:#fff; border:1px solid #E2E8F0; border-radius:12px; margin-bottom:8px; }
+    </style>
+
+    <script src="common.js"></script>
+    <script>
+    var allMembers = [];
+
+    function switchLaTab(tab) {
+        document.querySelectorAll('.la-panel').forEach(function(p) { p.style.display = 'none'; });
+        document.querySelectorAll('.la-tab').forEach(function(t) { t.classList.remove('active'); });
+        document.getElementById('tab-' + tab).style.display = 'block';
+        var tabs = document.querySelectorAll('.la-tab');
+        var tabMap = ['members','award','rewards','settings'];
+        var idx = tabMap.indexOf(tab);
+        if (idx >= 0 && tabs[idx]) tabs[idx].classList.add('active');
+
+        if (tab === 'members') loadMembers();
+        if (tab === 'rewards') loadAdminRewards();
+        if (tab === 'settings') loadLoyaltySettings();
+    }
+
+    // ===== 會員列表 =====
+    async function loadMembers() {
+        var el = document.getElementById('memberListEl');
+        try {
+            var { data } = await sb.from('loyalty_members')
+                .select('*')
+                .eq('company_id', window.currentCompanyId)
+                .order('created_at', { ascending: false });
+            allMembers = data || [];
+            renderMembers(allMembers);
+        } catch(e) {
+            el.innerHTML = '<div style="padding:16px;text-align:center;">載入失敗</div>';
+        }
+    }
+
+    function renderMembers(list) {
+        var el = document.getElementById('memberListEl');
+        if (!list || list.length === 0) {
+            el.innerHTML = '<div style="padding:16px;text-align:center;color:#94A3B8;">尚無會員</div>';
+            return;
+        }
+        var html = '<div style="font-size:12px;color:#94A3B8;margin-bottom:8px;">共 ' + list.length + ' 位會員</div>';
+        list.forEach(function(m) {
+            var joinDate = m.member_since || '';
+            html += '<div class="member-row">';
+            html += '<div class="avatar">👤</div>';
+            html += '<div style="flex:1;min-width:0;">';
+            html += '<div style="font-size:14px;font-weight:700;">' + escapeHTML(m.name || m.phone) + '</div>';
+            html += '<div style="font-size:12px;color:#64748B;">' + escapeHTML(m.phone) + ' · 加入 ' + joinDate + '</div>';
+            html += '</div>';
+            html += '<div style="text-align:right;">';
+            html += '<div style="font-size:16px;font-weight:800;color:#7C3AED;">' + (m.available_points || 0) + '</div>';
+            html += '<div style="font-size:10px;color:#94A3B8;">可用點數</div>';
+            html += '</div>';
+            html += '</div>';
+        });
+        el.innerHTML = html;
+    }
+
+    function searchMembers() {
+        var q = document.getElementById('memberSearch').value.trim().toLowerCase();
+        if (!q) { renderMembers(allMembers); return; }
+        var filtered = allMembers.filter(function(m) {
+            return (m.phone || '').includes(q) || (m.name || '').toLowerCase().includes(q);
+        });
+        renderMembers(filtered);
+    }
+
+    // ===== 手動送點 =====
+    async function doAwardPoints() {
+        var phone = document.getElementById('awardPhone').value.trim();
+        var points = parseInt(document.getElementById('awardPoints').value) || 0;
+        var note = document.getElementById('awardNote').value.trim();
+        if (!phone || phone.length < 9) { showToast('請輸入正確手機號碼'); return; }
+        if (points <= 0) { showToast('請輸入正數點數'); return; }
+
+        try {
+            // 查詢或建立會員
+            var { data: member } = await sb.from('loyalty_members')
+                .select('*')
+                .eq('company_id', window.currentCompanyId)
+                .eq('phone', phone)
+                .maybeSingle();
+
+            if (!member) {
+                var { data: newM, error } = await sb.from('loyalty_members')
+                    .insert({ company_id: window.currentCompanyId, phone: phone, total_points: 0 })
+                    .select().single();
+                if (error) throw error;
+                member = newM;
+            }
+
+            // 更新點數
+            await sb.from('loyalty_members')
+                .update({ total_points: (member.total_points || 0) + points })
+                .eq('id', member.id);
+
+            // 記錄交易
+            await sb.from('loyalty_transactions').insert({
+                company_id: window.currentCompanyId,
+                member_id: member.id,
+                type: 'earn',
+                points: points,
+                source: 'manual',
+                note: note || '手動送點',
+                created_by: window.currentEmployee?.id || null
+            });
+
+            showToast('✅ 送出 ' + points + ' 點給 ' + phone);
+            document.getElementById('awardPhone').value = '';
+            document.getElementById('awardPoints').value = '';
+            document.getElementById('awardNote').value = '';
+        } catch(e) {
+            console.error(e);
+            showToast('❌ 送點失敗');
+        }
+    }
+
+    // ===== 兌換商品管理 =====
+    async function loadAdminRewards() {
+        var el = document.getElementById('rewardsListEl');
+        try {
+            var { data } = await sb.from('loyalty_rewards')
+                .select('*')
+                .eq('company_id', window.currentCompanyId)
+                .order('sort_order');
+            if (!data || data.length === 0) {
+                el.innerHTML = '<div style="padding:16px;text-align:center;color:#94A3B8;">尚無兌換商品</div>';
+                return;
+            }
+            var html = '';
+            data.forEach(function(r) {
+                html += '<div class="reward-admin-row">';
+                html += '<div style="font-size:24px;">🎁</div>';
+                html += '<div style="flex:1;">';
+                html += '<div style="font-size:14px;font-weight:700;">' + escapeHTML(r.name) + (r.is_active ? '' : ' <span style="color:#EF4444;font-size:11px;">（已停用）</span>') + '</div>';
+                html += '<div style="font-size:12px;color:#64748B;">' + r.points_required + '點' + (r.description ? ' · ' + escapeHTML(r.description) : '') + '</div>';
+                html += '</div>';
+                html += '<div style="display:flex;gap:6px;">';
+                html += '<button onclick="showRewardModal(\'' + r.id + '\')" style="padding:6px 10px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;cursor:pointer;font-size:12px;">✏️</button>';
+                html += '<button onclick="toggleReward(\'' + r.id + '\',' + r.is_active + ')" style="padding:6px 10px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;cursor:pointer;font-size:12px;">' + (r.is_active ? '🚫' : '✅') + '</button>';
+                html += '</div>';
+                html += '</div>';
+            });
+            el.innerHTML = html;
+        } catch(e) {
+            el.innerHTML = '<div style="padding:16px;text-align:center;">載入失敗</div>';
+        }
+    }
+
+    function showRewardModal(editId) {
+        document.getElementById('rewardEditId').value = editId || '';
+        document.getElementById('rewardModalTitle').textContent = editId ? '編輯兌換商品' : '新增兌換商品';
+        document.getElementById('rewardName').value = '';
+        document.getElementById('rewardDesc').value = '';
+        document.getElementById('rewardPts').value = '';
+
+        if (editId) {
+            // 從 DOM 讀取現有資料（簡化，不再查 DB）
+            sb.from('loyalty_rewards').select('*').eq('id', editId).single().then(function(res) {
+                if (res.data) {
+                    document.getElementById('rewardName').value = res.data.name || '';
+                    document.getElementById('rewardDesc').value = res.data.description || '';
+                    document.getElementById('rewardPts').value = res.data.points_required || '';
+                }
+            });
+        }
+        document.getElementById('rewardModal').style.display = 'block';
+    }
+
+    function closeRewardModal() { document.getElementById('rewardModal').style.display = 'none'; }
+
+    async function saveReward() {
+        var editId = document.getElementById('rewardEditId').value;
+        var name = document.getElementById('rewardName').value.trim();
+        var desc = document.getElementById('rewardDesc').value.trim();
+        var pts = parseInt(document.getElementById('rewardPts').value) || 0;
+        if (!name) { showToast('請輸入商品名稱'); return; }
+        if (pts <= 0) { showToast('請輸入所需點數'); return; }
+
+        try {
+            if (editId) {
+                await sb.from('loyalty_rewards').update({ name: name, description: desc, points_required: pts }).eq('id', editId);
+            } else {
+                await sb.from('loyalty_rewards').insert({ company_id: window.currentCompanyId, name: name, description: desc, points_required: pts });
+            }
+            showToast('✅ 儲存成功');
+            closeRewardModal();
+            loadAdminRewards();
+        } catch(e) {
+            showToast('❌ 儲存失敗');
+        }
+    }
+
+    async function toggleReward(id, currentActive) {
+        try {
+            await sb.from('loyalty_rewards').update({ is_active: !currentActive }).eq('id', id);
+            showToast(currentActive ? '已停用' : '已啟用');
+            loadAdminRewards();
+        } catch(e) { showToast('❌ 操作失敗'); }
+    }
+
+    // ===== 集點設定 =====
+    async function loadLoyaltySettings() {
+        try {
+            var { data } = await sb.from('loyalty_settings')
+                .select('*')
+                .eq('company_id', window.currentCompanyId)
+                .maybeSingle();
+            if (data) {
+                document.getElementById('setPointsPerAmount').value = data.points_per_amount || 50;
+                document.getElementById('setWelcomePoints').value = data.welcome_points || 0;
+                document.getElementById('setExpiryMonths').value = data.expiry_months || 0;
+            }
+        } catch(e) { console.warn(e); }
+
+        // 消費者連結
+        var baseUrl = window.location.origin + window.location.pathname.replace('loyalty_admin.html', '');
+        document.getElementById('loyaltyLink').textContent = baseUrl + 'loyalty.html?store=' + window.currentCompanyId;
+    }
+
+    async function saveLoyaltySettings() {
+        var ppa = parseInt(document.getElementById('setPointsPerAmount').value) || 50;
+        var wp = parseInt(document.getElementById('setWelcomePoints').value) || 0;
+        var em = parseInt(document.getElementById('setExpiryMonths').value) || 0;
+
+        try {
+            var { data: existing } = await sb.from('loyalty_settings')
+                .select('id')
+                .eq('company_id', window.currentCompanyId)
+                .maybeSingle();
+
+            if (existing) {
+                await sb.from('loyalty_settings').update({
+                    points_per_amount: ppa, welcome_points: wp, expiry_months: em,
+                    updated_at: new Date().toISOString()
+                }).eq('id', existing.id);
+            } else {
+                await sb.from('loyalty_settings').insert({
+                    company_id: window.currentCompanyId,
+                    points_per_amount: ppa, welcome_points: wp, expiry_months: em
+                });
+            }
+            showToast('✅ 設定已儲存');
+        } catch(e) {
+            console.error(e);
+            showToast('❌ 儲存失敗');
+        }
+    }
+
+    // ===== 初始化 =====
+    window.addEventListener('load', async function() {
+        if (typeof initializeLiff === 'undefined') return;
+        var ok = await initializeLiff({ requireLineApp: true });
+        if (!ok) return;
+        var loggedIn = await checkUserStatus();
+        if (!loggedIn) { window.location.href = 'index.html'; return; }
+        document.getElementById('loadingPage').style.display = 'none';
+        loadMembers();
+    });
+    </script>
+</body>
+</html>

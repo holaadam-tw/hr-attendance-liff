@@ -4334,37 +4334,81 @@ async function checkMemberPoints() {
   } catch(e) { console.warn('Check points error:', e); }
 }
 
-async function awardLoyaltyPoints(orderTotal) {
-  const phone = document.getElementById('memberPhone')?.value?.trim();
-  if (!phone || phone.length < 9 || !loyaltyConfig || !window._loyaltyEnabled) return;
-  const spendPer = loyaltyConfig.spend_per_point || 50;
-  const earnedPoints = Math.floor(orderTotal / spendPer);
-  if (earnedPoints <= 0) return;
+async function awardLoyaltyPoints(orderTotal, orderId) {
+  var phone = document.getElementById('memberPhone')?.value?.trim();
+  if (!phone || phone.length < 9 || !loyaltyConfig || !window._loyaltyEnabled) return 0;
+
+  // 讀取 loyalty_settings（新表），fallback 到 store_profiles.loyalty_config
+  var spendPer = loyaltyConfig.spend_per_point || 50;
   try {
-    if (memberPointsData) {
-      // Update existing
-      await fetch(SUPABASE_URL + '/rest/v1/loyalty_points?id=eq.' + memberPointsData.id, {
-        method: 'PATCH',
-        headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
-        body: JSON.stringify({
-          points: (memberPointsData.points || 0) + earnedPoints,
-          total_earned: (memberPointsData.total_earned || 0) + earnedPoints,
-          updated_at: new Date().toISOString()
-        })
-      });
-    } else {
-      // Insert new
-      await fetch(SUPABASE_URL + '/rest/v1/loyalty_points', {
+    var settingsResp = await fetch(SUPABASE_URL + '/rest/v1/loyalty_settings?company_id=eq.' + currentStoreId + '&limit=1', {
+      headers: { 'apikey': SUPABASE_KEY }
+    });
+    var settingsArr = await settingsResp.json();
+    if (settingsArr && settingsArr.length > 0) spendPer = settingsArr[0].points_per_amount || spendPer;
+  } catch(e) {}
+
+  var earnedPoints = Math.floor(orderTotal / spendPer);
+  if (earnedPoints <= 0) return 0;
+
+  try {
+    // 查詢/建立 loyalty_members
+    var memberResp = await fetch(SUPABASE_URL + '/rest/v1/loyalty_members?company_id=eq.' + currentStoreId + '&phone=eq.' + encodeURIComponent(phone) + '&limit=1', {
+      headers: { 'apikey': SUPABASE_KEY }
+    });
+    var members = await memberResp.json();
+    var member = members && members.length > 0 ? members[0] : null;
+
+    if (!member) {
+      // 新增會員
+      var createResp = await fetch(SUPABASE_URL + '/rest/v1/loyalty_members', {
         method: 'POST',
-        headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
-        body: JSON.stringify({
-          store_id: currentStoreId,
-          customer_line_id: phone,
-          points: earnedPoints,
-          total_earned: earnedPoints
-        })
+        headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=representation' },
+        body: JSON.stringify({ company_id: currentStoreId, phone: phone, total_points: 0 })
       });
+      var created = await createResp.json();
+      member = Array.isArray(created) ? created[0] : created;
     }
+
+    if (!member || !member.id) return 0;
+
+    // 更新 total_points + last_visit
+    await fetch(SUPABASE_URL + '/rest/v1/loyalty_members?id=eq.' + member.id, {
+      method: 'PATCH',
+      headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+      body: JSON.stringify({
+        total_points: (member.total_points || 0) + earnedPoints,
+        last_visit: new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' })
+      })
+    });
+
+    // 寫入 loyalty_transactions
+    await fetch(SUPABASE_URL + '/rest/v1/loyalty_transactions', {
+      method: 'POST',
+      headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+      body: JSON.stringify({
+        company_id: currentStoreId,
+        member_id: member.id,
+        type: 'earn',
+        points: earnedPoints,
+        amount: orderTotal,
+        source: 'order',
+        source_id: orderId || null,
+        note: '消費 $' + orderTotal + ' 集點'
+      })
+    });
+
+    // 同步舊表（向下相容）
+    try {
+      if (memberPointsData) {
+        await fetch(SUPABASE_URL + '/rest/v1/loyalty_points?id=eq.' + memberPointsData.id, {
+          method: 'PATCH',
+          headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+          body: JSON.stringify({ points: (memberPointsData.points || 0) + earnedPoints, total_earned: (memberPointsData.total_earned || 0) + earnedPoints })
+        });
+      }
+    } catch(e2) {}
+
     return earnedPoints;
   } catch(e) { console.warn('Award points error:', e); return 0; }
 }

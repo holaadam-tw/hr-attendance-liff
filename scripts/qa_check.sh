@@ -79,7 +79,7 @@ echo ""
 
 # === 6. 返回按鍵檢查 ===
 echo "--- 6. 子頁面返回按鍵 ---"
-SUBPAGES="checkin.html records.html salary.html requests.html schedule.html services.html fieldwork.html booking_service_admin.html"
+SUBPAGES="checkin.html records.html salary.html requests.html schedule.html services.html fieldwork.html booking_service_admin.html loyalty_admin.html"
 MISSING_BACK=""
 for f in $SUBPAGES; do
     if [ -f "$f" ]; then
