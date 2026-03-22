@@ -161,11 +161,13 @@ export function switchRestaurantTab(tab, el) {
     document.getElementById('rdOrdersTab').style.display = tab === 'orders' ? '' : 'none';
     document.getElementById('rdMenuTab').style.display = tab === 'menu' ? '' : 'none';
     document.getElementById('rdReportTab').style.display = tab === 'report' ? '' : 'none';
+    var hoursTab = document.getElementById('rdHoursTab');
+    if (hoursTab) hoursTab.style.display = tab === 'hours' ? '' : 'none';
     document.getElementById('rdSettingsTab').style.display = tab === 'settings' ? '' : 'none';
     if (tab === 'orders') loadStoreOrders();
     if (tab === 'menu') { loadMenuCategories(); loadMenuItems(); }
     if (tab === 'report') loadSalesReport();
-    if (tab === 'settings') loadStoreSettings();
+    if (tab === 'hours' || tab === 'settings') loadStoreSettings();
 }
 
 // ===== 訂單即時通知 =====
