@@ -314,19 +314,52 @@
 
             <!-- ====== 年終獎金 ====== -->
             <div id="salaryBonusView" class="salary-view">
-                <div class="card" style="padding:20px;text-align:center;">
-                    <div style="font-size:48px;margin-bottom:12px;">🎁</div>
-                    <h3 style="font-size:18px;font-weight:800;margin-bottom:8px;">年終獎金試算</h3>
-                    <p style="font-size:13px;color:#64748B;margin-bottom:20px;">年終獎金試算功能在管理後台，<br>包含出勤率、考績、年資等精算項目。</p>
-                    <button onclick="window.location.href='admin.html#payroll'" style="width:100%;padding:14px;border:none;border-radius:14px;background:linear-gradient(135deg,#F59E0B,#D97706);color:#fff;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 4px 16px rgba(245,158,11,.3);">
-                        前往年終獎金試算 →
-                    </button>
+                <div class="card" style="padding:16px;">
+                    <div class="form-group" style="margin-bottom:12px;">
+                        <label style="font-size:13px;font-weight:700;">試算年度</label>
+                        <select id="bonusYear" onchange="loadHybridBonusData()" style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;"></select>
+                    </div>
+                    <div id="bonusLoading" style="text-align:center;color:#666;padding:30px;display:none;">⏳ 載入中...</div>
+                    <div class="lunch-summary" id="bonusSummary" style="display:none;background:#F8FAFC;border-radius:12px;padding:14px;margin-bottom:12px;">
+                        <h3 style="margin-bottom:10px;font-size:14px;">📈 試算摘要</h3>
+                        <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;"><span>符合資格人數</span><span id="eligibleCount" style="font-weight:700;">0</span></div>
+                        <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;"><span>總預算</span><span id="totalBudget" style="font-weight:700;">$0</span></div>
+                        <div style="display:flex;justify-content:space-between;font-size:13px;"><span>平均獎金</span><span id="avgBonus" style="font-weight:700;">$0</span></div>
+                    </div>
+                    <div id="matrixRef" style="display:none;">
+                        <div onclick="toggleMatrixRef()" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#F5F3FF;border-radius:12px;margin-bottom:10px;">
+                            <span style="font-weight:700;font-size:13px;color:#4F46E5;">📊 獎金矩陣參考表</span>
+                            <span id="matrixRefArrow" style="font-size:12px;color:#4F46E5;">▼</span>
+                        </div>
+                        <div id="matrixRefBody" style="display:none;overflow-x:auto;margin-bottom:16px;"></div>
+                    </div>
+                    <div class="form-group" id="bonusEmpSelect" style="display:none;margin-bottom:12px;">
+                        <label style="font-size:13px;font-weight:700;">選擇員工</label>
+                        <select id="bonusEmpDropdown" onchange="renderSelectedBonusCard()" style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;">
+                            <option value="_all">📋 全部員工總覽</option>
+                        </select>
+                    </div>
+                    <div id="bonusList" style="margin-top:10px;"></div>
+                    <div id="bonusActions" style="display:none;margin-top:16px;">
+                        <button class="btn btn-primary" onclick="saveAllBonuses()">💾 儲存全部獎金</button>
+                        <button class="btn btn-secondary" onclick="exportBonusCSV()" style="margin-top:8px;">📊 匯出 CSV</button>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
     <script src="common.js"></script>
+    <script type="module">
+        import { loadHybridBonusData, renderSelectedBonusCard, saveAllBonuses, exportBonusCSV, toggleMatrixRef, updatePerformance, updateAdjustment } from './modules/payroll.js';
+        window.loadHybridBonusData = loadHybridBonusData;
+        window.renderSelectedBonusCard = renderSelectedBonusCard;
+        window.saveAllBonuses = saveAllBonuses;
+        window.exportBonusCSV = exportBonusCSV;
+        window.toggleMatrixRef = toggleMatrixRef;
+        window.updatePerformance = updatePerformance;
+        window.updateAdjustment = updateAdjustment;
+    </script>
     <script>
         let salaryYear = new Date().getFullYear();
         let salaryMonth = new Date().getMonth() - 1;
@@ -346,6 +379,22 @@
             var el = document.getElementById(viewMap[view]);
             if (el) el.classList.add('active');
             if (view === 'calc') calculateSalary();
+            if (view === 'bonus') initBonusTab();
+        }
+
+        var _bonusInited = false;
+        function initBonusTab() {
+            if (_bonusInited) return;
+            _bonusInited = true;
+            var sel = document.getElementById('bonusYear');
+            if (!sel) return;
+            var y = new Date().getFullYear();
+            for (var i = y; i >= y - 3; i--) {
+                var opt = document.createElement('option');
+                opt.value = i; opt.textContent = i + ' 年';
+                sel.appendChild(opt);
+            }
+            if (typeof loadHybridBonusData === 'function') loadHybridBonusData();
         }
 
         // ===== Allowance Mode Toggle =====
@@ -686,6 +735,8 @@
         }
 
         function checkPayrollPassword() {
+            // platform_admin 直接通過（密碼鎖會在 admin.html 另外處理）
+            if (window.isPlatformAdmin) return Promise.resolve(true);
             if (isPayrollUnlocked()) return Promise.resolve(true);
             const setting = getCachedSetting('payroll_password');
             const pw = (setting && setting.password) ? setting.password : null;
