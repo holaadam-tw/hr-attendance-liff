@@ -28,6 +28,16 @@
 
         <!-- Tab: 會員列表 -->
         <div id="tab-members" class="la-panel">
+            <!-- 核銷兌換碼 -->
+            <div class="card" style="padding:14px;margin-bottom:12px;background:#FEF3C7;border:2px solid #F59E0B;">
+                <div style="font-size:13px;font-weight:700;color:#92400E;margin-bottom:8px;">🎫 核銷兌換碼</div>
+                <div style="display:flex;gap:8px;">
+                    <input type="text" id="redeemCodeInput" placeholder="輸入 6 碼兌換碼" maxlength="6" inputmode="numeric"
+                        style="flex:1;padding:10px 12px;border:2px solid #E2E8F0;border-radius:10px;font-size:16px;font-weight:700;letter-spacing:4px;text-align:center;">
+                    <button onclick="verifyRedeemCode()" style="padding:10px 16px;border:none;border-radius:10px;background:#F59E0B;color:#fff;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;">核銷</button>
+                </div>
+                <div id="redeemResult" style="margin-top:8px;font-size:13px;display:none;"></div>
+            </div>
             <div style="margin-bottom:12px;">
                 <input type="text" id="memberSearch" placeholder="搜尋手機或姓名..." oninput="searchMembers()" style="width:100%;padding:12px 14px;border:1px solid #E2E8F0;border-radius:12px;font-size:14px;">
             </div>
@@ -372,6 +382,67 @@
         } catch(e) {
             console.error(e);
             showToast('❌ 儲存失敗');
+        }
+    }
+
+    // ===== 核銷兌換碼 =====
+    async function verifyRedeemCode() {
+        var code = document.getElementById('redeemCodeInput').value.trim();
+        var resultEl = document.getElementById('redeemResult');
+        if (!code || code.length !== 6) { showToast('請輸入 6 碼兌換碼'); return; }
+
+        resultEl.style.display = 'block';
+        resultEl.innerHTML = '<span style="color:#94A3B8;">查詢中...</span>';
+
+        try {
+            var { data: rd } = await sb.from('loyalty_redemptions')
+                .select('*, loyalty_members(name, phone, line_user_id), loyalty_rewards(name)')
+                .eq('company_id', window.currentCompanyId)
+                .eq('code', code)
+                .maybeSingle();
+
+            if (!rd) {
+                resultEl.innerHTML = '<span style="color:#DC2626;">找不到此兌換碼</span>';
+                return;
+            }
+            if (rd.status === 'used') {
+                var usedAt = rd.redeemed_at ? new Date(rd.redeemed_at).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' }) : '';
+                resultEl.innerHTML = '<span style="color:#94A3B8;">此兌換碼已核銷（' + usedAt + '）</span>';
+                return;
+            }
+            if (rd.status === 'expired' || new Date(rd.expires_at) < new Date()) {
+                resultEl.innerHTML = '<span style="color:#DC2626;">此兌換碼已過期</span>';
+                return;
+            }
+
+            var memberName = rd.loyalty_members?.name || rd.loyalty_members?.phone || 'LINE 會員';
+            var rewardName = rd.loyalty_rewards?.name || '商品';
+            resultEl.innerHTML = '<div style="background:#F0FDF4;border-radius:10px;padding:12px;margin-top:4px;">' +
+                '<div style="font-size:14px;font-weight:700;color:#059669;margin-bottom:6px;">✅ 兌換碼有效</div>' +
+                '<div style="font-size:13px;color:#1E293B;">會員：' + escapeHTML(memberName) + '</div>' +
+                '<div style="font-size:13px;color:#1E293B;">商品：' + escapeHTML(rewardName) + '</div>' +
+                '<div style="font-size:13px;color:#1E293B;">點數：' + rd.points_used + ' 點</div>' +
+                '<button onclick="confirmRedeem(\'' + rd.id + '\')" style="margin-top:10px;width:100%;padding:12px;border:none;border-radius:10px;background:#059669;color:#fff;font-size:14px;font-weight:700;cursor:pointer;">確認核銷</button>' +
+            '</div>';
+        } catch(e) {
+            console.error(e);
+            resultEl.innerHTML = '<span style="color:#DC2626;">查詢失敗</span>';
+        }
+    }
+
+    async function confirmRedeem(redemptionId) {
+        try {
+            await sb.from('loyalty_redemptions').update({
+                status: 'used',
+                redeemed_at: new Date().toISOString(),
+                redeemed_by: window.currentEmployee?.id || null
+            }).eq('id', redemptionId);
+
+            document.getElementById('redeemResult').innerHTML = '<span style="color:#059669;font-weight:700;">🎉 核銷成功！</span>';
+            document.getElementById('redeemCodeInput').value = '';
+            showToast('✅ 核銷完成');
+        } catch(e) {
+            showToast('❌ 核銷失敗');
         }
     }
 

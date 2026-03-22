@@ -269,23 +269,56 @@
 
     async function redeemReward(rewardId, pointsRequired, rewardName) {
         if (!currentMember || !isLineLoggedIn) return;
-        if (!confirm('確定要兌換「' + rewardName + '」（' + pointsRequired + '點）？')) return;
+        if (!confirm('確定要兌換「' + rewardName + '」（' + pointsRequired + '點）？\n\n兌換後將產生兌換碼，請出示給店員核銷。')) return;
         try {
             var res = await sb.from('loyalty_members').select('available_points, used_points').eq('id', currentMember.id).single();
             if (!res.data || res.data.available_points < pointsRequired) { showToast('❌ 點數不足'); return; }
 
+            // 產生 6 碼兌換碼
+            var code = Math.floor(100000 + Math.random() * 900000).toString();
+            var expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+            // 寫入 loyalty_redemptions
+            var { error: rErr } = await sb.from('loyalty_redemptions').insert({
+                company_id: companyId, member_id: currentMember.id, reward_id: rewardId,
+                code: code, points_used: pointsRequired, status: 'pending', expires_at: expiresAt
+            });
+            if (rErr) throw rErr;
+
+            // 扣除 used_points
             await sb.from('loyalty_members').update({ used_points: res.data.used_points + pointsRequired }).eq('id', currentMember.id);
+
+            // 記錄交易
             await sb.from('loyalty_transactions').insert({
                 company_id: companyId, member_id: currentMember.id, type: 'redeem',
-                points: -pointsRequired, source: 'manual', note: '兌換：' + rewardName
+                points: -pointsRequired, source: 'manual', note: '兌換：' + rewardName + '（碼：' + code + '）'
             });
 
             currentMember.available_points = res.data.available_points - pointsRequired;
             document.getElementById('memberPoints').textContent = currentMember.available_points;
-            showToast('🎉 兌換成功！請向店員出示');
             loadTransactions('txHistory');
             loadRewards();
-        } catch(e) { showToast('❌ 兌換失敗'); }
+
+            // 顯示兌換碼
+            showRedeemCode(code, rewardName);
+        } catch(e) { console.error(e); showToast('❌ 兌換失敗'); }
+    }
+
+    function showRedeemCode(code, rewardName) {
+        var overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
+        overlay.innerHTML = '<div style="background:#fff;border-radius:24px;padding:32px 24px;text-align:center;max-width:360px;width:100%;">' +
+            '<div style="font-size:48px;margin-bottom:12px;">🎉</div>' +
+            '<div style="font-size:16px;font-weight:800;margin-bottom:4px;">兌換成功</div>' +
+            '<div style="font-size:13px;color:#64748B;margin-bottom:20px;">' + escapeHTML(rewardName) + '</div>' +
+            '<div style="background:#F8FAFC;border-radius:16px;padding:20px;margin-bottom:16px;">' +
+                '<div style="font-size:12px;color:#94A3B8;margin-bottom:8px;">兌換碼</div>' +
+                '<div style="font-size:36px;font-weight:900;letter-spacing:6px;color:#7C3AED;">' + code + '</div>' +
+                '<div style="font-size:12px;color:#94A3B8;margin-top:8px;">24 小時內有效，請出示給店員核銷</div>' +
+            '</div>' +
+            '<button onclick="this.closest(\'div[style*=fixed]\').remove()" style="width:100%;padding:14px;border:none;border-radius:14px;background:#7C3AED;color:#fff;font-size:15px;font-weight:700;cursor:pointer;">確定</button>' +
+        '</div>';
+        document.body.appendChild(overlay);
     }
 
     // ===== 綁定手機 =====
