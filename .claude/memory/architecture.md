@@ -51,7 +51,9 @@ async function saveSetting(key, value, description) {
   - 員工頁面（index/checkin/records/requests/fieldwork/salary/services/schedule/loyalty/booking_service_admin）：`initializeLiff({ requireLineApp: true })` → 非 LINE 顯示「請從 LINE 開啟」
   - 管理頁面（admin via auth.js `checkAdminPermission()`、platform）：`initializeLiff()` 不帶參數 → 允許瀏覽器 LINE OAuth
   - 消費者頁面（booking/booking_service/order）：完全不走 LIFF
+- **LIFF OAuth 跳轉**：`liff.login()` 不帶 `redirectUri`（避免非 endpoint URL 被 LINE 拒絕 400）；非 index.html 頁面登入前存 `sessionStorage('liff_redirect_page')`，登入成功後自動跳回
 - **QA 腳本**：`bash scripts/qa_check.sh`（7 項檢查），commit 前必跑，FAIL 必修
+- **回歸測試清單**：CLAUDE.md 末尾有核心頁面開啟測試 + 修改影響範圍對照表，commit 前必確認
 
 ## 最近修改記錄
 - 2026-03-10: 權限分級 + 薪酬密碼鎖
@@ -83,4 +85,4 @@ async function saveSetting(key, value, description) {
 - 2026-03-18: quick_check_in RPC 遲到+早退判定（021→022_add_early_leave.sql）：上班→is_late（排班/default_work_start/late_threshold_minutes）；下班→is_early_leave（排班/default_work_end/early_leave_threshold_minutes）；admin.html 考勤設定卡片含上下班時間+遲到早退容忍分鐘；records.html 月曆顯示早退標記
 - 2026-03-18: index.html 加入 ?goto= URL 參數跳轉（handleGotoParam），支援 Rich Menu 直接跳轉到 records/leave/attendance/requests/salary/checkin/services/fieldwork/admin
 - 2026-03-17: index.html 骨架屏 + 載入優化 + ?goto= URL 跳轉：skeleton 在 LIFF init 後立即顯示；首頁不等天氣/公告載完就顯示；bindPage 預設不加 active；handleGotoParam() 支援 Rich Menu 直接跳轉（records/leave/attendance/requests/salary/checkin/services/fieldwork/admin）
-- 2026-03-21: 全頁面時區修正（toLocaleTimeString 加 timeZone:'Asia/Taipei'）+ initializeLiff 改為 requireLineApp 參數控制（員工頁面擋非 LINE，管理頁面允許瀏覽器 OAuth）+ 新增 scripts/qa_check.sh（7 項自動檢查）
+- 2026-03-21: 全頁面時區修正 + initializeLiff requireLineApp 參數 + scripts/qa_check.sh + liff.login() 移除 redirectUri 改 sessionStorage 跳轉（修 admin.html 400）+ CLAUDE.md 回歸測試清單
