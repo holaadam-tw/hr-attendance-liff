@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>🎁 集點會員</title>
+    <title>集點會員</title>
     <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
@@ -13,48 +13,52 @@
         .header { text-align:center; padding:32px 0 20px; }
         .header h1 { font-size:24px; font-weight:800; color:#fff; text-shadow:0 2px 8px rgba(0,0,0,.15); }
         .header p { font-size:14px; color:rgba(255,255,255,.75); margin-top:6px; }
-        .content-card { background:#fff; border-radius:24px; padding:24px 20px; box-shadow:0 8px 32px rgba(0,0,0,.12); margin-bottom:16px; }
+        .card { background:#fff; border-radius:24px; padding:24px 20px; box-shadow:0 8px 32px rgba(0,0,0,.12); margin-bottom:16px; }
         .btn { display:block; width:100%; padding:14px; border:none; border-radius:14px; font-size:15px; font-weight:700; cursor:pointer; font-family:inherit; transition:all .2s; }
-        .btn-primary { background:linear-gradient(135deg,#7C3AED,#6D28D9); color:#fff; box-shadow:0 4px 16px rgba(124,58,237,.3); }
-        .btn-primary:active { transform:scale(0.98); }
+        .btn:active { transform:scale(0.98); }
         .btn-line { background:#06C755; color:#fff; box-shadow:0 4px 16px rgba(6,199,85,.3); }
-        .btn-line:active { transform:scale(0.98); }
-        .btn-outline { background:#fff; color:#7C3AED; border:2px solid #7C3AED; }
+        .btn-query { background:#6366F1; color:#fff; }
         .point-card { background:linear-gradient(135deg,#667eea 0%,#764ba2 100%); color:#fff; border-radius:20px; padding:24px; text-align:center; margin-bottom:20px; }
         .point-card .pts { font-size:48px; font-weight:900; margin:12px 0 4px; }
         .point-card .label { font-size:13px; opacity:0.85; }
         .tx-row { display:flex; justify-content:space-between; align-items:center; padding:12px 0; border-bottom:1px solid #F1F5F9; }
         .tx-row:last-child { border-bottom:none; }
-        .section-title { font-size:15px; font-weight:800; margin-bottom:14px; display:flex; align-items:center; gap:8px; }
+        .section-title { font-size:15px; font-weight:800; margin-bottom:14px; }
         .reward-card { display:flex; align-items:center; gap:14px; padding:14px; border:2px solid #E2E8F0; border-radius:14px; margin-bottom:10px; cursor:pointer; transition:all .2s; }
         .reward-card:hover { border-color:#C4B5FD; }
         .reward-card .rpts { background:#EDE9FE; color:#7C3AED; padding:4px 10px; border-radius:8px; font-size:12px; font-weight:700; white-space:nowrap; }
         .toast { position:fixed; top:20px; left:50%; transform:translateX(-50%); background:#1E293B; color:#fff; padding:12px 24px; border-radius:12px; font-size:14px; z-index:9999; display:none; }
         .back-btn { display:inline-flex; align-items:center; gap:6px; color:rgba(255,255,255,.85); font-size:14px; font-weight:600; text-decoration:none; margin-bottom:16px; }
-        #loginView, #memberView { display:none; }
+        .divider { display:flex; align-items:center; gap:12px; margin:16px 0; color:#94A3B8; font-size:13px; }
+        .divider::before, .divider::after { content:''; flex:1; height:1px; background:#E2E8F0; }
+        #loginView, #memberView, #phoneView { display:none; }
     </style>
 </head>
 <body>
     <div class="container">
         <a class="back-btn" href="javascript:history.back()">← 返回</a>
         <div class="header">
-            <h1>🎁 集點會員</h1>
+            <h1>集點會員</h1>
             <p id="storeName">載入中...</p>
         </div>
 
-        <!-- 登入 View -->
+        <!-- 未登入 View -->
         <div id="loginView">
-            <div class="content-card" style="text-align:center;">
-                <div style="font-size:48px;margin-bottom:16px;">🎁</div>
-                <h2 style="font-size:18px;font-weight:800;margin-bottom:8px;">查看您的集點</h2>
-                <p style="font-size:13px;color:#64748B;margin-bottom:20px;">使用 LINE 帳號登入，查看點數餘額、兌換商品</p>
-                <button class="btn btn-line" onclick="loginWithLine()">
-                    LINE 登入查看點數
+            <div class="card" style="text-align:center;">
+                <div style="font-size:60px;margin-bottom:16px;">🎁</div>
+                <h2 style="font-size:18px;font-weight:800;margin-bottom:8px;">集點會員</h2>
+                <p style="font-size:13px;color:#64748B;margin-bottom:24px;">登入查看點數或開始集點</p>
+                <button class="btn btn-line" onclick="loginWithLine()" style="margin-bottom:0;">
+                    🟢 LINE 登入查看點數
                 </button>
+                <div class="divider">或</div>
+                <input type="tel" id="phoneInput" placeholder="輸入手機號碼查詢" maxlength="10"
+                    style="width:100%;padding:12px 14px;border:2px solid #E2E8F0;border-radius:12px;font-size:15px;margin-bottom:8px;">
+                <button class="btn btn-query" onclick="queryByPhone()">查詢點數</button>
             </div>
         </div>
 
-        <!-- 會員 View -->
+        <!-- LINE 登入後 View（可兌換） -->
         <div id="memberView">
             <div class="point-card">
                 <div style="font-size:14px;font-weight:600;" id="memberName">會員</div>
@@ -62,16 +66,32 @@
                 <div class="label">可用點數</div>
                 <div style="font-size:11px;opacity:0.7;margin-top:8px;" id="memberSince"></div>
             </div>
-
-            <div class="content-card">
-                <div class="section-title">📋 點數記錄</div>
-                <div id="txHistory" style="font-size:13px;color:#94A3B8;">載入中...</div>
-            </div>
-
-            <div class="content-card">
+            <div class="card">
                 <div class="section-title">🎁 兌換商品</div>
                 <div id="rewardsList"></div>
             </div>
+            <div class="card">
+                <div class="section-title">📋 點數記錄</div>
+                <div id="txHistory" style="font-size:13px;color:#94A3B8;">載入中...</div>
+            </div>
+        </div>
+
+        <!-- 手機查詢 View（只能看） -->
+        <div id="phoneView">
+            <div class="point-card">
+                <div style="font-size:14px;font-weight:600;" id="phoneMemberName">📱</div>
+                <div class="pts" id="phoneMemberPoints">0</div>
+                <div class="label">可用點數</div>
+            </div>
+            <div class="card">
+                <div class="section-title">📋 點數記錄</div>
+                <div id="phoneTxHistory" style="font-size:13px;color:#94A3B8;">載入中...</div>
+            </div>
+            <div class="card" style="text-align:center;padding:20px;">
+                <p style="font-size:13px;color:#64748B;margin-bottom:12px;">LINE 登入後可兌換商品</p>
+                <button class="btn btn-line" onclick="loginWithLine()">🟢 LINE 登入</button>
+            </div>
+            <button class="btn" onclick="switchToLogin()" style="background:rgba(255,255,255,.15);color:#fff;margin-top:8px;">← 重新查詢</button>
         </div>
     </div>
 
@@ -86,70 +106,57 @@
     var companyId = '';
     var currentMember = null;
     var lineUserId = null;
+    var isLineLoggedIn = false;
 
-    function showToast(msg) {
-        var el = document.getElementById('toast');
-        el.textContent = msg;
-        el.style.display = 'block';
-        setTimeout(function() { el.style.display = 'none'; }, 2500);
-    }
+    function showToast(msg) { var el = document.getElementById('toast'); el.textContent = msg; el.style.display = 'block'; setTimeout(function() { el.style.display = 'none'; }, 2500); }
     function escapeHTML(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
     // ===== 初始化 =====
     window.addEventListener('load', async function() {
         var params = new URLSearchParams(window.location.search);
         companyId = params.get('store') || params.get('company');
-        if (!companyId) {
-            document.getElementById('storeName').textContent = '缺少商店參數';
-            return;
-        }
+        if (!companyId) { document.getElementById('storeName').textContent = '缺少商店參數'; return; }
 
-        // 載入商店名稱
         try {
             var res = await sb.from('companies').select('name').eq('id', companyId).maybeSingle();
             if (res.data) document.getElementById('storeName').textContent = res.data.name;
         } catch(e) {}
 
-        // LIFF 初始化
+        // LIFF 初始化（不強制）
         try {
             await liff.init({ liffId: LIFF_ID });
             if (liff.isLoggedIn()) {
                 var profile = await liff.getProfile();
                 lineUserId = profile.userId;
-                await loadMember(profile.displayName);
+                isLineLoggedIn = true;
+                await loadLineMember(profile.displayName);
                 return;
             }
         } catch(e) { console.log('LIFF init:', e.message); }
 
-        // 未登入 → 顯示登入按鈕
         document.getElementById('loginView').style.display = 'block';
     });
 
-    // ===== LINE 登入 =====
-    function loginWithLine() {
-        liff.login({ redirectUri: window.location.href });
+    function loginWithLine() { liff.login({ redirectUri: window.location.href }); }
+
+    function switchToLogin() {
+        document.getElementById('phoneView').style.display = 'none';
+        document.getElementById('loginView').style.display = 'block';
     }
 
-    // ===== 載入會員資料 =====
-    async function loadMember(displayName) {
+    // ===== LINE 登入 → 載入會員 =====
+    async function loadLineMember(displayName) {
         try {
-            var res = await sb.from('loyalty_members')
-                .select('*')
-                .eq('company_id', companyId)
-                .eq('line_user_id', lineUserId)
-                .maybeSingle();
-
+            var res = await sb.from('loyalty_members').select('*').eq('company_id', companyId).eq('line_user_id', lineUserId).maybeSingle();
             var member = res.data;
 
             if (!member) {
-                // 查歡迎點數
                 var welcomePoints = 0;
                 try {
                     var sr = await sb.from('loyalty_settings').select('welcome_points').eq('company_id', companyId).maybeSingle();
                     if (sr.data) welcomePoints = sr.data.welcome_points || 0;
                 } catch(e) {}
 
-                // 新增會員
                 var ir = await sb.from('loyalty_members')
                     .insert({ company_id: companyId, line_user_id: lineUserId, name: displayName || null, total_points: welcomePoints })
                     .select().single();
@@ -167,93 +174,89 @@
             currentMember = member;
             document.getElementById('loginView').style.display = 'none';
             document.getElementById('memberView').style.display = 'block';
-            document.getElementById('memberName').textContent = member.name || displayName || '會員';
+            document.getElementById('memberName').textContent = '👋 歡迎回來，' + (member.name || displayName || '會員') + '！';
             document.getElementById('memberPoints').textContent = member.available_points || 0;
             if (member.member_since) document.getElementById('memberSince').textContent = '會員自 ' + member.member_since;
 
-            loadTransactions();
+            loadTransactions('txHistory');
             loadRewards();
         } catch(e) {
             console.error(e);
-            showToast('載入失敗，請重試');
+            showToast('載入失敗');
             document.getElementById('loginView').style.display = 'block';
         }
     }
 
-    // ===== 載入點數記錄 =====
-    async function loadTransactions() {
-        var el = document.getElementById('txHistory');
-        try {
-            var res = await sb.from('loyalty_transactions')
-                .select('*')
-                .eq('member_id', currentMember.id)
-                .order('created_at', { ascending: false })
-                .limit(10);
+    // ===== 手機查詢（只能看） =====
+    async function queryByPhone() {
+        var phone = document.getElementById('phoneInput').value.trim();
+        if (!phone || phone.length < 9) { showToast('請輸入正確的手機號碼'); return; }
 
-            if (!res.data || res.data.length === 0) {
-                el.innerHTML = '<div style="text-align:center;padding:16px;color:#94A3B8;">尚無點數記錄</div>';
-                return;
-            }
+        try {
+            var res = await sb.from('loyalty_members').select('*').eq('company_id', companyId).eq('phone', phone).maybeSingle();
+            if (!res.data) { showToast('找不到此手機的會員資料'); return; }
+
+            currentMember = res.data;
+            document.getElementById('loginView').style.display = 'none';
+            document.getElementById('phoneView').style.display = 'block';
+            document.getElementById('phoneMemberName').textContent = '📱 ' + phone.replace(/(\d{4})(\d{3})(\d{3})/, '$1-$2-$3');
+            document.getElementById('phoneMemberPoints').textContent = res.data.available_points || 0;
+
+            loadTransactions('phoneTxHistory');
+        } catch(e) {
+            showToast('查詢失敗');
+        }
+    }
+
+    // ===== 載入點數記錄 =====
+    async function loadTransactions(containerId) {
+        var el = document.getElementById(containerId);
+        if (!currentMember) return;
+        try {
+            var res = await sb.from('loyalty_transactions').select('*').eq('member_id', currentMember.id).order('created_at', { ascending: false }).limit(10);
+            if (!res.data || res.data.length === 0) { el.innerHTML = '<div style="text-align:center;padding:16px;color:#94A3B8;">尚無點數記錄</div>'; return; }
 
             var html = '';
             res.data.forEach(function(t) {
                 var isEarn = t.type === 'earn';
                 var dateStr = t.created_at ? new Date(t.created_at).toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei', month: 'numeric', day: 'numeric' }) : '';
                 var sourceLabel = { order: '🛒 消費集點', booking: '📅 預約集點', manual: '🎁 手動' }[t.source] || '';
-                html += '<div class="tx-row">';
-                html += '<div>';
+                html += '<div class="tx-row"><div>';
                 html += '<div style="font-size:13px;font-weight:600;">' + escapeHTML(t.note || sourceLabel || (isEarn ? '獲得點數' : '兌換商品')) + '</div>';
                 html += '<div style="font-size:11px;color:#94A3B8;">' + dateStr + (t.amount ? ' · $' + t.amount : '') + '</div>';
                 html += '</div>';
-                html += '<div style="font-size:15px;font-weight:800;color:' + (isEarn ? '#059669' : '#DC2626') + ';">' + (isEarn ? '+' : '') + t.points + '</div>';
-                html += '</div>';
+                html += '<div style="font-size:15px;font-weight:800;color:' + (isEarn ? '#059669' : '#DC2626') + ';">' + (isEarn ? '+' : '') + t.points + '</div></div>';
             });
             el.innerHTML = html;
-        } catch(e) {
-            el.innerHTML = '<div style="text-align:center;padding:16px;color:#94A3B8;">載入失敗</div>';
-        }
+        } catch(e) { el.innerHTML = '<div style="text-align:center;padding:16px;color:#94A3B8;">載入失敗</div>'; }
     }
 
-    // ===== 載入兌換商品 =====
+    // ===== 兌換商品（LINE 登入才有） =====
     async function loadRewards() {
         var el = document.getElementById('rewardsList');
         try {
-            var res = await sb.from('loyalty_rewards')
-                .select('*')
-                .eq('company_id', companyId)
-                .eq('is_active', true)
-                .order('sort_order');
-
-            if (!res.data || res.data.length === 0) {
-                el.innerHTML = '<div style="text-align:center;padding:16px;color:#94A3B8;">目前沒有兌換商品</div>';
-                return;
-            }
+            var res = await sb.from('loyalty_rewards').select('*').eq('company_id', companyId).eq('is_active', true).order('sort_order');
+            if (!res.data || res.data.length === 0) { el.innerHTML = '<div style="text-align:center;padding:16px;color:#94A3B8;">目前沒有兌換商品</div>'; return; }
 
             var pts = currentMember.available_points || 0;
             var html = '';
             res.data.forEach(function(r) {
                 var canRedeem = pts >= r.points_required;
                 html += '<div class="reward-card" style="' + (canRedeem ? '' : 'opacity:0.5;') + '" onclick="' + (canRedeem ? "redeemReward('" + r.id + "'," + r.points_required + ",'" + escapeHTML(r.name).replace(/'/g, "\\'") + "')" : '') + '">';
-                html += '<div style="font-size:28px;">🎁</div>';
-                html += '<div style="flex:1;min-width:0;">';
+                html += '<div style="font-size:28px;">🎁</div><div style="flex:1;min-width:0;">';
                 html += '<div style="font-size:14px;font-weight:700;">' + escapeHTML(r.name) + '</div>';
                 if (r.description) html += '<div style="font-size:12px;color:#64748B;margin-top:2px;">' + escapeHTML(r.description) + '</div>';
-                html += '</div>';
-                html += '<div class="rpts">' + r.points_required + '點</div>';
-                html += '</div>';
+                html += '</div><div class="rpts">' + r.points_required + '點</div></div>';
             });
             el.innerHTML = html;
-        } catch(e) {
-            el.innerHTML = '<div style="text-align:center;padding:16px;color:#94A3B8;">載入失敗</div>';
-        }
+        } catch(e) { el.innerHTML = '<div style="text-align:center;padding:16px;color:#94A3B8;">載入失敗</div>'; }
     }
 
-    // ===== 兌換 =====
     async function redeemReward(rewardId, pointsRequired, rewardName) {
-        if (!currentMember) return;
+        if (!currentMember || !isLineLoggedIn) return;
         if (!confirm('確定要兌換「' + rewardName + '」（' + pointsRequired + '點）？')) return;
         try {
-            var res = await sb.from('loyalty_members').select('available_points, total_points, used_points').eq('id', currentMember.id).single();
+            var res = await sb.from('loyalty_members').select('available_points, used_points').eq('id', currentMember.id).single();
             if (!res.data || res.data.available_points < pointsRequired) { showToast('❌ 點數不足'); return; }
 
             await sb.from('loyalty_members').update({ used_points: res.data.used_points + pointsRequired }).eq('id', currentMember.id);
@@ -262,11 +265,10 @@
                 points: -pointsRequired, source: 'manual', note: '兌換：' + rewardName
             });
 
-            currentMember.used_points = res.data.used_points + pointsRequired;
             currentMember.available_points = res.data.available_points - pointsRequired;
             document.getElementById('memberPoints').textContent = currentMember.available_points;
             showToast('🎉 兌換成功！請向店員出示');
-            loadTransactions();
+            loadTransactions('txHistory');
             loadRewards();
         } catch(e) { showToast('❌ 兌換失敗'); }
     }
