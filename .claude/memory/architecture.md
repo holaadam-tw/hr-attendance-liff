@@ -106,3 +106,4 @@ async function saveSetting(key, value, description) {
 - 2026-03-21: loyalty.html 移除 LIFF SDK，LINE 登入改跳 liff.line.me URL → index.html handleGotoParam(loyalty) 存 userId 到 sessionStorage → 跳回 loyalty.html 讀取
 - 2026-03-21: 030_loyalty_phone_nullable.sql — phone DROP NOT NULL（LINE 會員不一定有手機）；loadLineMember 加 null 防護
 - 2026-03-21: order.html loginLineForLoyalty 改用 LIFF URL 跳轉（移除 liff.login redirectUri）；initApp 加 sessionStorage fallback 讀 LINE userId；index.html handleGotoParam 加 goto=order
+- 2026-03-23: 031_fix_quick_check_in_exception.sql — 修正下班打卡「已打過上班卡」：INSERT 移入 BEGIN...EXCEPTION 子區塊；unique_violation 時重新查詢自動下班；下班判定改 v_existing IS NOT NULL（不要求 check_in_time NOT NULL）
