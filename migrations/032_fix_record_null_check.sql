@@ -1,12 +1,11 @@
 -- 032_fix_record_null_check.sql
--- 修正 PostgreSQL RECORD IS NOT NULL 陷阱
+-- 修正 PostgreSQL RECORD IS NOT NULL 陷阱 + GPS 地點驗證
 --
--- 問題：PostgreSQL 的 RECORD IS NOT NULL 要求所有欄位都非 NULL，
--- 若 RECORD 中有任何欄位是 NULL，整個 RECORD 會被判定為 NULL。
--- 例如 attendance 表的 check_out_time 為 NULL 時，
--- v_existing IS NOT NULL 會返回 false，導致下班打卡進入上班分支。
---
--- 修正：所有 RECORD 判定改用 .id IS NOT NULL
+-- 修正 1：RECORD IS NOT NULL 要求所有欄位都非 NULL，
+--   若有任何欄位是 NULL 整個 RECORD 被判定為 NULL → 改用 .id IS NOT NULL
+-- 修正 2：若公司有設定打卡地點（office_locations），
+--   但員工 GPS 不在任何地點範圍內 → 拒絕打卡（回傳 error）
+-- 功能：上班/下班打卡、遲到/早退判定
 
 CREATE OR REPLACE FUNCTION quick_check_in(
     p_line_user_id TEXT,
@@ -125,7 +124,8 @@ BEGIN
     WHERE key = 'office_locations'
       AND company_id = v_employee.company_id;
 
-    IF v_locations IS NOT NULL AND jsonb_typeof(v_locations) = 'array' THEN
+    IF v_locations IS NOT NULL AND jsonb_typeof(v_locations) = 'array'
+       AND jsonb_array_length(v_locations) > 0 THEN
         FOR v_loc IN SELECT * FROM jsonb_array_elements(v_locations)
         LOOP
             v_dist := 6371000 * 2 * asin(sqrt(
@@ -138,6 +138,15 @@ BEGIN
                 v_matched_location := v_loc->>'name';
             END IF;
         END LOOP;
+
+        -- GPS 地點驗證：有設定打卡地點但不在範圍內 → 拒絕打卡
+        IF v_matched_location IS NULL THEN
+            RETURN jsonb_build_object(
+                'success', false,
+                'error', '不在打卡範圍內，請移至公司附近再打卡',
+                'min_distance', round(v_min_dist::numeric, 0)
+            );
+        END IF;
     END IF;
 
     v_location_name := COALESCE(v_matched_location, '未知地點');

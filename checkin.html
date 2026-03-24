@@ -89,7 +89,14 @@
             const btn = document.getElementById('captureBtn');
             const statusBox = document.getElementById('checkInStatus');
             btn.disabled = true; btn.textContent = '處理中...';
-            
+            // 安全計時：10 秒後自動恢復按鈕（防止卡在「處理中」）
+            const safetyTimer = setTimeout(() => {
+                if (btn.disabled && btn.textContent === '處理中...') {
+                    btn.disabled = false; btn.textContent = '📸 重試';
+                    showStatus(statusBox, 'warning', '⚠️ 操作逾時，請重試');
+                }
+            }, 10000);
+
             try {
                 const video = document.getElementById('video');
                 const canvas = document.getElementById('canvas');
@@ -122,6 +129,7 @@
                 try {
                     loc = cachedLocation || await getGPS();
                 } catch(gpsErr) {
+                    clearTimeout(safetyTimer);
                     showGPSWarning(statusBox);
                     btn.disabled = false; btn.textContent = '📸 重試';
                     return;
@@ -129,11 +137,13 @@
 
                 if (loc.accuracy !== undefined) {
                     if (loc.accuracy < 5) {
+                        clearTimeout(safetyTimer);
                         showStatus(statusBox, 'warning', '⚠️ GPS 精度異常（過於精確），請關閉模擬定位 App 後重試');
                         btn.disabled = false; btn.textContent = '📸 重試';
                         return;
                     }
                     if (loc.accuracy > 500) {
+                        clearTimeout(safetyTimer);
                         showStatus(statusBox, 'warning', '⚠️ GPS 訊號太弱（精度 >500m），請到戶外或窗邊重試');
                         btn.disabled = false; btn.textContent = '📸 重試';
                         return;
@@ -149,11 +159,12 @@
                 if (rpcError) throw rpcError;
                 if (!rpcData.success) throw new Error(rpcData.error);
 
+                clearTimeout(safetyTimer);
                 if (rpcData.location_name) localStorage.setItem('last_location', rpcData.location_name);
 
                 const typeText = currentCheckInType === 'in' ? '上班' : '下班';
                 showToast(`✅ ${typeText}成功！@${rpcData.location_name || '公司'}`);
-                
+
                 // 上班打卡且10點前 → 彈出便當訂購
                 if (currentCheckInType === 'in' && new Date().getHours() < 9) {
                     showLunchPopup();
@@ -162,6 +173,7 @@
                 }
 
             } catch (err) {
+                clearTimeout(safetyTimer);
                 console.error(err);
                 showStatus(statusBox, 'error', `❌ 失敗: ${friendlyError(err)}`);
                 btn.disabled = false; btn.textContent = '📸 重試';
