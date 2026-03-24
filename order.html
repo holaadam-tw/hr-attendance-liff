@@ -1776,8 +1776,8 @@ let isScrollingByClick = false;
 let loyaltyConfig = null;
 let memberPointsData = null;
 let _toastTimer = null;
-let _lineUserId = null;  // LINE 登入後取得的 userId（集點用）
-let _lineProfile = null; // LINE profile（集點用）
+let _lineUserId = null;  // LINE userId（推播用，非必要）
+let _lineProfile = null;
 
 // ===== EMOJI ICONS (ES6 \u{} safe encoding) =====
 const ICONS = {
@@ -1857,23 +1857,19 @@ async function initApp() {
   const params = new URLSearchParams(window.location.search);
   const storeSlug = params.get('store');
 
-  // LINE LIFF 初始化（可選，用於集點+推播）
+  // LINE LIFF 初始化（可選，取得 userId 供推播用）
   try {
     await liff.init({ liffId: '2008962829-bnsS1bbB' });
     if (liff.isLoggedIn()) {
       _lineProfile = await liff.getProfile();
       _lineUserId = _lineProfile.userId;
       console.log('LINE 已登入:', _lineProfile.displayName);
-    } else if (liff.isInClient()) {
-      // 在 LINE 內開啟但未登入 → 自動登入（不帶 redirectUri 避免 400）
-      liff.login();
-      return; // login 會重導，不繼續 initApp
     }
   } catch(e) { console.log('LIFF init skipped:', e.message); }
-  // Fallback: 從 sessionStorage 讀取 LINE userId（LIFF URL 跳轉回來時）
+  // Fallback: 從 sessionStorage 讀取 LINE userId
   if (!_lineUserId && storeSlug) {
     var savedUid = sessionStorage.getItem('loyalty_line_user_id_' + storeSlug);
-    if (savedUid) { _lineUserId = savedUid; console.log('LINE userId from session:', savedUid); }
+    if (savedUid) { _lineUserId = savedUid; }
   }
 
   // 先設定模式，讓 applyStoreThemeColor 知道是否為消費者模式
@@ -1896,11 +1892,6 @@ async function initApp() {
   try {
     if (storeSlug) {
       await loadStoreFromSupabase(storeSlug);
-      // store 載入後再試一次 sessionStorage（key 可能是 company_id）
-      if (!_lineUserId && window._storeCompanyId && window._storeCompanyId !== storeSlug) {
-        var savedUid2 = sessionStorage.getItem('loyalty_line_user_id_' + window._storeCompanyId);
-        if (savedUid2) { _lineUserId = savedUid2; console.log('LINE userId from session (companyId):', savedUid2); }
-      }
     } else {
       loadDemoData();
     }
@@ -3990,7 +3981,7 @@ async function confirmAndSubmitOrder() {
     order_type: isTakeout ? 'takeout' : 'dine_in',
     customer_phone: memberPhone || null,
     customer_name: customerName || null,
-    customer_line_id: _lineUserId || null,
+    customer_line_id: _lineUserId || null,  // 有值才存（LINE 推播用）
     notes: isTakeout ? '' : '用餐人數: ' + guestCount
   };
   try {
@@ -4008,10 +3999,7 @@ async function confirmAndSubmitOrder() {
         return;
       }
       const resData = await res.json();
-      if (resData && resData[0]) {
-        if (resData[0].order_number) orderNum = resData[0].order_number;
-        if (resData[0].id) window._lastOrderId = resData[0].id;
-      }
+      if (resData && resData[0] && resData[0].order_number) orderNum = resData[0].order_number;
     }
   } catch (e) {
     console.error('Order submit error:', e);
@@ -4020,12 +4008,6 @@ async function confirmAndSubmitOrder() {
     btn.textContent = '確認送出';
     return;
   }
-  // 會員集點
-  let earnedPts = 0;
-  if (loyaltyConfig) {
-    earnedPts = await awardLoyaltyPoints(totalPrice, window._lastOrderId) || 0;
-  }
-
   // 儲存手機號給「我的訂單」面板用
   window._myOrderPhone = memberPhone;
 
@@ -4068,10 +4050,10 @@ async function confirmAndSubmitOrder() {
     console.warn('客戶資料更新跳過:', e.message);
   }
 
-  showOrderSuccess(totalQty, totalPrice, tableNum, orderNum, earnedPts);
+  showOrderSuccess(totalQty, totalPrice, tableNum, orderNum);
 }
 
-function showOrderSuccess(qty, price, table, orderNum, earnedPts) {
+function showOrderSuccess(qty, price, table, orderNum) {
   const isTakeout = table === '外帶';
 
   // 記錄本次訂單，清空購物車
@@ -4082,14 +4064,12 @@ function showOrderSuccess(qty, price, table, orderNum, earnedPts) {
   cart = [];
   updateCartUI();
   showMyOrdersBtn();
-  const pointsHtml = earnedPts > 0 ? '<div style="background:#FEF3C7;border-radius:10px;padding:8px 16px;margin-bottom:16px;display:inline-block;font-size:13px;color:#92400E;">🎯 本次獲得 <b>' + earnedPts + '</b> 點</div>' : '';
   const overlay = document.getElementById('itemModalOverlay');
   overlay.innerHTML = '<div class="item-modal" onclick="event.stopPropagation()" style="text-align:center; padding: 40px 20px;">' +
     '<div style="font-size:64px; margin-bottom:16px; color:#4CAF50;">&#10003;</div>' +
     '<h2 style="font-size:22px; font-weight:800; margin-bottom:8px;">訂單已送出！</h2>' +
     (orderNum ? '<div style="background:#F0FDF4;border:2px solid #86EFAC;border-radius:12px;padding:12px 20px;margin-bottom:16px;display:inline-block;"><div style="font-size:11px;color:#16A34A;margin-bottom:2px;">' + (isTakeout ? '取餐號碼' : '訂單號碼') + '</div><div style="font-size:36px;font-weight:900;color:#15803D;letter-spacing:4px;">' + orderNum + '</div></div>' : '') +
     '<p style="color:#666; font-size:14px; margin-bottom:20px;">' + (isTakeout ? '外帶' : '桌號 ' + table) + '&#12288;' + qty + ' 道菜品&#12288;合計 $' + price + '</p>' +
-    pointsHtml +
     '<p style="color:#999; font-size:12px; margin-bottom:24px;">' + (isTakeout ? '請至櫃檯等候叫號取餐' : '廚房正在準備您的餐點，請稍候') + '</p>' +
     '<div style="display:flex;flex-direction:column;gap:12px;margin-top:24px;padding:0 16px;">' +
     '<button onclick="showMyOrdersPanel()" style="width:100%;padding:16px;border:2px solid var(--primary);border-radius:14px;background:#fff;color:var(--primary);font-size:16px;font-weight:800;cursor:pointer;font-family:inherit;">📋 查看我的訂單</button>' +
@@ -4393,83 +4373,7 @@ async function checkMemberPoints() {
   } catch(e) { console.warn('Check points error:', e); }
 }
 
-async function awardLoyaltyPoints(orderTotal, orderId) {
-  // LINE userId 集點（優先），fallback 到手機號碼
-  var lineUid = _lineUserId;
-  var phone = document.getElementById('memberPhone')?.value?.trim() || document.getElementById('confirmPhone')?.value?.trim();
-  if (!lineUid && (!phone || phone.length < 9)) return 0;
-  if (!window._loyaltyEnabled) return 0;
-
-  // 讀取 loyalty_settings
-  var spendPer = (loyaltyConfig && loyaltyConfig.spend_per_point) || 50;
-  try {
-    var settingsResp = await fetch(SUPABASE_URL + '/rest/v1/loyalty_settings?company_id=eq.' + (window._storeCompanyId || currentStoreId) + '&limit=1', {
-      headers: { 'apikey': SUPABASE_KEY }
-    });
-    var settingsArr = await settingsResp.json();
-    if (settingsArr && settingsArr.length > 0) spendPer = settingsArr[0].points_per_amount || spendPer;
-  } catch(e) {}
-
-  var earnedPoints = Math.floor(orderTotal / spendPer);
-  if (earnedPoints <= 0) return 0;
-
-  try {
-    var member = null;
-    var headers = { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' };
-
-    // 查詢會員：LINE userId 優先
-    if (lineUid) {
-      var resp = await fetch(SUPABASE_URL + '/rest/v1/loyalty_members?company_id=eq.' + (window._storeCompanyId || currentStoreId) + '&line_user_id=eq.' + encodeURIComponent(lineUid) + '&limit=1', { headers: headers });
-      var arr = await resp.json();
-      member = arr && arr.length > 0 ? arr[0] : null;
-      if (!member) {
-        var cr = await fetch(SUPABASE_URL + '/rest/v1/loyalty_members', {
-          method: 'POST', headers: { ...headers, 'Prefer': 'return=representation' },
-          body: JSON.stringify({ company_id: (window._storeCompanyId || currentStoreId), line_user_id: lineUid, name: _lineProfile?.displayName || null, phone: phone || null, total_points: 0 })
-        });
-        var created = await cr.json();
-        member = Array.isArray(created) ? created[0] : created;
-      }
-    } else if (phone) {
-      // Fallback: 手機號碼
-      var resp2 = await fetch(SUPABASE_URL + '/rest/v1/loyalty_members?company_id=eq.' + (window._storeCompanyId || currentStoreId) + '&phone=eq.' + encodeURIComponent(phone) + '&limit=1', { headers: headers });
-      var arr2 = await resp2.json();
-      member = arr2 && arr2.length > 0 ? arr2[0] : null;
-      if (!member) {
-        var cr2 = await fetch(SUPABASE_URL + '/rest/v1/loyalty_members', {
-          method: 'POST', headers: { ...headers, 'Prefer': 'return=representation' },
-          body: JSON.stringify({ company_id: (window._storeCompanyId || currentStoreId), phone: phone, total_points: 0 })
-        });
-        var created2 = await cr2.json();
-        member = Array.isArray(created2) ? created2[0] : created2;
-      }
-    }
-
-    if (!member || !member.id) return 0;
-
-    // 更新 total_points + last_visit
-    await fetch(SUPABASE_URL + '/rest/v1/loyalty_members?id=eq.' + member.id, {
-      method: 'PATCH', headers: { ...headers, 'Prefer': 'return=minimal' },
-      body: JSON.stringify({ total_points: (member.total_points || 0) + earnedPoints, last_visit: new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' }) })
-    });
-
-    // 寫入 loyalty_transactions
-    await fetch(SUPABASE_URL + '/rest/v1/loyalty_transactions', {
-      method: 'POST', headers: { ...headers, 'Prefer': 'return=minimal' },
-      body: JSON.stringify({ company_id: (window._storeCompanyId || currentStoreId), member_id: member.id, type: 'earn', points: earnedPoints, amount: orderTotal, source: 'order', source_id: orderId || null, note: '消費 $' + orderTotal + ' 集點' })
-    });
-
-    return earnedPoints;
-  } catch(e) { console.warn('Award points error:', e); return 0; }
-}
-
-// LINE 登入集點（可選按鈕）— 跳轉 LIFF URL 方式
-function loginLineForLoyalty() {
-  var storeParam = new URLSearchParams(window.location.search).get('store') || '';
-  var currentUrl = window.location.pathname.split('/').pop() + window.location.search;
-  sessionStorage.setItem('liff_redirect_page', currentUrl);
-  window.location.href = 'https://liff.line.me/2008962829-bnsS1bbB?goto=order&store=' + storeParam;
-}
+// 集點已移至店家端（store.js awardOrderLoyalty），訂單完成時由管理員觸發
 
 // ===== 確認頁手機輸入 =====
 var _confirmPhoneTimer = null;

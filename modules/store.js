@@ -365,6 +365,10 @@ export async function updateOrderStatus(orderId, newStatus) {
                 try { await sb.functions.invoke('send-line-notify', { body: { userId: o.customer_line_id, message: msgs[newStatus] } }); } catch(e2) { console.warn('推播失敗', e2); }
             }
         }
+        // 訂單完成 → 自動集點
+        if (newStatus === 'completed' && o) {
+            try { await awardOrderLoyalty(o, window.currentCompanyId); } catch(e2) { console.warn('訂單集點失敗（不影響狀態）:', e2); }
+        }
         showToast('✅ 狀態已更新');
         closeOrderDetail();
         await loadStoreOrders();
@@ -372,6 +376,75 @@ export async function updateOrderStatus(orderId, newStatus) {
         console.error(e);
         showToast('❌ 更新失敗');
     }
+}
+
+// 訂單完成集點（用手機號碼識別會員）
+async function awardOrderLoyalty(order, companyId) {
+    var phone = order.customer_phone;
+    if (!phone || !companyId) return;
+    try {
+        // 檢查 loyalty_enabled
+        var loyaltyEnabled = getCachedSetting('loyalty_enabled');
+        if (loyaltyEnabled !== 'true') return;
+
+        // 防重複：檢查是否已集過點
+        try {
+            var { data: existing } = await sb.from('loyalty_transactions')
+                .select('id').eq('source', 'order').eq('source_id', order.id).limit(1);
+            if (existing && existing.length > 0) return;
+        } catch(e) {}
+
+        // 讀取集點設定
+        var perAmount = 100;
+        var welcomePts = 0;
+        try {
+            var { data: ls } = await sb.from('loyalty_settings')
+                .select('points_per_amount, welcome_points')
+                .eq('company_id', companyId).maybeSingle();
+            if (ls?.points_per_amount) perAmount = ls.points_per_amount;
+            if (ls?.welcome_points) welcomePts = ls.welcome_points;
+        } catch(e) {}
+
+        var earnedPoints = Math.floor(parseFloat(order.total) / perAmount);
+        if (earnedPoints <= 0) return;
+
+        // 查詢/建立會員
+        var { data: member } = await sb.from('loyalty_members')
+            .select('id, total_points')
+            .eq('company_id', companyId).eq('phone', phone).maybeSingle();
+
+        if (!member) {
+            var { data: newM } = await sb.from('loyalty_members').insert({
+                company_id: companyId, phone: phone,
+                name: order.customer_name || null,
+                total_points: welcomePts
+            }).select().single();
+            member = newM;
+            if (welcomePts > 0 && member) {
+                await sb.from('loyalty_transactions').insert({
+                    company_id: companyId, member_id: member.id, type: 'earn',
+                    points: welcomePts, source: 'manual', note: '新會員歡迎禮'
+                });
+            }
+        }
+        if (!member) return;
+
+        // 寫入集點記錄
+        await sb.from('loyalty_transactions').insert({
+            company_id: companyId, member_id: member.id, type: 'earn',
+            points: earnedPoints, amount: parseFloat(order.total),
+            source: 'order', source_id: order.id,
+            note: '線上點餐集點 +' + earnedPoints
+        });
+
+        // 更新會員點數
+        await sb.from('loyalty_members').update({
+            total_points: (member.total_points || 0) + earnedPoints,
+            last_visit: new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' })
+        }).eq('id', member.id);
+
+        showToast('🎁 已為 ' + phone + ' 集 ' + earnedPoints + ' 點');
+    } catch(e) { console.warn('awardOrderLoyalty error:', e); }
 }
 
 // ===== 商店基本 CRUD =====
