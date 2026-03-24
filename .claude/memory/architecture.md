@@ -47,6 +47,7 @@ async function saveSetting(key, value, description) {
 - CORS：瀏覽器不能直接呼叫 LINE API，需 Edge Function
 - admin.html 系統設定 tab 名稱是 'setting'（不是 'feature'）
 - Supabase JS 的 `.maybeSingle()` 回傳 PromiseLike（非標準 Promise），不能直接 `.catch()`，必須用 try/catch 或 `Promise.resolve()` 包裝
+- **PostgreSQL RECORD IS NOT NULL 陷阱**：`RECORD IS NOT NULL` 要求所有欄位都非 NULL，若有任何欄位是 NULL 整個 RECORD 被判定為 NULL。永遠用 `.id IS NOT NULL` 取代 `IS NOT NULL`（例如 `v_existing.id IS NOT NULL` 而非 `v_existing IS NOT NULL`）
 - **時區規則**：所有 `toLocaleTimeString` / `toLocaleString` / `toLocaleDateString` 必須加 `timeZone: 'Asia/Taipei'`；不能用 `getHours()`/`getMinutes()` 處理 DB 回傳的時間（只有顯示「現在時間」的即時時鐘例外）
 - **LIFF 環境檢查 — 頁面四分類**：
   - 員工頁面（index/checkin/records/requests/fieldwork/salary/services/schedule/booking_service_admin）：`initializeLiff({ requireLineApp: true })`
@@ -106,4 +107,5 @@ async function saveSetting(key, value, description) {
 - 2026-03-21: loyalty.html 移除 LIFF SDK，LINE 登入改跳 liff.line.me URL → index.html handleGotoParam(loyalty) 存 userId 到 sessionStorage → 跳回 loyalty.html 讀取
 - 2026-03-21: 030_loyalty_phone_nullable.sql — phone DROP NOT NULL（LINE 會員不一定有手機）；loadLineMember 加 null 防護
 - 2026-03-21: order.html loginLineForLoyalty 改用 LIFF URL 跳轉（移除 liff.login redirectUri）；initApp 加 sessionStorage fallback 讀 LINE userId；index.html handleGotoParam 加 goto=order
-- 2026-03-23: 031_fix_quick_check_in_exception.sql — 修正下班打卡「已打過上班卡」：INSERT 移入 BEGIN...EXCEPTION 子區塊；unique_violation 時重新查詢自動下班；下班判定改 v_existing IS NOT NULL（不要求 check_in_time NOT NULL）
+- 2026-03-23: 031_fix_quick_check_in_exception.sql — INSERT 移入 BEGIN...EXCEPTION 子區塊；unique_violation 時重新查詢自動下班
+- 2026-03-24: 032_fix_record_null_check.sql — 修正 RECORD IS NOT NULL 陷阱：所有判定改用 `.id IS NOT NULL`（v_employee/v_existing/v_schedule）
