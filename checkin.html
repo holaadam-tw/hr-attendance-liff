@@ -45,6 +45,23 @@
         </div>
     </div>
 
+    <!-- GPS 錯誤 Modal -->
+    <div id="gpsErrorModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9999;align-items:center;justify-content:center;padding:20px;">
+        <div style="background:#fff;border-radius:20px;padding:28px;max-width:320px;width:100%;text-align:center;">
+            <div style="font-size:48px;margin-bottom:16px;">📍</div>
+            <h3 style="margin:0 0 8px;font-size:18px;">請開啟定位服務</h3>
+            <p style="font-size:14px;color:#666;line-height:1.6;margin-bottom:20px;">
+                打卡需要取得您的位置資訊，請依照以下步驟開啟：<br><br>
+                <strong>Android：</strong>下拉通知欄 → 開啟「位置」<br>
+                <strong>iPhone：</strong>設定 → 隱私 → 定位服務 → 開啟
+            </p>
+            <button onclick="document.getElementById('gpsErrorModal').style.display='none'"
+                style="width:100%;padding:12px;background:linear-gradient(135deg,#667eea,#764ba2);border:none;border-radius:12px;color:#fff;font-size:15px;font-weight:700;cursor:pointer;">
+                我知道了
+            </button>
+        </div>
+    </div>
+
     <script src="common.js"></script>
     <script>
         let currentCheckInType = 'in';
@@ -342,18 +359,7 @@
         }
 
         function showGPSWarning(statusBox) {
-            const el = document.getElementById('gpsWarning');
-            if (el) { el.style.display = ''; return; }
-            const warning = document.createElement('div');
-            warning.id = 'gpsWarning';
-            warning.style.cssText = 'background:#FEF2F2;border:1px solid #FECACA;border-radius:12px;padding:14px;margin:8px 0;';
-            warning.innerHTML =
-                '<p style="color:#DC2626;font-weight:700;margin:0 0 6px;">📍 定位未開啟</p>' +
-                '<p style="color:#7F1D1D;font-size:13px;line-height:1.6;margin:0;">' +
-                '打卡需要定位資訊，請開啟定位：<br>' +
-                '• iPhone：設定 → 隱私權 → 定位服務 → LINE<br>' +
-                '• Android：設定 → 應用程式 → LINE → 權限 → 位置</p>';
-            statusBox.parentNode.insertBefore(warning, statusBox.nextSibling);
+            document.getElementById('gpsErrorModal').style.display = 'flex';
         }
 
         window.addEventListener('load', async () => {
