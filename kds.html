@@ -264,6 +264,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let currentStoreId = null;
+let kdsCompanyId = null;
 let orders = [];
 let filterMode = 'all'; // 'all' | 'active' | 'ready'
 let soundEnabled = true;
@@ -282,12 +283,13 @@ async function init() {
         return;
     }
     // Lookup store
-    const { data: store } = await sb.from('store_profiles').select('id, store_name').eq('store_slug', storeSlug).single();
+    const { data: store } = await sb.from('store_profiles').select('id, store_name, company_id').eq('store_slug', storeSlug).single();
     if (!store) {
         document.getElementById('orderGrid').innerHTML = '<div class="kds-empty"><div class="kds-empty-icon">❌</div><div>找不到商店</div></div>';
         return;
     }
     currentStoreId = store.id;
+    kdsCompanyId = store.company_id;
     document.getElementById('storeName').textContent = store.store_name;
     document.title = 'KDS · ' + store.store_name;
 
@@ -529,6 +531,8 @@ async function updateStatus(orderId, newStatus) {
         const idx = orders.findIndex(o => o.id === orderId);
         if (idx >= 0) {
             if (newStatus === 'completed') {
+                // 訂單完成 → 自動集點
+                try { await kdsAwardLoyalty(orders[idx]); } catch(e2) { console.warn('KDS 集點失敗:', e2); }
                 window._todayCompletedCount = (window._todayCompletedCount || 0) + 1;
                 orders.splice(idx, 1);
             } else if (newStatus === 'cancelled') {
@@ -545,6 +549,76 @@ async function updateStatus(orderId, newStatus) {
         console.error(e);
         showToast('❌ 更新失敗');
     }
+}
+
+// KDS 訂單完成集點（用手機號碼識別會員）
+async function kdsAwardLoyalty(order) {
+    var phone = order.customer_phone;
+    var companyId = kdsCompanyId;
+    console.log('🎁 KDS 集點觸發:', { companyId, phone, total: order.total });
+    if (!phone || !companyId) return;
+    try {
+        // 檢查 loyalty_enabled
+        var { data: enabledRow } = await sb.from('system_settings')
+            .select('value').eq('company_id', companyId).eq('key', 'loyalty_enabled').maybeSingle();
+        if (!enabledRow || enabledRow.value !== 'true') { console.log('🎁 集點未開啟'); return; }
+
+        // 防重複
+        var { data: existing } = await sb.from('loyalty_transactions')
+            .select('id').eq('source', 'order').eq('source_id', order.id).limit(1);
+        if (existing && existing.length > 0) { console.log('🎁 已集過點'); return; }
+
+        // 讀取集點設定（loyalty_settings 優先，fallback system_settings）
+        var perAmount = 100;
+        var welcomePts = 0;
+        try {
+            var { data: ls } = await sb.from('loyalty_settings')
+                .select('points_per_amount, welcome_points')
+                .eq('company_id', companyId).maybeSingle();
+            if (ls?.points_per_amount) perAmount = ls.points_per_amount;
+            if (ls?.welcome_points) welcomePts = ls.welcome_points;
+        } catch(e) {}
+        if (perAmount === 100) {
+            try {
+                var { data: ppaRow } = await sb.from('system_settings')
+                    .select('value').eq('company_id', companyId).eq('key', 'loyalty_points_per_amount').maybeSingle();
+                if (ppaRow?.value) perAmount = parseInt(ppaRow.value) || 100;
+            } catch(e) {}
+        }
+
+        var earnedPoints = Math.floor(parseFloat(order.total) / perAmount);
+        if (earnedPoints <= 0) return;
+
+        // 查詢/建立會員
+        var { data: member } = await sb.from('loyalty_members')
+            .select('id, total_points').eq('company_id', companyId).eq('phone', phone).maybeSingle();
+        if (!member) {
+            var { data: newM } = await sb.from('loyalty_members').insert({
+                company_id: companyId, phone: phone,
+                name: order.customer_name || null, total_points: welcomePts
+            }).select().single();
+            member = newM;
+            if (welcomePts > 0 && member) {
+                await sb.from('loyalty_transactions').insert({
+                    company_id: companyId, member_id: member.id, type: 'earn',
+                    points: welcomePts, source: 'manual', note: '新會員歡迎禮'
+                });
+            }
+        }
+        if (!member) return;
+
+        // 寫入集點 + 更新會員
+        await sb.from('loyalty_transactions').insert({
+            company_id: companyId, member_id: member.id, type: 'earn',
+            points: earnedPoints, amount: parseFloat(order.total),
+            source: 'order', source_id: order.id, note: '線上點餐集點 +' + earnedPoints
+        });
+        await sb.from('loyalty_members').update({
+            total_points: (member.total_points || 0) + earnedPoints,
+            last_visit: new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' })
+        }).eq('id', member.id);
+        console.log('🎁 KDS 集點成功:', { phone, points: earnedPoints });
+    } catch(e) { console.warn('kdsAwardLoyalty error:', e); }
 }
 
 async function checkPendingTimeout() {

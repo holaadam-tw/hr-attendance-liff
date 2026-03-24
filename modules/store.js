@@ -351,9 +351,11 @@ export function showOrderDetail(orderId) {
 export function closeOrderDetail() { document.getElementById('orderDetailModal').style.display = 'none'; }
 
 export async function updateOrderStatus(orderId, newStatus) {
+    console.log('📦 updateOrderStatus:', orderId, newStatus);
     try {
         await sb.from('orders').update({ status: newStatus, updated_at: new Date().toISOString() }).eq('id', orderId);
         const o = rdOrders.find(x => x.id === orderId);
+        console.log('📦 order found:', !!o, o?.customer_phone, 'companyId:', window.currentCompanyId);
         if (o?.customer_line_id) {
             const pickup = o.pickup_number ? '#' + String(o.pickup_number).padStart(3, '0') : '#' + o.order_number;
             const msgs = {
