@@ -381,20 +381,22 @@ export async function updateOrderStatus(orderId, newStatus) {
 // 訂單完成集點（用手機號碼識別會員）
 async function awardOrderLoyalty(order, companyId) {
     var phone = order.customer_phone;
-    if (!phone || !companyId) return;
+    console.log('🎁 集點觸發:', { companyId, phone, total: order.total, orderId: order.id });
+    if (!phone || !companyId) { console.log('🎁 集點跳過: 缺 phone 或 companyId'); return; }
     try {
-        // 檢查 loyalty_enabled
+        // 檢查 loyalty_enabled（system_settings）
         var loyaltyEnabled = getCachedSetting('loyalty_enabled');
+        console.log('🎁 loyalty_enabled =', loyaltyEnabled);
         if (loyaltyEnabled !== 'true') return;
 
         // 防重複：檢查是否已集過點
         try {
             var { data: existing } = await sb.from('loyalty_transactions')
                 .select('id').eq('source', 'order').eq('source_id', order.id).limit(1);
-            if (existing && existing.length > 0) return;
+            if (existing && existing.length > 0) { console.log('🎁 已集過點，跳過'); return; }
         } catch(e) {}
 
-        // 讀取集點設定
+        // 讀取集點設定：優先 loyalty_settings，fallback 到 system_settings
         var perAmount = 100;
         var welcomePts = 0;
         try {
@@ -404,9 +406,15 @@ async function awardOrderLoyalty(order, companyId) {
             if (ls?.points_per_amount) perAmount = ls.points_per_amount;
             if (ls?.welcome_points) welcomePts = ls.welcome_points;
         } catch(e) {}
+        // Fallback: system_settings loyalty_points_per_amount（admin.html 餐飲設定存這裡）
+        if (perAmount === 100) {
+            var cachedPpa = getCachedSetting('loyalty_points_per_amount');
+            if (cachedPpa) perAmount = parseInt(cachedPpa) || 100;
+        }
+        console.log('🎁 perAmount =', perAmount);
 
         var earnedPoints = Math.floor(parseFloat(order.total) / perAmount);
-        if (earnedPoints <= 0) return;
+        if (earnedPoints <= 0) { console.log('🎁 點數為 0，跳過'); return; }
 
         // 查詢/建立會員
         var { data: member } = await sb.from('loyalty_members')
@@ -427,7 +435,7 @@ async function awardOrderLoyalty(order, companyId) {
                 });
             }
         }
-        if (!member) return;
+        if (!member) { console.log('🎁 無法建立會員'); return; }
 
         // 寫入集點記錄
         await sb.from('loyalty_transactions').insert({
@@ -443,6 +451,7 @@ async function awardOrderLoyalty(order, companyId) {
             last_visit: new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' })
         }).eq('id', member.id);
 
+        console.log('🎁 集點成功:', { phone, points: earnedPoints });
         showToast('🎁 已為 ' + phone + ' 集 ' + earnedPoints + ' 點');
     } catch(e) { console.warn('awardOrderLoyalty error:', e); }
 }
