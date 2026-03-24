@@ -398,7 +398,7 @@ async function awardOrderLoyalty(order, companyId) {
             if (existing && existing.length > 0) { console.log('🎁 已集過點，跳過'); return; }
         } catch(e) {}
 
-        // 讀取集點設定：優先 loyalty_settings，fallback 到 system_settings
+        // 讀取集點設定（唯一來源：loyalty_settings）
         var perAmount = 100;
         var welcomePts = 0;
         try {
@@ -408,11 +408,6 @@ async function awardOrderLoyalty(order, companyId) {
             if (ls?.points_per_amount) perAmount = ls.points_per_amount;
             if (ls?.welcome_points) welcomePts = ls.welcome_points;
         } catch(e) {}
-        // Fallback: system_settings loyalty_points_per_amount（admin.html 餐飲設定存這裡）
-        if (perAmount === 100) {
-            var cachedPpa = getCachedSetting('loyalty_points_per_amount');
-            if (cachedPpa) perAmount = parseInt(cachedPpa) || 100;
-        }
         console.log('🎁 perAmount =', perAmount);
 
         var earnedPoints = Math.floor(parseFloat(order.total) / perAmount);
@@ -1245,7 +1240,7 @@ async function loadOrderModeAndLoyalty() {
     var cid = window.currentCompanyId;
     if (!cid) return;
     try {
-        var { data } = await sb.from('system_settings').select('key, value').eq('company_id', cid).in('key', ['order_mode', 'loyalty_enabled', 'loyalty_points_per_amount']);
+        var { data } = await sb.from('system_settings').select('key, value').eq('company_id', cid).in('key', ['order_mode', 'loyalty_enabled']);
         var settings = {};
         (data || []).forEach(function(r) { settings[r.key] = r.value; });
         // 點餐模式
@@ -1266,8 +1261,7 @@ async function loadOrderModeAndLoyalty() {
             loyaltyEl.checked = settings['loyalty_enabled'] === 'true';
             if (loyaltyBlock) loyaltyBlock.style.display = loyaltyEl.checked ? '' : 'none';
         }
-        var ppaEl = document.getElementById('rdPointsPerAmount');
-        if (ppaEl && settings['loyalty_points_per_amount']) ppaEl.value = settings['loyalty_points_per_amount'];
+        // loyalty_points_per_amount 已移至 loyalty_settings 表，不再從 system_settings 讀取
     } catch(e) { console.warn('loadOrderModeAndLoyalty:', e); }
 }
 
@@ -1296,13 +1290,7 @@ export async function saveRdLoyaltyEnabled(enabled) {
     } catch(e) { showToast('❌ 儲存失敗'); }
 }
 
-export async function saveRdPointsPerAmount() {
-    var val = document.getElementById('rdPointsPerAmount')?.value || '50';
-    try {
-        await saveSetting('loyalty_points_per_amount', val, '集點規則：幾元得1點');
-        showToast('✅ 集點規則已儲存');
-    } catch(e) { showToast('❌ 儲存失敗'); }
-}
+// saveRdPointsPerAmount 已移除 — 集點規則統一在 loyalty_admin.html 的 loyalty_settings 設定
 
 export async function saveBusinessHours() {
     const bh = {};

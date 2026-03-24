@@ -571,7 +571,7 @@ async function kdsAwardLoyalty(order) {
             .select('id').eq('source', 'order').eq('source_id', order.id).limit(1);
         if (existing && existing.length > 0) { console.log('🎁 已集過點'); return; }
 
-        // 讀取集點設定（loyalty_settings 優先，fallback system_settings）
+        // 讀取集點設定（唯一來源：loyalty_settings）
         var perAmount = 100;
         var welcomePts = 0;
         try {
@@ -581,13 +581,6 @@ async function kdsAwardLoyalty(order) {
             if (ls?.points_per_amount) perAmount = ls.points_per_amount;
             if (ls?.welcome_points) welcomePts = ls.welcome_points;
         } catch(e) {}
-        if (perAmount === 100) {
-            try {
-                var { data: ppaRow } = await sb.from('system_settings')
-                    .select('value').eq('company_id', companyId).eq('key', 'loyalty_points_per_amount').maybeSingle();
-                if (ppaRow?.value) perAmount = parseInt(ppaRow.value) || 100;
-            } catch(e) {}
-        }
 
         var earnedPoints = Math.floor(parseFloat(order.total) / perAmount);
         if (earnedPoints <= 0) return;

@@ -68,7 +68,7 @@ import {
     removeOptionGroup, addOptionChoice, removeOptionChoice,
     toggleOptionType, toggleOptionReq, addComboGroup, removeComboGroup,
     saveBusinessHours, saveLineGroupId, saveLoyaltyConfig,
-    setOrderMode, saveRdLoyaltyEnabled, saveRdPointsPerAmount,
+    setOrderMode, saveRdLoyaltyEnabled,
     generateTableQRCodes, printTableQRCodes,
     handleMenuPhotoUpload, analyzeMenuPhoto, confirmAIMenu, cancelAIMenu,
     showCopyMenuModal, closeCopyMenuModal, executeCopyMenu,
@@ -261,7 +261,7 @@ window.saveLineGroupId = saveLineGroupId;
 window.saveLoyaltyConfig = saveLoyaltyConfig;
 window.setOrderMode = setOrderMode;
 window.saveRdLoyaltyEnabled = saveRdLoyaltyEnabled;
-window.saveRdPointsPerAmount = saveRdPointsPerAmount;
+// saveRdPointsPerAmount 已移除
 window.generateTableQRCodes = generateTableQRCodes;
 window.printTableQRCodes = printTableQRCodes;
 window.handleMenuPhotoUpload = handleMenuPhotoUpload;
