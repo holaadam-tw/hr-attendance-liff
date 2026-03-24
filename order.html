@@ -1857,13 +1857,17 @@ async function initApp() {
   const params = new URLSearchParams(window.location.search);
   const storeSlug = params.get('store');
 
-  // LINE LIFF 初始化（可選，用於集點）
+  // LINE LIFF 初始化（可選，用於集點+推播）
   try {
     await liff.init({ liffId: '2008962829-bnsS1bbB' });
     if (liff.isLoggedIn()) {
       _lineProfile = await liff.getProfile();
       _lineUserId = _lineProfile.userId;
       console.log('LINE 已登入:', _lineProfile.displayName);
+    } else if (liff.isInClient()) {
+      // 在 LINE 內開啟但未登入 → 自動登入（不帶 redirectUri 避免 400）
+      liff.login();
+      return; // login 會重導，不繼續 initApp
     }
   } catch(e) { console.log('LIFF init skipped:', e.message); }
   // Fallback: 從 sessionStorage 讀取 LINE userId（LIFF URL 跳轉回來時）
@@ -1892,6 +1896,11 @@ async function initApp() {
   try {
     if (storeSlug) {
       await loadStoreFromSupabase(storeSlug);
+      // store 載入後再試一次 sessionStorage（key 可能是 company_id）
+      if (!_lineUserId && window._storeCompanyId && window._storeCompanyId !== storeSlug) {
+        var savedUid2 = sessionStorage.getItem('loyalty_line_user_id_' + window._storeCompanyId);
+        if (savedUid2) { _lineUserId = savedUid2; console.log('LINE userId from session (companyId):', savedUid2); }
+      }
     } else {
       loadDemoData();
     }
