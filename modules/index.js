@@ -78,7 +78,7 @@ import {
     loadTransactions, toggleLoyalty, loadMemberList,
     loadBookingForStore, loadBookingStoreList,
     loadMembersForStore, toggleMemberLoyalty, searchMemberByPhone, loadMemberStoreList
-} from './store.js';
+} from './store.js?v=20260325';
 
 import {
     INDUSTRY_TEMPLATES,
