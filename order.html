@@ -3981,6 +3981,7 @@ async function confirmAndSubmitOrder() {
     order_type: isTakeout ? 'takeout' : 'dine_in',
     customer_phone: memberPhone || null,
     customer_name: customerName || null,
+    customer_line_id: _lineUserId || null,
     notes: isTakeout ? '' : '用餐人數: ' + guestCount
   };
   try {
@@ -3998,7 +3999,10 @@ async function confirmAndSubmitOrder() {
         return;
       }
       const resData = await res.json();
-      if (resData && resData[0] && resData[0].order_number) orderNum = resData[0].order_number;
+      if (resData && resData[0]) {
+        if (resData[0].order_number) orderNum = resData[0].order_number;
+        if (resData[0].id) window._lastOrderId = resData[0].id;
+      }
     }
   } catch (e) {
     console.error('Order submit error:', e);
@@ -4010,7 +4014,7 @@ async function confirmAndSubmitOrder() {
   // 會員集點
   let earnedPts = 0;
   if (loyaltyConfig) {
-    earnedPts = await awardLoyaltyPoints(totalPrice) || 0;
+    earnedPts = await awardLoyaltyPoints(totalPrice, window._lastOrderId) || 0;
   }
 
   // 儲存手機號給「我的訂單」面板用
@@ -4383,7 +4387,7 @@ async function checkMemberPoints() {
 async function awardLoyaltyPoints(orderTotal, orderId) {
   // LINE userId 集點（優先），fallback 到手機號碼
   var lineUid = _lineUserId;
-  var phone = document.getElementById('memberPhone')?.value?.trim();
+  var phone = document.getElementById('memberPhone')?.value?.trim() || document.getElementById('confirmPhone')?.value?.trim();
   if (!lineUid && (!phone || phone.length < 9)) return 0;
   if (!window._loyaltyEnabled) return 0;
 
