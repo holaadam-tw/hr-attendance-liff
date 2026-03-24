@@ -109,4 +109,4 @@ async function saveSetting(key, value, description) {
 - 2026-03-21: order.html loginLineForLoyalty 改用 LIFF URL 跳轉（移除 liff.login redirectUri）；initApp 加 sessionStorage fallback 讀 LINE userId；index.html handleGotoParam 加 goto=order
 - 2026-03-23: 031_fix_quick_check_in_exception.sql — INSERT 移入 BEGIN...EXCEPTION 子區塊；unique_violation 時重新查詢自動下班
 - 2026-03-24: 032_fix_record_null_check.sql — 修正 RECORD IS NOT NULL 陷阱 + GPS 地點驗證（有設定打卡地點但不在範圍→拒絕打卡）；checkin.html「處理中」10 秒安全逾時
-- 2026-03-24: order.html 送出訂單加入 customer_line_id（LINE 推播+集點）；awardLoyaltyPoints 傳入 orderId 作為 source_id；phone fallback 加 confirmPhone
+- 2026-03-24: 集點架構變更：消費者端（order.html）不再集點，改由店家端（store.js awardOrderLoyalty）在訂單 completed 時用手機號碼集點；order.html 移除 LIFF 自動登入+awardLoyaltyPoints+loginLineForLoyalty；保留 customer_line_id 供 LINE 推播
