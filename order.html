@@ -4421,24 +4421,136 @@ function buildRewardHintHtml(pts) {
 }
 
 // 產生可兌換商品列表 HTML
-function buildRewardsListHtml(pts) {
+function buildRewardsListHtml(pts, showRedeemBtn) {
   var rewards = _loyaltyRewardsCache || [];
   if (rewards.length === 0) return '';
   var html = '<div style="margin-top:16px;"><div style="font-size:13px;font-weight:700;color:#64748B;margin-bottom:8px;">🎁 可兌換商品</div>';
   rewards.forEach(function(r) {
     var canRedeem = pts >= r.points_required;
     html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:' + (canRedeem ? '#F0FDF4' : '#F8FAFC') + ';border-radius:10px;margin-bottom:6px;' + (canRedeem ? 'border:1px solid #BBF7D0;' : '') + '">';
-    html += '<div><div style="font-size:14px;font-weight:600;' + (canRedeem ? 'color:#059669;' : '') + '">' + escHtml(r.name) + '</div>';
+    html += '<div style="flex:1;min-width:0;"><div style="font-size:14px;font-weight:600;' + (canRedeem ? 'color:#059669;' : '') + '">' + escHtml(r.name) + '</div>';
     if (r.description) html += '<div style="font-size:11px;color:#94A3B8;margin-top:2px;">' + escHtml(r.description) + '</div>';
+    html += '<div style="font-size:12px;font-weight:800;color:' + (canRedeem ? '#059669' : '#6366F1') + ';margin-top:2px;">' + r.points_required + ' 點</div>';
     html += '</div>';
-    html += '<div style="text-align:right;">';
-    html += '<div style="font-size:14px;font-weight:800;color:' + (canRedeem ? '#059669' : '#6366F1') + ';">' + r.points_required + ' 點</div>';
-    if (canRedeem) html += '<div style="font-size:10px;color:#059669;font-weight:600;">✅ 可兌換</div>';
-    else html += '<div style="font-size:10px;color:#94A3B8;">差 ' + (r.points_required - pts) + ' 點</div>';
+    html += '<div style="margin-left:10px;">';
+    if (showRedeemBtn && canRedeem) {
+      html += '<button onclick="redeemReward(\'' + r.id + '\',' + r.points_required + ',\'' + escHtml(r.name).replace(/'/g, "\\'") + '\')" style="padding:8px 16px;border:none;border-radius:8px;background:var(--primary);color:#fff;font-size:13px;font-weight:700;cursor:pointer;">兌換</button>';
+    } else if (showRedeemBtn) {
+      html += '<button disabled style="padding:8px 16px;border:none;border-radius:8px;background:#E2E8F0;color:#94A3B8;font-size:13px;font-weight:700;cursor:not-allowed;">差 ' + (r.points_required - pts) + ' 點</button>';
+    } else {
+      if (canRedeem) html += '<div style="font-size:10px;color:#059669;font-weight:600;">✅ 可兌換</div>';
+      else html += '<div style="font-size:10px;color:#94A3B8;">差 ' + (r.points_required - pts) + ' 點</div>';
+    }
     html += '</div></div>';
   });
   html += '</div>';
   return html;
+}
+
+async function redeemReward(rewardId, pointsRequired, rewardName) {
+  var phone = window._myOrderPhone || document.getElementById('memberPhone')?.value?.trim();
+  var companyId = window._storeCompanyId || currentStoreId;
+  if (!phone || !companyId) {
+    showToast('請先輸入手機號碼查詢點數');
+    return;
+  }
+
+  if (!confirm('確定要用 ' + pointsRequired + ' 點兌換 ' + rewardName + ' 嗎？')) return;
+
+  try {
+    // 1. 查會員
+    var memberRes = await fetch(SUPABASE_URL + '/rest/v1/loyalty_members?company_id=eq.' + companyId +
+      '&phone=eq.' + encodeURIComponent(phone) + '&limit=1', { headers: { 'apikey': SUPABASE_KEY } });
+    var memberArr = await memberRes.json();
+    if (!Array.isArray(memberArr) || memberArr.length === 0) {
+      showToast('找不到會員資料'); return;
+    }
+    var member = memberArr[0];
+    var available = (member.total_points || 0) - (member.used_points || 0);
+    if (available < pointsRequired) {
+      showToast('點數不足，目前可用 ' + available + ' 點'); return;
+    }
+
+    // 2. 產生 6 碼兌換碼
+    var code = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // 3. 寫入 loyalty_redemptions
+    var expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    var rdRes = await fetch(SUPABASE_URL + '/rest/v1/loyalty_redemptions', {
+      method: 'POST',
+      headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=representation' },
+      body: JSON.stringify({
+        company_id: companyId,
+        member_id: member.id,
+        reward_id: rewardId,
+        code: code,
+        points_used: pointsRequired,
+        status: 'pending',
+        expires_at: expiresAt
+      })
+    });
+    if (!rdRes.ok) {
+      var errText = await rdRes.text();
+      // 兌換碼重複，再試一次
+      if (errText.indexOf('unique') !== -1) {
+        code = Math.floor(100000 + Math.random() * 900000).toString();
+        var rdRes2 = await fetch(SUPABASE_URL + '/rest/v1/loyalty_redemptions', {
+          method: 'POST',
+          headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=representation' },
+          body: JSON.stringify({ company_id: companyId, member_id: member.id, reward_id: rewardId, code: code, points_used: pointsRequired, status: 'pending', expires_at: expiresAt })
+        });
+        if (!rdRes2.ok) throw new Error('寫入兌換碼失敗');
+      } else {
+        throw new Error('寫入兌換碼失敗');
+      }
+    }
+
+    // 4. 更新 used_points
+    await fetch(SUPABASE_URL + '/rest/v1/loyalty_members?id=eq.' + member.id, {
+      method: 'PATCH',
+      headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ used_points: (member.used_points || 0) + pointsRequired })
+    });
+
+    // 5. 寫入 loyalty_transactions
+    await fetch(SUPABASE_URL + '/rest/v1/loyalty_transactions', {
+      method: 'POST',
+      headers: { 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        company_id: companyId,
+        member_id: member.id,
+        type: 'redeem',
+        points: -pointsRequired,
+        source: 'redemption',
+        description: '兌換 ' + rewardName
+      })
+    });
+
+    // 6. 顯示兌換碼 overlay
+    showRedeemCodeOverlay(code, rewardName);
+
+    // 7. 刷新點數
+    loadPointsHistory();
+
+  } catch(e) {
+    console.error('Redeem error:', e);
+    showToast('兌換失敗：' + (e.message || e));
+  }
+}
+
+function showRedeemCodeOverlay(code, rewardName) {
+  var overlay = document.getElementById('itemModalOverlay');
+  overlay.innerHTML = '<div class="item-modal" onclick="event.stopPropagation()" style="padding:32px 24px;text-align:center;max-width:340px;margin:auto;">' +
+    '<div style="font-size:48px;margin-bottom:8px;">🎁</div>' +
+    '<div style="font-size:20px;font-weight:800;color:#1A1A2E;margin-bottom:20px;">兌換成功！</div>' +
+    '<div style="font-size:13px;color:#64748B;margin-bottom:6px;">兌換碼</div>' +
+    '<div style="font-size:42px;font-weight:900;letter-spacing:8px;color:var(--primary);background:#F0F0FF;border-radius:16px;padding:16px 0;margin-bottom:16px;">' + code + '</div>' +
+    '<div style="font-size:16px;font-weight:700;color:#1A1A2E;margin-bottom:8px;">' + escHtml(rewardName) + '</div>' +
+    '<div style="font-size:13px;color:#94A3B8;margin-bottom:4px;">24 小時內有效</div>' +
+    '<div style="font-size:13px;color:#94A3B8;margin-bottom:24px;">請出示給店員核銷</div>' +
+    '<button onclick="document.getElementById(\'itemModalOverlay\').classList.remove(\'show\')" style="width:100%;padding:14px;border:none;border-radius:12px;background:var(--primary);color:#fff;font-size:16px;font-weight:700;cursor:pointer;">關閉</button>' +
+  '</div>';
+  overlay.classList.add('show');
 }
 
 // ===== 確認頁手機輸入 =====
@@ -4817,7 +4929,7 @@ async function loadPointsHistory() {
       html += '</div>';
     });
     // 加上可兌換商品列表
-    html += buildRewardsListHtml(totalPoints);
+    html += buildRewardsListHtml(totalPoints, true);
     container.innerHTML = html;
   } catch(e) {
     console.warn('Load points history error:', e);
