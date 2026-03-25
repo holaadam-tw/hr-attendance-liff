@@ -1775,6 +1775,7 @@ let guestCount = 3;
 let isScrollingByClick = false;
 let loyaltyConfig = null;
 let memberPointsData = null;
+let _loyaltyRewardsCache = null; // loyalty_rewards 快取
 let _toastTimer = null;
 let _lineUserId = null;  // LINE userId（推播用，非必要）
 let _lineProfile = null;
@@ -3767,7 +3768,7 @@ function submitOrder() {
 
   // 組合確認清單 HTML
   var listHtml = '';
-  cart.forEach(function(c) {
+  cart.forEach(function(c, idx) {
     var item = menuItems.find(function(i) { return i.id === c.id; });
     var name = item ? item.name : 'Unknown';
     var detail = '';
@@ -3781,9 +3782,12 @@ function submitOrder() {
         '<div style="font-weight:700;font-size:15px;color:#1A1A2E;">' + escHtml(name) + '</div>' +
         (detail ? '<div style="font-size:12px;color:#888;margin-top:2px;">' + escHtml(detail) + '</div>' : '') +
       '</div>' +
-      '<div style="text-align:right;white-space:nowrap;margin-left:12px;">' +
-        '<span style="font-size:13px;color:#666;">x' + c.qty + '</span>' +
-        '<div style="font-weight:800;font-size:15px;color:var(--primary);">$' + (c.price * c.qty) + '</div>' +
+      '<div style="display:flex;align-items:center;gap:8px;white-space:nowrap;margin-left:12px;">' +
+        '<div style="text-align:right;">' +
+          '<span style="font-size:13px;color:#666;">x' + c.qty + '</span>' +
+          '<div style="font-weight:800;font-size:15px;color:var(--primary);">$' + (c.price * c.qty) + '</div>' +
+        '</div>' +
+        '<button onclick="removeConfirmItem(' + idx + ')" style="background:none;border:none;font-size:20px;cursor:pointer;padding:4px;line-height:1;color:#EF4444;" title="刪除">🗑️</button>' +
       '</div></div>';
   });
 
@@ -3809,6 +3813,7 @@ function submitOrder() {
       '<div id="confirmMemberCard" style="display:none;background:#F8FAFC;border-radius:10px;padding:10px 12px;font-size:12px;"></div>' +
     '</div>' +
     '<div style="display:flex;gap:10px;margin-top:12px;">' +
+      '<button onclick="clearCartFromConfirm()" style="flex:1;padding:14px;border:2px solid #EF4444;border-radius:12px;background:#FFF;font-size:14px;font-weight:700;color:#EF4444;cursor:pointer;">清空購物車</button>' +
       '<button onclick="closeConfirmOrder()" style="flex:1;padding:14px;border:2px solid #DDD;border-radius:12px;background:#FFF;font-size:15px;font-weight:700;color:#666;cursor:pointer;">返回修改</button>' +
       '<button onclick="confirmAndSubmitOrder()" id="confirmSubmitBtn" style="flex:2;padding:14px;border:none;border-radius:12px;background:var(--primary);color:#FFF;font-size:15px;font-weight:700;cursor:pointer;">確認送出</button>' +
     '</div>' +
@@ -3829,6 +3834,27 @@ function submitOrder() {
 
 function closeConfirmOrder() {
   document.getElementById('itemModalOverlay').classList.remove('show');
+}
+
+function removeConfirmItem(idx) {
+  if (idx < 0 || idx >= cart.length) return;
+  cart.splice(idx, 1);
+  updateCartUI();
+  if (cart.length === 0) {
+    closeConfirmOrder();
+    showToast('購物車已清空');
+    return;
+  }
+  // 重新渲染確認頁
+  closeConfirmOrder();
+  setTimeout(function() { submitOrder(); }, 100);
+}
+
+function clearCartFromConfirm() {
+  cart.length = 0;
+  updateCartUI();
+  closeConfirmOrder();
+  showToast('購物車已清空');
 }
 
 // ===== VIEW MODE TOGGLE =====
@@ -4331,6 +4357,8 @@ async function checkMemberPoints() {
   localStorage.setItem('member_phone_' + currentStoreId, phone);
   try {
     var companyId = window._storeCompanyId || currentStoreId;
+    // 同時載入會員資料和兌換商品
+    await loadLoyaltyRewards();
     const res = await fetch(SUPABASE_URL + '/rest/v1/loyalty_members?company_id=eq.' + companyId + '&phone=eq.' + encodeURIComponent(phone) + '&limit=1', {
       headers: { 'apikey': SUPABASE_KEY }
     });
@@ -4339,42 +4367,79 @@ async function checkMemberPoints() {
     if (data && data.length > 0) {
       memberPointsData = data[0];
       const pts = memberPointsData.total_points || 0;
-      const cfg = loyaltyConfig || {};
-      const needed = cfg.points_to_redeem || 10;
-      const discount = cfg.discount_amount || 50;
       document.getElementById('memberPoints').textContent = '🎯 ' + pts + ' 點';
       info.style.display = '';
-      if (pts >= needed) {
-        info.innerHTML = '🎉 您有 <b>' + pts + '</b> 點，可兌換 <b>$' + discount + '</b> 折扣！<br><span style="font-size:11px;color:#94A3B8;">下次結帳時自動折抵</span>';
-      } else {
-        info.innerHTML = '目前 <b>' + pts + '</b> 點，再集 <b>' + (needed - pts) + '</b> 點可兌換 $' + discount + ' 折扣';
-      }
-      // 加上集點規則說明
+      info.innerHTML = buildRewardHintHtml(pts);
+      // 集點規則
       if (loyaltyConfig && window._loyaltyEnabled) {
-        const ruleText = '<br><span style="font-size:11px;color:#94A3B8;">集點規則：每消費 $' +
-          (loyaltyConfig.spend_per_point || 50) + ' 得 1 點，' +
-          (loyaltyConfig.points_to_redeem || 10) + ' 點可折 $' +
-          (loyaltyConfig.discount_amount || 50) + '</span>';
-        info.innerHTML += ruleText;
+        info.innerHTML += '<br><span style="font-size:11px;color:#94A3B8;">集點規則：每消費 $' +
+          (loyaltyConfig.spend_per_point || 50) + ' 得 1 點</span>';
       }
     } else {
       memberPointsData = null;
       document.getElementById('memberPoints').textContent = '新會員';
       info.style.display = '';
       info.innerHTML = '歡迎加入！消費即可開始集點';
-      // 加上集點規則說明
       if (loyaltyConfig && window._loyaltyEnabled) {
-        const ruleText = '<br><span style="font-size:11px;color:#94A3B8;">集點規則：每消費 $' +
-          (loyaltyConfig.spend_per_point || 50) + ' 得 1 點，' +
-          (loyaltyConfig.points_to_redeem || 10) + ' 點可折 $' +
-          (loyaltyConfig.discount_amount || 50) + '</span>';
-        info.innerHTML += ruleText;
+        info.innerHTML += '<br><span style="font-size:11px;color:#94A3B8;">集點規則：每消費 $' +
+          (loyaltyConfig.spend_per_point || 50) + ' 得 1 點</span>';
       }
     }
   } catch(e) { console.warn('Check points error:', e); }
 }
 
 // 集點已移至店家端（store.js awardOrderLoyalty），訂單完成時由管理員觸發
+
+// 讀取 loyalty_rewards（兌換商品列表）
+async function loadLoyaltyRewards() {
+  var companyId = window._storeCompanyId || currentStoreId;
+  if (!companyId) return [];
+  if (_loyaltyRewardsCache) return _loyaltyRewardsCache;
+  try {
+    var res = await fetch(SUPABASE_URL + '/rest/v1/loyalty_rewards?company_id=eq.' + companyId + '&is_active=eq.true&order=points_required.asc', {
+      headers: { 'apikey': SUPABASE_KEY }
+    });
+    var data = await res.json();
+    _loyaltyRewardsCache = Array.isArray(data) ? data : [];
+    return _loyaltyRewardsCache;
+  } catch(e) {
+    console.warn('Load loyalty_rewards error:', e);
+    return [];
+  }
+}
+
+// 產生動態集點提示文字
+function buildRewardHintHtml(pts) {
+  var rewards = _loyaltyRewardsCache || [];
+  if (rewards.length === 0) return '目前 <b>' + pts + '</b> 點';
+  var lowest = rewards[0]; // ORDER BY points_required ASC
+  var needed = lowest.points_required - pts;
+  if (needed <= 0) {
+    return '目前 <b>' + pts + '</b> 點，可兌換 <b>' + escHtml(lowest.name) + '</b>！';
+  }
+  return '目前 <b>' + pts + '</b> 點，再集 <b>' + needed + '</b> 點可兌換 ' + escHtml(lowest.name);
+}
+
+// 產生可兌換商品列表 HTML
+function buildRewardsListHtml(pts) {
+  var rewards = _loyaltyRewardsCache || [];
+  if (rewards.length === 0) return '';
+  var html = '<div style="margin-top:16px;"><div style="font-size:13px;font-weight:700;color:#64748B;margin-bottom:8px;">🎁 可兌換商品</div>';
+  rewards.forEach(function(r) {
+    var canRedeem = pts >= r.points_required;
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:' + (canRedeem ? '#F0FDF4' : '#F8FAFC') + ';border-radius:10px;margin-bottom:6px;' + (canRedeem ? 'border:1px solid #BBF7D0;' : '') + '">';
+    html += '<div><div style="font-size:14px;font-weight:600;' + (canRedeem ? 'color:#059669;' : '') + '">' + escHtml(r.name) + '</div>';
+    if (r.description) html += '<div style="font-size:11px;color:#94A3B8;margin-top:2px;">' + escHtml(r.description) + '</div>';
+    html += '</div>';
+    html += '<div style="text-align:right;">';
+    html += '<div style="font-size:14px;font-weight:800;color:' + (canRedeem ? '#059669' : '#6366F1') + ';">' + r.points_required + ' 點</div>';
+    if (canRedeem) html += '<div style="font-size:10px;color:#059669;font-weight:600;">✅ 可兌換</div>';
+    else html += '<div style="font-size:10px;color:#94A3B8;">差 ' + (r.points_required - pts) + ' 點</div>';
+    html += '</div></div>';
+  });
+  html += '</div>';
+  return html;
+}
 
 // ===== 確認頁手機輸入 =====
 var _confirmPhoneTimer = null;
@@ -4413,11 +4478,12 @@ async function loadConfirmMemberInfo(phone) {
       console.warn('store_customers 查詢跳過:', e.message);
     }
 
-    // 2. 查點數（用 loyalty_members）
+    // 2. 查點數（用 loyalty_members）+ 載入兌換商品
     var points = 0;
     var companyId = window._storeCompanyId || currentStoreId;
     if (loyaltyConfig) {
       try {
+        await loadLoyaltyRewards();
         var ptsRes = await fetch(SUPABASE_URL + '/rest/v1/loyalty_members?company_id=eq.' + companyId + '&phone=eq.' + encodeURIComponent(phone) + '&limit=1', {
           headers: { 'apikey': SUPABASE_KEY }
         });
@@ -4451,16 +4517,17 @@ async function loadConfirmMemberInfo(phone) {
 
       // 點數（如果集點有開）
       if (loyaltyConfig && window._loyaltyEnabled !== false) {
-        var cfg = loyaltyConfig;
-        var needed = cfg.points_to_redeem || cfg.points_per_reward || 10;
-        var discount = cfg.discount_amount || cfg.reward_discount || 50;
+        var rewards = _loyaltyRewardsCache || [];
+        var lowest = rewards.length > 0 ? rewards[0] : null;
         html += '<div style="text-align:right;">';
         html += '<span style="font-size:16px;font-weight:900;color:var(--primary);">' + points + '</span>';
         html += '<span style="font-size:11px;color:var(--primary);font-weight:600;"> 點</span>';
-        if (points >= needed) {
-          html += '<div style="font-size:10px;color:#059669;font-weight:600;">🎉 可折$' + discount + '</div>';
-        } else {
-          html += '<div style="font-size:10px;color:#94A3B8;">再' + (needed - points) + '點可折$' + discount + '</div>';
+        if (lowest) {
+          if (points >= lowest.points_required) {
+            html += '<div style="font-size:10px;color:#059669;font-weight:600;">🎉 可兌換' + escHtml(lowest.name) + '</div>';
+          } else {
+            html += '<div style="font-size:10px;color:#94A3B8;">再' + (lowest.points_required - points) + '點可兌換' + escHtml(lowest.name) + '</div>';
+          }
         }
         html += '</div>';
       }
@@ -4584,10 +4651,11 @@ async function loadMyOrdersForPanel() {
     // === 點數卡 ===
     var pointsCard = document.getElementById('myOrdersPointsCard');
     if (pointsCard && loyaltyConfig && window._loyaltyEnabled !== false) {
-      var cfg = loyaltyConfig;
-      var needed = cfg.points_to_redeem || cfg.points_per_reward || 10;
-      var discount = cfg.discount_amount || cfg.reward_discount || 50;
-      var progress = Math.min(100, Math.round(points / needed * 100));
+      await loadLoyaltyRewards();
+      var rewards = _loyaltyRewardsCache || [];
+      var lowestR = rewards.length > 0 ? rewards[0] : null;
+      var progressMax = lowestR ? lowestR.points_required : 10;
+      var progress = Math.min(100, Math.round(points / progressMax * 100));
 
       var phtml = '<div style="background:linear-gradient(135deg, var(--primary), #6366F1);border-radius:16px;padding:16px;margin-bottom:16px;color:#fff;">';
       phtml += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">';
@@ -4602,10 +4670,14 @@ async function loadMyOrdersForPanel() {
       // 進度條
       phtml += '<div style="background:rgba(255,255,255,0.25);border-radius:4px;height:6px;margin-bottom:6px;">';
       phtml += '<div style="background:#fff;border-radius:4px;height:6px;width:' + progress + '%;transition:width 0.5s;"></div></div>';
-      if (points >= needed) {
-        phtml += '<div style="font-size:12px;font-weight:700;">🎉 可折抵 $' + discount + '！結帳時自動折扣</div>';
+      if (lowestR) {
+        if (points >= lowestR.points_required) {
+          phtml += '<div style="font-size:12px;font-weight:700;">🎉 可兌換 ' + escHtml(lowestR.name) + '！</div>';
+        } else {
+          phtml += '<div style="font-size:12px;opacity:0.85;">再 ' + (lowestR.points_required - points) + ' 點可兌換 ' + escHtml(lowestR.name) + '</div>';
+        }
       } else {
-        phtml += '<div style="font-size:12px;opacity:0.85;">再 ' + (needed - points) + ' 點可折 $' + discount + '</div>';
+        phtml += '<div style="font-size:12px;opacity:0.85;">目前 ' + points + ' 點</div>';
       }
       phtml += '</div>';
       pointsCard.innerHTML = phtml;
@@ -4697,7 +4769,7 @@ async function loadPointsHistory() {
       if (Array.isArray(parsed)) data = parsed;
     }
 
-    // 載入 loyalty_settings
+    // 載入 loyalty_settings + loyalty_rewards
     if (!loyaltyConfig && companyId) {
       try {
         var lcRes = await fetch(SUPABASE_URL + '/rest/v1/loyalty_settings?company_id=eq.' + companyId + '&limit=1', {
@@ -4709,21 +4781,24 @@ async function loadPointsHistory() {
         }
       } catch(e) { console.warn('Load loyalty config:', e); }
     }
+    await loadLoyaltyRewards();
+    var rewards = _loyaltyRewardsCache || [];
+    var lowestReward = rewards.length > 0 ? rewards[0] : null;
 
     // 點數餘額卡片
     var html = '<div style="background:linear-gradient(135deg,#6366F1,#8B5CF6);border-radius:16px;padding:24px;margin-bottom:20px;text-align:center;color:#fff;">';
     html += '<div style="font-size:13px;opacity:.8;margin-bottom:4px;">我的點數</div>';
     html += '<div style="font-size:48px;font-weight:800;line-height:1.1;">' + totalPoints + '</div>';
     html += '<div style="font-size:13px;opacity:.8;margin-top:4px;">點</div>';
-    if (loyaltyConfig && loyaltyConfig.enabled) {
-      var ptsNeeded = (loyaltyConfig.points_to_redeem || 10) - totalPoints;
+    if (lowestReward) {
+      var ptsNeeded = lowestReward.points_required - totalPoints;
       if (ptsNeeded > 0) {
         html += '<div style="margin-top:12px;padding:8px 16px;background:rgba(255,255,255,.15);border-radius:20px;font-size:12px;">';
-        html += '再集 ' + ptsNeeded + ' 點即可兌換 $' + (loyaltyConfig.discount_amount || 50) + ' 折扣';
+        html += '再集 ' + ptsNeeded + ' 點可兌換 ' + escHtml(lowestReward.name);
         html += '</div>';
       } else {
         html += '<div style="margin-top:12px;padding:8px 16px;background:rgba(255,255,255,.25);border-radius:20px;font-size:13px;font-weight:700;">';
-        html += '🎉 已達兌換門檻！下次消費可折 $' + (loyaltyConfig.discount_amount || 50);
+        html += '🎉 可兌換 ' + escHtml(lowestReward.name) + '！';
         html += '</div>';
       }
     }
@@ -4741,6 +4816,8 @@ async function loadPointsHistory() {
       html += '<div style="font-size:16px;font-weight:800;color:' + (isEarn ? '#059669' : '#DC2626') + ';">' + (isEarn ? '+' : '-') + pts + '</div>';
       html += '</div>';
     });
+    // 加上可兌換商品列表
+    html += buildRewardsListHtml(totalPoints);
     container.innerHTML = html;
   } catch(e) {
     console.warn('Load points history error:', e);
