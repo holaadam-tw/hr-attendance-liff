@@ -123,8 +123,9 @@
     // ===== 初始化 =====
     window.addEventListener('load', async function() {
         var params = new URLSearchParams(window.location.search);
-        companyId = params.get('store') || params.get('company');
+        companyId = params.get('store') || params.get('company') || sessionStorage.getItem('loyalty_company_id');
         if (!companyId) { document.getElementById('storeName').textContent = '缺少商店參數'; return; }
+        sessionStorage.setItem('loyalty_company_id', companyId);
 
         // 檢查是否從 LIFF 跳轉回來（帶有 line_user_id）
         var savedLineId = sessionStorage.getItem('loyalty_line_user_id_' + companyId);
