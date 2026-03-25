@@ -109,5 +109,8 @@ async function saveSetting(key, value, description) {
 - 2026-03-21: order.html loginLineForLoyalty 改用 LIFF URL 跳轉（移除 liff.login redirectUri）；initApp 加 sessionStorage fallback 讀 LINE userId；index.html handleGotoParam 加 goto=order
 - 2026-03-23: 031_fix_quick_check_in_exception.sql — INSERT 移入 BEGIN...EXCEPTION 子區塊；unique_violation 時重新查詢自動下班
 - 2026-03-24: 032_fix_record_null_check.sql — 修正 RECORD IS NOT NULL 陷阱 + GPS 地點驗證（有設定打卡地點但不在範圍→拒絕打卡）；checkin.html「處理中」10 秒安全逾時
-- 2026-03-24: 集點架構變更：消費者端（order.html）不再集點，改由店家端在訂單 completed 時用手機號碼集點；兩條路徑：store.js `awardOrderLoyalty`（admin.html）+ kds.html `kdsAwardLoyalty`（獨立廚房系統）；集點設定讀取順序：loyalty_settings → system_settings fallback
+- 2026-03-24: 集點架構變更：消費者端（order.html）不再集點，改由店家端在訂單 completed 時用手機號碼集點；兩條路徑：store.js `awardOrderLoyalty`（admin.html）+ kds.html `kdsAwardLoyalty`（獨立廚房系統）
 - 2026-03-25: kds.html 有獨立 `updateStatus` 函數（不走 store.js），需獨立處理集點；init 時取 company_id 存 kdsCompanyId
+- 2026-03-25: 集點設定統一只讀 loyalty_settings 表（移除 system_settings loyalty_points_per_amount fallback）；033 SQL 清除舊 key
+- 2026-03-25: order.html 點數查詢全面改用 loyalty_members（phone）+ loyalty_transactions（member_id），移除所有 loyalty_points 表引用
+- 2026-03-25: checkin.html 打卡成功改為顯示結果畫面（時間+地點+返回/關閉按鈕），不再自動跳轉 index.html（LIFF 環境跳轉會卡 loading）
