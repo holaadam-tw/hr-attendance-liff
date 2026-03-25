@@ -1306,6 +1306,7 @@ body {
     <button onclick="checkMemberPoints()" style="padding:8px 14px;border:none;border-radius:10px;background:var(--primary);color:#fff;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;">查點數</button>
   </div>
   <div id="memberInfo" style="display:none;margin-top:8px;padding:8px;background:rgba(0,0,0,0.03);border-radius:8px;font-size:12px;color:var(--text-secondary);"></div>
+  <div id="memberRewardsList"></div>
 </div>
 
 <!-- ===== SEARCH BAR ===== -->
@@ -4364,6 +4365,7 @@ async function checkMemberPoints() {
     });
     const data = await res.json();
     const info = document.getElementById('memberInfo');
+    var rewardsList = document.getElementById('memberRewardsList');
     if (data && data.length > 0) {
       memberPointsData = data[0];
       const pts = memberPointsData.total_points || 0;
@@ -4375,6 +4377,8 @@ async function checkMemberPoints() {
         info.innerHTML += '<br><span style="font-size:11px;color:#94A3B8;">集點規則：每消費 $' +
           (loyaltyConfig.spend_per_point || 50) + ' 得 1 點</span>';
       }
+      // 直接展開可兌換商品列表
+      if (rewardsList) rewardsList.innerHTML = buildRewardsListHtml(pts, true);
     } else {
       memberPointsData = null;
       document.getElementById('memberPoints').textContent = '新會員';
@@ -4384,6 +4388,7 @@ async function checkMemberPoints() {
         info.innerHTML += '<br><span style="font-size:11px;color:#94A3B8;">集點規則：每消費 $' +
           (loyaltyConfig.spend_per_point || 50) + ' 得 1 點</span>';
       }
+      if (rewardsList) rewardsList.innerHTML = buildRewardsListHtml(0, false);
     }
   } catch(e) { console.warn('Check points error:', e); }
 }
