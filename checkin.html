@@ -163,13 +163,15 @@
                 if (rpcData.location_name) localStorage.setItem('last_location', rpcData.location_name);
 
                 const typeText = currentCheckInType === 'in' ? '上班' : '下班';
-                showToast(`✅ ${typeText}成功！@${rpcData.location_name || '公司'}`);
+                const locText = rpcData.location_name || '公司';
+                const nowTime = new Date().toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', hour12: false });
 
-                // 上班打卡且10點前 → 彈出便當訂購
+                // 顯示成功結果畫面
+                showCheckInSuccess(typeText, locText, nowTime);
+
+                // 上班打卡且9點前 → 3 秒後彈出便當訂購
                 if (currentCheckInType === 'in' && new Date().getHours() < 9) {
-                    showLunchPopup();
-                } else {
-                    setTimeout(() => { window.location.href = 'index.html'; }, 1500);
+                    setTimeout(() => showLunchPopup(), 2000);
                 }
 
             } catch (err) {
@@ -294,12 +296,13 @@
 
                     if (rpcData.location_name) localStorage.setItem('last_location', rpcData.location_name);
                     const typeText = currentCheckInType === 'in' ? '上班' : '下班';
-                    showToast(`✅ ${typeText}成功！@${rpcData.location_name || '公司'}`);
+                    const locText = rpcData.location_name || '公司';
+                    const nowTime = new Date().toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', hour12: false });
+
+                    showCheckInSuccess(typeText, locText, nowTime);
 
                     if (currentCheckInType === 'in' && new Date().getHours() < 9) {
-                        showLunchPopup();
-                    } else {
-                        setTimeout(() => { window.location.href = 'index.html'; }, 1500);
+                        setTimeout(() => showLunchPopup(), 2000);
                     }
                 } catch(err) {
                     console.error(err);
@@ -398,6 +401,46 @@
         window.addEventListener('beforeunload', () => {
             if (videoStream) videoStream.getTracks().forEach(t => t.stop());
         });
+
+        // ===== 打卡成功畫面 =====
+        function showCheckInSuccess(typeText, location, time) {
+            // 隱藏打卡區域，顯示成功畫面
+            const container = document.querySelector('.container');
+            if (container) container.innerHTML = `
+                <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80vh;padding:20px;text-align:center;">
+                    <div style="font-size:72px;margin-bottom:16px;">${typeText === '上班' ? '🌅' : '🌙'}</div>
+                    <h1 style="font-size:24px;font-weight:800;color:#0F172A;margin-bottom:8px;">
+                        ${typeText}打卡成功！
+                    </h1>
+                    <div style="background:#F0FDF4;border:2px solid #86EFAC;border-radius:16px;padding:20px 32px;margin:16px 0;">
+                        <div style="font-size:36px;font-weight:900;color:#15803D;letter-spacing:2px;">${time}</div>
+                        <div style="font-size:14px;color:#16A34A;margin-top:4px;">📍 ${location}</div>
+                    </div>
+                    <button onclick="goBack()" style="width:100%;max-width:300px;padding:16px;background:linear-gradient(135deg,#4F46E5,#7C3AED);border:none;border-radius:14px;color:#fff;font-size:16px;font-weight:700;cursor:pointer;margin-top:24px;box-shadow:0 4px 12px rgba(79,70,229,0.3);">
+                        🏠 返回首頁
+                    </button>
+                    <button onclick="closeLiff()" style="width:100%;max-width:300px;padding:12px;background:transparent;border:1px solid #E2E8F0;border-radius:12px;color:#64748B;font-size:14px;cursor:pointer;margin-top:10px;">
+                        ✕ 關閉視窗
+                    </button>
+                </div>
+            `;
+        }
+
+        function goBack() {
+            if (typeof liff !== 'undefined' && liff.isInClient && liff.isInClient()) {
+                window.location.href = 'index.html';
+            } else {
+                window.location.href = 'index.html';
+            }
+        }
+
+        function closeLiff() {
+            if (typeof liff !== 'undefined' && liff.isInClient && liff.isInClient()) {
+                liff.closeWindow();
+            } else {
+                window.close();
+            }
+        }
 
         // ===== 便當訂購彈窗 =====
         function showLunchPopup() {
