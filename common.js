@@ -27,9 +27,9 @@ let isProcessing = false;
 
 // ===== 初始化 LIFF =====
 async function initializeLiff(options) {
-    var opts = options || {};
+    const opts = options || {};
     try {
-        console.log('🚀 系統初始化...');
+        // 系統初始化
         await liff.init({ liffId: CONFIG.LIFF_ID });
         if (!liff.isLoggedIn()) {
             // requireLineApp: 員工頁面（index/checkin）必須從 LINE 開啟
@@ -39,7 +39,7 @@ async function initializeLiff(options) {
                 return false;
             }
             // 儲存目標頁面（非 index.html 時），登入後自動跳回
-            var targetPage = window.location.pathname.split('/').pop();
+            const targetPage = window.location.pathname.split('/').pop();
             if (targetPage && targetPage !== 'index.html' && targetPage !== '') {
                 sessionStorage.setItem('liff_redirect_page', targetPage + window.location.hash);
             }
@@ -50,7 +50,7 @@ async function initializeLiff(options) {
 
         liffProfile = await liff.getProfile();
         // 登入後跳轉到原始目標頁面（從 admin.html 等頁面觸發的登入）
-        var pendingPage = sessionStorage.getItem('liff_redirect_page');
+        const pendingPage = sessionStorage.getItem('liff_redirect_page');
         if (pendingPage) {
             sessionStorage.removeItem('liff_redirect_page');
             window.location.href = pendingPage;
@@ -207,7 +207,7 @@ async function checkUserStatus() {
     try {
         // === 先檢查是否為平台管理員 ===
         const { data: padmin } = await sb.from('platform_admins')
-            .select('*')
+            .select('id, name, line_user_id')
             .eq('line_user_id', liffProfile.userId)
             .eq('is_active', true)
             .maybeSingle();
@@ -251,7 +251,7 @@ async function checkUserStatus() {
 
             // 建立虛擬 employee 物件（平台管理員可能不在該公司有 employee 記錄）
             const { data: empData } = await sb.from('employees')
-                .select('*')
+                .select('id, name, role, department, position, employee_number, line_user_id, company_id, is_active, hire_date')
                 .eq('line_user_id', liffProfile.userId)
                 .eq('company_id', currentCompanyId)
                 .maybeSingle();
@@ -282,7 +282,7 @@ async function checkUserStatus() {
 
         // === 一般員工流程（原邏輯）===
         const { data, error } = await sb.from('employees')
-            .select('*')
+            .select('id, name, role, department, position, employee_number, line_user_id, company_id, is_active, hire_date')
             .eq('line_user_id', liffProfile.userId)
             .maybeSingle();
 
@@ -303,7 +303,7 @@ async function checkUserStatus() {
                     currentCompanyFeatures = company?.features || null;
                     currentCompanyName = company?.name || null;
                     currentCompanyIndustry = company?.industry || 'general';
-                } catch(e) { console.log('載入公司資料失敗', e); }
+                } catch(e) { console.error('載入公司資料失敗:', e); }
                 await Promise.all([loadSettings(), checkTodayAttendance()]);
             }
             updateUserInfo(data);
@@ -365,7 +365,7 @@ async function loadSettings(forceRefresh) {
                             .eq('key', 'feature_visibility')
                             .maybeSingle();
                         if (fvData) _settingsCache['feature_visibility'] = fvData.value;
-                    } catch(e) {}
+                    } catch(e) { console.error('讀取 feature_visibility 失敗:', e); }
                 }
                 return;
             }
@@ -385,7 +385,7 @@ async function loadSettings(forceRefresh) {
                 const cacheToStore = { ..._settingsCache };
                 delete cacheToStore['feature_visibility'];
                 sessionStorage.setItem('system_settings_cache', JSON.stringify(cacheToStore));
-            } catch(e) {}
+            } catch(e) { console.error('寫入 sessionStorage 快取失敗:', e); }
         }
     } catch (e) {
         console.error('載入設定失敗', e);
@@ -395,7 +395,7 @@ async function loadSettings(forceRefresh) {
 // 清除設定快取（管理員修改設定後呼叫）
 function invalidateSettingsCache() {
     _settingsCache = null;
-    try { sessionStorage.removeItem('system_settings_cache'); } catch(e) {}
+    try { sessionStorage.removeItem('system_settings_cache'); } catch(e) { console.error('清除 sessionStorage 快取失敗:', e); }
 }
 
 // 從快取取得 system_settings 的值，避免重複查詢 DB
@@ -405,10 +405,10 @@ function getCachedSetting(key) {
 
 // 統一儲存 system_settings（先查再更新，避免重複 insert）
 async function saveSetting(key, value, description) {
-    var companyId = window.currentCompanyId || window.currentEmployee?.company_id || currentEmployee?.company_id;
+    const companyId = window.currentCompanyId || window.currentEmployee?.company_id || currentEmployee?.company_id;
     if (!companyId) { console.warn('saveSetting: no companyId'); return; }
 
-    var { data: existing } = await sb.from('system_settings')
+    const { data: existing } = await sb.from('system_settings')
         .select('id')
         .eq('key', key)
         .eq('company_id', companyId)
@@ -429,13 +429,13 @@ async function saveSetting(key, value, description) {
 
 // 新公司初始化預設設定
 async function initCompanySettings(companyId) {
-    var defaults = [
+    const defaults = [
         { key: 'feature_visibility', value: {leave:true, attendance:true, salary:true, lunch:true, fieldwork:true, sales_target:true, store_ordering:true, booking:true, loyalty:true}, description: '功能開關（第二層，業主微調）' },
         { key: 'work_hours', value: {start:'08:00', end:'18:00', break:60}, description: '工作時間' },
         { key: 'check_in_radius', value: {meters:1000}, description: '打卡距離' },
         { key: 'departments', value: ['管理部','生產部','業務部','倉管部'], description: '部門列表' }
     ];
-    for (var d of defaults) {
+    for (const d of defaults) {
         await sb.from('system_settings').insert({ ...d, company_id: companyId }).catch(function() {});
     }
 }
@@ -468,7 +468,7 @@ function preloadGPS() {
 
             el.className = 'location-status ready';
             if (foundLocation) {
-                el.innerHTML = `<div class="dot" style="background:#10b981;"></div><span>📍 您在：${foundLocation}</span>`;
+                el.innerHTML = `<div class="dot" style="background:#10b981;"></div><span>📍 您在：${escapeHTML(foundLocation)}</span>`;
             } else {
                 el.innerHTML = `<div class="dot" style="background:#f59e0b;"></div><span>⚠️ 未在打卡範圍內</span>`;
             }
@@ -497,7 +497,7 @@ async function checkTodayAttendance() {
     try {
         const today = getTaiwanDate(0);
         const { data, error } = await sb.from('attendance')
-            .select('*')
+            .select('id, check_in_time, check_out_time, total_work_hours, check_in_location, date')
             .eq('employee_id', currentEmployee.id)
             .eq('date', today)
             .maybeSingle();
@@ -572,7 +572,7 @@ async function handleBind() {
     showStatus(statusBox, 'info', '驗證中...');
     try {
         const { data, error } = await sb.rpc('bind_employee', params);
-        console.log('[handleBind] rpc result:', { data, error });
+        if (error) console.error('[handleBind] rpc error:', error);
         if (error) throw error;
 
         // RPC 回傳格式可能是 {success:true}, true, 或 null（無 error 即成功）
@@ -758,7 +758,7 @@ async function loadLeaveHistory() {
         // 如果 RPC 沒有資料，直接查表（含 rejected）
         if (records.length === 0) {
             const { data } = await sb.from('leave_requests')
-                .select('*')
+                .select('id, leave_type, status, start_date, end_date, days, reason, rejection_reason, created_at')
                 .eq('employee_id', currentEmployee.id)
                 .order('created_at', { ascending: false })
                 .limit(10);
@@ -862,7 +862,7 @@ async function loadMakeupHistory() {
     
     try {
         const { data } = await sb.from('makeup_punch_requests')
-            .select('*')
+            .select('id, punch_date, punch_type, punch_time, status, reason, rejection_reason, created_at')
             .eq('employee_id', currentEmployee.id)
             .order('created_at', { ascending: false })
             .limit(10);
@@ -899,7 +899,6 @@ async function loadMakeupHistory() {
 // ===== LINE Messaging API 推播 =====
 async function sendLineMessage(to, text) {
     const setting = getCachedSetting('line_messaging_api');
-    console.log('[LINE Push] token:', setting?.token ? '有' : '無', 'to:', to ? (to.substring(0, 8) + '...') : '無');
     if (!setting?.token || !to) { console.warn('[LINE Push] 未設定，跳過'); return; }
     try {
         const res = await fetch('https://nssuisyvlrqnqfxupklb.supabase.co/functions/v1/line-push', {
@@ -911,7 +910,7 @@ async function sendLineMessage(to, text) {
             body: JSON.stringify({ token: setting.token, to, text })
         });
         const result = await res.json().catch(() => ({}));
-        console.log('[LINE Push] 回傳:', result);
+        if (!result || result.error) console.error('[LINE Push] 回傳錯誤:', result);
     } catch(e) {
         console.error('[LINE Push] 錯誤:', e);
     }
@@ -923,7 +922,7 @@ async function sendAdminNotify(message) {
         if (!setting?.token || !setting?.groupId) return;
         await sendLineMessage(setting.groupId, message);
     } catch(e) {
-        console.log('LINE 推播失敗（非必要）', e);
+        console.warn('LINE 推播失敗（非必要）:', e);
     }
 }
 
@@ -935,50 +934,50 @@ async function sendUserNotify(employeeId, message) {
             .select('line_user_id').eq('id', employeeId).maybeSingle();
         if (!emp?.line_user_id) return;
         await sendLineMessage(emp.line_user_id, message);
-    } catch(e) { console.log('推播失敗', e); }
+    } catch(e) { console.warn('推播失敗:', e); }
 }
 
 // ===== 公告系統（使用 announcements 資料表） =====
 async function loadAnnouncements() {
     try {
-        var now = new Date().toISOString();
-        var query = sb.from('announcements')
-            .select('*')
+        const now = new Date().toISOString();
+        let query = sb.from('announcements')
+            .select('id, title, content, type, created_at, publish_at, expire_at, company_id')
             .eq('is_active', true)
             .lte('publish_at', now)
             .order('created_at', { ascending: false })
             .limit(20);
         if (currentCompanyId) query = query.eq('company_id', currentCompanyId);
 
-        var { data: announcements } = await query;
+        let { data: announcements } = await query;
         announcements = (announcements || []).filter(function(a) {
             return !a.expire_at || new Date(a.expire_at) > new Date();
         });
 
         // 公告小卡（員工卡右側）
-        var card = document.getElementById('announcementCard');
+        const card = document.getElementById('announcementCard');
         if (card && announcements.length > 0) {
             card.style.display = '';
 
             // 未讀數
-            var empId = currentEmployee?.id;
-            var ackedIds = [];
+            const empId = currentEmployee?.id;
+            let ackedIds = [];
             if (empId) {
-                var { data: acks } = await sb.from('announcement_acknowledgments')
+                const { data: acks } = await sb.from('announcement_acknowledgments')
                     .select('announcement_id').eq('employee_id', empId);
                 ackedIds = (acks || []).map(function(a) { return a.announcement_id; });
             }
-            var unread = announcements.filter(function(a) { return ackedIds.indexOf(a.id) === -1; });
+            const unread = announcements.filter(function(a) { return ackedIds.indexOf(a.id) === -1; });
 
-            var badge = document.getElementById('announceBadge');
+            const badge = document.getElementById('announceBadge');
             if (badge) {
                 if (unread.length > 0) { badge.textContent = unread.length; badge.style.display = ''; }
                 else { badge.style.display = 'none'; }
             }
 
-            var preview = document.getElementById('announcePreview');
+            const preview = document.getElementById('announcePreview');
             if (preview) {
-                var icons = { urgent:'🔴', important:'🟡', info:'📋' };
+                const icons = { urgent:'🔴', important:'🟡', info:'📋' };
                 preview.innerHTML = announcements.slice(0, 2).map(function(a) {
                     return '<div style="margin-bottom:4px;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' +
                         (icons[a.type] || '📋') + ' ' + escapeHTML(a.title) + '</div>';
@@ -995,14 +994,14 @@ async function loadAnnouncements() {
 
 // 公告列表彈窗
 window.showAnnouncementList = function() {
-    var announcements = window._announcements || [];
-    var unreadIds = (window._unreadAnnouncements || []).map(function(u) { return u.id; });
-    var icons = { urgent:'🔴', important:'🟡', info:'📋' };
+    const announcements = window._announcements || [];
+    const unreadIds = (window._unreadAnnouncements || []).map(function(u) { return u.id; });
+    const icons = { urgent:'🔴', important:'🟡', info:'📋' };
 
-    var html = announcements.map(function(a) {
-        var isUnread = unreadIds.indexOf(a.id) !== -1;
-        var date = new Date(a.created_at);
-        var dateStr = (date.getMonth() + 1) + '/' + date.getDate();
+    const html = announcements.map(function(a) {
+        const isUnread = unreadIds.indexOf(a.id) !== -1;
+        const date = new Date(a.created_at);
+        const dateStr = (date.getMonth() + 1) + '/' + date.getDate();
         return '<div style="padding:14px;background:#fff;border-radius:12px;margin-bottom:8px;cursor:pointer;' +
             (isUnread ? 'border-left:4px solid #6366F1;' : 'border-left:4px solid #E2E8F0;opacity:.7;') +
             '" onclick="event.stopPropagation();viewAnnouncement(\'' + a.id + '\')">' +
@@ -1014,7 +1013,7 @@ window.showAnnouncementList = function() {
             '</div>';
     }).join('');
 
-    var overlay = document.createElement('div');
+    const overlay = document.createElement('div');
     overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:flex-end;justify-content:center;';
     overlay.onclick = function() { document.body.removeChild(overlay); };
     overlay.innerHTML = '<div style="background:#F8FAFC;border-radius:20px 20px 0 0;padding:20px;max-height:70vh;overflow-y:auto;width:100%;max-width:480px;" onclick="event.stopPropagation()">' +
@@ -1027,25 +1026,25 @@ window.showAnnouncementList = function() {
 
 // 查看單則公告 + 標記已讀
 window.viewAnnouncement = async function(id) {
-    var a = (window._announcements || []).find(function(x) { return x.id === id; });
+    const a = (window._announcements || []).find(function(x) { return x.id === id; });
     if (!a) return;
 
-    var empId = currentEmployee?.id;
+    const empId = currentEmployee?.id;
     if (empId) {
         try {
             await sb.from('announcement_acknowledgments').upsert({
                 announcement_id: a.id,
                 employee_id: empId
             }, { onConflict: 'announcement_id,employee_id', ignoreDuplicates: true });
-        } catch(e) {}
+        } catch(e) { console.error('標記公告已讀失敗:', e); }
     }
 
-    var typeLabels = { urgent:'🔴 緊急公告', important:'🟡 重要公告', info:'📋 一般公告' };
-    var typeColors = { urgent:'#DC2626', important:'#EA580C', info:'#2563EB' };
-    var date = new Date(a.created_at);
-    var dateStr = date.getFullYear() + '/' + (date.getMonth() + 1) + '/' + date.getDate();
+    const typeLabels = { urgent:'🔴 緊急公告', important:'🟡 重要公告', info:'📋 一般公告' };
+    const typeColors = { urgent:'#DC2626', important:'#EA580C', info:'#2563EB' };
+    const date = new Date(a.created_at);
+    const dateStr = date.getFullYear() + '/' + (date.getMonth() + 1) + '/' + date.getDate();
 
-    var overlay = document.createElement('div');
+    const overlay = document.createElement('div');
     overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;';
     overlay.onclick = function() { document.body.removeChild(overlay); loadAnnouncements(); };
     overlay.innerHTML = '<div style="background:#fff;border-radius:20px;padding:24px;max-width:440px;width:100%;max-height:80vh;overflow-y:auto;" onclick="event.stopPropagation()">' +
@@ -1145,12 +1144,12 @@ async function loadMonthlyAttendance() {
             return `
                 <div class="attendance-item ${r.is_late ? 'late' : 'normal'}">
                     <div class="date">
-                        <span>${r.date}</span>
+                        <span>${escapeHTML(r.date)}</span>
                         <span>${badge} <span style="font-size:12px;color:#6b7280;">${hours}</span></span>
                     </div>
                     <div class="details">
-                        <span>上班: ${checkInTime}${lateMinutes}</span>
-                        <span>下班: ${checkOutTime}</span>
+                        <span>上班: ${escapeHTML(checkInTime)}${lateMinutes}</span>
+                        <span>下班: ${escapeHTML(checkOutTime)}</span>
                     </div>
                     ${r.photo_url ? `<div style="margin-top:5px;"><a href="${escapeHTML(r.photo_url)}" target="_blank" rel="noopener" class="photo-link">📷 查看照片</a></div>` : ''}
                 </div>
@@ -1159,7 +1158,7 @@ async function loadMonthlyAttendance() {
         list.innerHTML = html;
     } catch (err) { 
         console.error(err); 
-        list.innerHTML = `<p class="text-center-error">查詢失敗：${friendlyError(err)}</p>`;
+        list.innerHTML = `<p class="text-center-error">查詢失敗：${escapeHTML(friendlyError(err))}</p>`;
     }
 }
 
@@ -1289,7 +1288,7 @@ async function addNewLocation() {
     if (!name || !lat || !lng) return showToast('⚠️ 資料不完整');
     if (!radius || radius < 50) return showToast('⚠️ 打卡半徑至少 50 公尺');
 
-    var loc = { name, lat, lng, radius };
+    const loc = { name, lat, lng, radius };
     if (address) loc.address = address;
     const newLocations = [...officeLocations, loc];
     await saveLocationsToDB(newLocations);
@@ -1301,35 +1300,35 @@ async function addNewLocation() {
 }
 
 function editLocation(index) {
-    var loc = officeLocations[index];
+    const loc = officeLocations[index];
     if (!loc) return;
 
-    var newName = prompt('地點名稱：', loc.name);
+    let newName = prompt('地點名稱：', loc.name);
     if (newName === null) return;
     newName = newName.trim();
     if (!newName) return showToast('⚠️ 名稱不可為空');
 
-    var newAddress = prompt('地址（可留空）：', loc.address || '');
+    const newAddress = prompt('地址（可留空）：', loc.address || '');
     if (newAddress === null) return;
 
-    var newLat = prompt('緯度：', loc.lat);
+    let newLat = prompt('緯度：', loc.lat);
     if (newLat === null) return;
     newLat = parseFloat(newLat);
     if (isNaN(newLat)) return showToast('⚠️ 緯度格式錯誤');
 
-    var newLng = prompt('經度：', loc.lng);
+    let newLng = prompt('經度：', loc.lng);
     if (newLng === null) return;
     newLng = parseFloat(newLng);
     if (isNaN(newLng)) return showToast('⚠️ 經度格式錯誤');
 
-    var newRadius = prompt('打卡半徑 (公尺)：', loc.radius);
+    let newRadius = prompt('打卡半徑 (公尺)：', loc.radius);
     if (newRadius === null) return;
     newRadius = parseInt(newRadius);
     if (!newRadius || newRadius < 50) return showToast('⚠️ 打卡半徑至少 50 公尺');
 
-    var updated = officeLocations.map(function(l, i) {
+    const updated = officeLocations.map(function(l, i) {
         if (i !== index) return l;
-        var copy = { name: newName, lat: newLat, lng: newLng, radius: newRadius };
+        const copy = { name: newName, lat: newLat, lng: newLng, radius: newRadius };
         if (newAddress.trim()) copy.address = newAddress.trim();
         return copy;
     });
@@ -1375,7 +1374,7 @@ function calculateAndUpdateMonthsWorked(hireDate, targetElement) {
 }
 
 // ===== 權限分級 =====
-var ROLE_PERMISSIONS = {
+const ROLE_PERMISSIONS = {
     platform_admin: {
         admin_pages: ['employees', 'leave', 'attendance', 'schedule', 'payroll', 'settings', 'announcements', 'requests', 'restaurant', 'booking', 'members', 'location', 'report', 'staff', 'lunch', 'client', 'fieldwork'],
         payroll_locked: true
@@ -1405,17 +1404,17 @@ function getRolePermissions() {
 
 // 套用 admin 頁面權限（隱藏無權限的格子）
 function applyAdminPermissions() {
-    var perms = getRolePermissions();
-    var allowed = perms.admin_pages || [];
+    const perms = getRolePermissions();
+    const allowed = perms.admin_pages || [];
     document.querySelectorAll('[data-permission]').forEach(function(el) {
-        var perm = el.getAttribute('data-permission');
+        const perm = el.getAttribute('data-permission');
         el.style.display = allowed.includes(perm) ? '' : 'none';
     });
 }
 
 // ===== 薪酬密碼鎖 =====
 function checkPayrollAccess(callback) {
-    var perms = getRolePermissions();
+    const perms = getRolePermissions();
     if (!perms.admin_pages.includes('payroll')) {
         showToast('⛔ 您沒有權限查看薪酬資料');
         return;
@@ -1430,7 +1429,7 @@ function checkPayrollAccess(callback) {
 function showPayrollPasswordDialog(callback) {
     if (window._payrollUnlocked) { callback(); return; }
 
-    var overlay = document.createElement('div');
+    const overlay = document.createElement('div');
     overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.6);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;';
     overlay.innerHTML = '<div style="background:#fff;border-radius:20px;padding:28px;max-width:360px;width:100%;text-align:center;">' +
         '<div style="font-size:40px;margin-bottom:12px;">🔒</div>' +
@@ -1452,24 +1451,24 @@ function showPayrollPasswordDialog(callback) {
 }
 
 window.verifyPayrollPw = function() {
-    var input = document.getElementById('payrollPwInput')?.value;
-    var setting = getCachedSetting('payroll_password');
-    var correctPw = (setting && setting.password) ? setting.password : '0000';
+    const input = document.getElementById('payrollPwInput')?.value;
+    const setting = getCachedSetting('payroll_password');
+    const correctPw = (setting && setting.password) ? setting.password : '0000';
 
     if (input === correctPw) {
         window._payrollUnlocked = true;
         if (window._payrollOverlay) window._payrollOverlay.remove();
         if (window._payrollCallback) window._payrollCallback();
     } else {
-        var err = document.getElementById('payrollPwError');
+        const err = document.getElementById('payrollPwError');
         if (err) err.style.display = '';
-        var inp = document.getElementById('payrollPwInput');
+        const inp = document.getElementById('payrollPwInput');
         if (inp) { inp.value = ''; inp.focus(); }
     }
 };
 
 window.savePayrollPassword = async function() {
-    var pw = document.getElementById('payrollNewPw')?.value.trim();
+    const pw = document.getElementById('payrollNewPw')?.value.trim();
     if (!pw) { showToast('⚠️ 請輸入密碼'); return; }
     await saveSetting('payroll_password', { password: pw }, '薪酬管理密碼');
     showToast('✅ 密碼已更新');
@@ -1482,7 +1481,7 @@ window.viewAsEmployee = false;
 
 window.toggleViewMode = function() {
     window.viewAsEmployee = !window.viewAsEmployee;
-    var btn = document.getElementById('viewToggleBtn');
+    const btn = document.getElementById('viewToggleBtn');
     if (btn) {
         if (window.viewAsEmployee) {
             btn.innerHTML = '👑 關閉員工視角';
@@ -1499,7 +1498,7 @@ window.toggleViewMode = function() {
     document.querySelectorAll('.feature-toggle').forEach(function(t) {
         t.style.display = window.viewAsEmployee ? 'none' : '';
     });
-    var adminEntry = document.getElementById('adminEntry');
+    const adminEntry = document.getElementById('adminEntry');
     if (adminEntry) adminEntry.style.display = window.viewAsEmployee ? 'none' : 'block';
 
     // 切換視角時直接用已有快取重新套用，不清除快取（避免 companyId 為空時設定丟失）
@@ -1559,7 +1558,7 @@ function initBottomNav() { /* 已停用 */ }
 
 
 // ===== 申請管理（管理後台） =====
-var reqMgrFilter = 'all';
+let reqMgrFilter = 'all';
 
 function switchReqMgrFilter(filter, btn) {
     reqMgrFilter = filter;
@@ -1571,12 +1570,12 @@ function switchReqMgrFilter(filter, btn) {
 }
 
 async function loadAllRequests() {
-    var el = document.getElementById('reqMgrList');
+    const el = document.getElementById('reqMgrList');
     if (!el) return;
     el.innerHTML = '<p style="text-align:center;color:#666;">載入中...</p>';
 
     try {
-        var query = sb.from('requests')
+        let query = sb.from('requests')
             .select('*, employees!requests_employee_id_fkey(name, department)')
             .order('created_at', { ascending: false })
             .limit(50);
@@ -1590,7 +1589,7 @@ async function loadAllRequests() {
             }
         }
 
-        var { data, error } = await query;
+        const { data, error } = await query;
         if (error) throw error;
 
         if (!data || data.length === 0) {
@@ -1608,35 +1607,35 @@ async function loadAllRequests() {
 }
 
 function renderAdminRequestCard(r) {
-    var typeLabel = r.type === 'repair' ? '🔧 報修' : '🛒 採購';
-    var typeBg = r.type === 'repair' ? '#DBEAFE' : '#F3E8FF';
-    var typeColor = r.type === 'repair' ? '#1E40AF' : '#6B21A8';
+    const typeLabel = r.type === 'repair' ? '🔧 報修' : '🛒 採購';
+    const typeBg = r.type === 'repair' ? '#DBEAFE' : '#F3E8FF';
+    const typeColor = r.type === 'repair' ? '#1E40AF' : '#6B21A8';
 
-    var statusMap = {
+    const statusMap = {
         pending:     { label: '待審核', bg: '#FEF3C7', color: '#92400E' },
         approved:    { label: '已核准', bg: '#DBEAFE', color: '#1E40AF' },
         in_progress: { label: '進行中', bg: '#D1FAE5', color: '#065F46' },
         completed:   { label: '已完成', bg: '#EDE9FE', color: '#5B21B6' },
         rejected:    { label: '已退回', bg: '#FEE2E2', color: '#991B1B' }
     };
-    var st = statusMap[r.status] || statusMap.pending;
+    const st = statusMap[r.status] || statusMap.pending;
 
-    var urgencyMap = {
+    const urgencyMap = {
         urgent: { label: '🔴 急迫', bg: '#FEE2E2', color: '#991B1B' },
         high:   { label: '⚡ 緊急', bg: '#FEF3C7', color: '#92400E' }
     };
-    var urg = urgencyMap[r.urgency];
+    const urg = urgencyMap[r.urgency];
 
-    var empName = r.employees?.name || '未知';
-    var empDept = r.employees?.department ? ' (' + r.employees.department + ')' : '';
+    const empName = r.employees?.name || '未知';
+    const empDept = r.employees?.department ? ' (' + escapeHTML(r.employees.department) + ')' : '';
 
-    var date = new Date(r.created_at);
-    var dateStr = (date.getMonth() + 1) + '/' + date.getDate() + ' ' +
+    const date = new Date(r.created_at);
+    const dateStr = (date.getMonth() + 1) + '/' + date.getDate() + ' ' +
         String(date.getHours()).padStart(2, '0') + ':' + String(date.getMinutes()).padStart(2, '0');
 
-    var costStr = r.estimated_cost ? ' | $' + Number(r.estimated_cost).toLocaleString() : '';
+    const costStr = r.estimated_cost ? ' | $' + Number(r.estimated_cost).toLocaleString() : '';
 
-    var html = '<div style="background:#fff;border-radius:14px;padding:14px 14px 14px 18px;margin-bottom:10px;box-shadow:0 2px 8px rgba(0,0,0,.04);border-left:4px solid ' +
+    let html = '<div style="background:#fff;border-radius:14px;padding:14px 14px 14px 18px;margin-bottom:10px;box-shadow:0 2px 8px rgba(0,0,0,.04);border-left:4px solid ' +
         (r.status === 'pending' ? '#F59E0B' : r.status === 'approved' ? '#3B82F6' : r.status === 'in_progress' ? '#10B981' : r.status === 'completed' ? '#8B5CF6' : '#EF4444') + ';">';
     html += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;flex-wrap:wrap;">';
     html += '<span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;background:' + typeBg + ';color:' + typeColor + ';">' + typeLabel + '</span>';
@@ -1680,7 +1679,7 @@ async function approveRequest(id) {
 }
 
 async function rejectRequest(id) {
-    var reason = prompt('請輸入退回原因：');
+    const reason = prompt('請輸入退回原因：');
     if (reason === null) return;
     try {
         await sb.from('requests').update({
@@ -1696,7 +1695,7 @@ async function rejectRequest(id) {
 
 async function updateRequestStatus(id, status) {
     try {
-        var update = { status: status, updated_at: new Date().toISOString() };
+        const update = { status: status, updated_at: new Date().toISOString() };
         await sb.from('requests').update(update).eq('id', id);
         showToast('✅ 已更新');
         loadAllRequests();
@@ -1758,7 +1757,6 @@ function getFeatureVisibility() {
 // 根據設定隱藏首頁「中間選單」項目
 function applyFeatureVisibility() {
     const features = getFeatureVisibility();
-    console.log('[applyFeatureVisibility] features:', JSON.stringify(features));
 
     document.querySelectorAll('.menu-grid .menu-item[data-feature]').forEach(item => {
         const keys = item.getAttribute('data-feature').split(',').map(k => k.trim());
@@ -1796,18 +1794,18 @@ function renderFeatureToggles() {
         return;
     }
 
-    var fvSetting = getCachedSetting('feature_visibility') || {};
+    const fvSetting = getCachedSetting('feature_visibility') || {};
 
     document.querySelectorAll('.menu-grid .menu-item[data-feature]').forEach(function(el) {
         // 已有 toggle 就跳過
         if (el.querySelector('.feature-toggle')) return;
 
-        var featureKeys = el.getAttribute('data-feature');
-        var firstKey = featureKeys.split(',')[0].trim();
+        const featureKeys = el.getAttribute('data-feature');
+        const firstKey = featureKeys.split(',')[0].trim();
         // feature_visibility 預設全 true
-        var isOn = fvSetting[firstKey] !== undefined ? fvSetting[firstKey] : true;
+        const isOn = fvSetting[firstKey] !== undefined ? fvSetting[firstKey] : true;
 
-        var toggle = document.createElement('div');
+        const toggle = document.createElement('div');
         toggle.className = 'feature-toggle';
         toggle.style.cssText = 'position:absolute;top:6px;right:6px;z-index:5;';
         toggle.innerHTML = '<label style="display:flex;align-items:center;cursor:pointer;">' +
@@ -1825,10 +1823,10 @@ function renderFeatureToggles() {
 }
 
 window.toggleFeatureSwitch = async function(checkbox) {
-    var keys = checkbox.getAttribute('data-feature-key').split(',');
-    var isOn = checkbox.checked;
+    const keys = checkbox.getAttribute('data-feature-key').split(',');
+    const isOn = checkbox.checked;
 
-    var companyId = window.currentCompanyId || currentEmployee?.company_id;
+    const companyId = window.currentCompanyId || currentEmployee?.company_id;
     if (!companyId) {
         console.warn('toggleFeatureSwitch: no companyId');
         checkbox.checked = !isOn;
@@ -1836,7 +1834,7 @@ window.toggleFeatureSwitch = async function(checkbox) {
     }
 
     // 讀取現有 feature_visibility，更新指定 key
-    var fv = Object.assign({}, getCachedSetting('feature_visibility') || {
+    const fv = Object.assign({}, getCachedSetting('feature_visibility') || {
         leave:true, attendance:true, salary:true, lunch:true,
         fieldwork:true, sales_target:true, store_ordering:true, booking:true, loyalty:true
     });
@@ -1851,9 +1849,9 @@ window.toggleFeatureSwitch = async function(checkbox) {
         if (_settingsCache) _settingsCache['feature_visibility'] = fv;
 
         // 更新 toggle 外觀
-        var track = checkbox.nextElementSibling;
+        const track = checkbox.nextElementSibling;
         track.style.background = isOn ? '#22C55E' : '#CBD5E1';
-        var knob = track.firstElementChild;
+        const knob = track.firstElementChild;
         if (isOn) { knob.style.left = ''; knob.style.right = '2px'; }
         else { knob.style.right = ''; knob.style.left = '2px'; }
 
@@ -1911,7 +1909,7 @@ async function loadOvertimeHistory() {
     
     try {
         const { data } = await sb.from('overtime_requests')
-            .select('*')
+            .select('id, ot_date, planned_hours, compensation_type, status, reason, approved_hours, actual_hours, final_hours, rejection_reason, created_at')
             .eq('employee_id', currentEmployee.id)
             .order('created_at', { ascending: false })
             .limit(10);
@@ -1956,16 +1954,16 @@ async function writeAuditLog(action, targetTable, targetId, targetName, details 
             target_name: targetName || '',
             details: details
         });
-    } catch(e) { console.log('Audit log failed (non-critical)', e); }
+    } catch(e) { console.warn('Audit log failed (non-critical):', e); }
 }
 
 // ===== 重要公告彈窗（登入時自動跳出） =====
 async function checkForcedAnnouncements() {
     if (!currentEmployee) return;
     try {
-        var now = new Date().toISOString();
-        var query = sb.from('announcements')
-            .select('*')
+        const now = new Date().toISOString();
+        let query = sb.from('announcements')
+            .select('id, title, content, type, created_at, publish_at, expire_at, company_id, is_popup')
             .eq('is_active', true)
             .eq('is_popup', true)
             .eq('type', 'urgent')
@@ -1973,33 +1971,33 @@ async function checkForcedAnnouncements() {
             .order('created_at', { ascending: false });
         if (currentCompanyId) query = query.eq('company_id', currentCompanyId);
 
-        var { data: forced } = await query;
+        let { data: forced } = await query;
         forced = (forced || []).filter(function(a) {
             return !a.expire_at || new Date(a.expire_at) > new Date();
         });
         if (forced.length === 0) return;
 
-        var ids = forced.map(function(a) { return a.id; });
-        var { data: acks } = await sb.from('announcement_acknowledgments')
+        const ids = forced.map(function(a) { return a.id; });
+        const { data: acks } = await sb.from('announcement_acknowledgments')
             .select('announcement_id')
             .eq('employee_id', currentEmployee.id)
             .in('announcement_id', ids);
 
-        var ackedIds = (acks || []).map(function(a) { return a.announcement_id; });
-        var unacked = forced.filter(function(a) { return ackedIds.indexOf(a.id) === -1; });
+        const ackedIds = (acks || []).map(function(a) { return a.announcement_id; });
+        const unacked = forced.filter(function(a) { return ackedIds.indexOf(a.id) === -1; });
         if (unacked.length === 0) return;
 
         showPopupAnnouncement(unacked[0]);
-    } catch(e) { console.log('Forced announcement check failed', e); }
+    } catch(e) { console.warn('Forced announcement check failed:', e); }
 }
 
 function showPopupAnnouncement(a) {
-    var existing = document.getElementById('forcedAnnModal');
+    const existing = document.getElementById('forcedAnnModal');
     if (existing) existing.remove();
 
-    var typeColor = { urgent:'#DC2626', important:'#EA580C', info:'#2563EB' }[a.type] || '#64748B';
+    const typeColor = { urgent:'#DC2626', important:'#EA580C', info:'#2563EB' }[a.type] || '#64748B';
 
-    var modal = document.createElement('div');
+    const modal = document.createElement('div');
     modal.id = 'forcedAnnModal';
     modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;';
     modal.innerHTML = '<div style="background:#fff;border-radius:20px;max-width:380px;width:100%;padding:24px;animation:pageIn 0.3s ease-out;">' +
@@ -2014,7 +2012,7 @@ function showPopupAnnouncement(a) {
 }
 
 async function acknowledgeForcedAnnouncement(announcementId) {
-    var btn = document.getElementById('forcedAckBtn');
+    const btn = document.getElementById('forcedAckBtn');
     if (btn) { btn.disabled = true; btn.textContent = '處理中...'; }
     try {
         await sb.from('announcement_acknowledgments').insert({
@@ -2022,7 +2020,7 @@ async function acknowledgeForcedAnnouncement(announcementId) {
             employee_id: currentEmployee.id
         });
         writeAuditLog('acknowledge', 'announcements', announcementId, currentEmployee.name, { announcement_id: announcementId });
-        var modal = document.getElementById('forcedAnnModal');
+        const modal = document.getElementById('forcedAnnModal');
         if (modal) modal.remove();
         showToast('✅ 已確認');
         setTimeout(function() { checkForcedAnnouncements(); }, 300);
@@ -2037,7 +2035,7 @@ async function getInsuranceBracket(monthlySalary) {
     try {
         const { data } = await sb.rpc('get_insurance_bracket', { p_salary: monthlySalary });
         if (data && data.length > 0) return data[0];
-    } catch(e) { console.log('級距查詢失敗，使用預設計算', e); }
+    } catch(e) { console.warn('級距查詢失敗，使用預設計算:', e); }
     
     // fallback: 直接計算
     return {

@@ -139,7 +139,7 @@ if (typeof _origOpenEdit === 'function') {
                 posSelect.innerHTML += `<option value="${escapeHTML(p)}">${escapeHTML(p)}</option>`;
             });
             if (currentVal) posSelect.value = currentVal;
-        } catch (e) { /* 非致命 */ }
+        } catch (e) { console.error('載入職位列表失敗（非致命）:', e); }
     };
 }
 
