@@ -13,6 +13,11 @@
 - 全域變數必須掛 `window.`（跨檔案共用），但 common.js 頂層用 `let` 宣告的變數（currentCompanyId 等）不會自動掛到 window，同檔案內直接用變數名存取
 - system_settings 的 company_id 是 NOT NULL
 - 快取：修改設定後 `invalidateSettingsCache()` + `loadSettings(true)`
+- Git 工作流：dev 分支開發 → 測試通過 → 合併到 main
+- node_modules 已加入 .gitignore，不可上傳
+- 全域錯誤監控：所有 HTML 頁面有 window.onerror → Supabase error_logs
+- OpenSpec SDD 已初始化：openspec/project.md 為專案總覽
+- 所有回應與文件使用繁體中文
 
 ## 角色權限
 - platform_admin > admin > manager > user

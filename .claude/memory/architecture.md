@@ -114,3 +114,8 @@ async function saveSetting(key, value, description) {
 - 2026-03-25: 集點設定統一只讀 loyalty_settings 表（移除 system_settings loyalty_points_per_amount fallback）；033 SQL 清除舊 key
 - 2026-03-25: order.html 點數查詢全面改用 loyalty_members（phone）+ loyalty_transactions（member_id），移除所有 loyalty_points 表引用
 - 2026-03-25: checkin.html 打卡成功改為顯示結果畫面（時間+地點+返回/關閉按鈕），不再自動跳轉 index.html（LIFF 環境跳轉會卡 loading）
+- 2026-04-03: 全域錯誤監控 — 18 個 HTML 頁面加入 window.onerror，錯誤自動送 Supabase error_logs 表
+- 2026-04-03: OpenSpec SDD 初始化（@fission-ai/openspec）— openspec/project.md 含技術棧/架構/49 張資料表/開發慣例
+- 2026-04-03: node_modules 從 git 移除（4402 檔 / 807K 行），加入 .gitignore
+- 2026-04-03: Git 工作流改為 dev 分支開發 → 測試通過 → 合併 main（不再直接推 main）
+- 2026-04-03: CLAUDE.md 更新開發規範（OpenSpec/error_logs/gitignore/繁體中文）

@@ -24,9 +24,26 @@
 - 若無法在 bash 執行（例如前端 LIFF 頁面），明確說明並改用 code review + logic walkthrough 替代
 
 ## Git 規則
-- 永遠推到 main 分支：`git push origin master:main`
-- 不要直接 `git push`（會推到 master）
+- **所有變更先在 dev 分支進行**，測試沒問題才合併到 main
+- 合併流程：`git checkout main && git merge dev && git push origin main`
+- 不要直接在 main 上開發
 - GitHub Pages 部署來源是 main 分支
+- `node_modules/` 已加入 `.gitignore`，**絕對不可上傳到 git**
+- 需要時用 `npm install` 還原即可
+
+## OpenSpec SDD
+- 專案已安裝 OpenSpec（`@fission-ai/openspec`）
+- 新功能開發用 `/opsx:propose "你的想法"` 開始
+- 規格文件放在 `openspec/specs/`，變更提案放在 `openspec/changes/`
+- 專案總覽：`openspec/project.md`
+
+## 全域錯誤監控
+- 所有 HTML 頁面已加入 `window.onerror`，錯誤自動送到 Supabase `error_logs` 表
+- 紀錄欄位：message, page, line, user_id, user_agent
+- 定期檢查：Supabase → Table Editor → error_logs
+
+## 語言規範
+- 所有回應、文件、commit 訊息使用**繁體中文**
 
 ### QA 自動檢查（每次修改程式碼後必做）
 每次修改完程式碼，commit 前必須執行：
