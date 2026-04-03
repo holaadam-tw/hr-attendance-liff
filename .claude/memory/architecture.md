@@ -118,3 +118,11 @@ async function saveSetting(key, value, description) {
 - 2026-03-25: order.html 集點提示改用 loyalty_rewards 表動態讀取（loadLoyaltyRewards + buildRewardHintHtml + buildRewardsListHtml），移除所有 points_to_redeem/discount_amount 硬編碼；我的點數 tab 加可兌換商品列表
 - 2026-03-25: order.html 我的點數 tab 加兌換功能（redeemReward）：6碼兌換碼→loyalty_redemptions(pending,24h)+used_points+loyalty_transactions(redeem,-N)→showRedeemCodeOverlay 大字顯示；用手機識別會員
 - 2026-03-25: index.html 集點格子連結加 ?store=currentCompanyId；loyalty.html 加 sessionStorage('loyalty_company_id') fallback 防參數遺失
+- 2026-04-03: v2.5 集點完善+考勤修正+DevOps（OpenSpec 歸檔 archive/2026-04-03_v2.5）
+- 2026-04-03: loyalty_admin.html 核銷改善（Enter 鍵+核銷後自動 loadMembers）；手動送點改為搜尋會員下拉+消費金額自動計算點數（依 loyalty_settings.points_per_amount）+直接輸入點數雙模式
+- 2026-04-03: store.js 餐飲訂位 confirmed 狀態按鈕從「報到入場→checked_in」改為「確認到店→completed」直接觸發 awardBookingLoyalty 集點
+- 2026-04-03: 035_fix_early_leave_overnight.sql — 早退判定修正：一般班只在 shift_end-2h 到 shift_end 之間判定（凌晨不誤判）；跨日班用 is_overnight 正確處理
+- 2026-04-03: checkin.html 新增 stopCamera() helper；安全計時器 10s→30s；closeLiff 非 LIFF 環境改為導回 index.html
+- 2026-04-03: 034_add_benmi_office_location.sql — 本米土城店 GPS 24.976995,121.442323 半徑 300m
+- 2026-04-03: 全部 19 個 HTML 加 <link rel="icon" href="data:,"> 消除 favicon 404
+- 2026-04-03: .github/workflows/ci.yml — push main/dev 或 PR 自動跑 npm test
