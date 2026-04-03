@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
+    <link rel="icon" href="data:,">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>🎁 集點會員管理</title>
@@ -34,6 +35,7 @@
                 <div style="font-size:13px;font-weight:700;color:#92400E;margin-bottom:8px;">🎫 核銷兌換碼</div>
                 <div style="display:flex;gap:8px;">
                     <input type="text" id="redeemCodeInput" placeholder="輸入 6 碼兌換碼" maxlength="6" inputmode="numeric"
+                        onkeydown="if(event.key==='Enter')verifyRedeemCode()"
                         style="flex:1;padding:10px 12px;border:2px solid #E2E8F0;border-radius:10px;font-size:16px;font-weight:700;letter-spacing:4px;text-align:center;">
                     <button onclick="verifyRedeemCode()" style="padding:10px 16px;border:none;border-radius:10px;background:#F59E0B;color:#fff;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;">核銷</button>
                 </div>
@@ -49,11 +51,41 @@
         <div id="tab-award" class="la-panel" style="display:none;">
             <div class="card" style="padding:20px;">
                 <h3 style="font-size:15px;font-weight:700;margin-bottom:16px;">🎁 手動送點</h3>
-                <div style="margin-bottom:12px;">
-                    <label style="font-size:13px;font-weight:600;color:#64748B;">手機號碼</label>
-                    <input type="tel" id="awardPhone" placeholder="0912345678" maxlength="10" style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:10px;margin-top:4px;font-size:14px;">
+                <!-- 會員搜尋 -->
+                <div style="margin-bottom:12px;position:relative;">
+                    <label style="font-size:13px;font-weight:600;color:#64748B;">搜尋會員</label>
+                    <input type="text" id="awardSearch" placeholder="手機號碼或姓名" oninput="searchAwardMember()" autocomplete="off"
+                        style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:10px;margin-top:4px;font-size:14px;">
+                    <div id="awardSearchResults" style="display:none;position:absolute;left:0;right:0;top:100%;background:#fff;border:1px solid #E2E8F0;border-radius:10px;max-height:200px;overflow-y:auto;z-index:10;box-shadow:0 4px 12px rgba(0,0,0,0.1);"></div>
                 </div>
-                <div style="margin-bottom:12px;">
+                <!-- 選中的會員資訊 -->
+                <div id="awardMemberCard" style="display:none;background:#F0FDF4;border:1px solid #86EFAC;border-radius:10px;padding:12px;margin-bottom:12px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <div>
+                            <div id="awardMemberName" style="font-size:14px;font-weight:700;color:#0F172A;"></div>
+                            <div id="awardMemberPhone" style="font-size:12px;color:#64748B;margin-top:2px;"></div>
+                        </div>
+                        <div style="text-align:right;">
+                            <div id="awardMemberPoints" style="font-size:18px;font-weight:800;color:#059669;"></div>
+                            <div style="font-size:11px;color:#64748B;">可用點數</div>
+                        </div>
+                    </div>
+                    <button onclick="clearAwardMember()" style="margin-top:8px;padding:4px 10px;border:1px solid #E2E8F0;border-radius:6px;background:#fff;color:#64748B;font-size:11px;cursor:pointer;">✕ 清除</button>
+                </div>
+                <!-- 送點模式切換 -->
+                <div style="display:flex;gap:8px;margin-bottom:12px;">
+                    <button id="awardModeAmount" onclick="switchAwardMode('amount')" style="flex:1;padding:8px;border:2px solid #4F46E5;border-radius:8px;background:#EEF2FF;color:#4F46E5;font-size:12px;font-weight:700;cursor:pointer;">依消費金額</button>
+                    <button id="awardModeDirect" onclick="switchAwardMode('direct')" style="flex:1;padding:8px;border:2px solid #E2E8F0;border-radius:8px;background:#fff;color:#64748B;font-size:12px;font-weight:700;cursor:pointer;">直接輸入點數</button>
+                </div>
+                <!-- 消費金額模式 -->
+                <div id="awardAmountSection" style="margin-bottom:12px;">
+                    <label style="font-size:13px;font-weight:600;color:#64748B;">消費金額</label>
+                    <input type="number" id="awardAmount" placeholder="500" min="1" oninput="calcAwardPoints()"
+                        style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:10px;margin-top:4px;font-size:14px;">
+                    <div id="awardCalcResult" style="margin-top:6px;font-size:13px;color:#4F46E5;font-weight:600;display:none;"></div>
+                </div>
+                <!-- 直接輸入點數模式 -->
+                <div id="awardDirectSection" style="margin-bottom:12px;display:none;">
                     <label style="font-size:13px;font-weight:600;color:#64748B;">點數</label>
                     <input type="number" id="awardPoints" placeholder="100" min="1" style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:10px;margin-top:4px;font-size:14px;">
                 </div>
@@ -179,6 +211,7 @@
         if (idx >= 0 && tabs[idx]) tabs[idx].classList.add('active');
 
         if (tab === 'members') loadMembers();
+        if (tab === 'award') { if (!allMembers.length) loadMembers(); loadAwardSettings(); }
         if (tab === 'rewards') loadAdminRewards();
         if (tab === 'settings') loadLoyaltySettings();
     }
@@ -238,27 +271,125 @@
     }
 
     // ===== 手動送點 =====
+    var _awardSelectedMember = null;
+    var _awardMode = 'amount'; // 'amount' or 'direct'
+    var _pointsPerAmount = 50; // 預設，會從 DB 載入
+
+    // 載入 points_per_amount 設定
+    async function loadAwardSettings() {
+        try {
+            var { data } = await sb.from('loyalty_settings')
+                .select('points_per_amount')
+                .eq('company_id', window.currentCompanyId)
+                .maybeSingle();
+            if (data) _pointsPerAmount = data.points_per_amount || 50;
+        } catch(e) { console.warn('載入集點設定失敗', e); }
+    }
+
+    function searchAwardMember() {
+        var q = document.getElementById('awardSearch').value.trim().toLowerCase();
+        var resultsEl = document.getElementById('awardSearchResults');
+        if (!q || q.length < 2) { resultsEl.style.display = 'none'; return; }
+        var filtered = allMembers.filter(function(m) {
+            return (m.phone || '').includes(q) || (m.name || '').toLowerCase().includes(q);
+        }).slice(0, 5);
+        if (filtered.length === 0) {
+            resultsEl.innerHTML = '<div style="padding:10px;color:#94A3B8;font-size:13px;">找不到會員，送點時將自動建立</div>';
+            resultsEl.style.display = 'block';
+            return;
+        }
+        var html = '';
+        filtered.forEach(function(m) {
+            var phoneTail = m.phone ? '****' + m.phone.slice(-4) : '無手機';
+            html += '<div onclick="selectAwardMember(\'' + m.id + '\')" style="padding:10px 12px;cursor:pointer;border-bottom:1px solid #F1F5F9;display:flex;justify-content:space-between;align-items:center;" onmouseover="this.style.background=\'#F8FAFC\'" onmouseout="this.style.background=\'#fff\'">';
+            html += '<div><div style="font-size:13px;font-weight:600;">' + escapeHTML(m.name || 'LINE 會員') + '</div><div style="font-size:11px;color:#94A3B8;">' + phoneTail + '</div></div>';
+            html += '<div style="font-size:13px;font-weight:700;color:#7C3AED;">' + (m.available_points || 0) + ' 點</div>';
+            html += '</div>';
+        });
+        resultsEl.innerHTML = html;
+        resultsEl.style.display = 'block';
+    }
+
+    function selectAwardMember(memberId) {
+        var member = allMembers.find(function(m) { return m.id === memberId; });
+        if (!member) return;
+        _awardSelectedMember = member;
+        document.getElementById('awardSearch').value = (member.name || '') + ' ' + (member.phone || '');
+        document.getElementById('awardSearchResults').style.display = 'none';
+        var card = document.getElementById('awardMemberCard');
+        card.style.display = 'block';
+        document.getElementById('awardMemberName').textContent = member.name || 'LINE 會員';
+        document.getElementById('awardMemberPhone').textContent = member.phone || '無手機號碼';
+        document.getElementById('awardMemberPoints').textContent = (member.available_points || 0) + ' 點';
+    }
+
+    function clearAwardMember() {
+        _awardSelectedMember = null;
+        document.getElementById('awardSearch').value = '';
+        document.getElementById('awardMemberCard').style.display = 'none';
+    }
+
+    function switchAwardMode(mode) {
+        _awardMode = mode;
+        document.getElementById('awardAmountSection').style.display = mode === 'amount' ? 'block' : 'none';
+        document.getElementById('awardDirectSection').style.display = mode === 'direct' ? 'block' : 'none';
+        document.getElementById('awardModeAmount').style.borderColor = mode === 'amount' ? '#4F46E5' : '#E2E8F0';
+        document.getElementById('awardModeAmount').style.background = mode === 'amount' ? '#EEF2FF' : '#fff';
+        document.getElementById('awardModeAmount').style.color = mode === 'amount' ? '#4F46E5' : '#64748B';
+        document.getElementById('awardModeDirect').style.borderColor = mode === 'direct' ? '#4F46E5' : '#E2E8F0';
+        document.getElementById('awardModeDirect').style.background = mode === 'direct' ? '#EEF2FF' : '#fff';
+        document.getElementById('awardModeDirect').style.color = mode === 'direct' ? '#4F46E5' : '#64748B';
+    }
+
+    function calcAwardPoints() {
+        var amount = parseInt(document.getElementById('awardAmount').value) || 0;
+        var resultEl = document.getElementById('awardCalcResult');
+        if (amount > 0) {
+            var pts = Math.floor(amount / _pointsPerAmount);
+            resultEl.textContent = '= ' + pts + ' 點（每 $' + _pointsPerAmount + ' 得 1 點）';
+            resultEl.style.display = 'block';
+        } else {
+            resultEl.style.display = 'none';
+        }
+    }
+
     async function doAwardPoints() {
-        var phone = document.getElementById('awardPhone').value.trim();
-        var points = parseInt(document.getElementById('awardPoints').value) || 0;
+        // 決定點數
+        var points = 0;
+        var amount = 0;
         var note = document.getElementById('awardNote').value.trim();
-        if (!phone || phone.length < 9) { showToast('請輸入正確手機號碼'); return; }
-        if (points <= 0) { showToast('請輸入正數點數'); return; }
+
+        if (_awardMode === 'amount') {
+            amount = parseInt(document.getElementById('awardAmount').value) || 0;
+            if (amount <= 0) { showToast('請輸入消費金額'); return; }
+            points = Math.floor(amount / _pointsPerAmount);
+            if (points <= 0) { showToast('金額不足以累積點數（每 $' + _pointsPerAmount + ' 得 1 點）'); return; }
+        } else {
+            points = parseInt(document.getElementById('awardPoints').value) || 0;
+            if (points <= 0) { showToast('請輸入正數點數'); return; }
+        }
 
         try {
-            // 查詢或建立會員
-            var { data: member } = await sb.from('loyalty_members')
-                .select('*')
-                .eq('company_id', window.currentCompanyId)
-                .eq('phone', phone)
-                .maybeSingle();
+            var member = _awardSelectedMember;
 
+            // 若未選擇會員，嘗試用搜尋欄的文字當手機號查詢
             if (!member) {
-                var { data: newM, error } = await sb.from('loyalty_members')
-                    .insert({ company_id: window.currentCompanyId, phone: phone, total_points: 0 })
-                    .select().single();
-                if (error) throw error;
-                member = newM;
+                var phone = document.getElementById('awardSearch').value.trim();
+                if (!phone || phone.length < 9) { showToast('請先搜尋並選擇會員，或輸入手機號碼'); return; }
+                var { data: found } = await sb.from('loyalty_members')
+                    .select('*')
+                    .eq('company_id', window.currentCompanyId)
+                    .eq('phone', phone)
+                    .maybeSingle();
+                if (!found) {
+                    var { data: newM, error } = await sb.from('loyalty_members')
+                        .insert({ company_id: window.currentCompanyId, phone: phone, total_points: 0 })
+                        .select().single();
+                    if (error) throw error;
+                    member = newM;
+                } else {
+                    member = found;
+                }
             }
 
             // 更新點數
@@ -272,15 +403,22 @@
                 member_id: member.id,
                 type: 'earn',
                 points: points,
+                amount: amount || null,
                 source: 'manual',
-                note: note || '手動送點',
+                note: note || (_awardMode === 'amount' ? '消費 $' + amount + ' 送 ' + points + ' 點' : '手動送點'),
                 created_by: window.currentEmployee?.id || null
             });
 
-            showToast('✅ 送出 ' + points + ' 點給 ' + phone);
-            document.getElementById('awardPhone').value = '';
+            var memberName = member.name || member.phone || '會員';
+            showToast('✅ 送出 ' + points + ' 點給 ' + memberName);
+            // 清空表單
+            clearAwardMember();
+            document.getElementById('awardAmount').value = '';
             document.getElementById('awardPoints').value = '';
             document.getElementById('awardNote').value = '';
+            document.getElementById('awardCalcResult').style.display = 'none';
+            // 刷新會員列表
+            loadMembers();
         } catch(e) {
             console.error(e);
             showToast('❌ 送點失敗');
@@ -495,9 +633,11 @@
                 redeemed_by: window.currentEmployee?.id || null
             }).eq('id', redemptionId);
 
-            document.getElementById('redeemResult').innerHTML = '<span style="color:#059669;font-weight:700;">🎉 核銷成功！</span>';
+            document.getElementById('redeemResult').innerHTML = '<div style="background:#F0FDF4;border-radius:10px;padding:12px;text-align:center;"><span style="color:#059669;font-size:18px;font-weight:700;">🎉 核銷成功！</span></div>';
             document.getElementById('redeemCodeInput').value = '';
             showToast('✅ 核銷完成');
+            // 自動刷新會員列表
+            loadMembers();
         } catch(e) {
             showToast('❌ 核銷失敗');
         }

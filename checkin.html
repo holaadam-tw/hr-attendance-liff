@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
+    <link rel="icon" href="data:,">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>📍 打卡 - 員工服務中心</title>
@@ -109,13 +110,14 @@
             const btn = document.getElementById('captureBtn');
             const statusBox = document.getElementById('checkInStatus');
             btn.disabled = true; btn.textContent = '處理中...';
-            // 安全計時：10 秒後自動恢復按鈕（防止卡在「處理中」）
+            // 安全計時：30 秒後自動恢復按鈕（防止卡在「處理中」）
             const safetyTimer = setTimeout(() => {
                 if (btn.disabled && btn.textContent === '處理中...') {
+                    stopCamera();
                     btn.disabled = false; btn.textContent = '📸 重試';
                     showStatus(statusBox, 'warning', '⚠️ 操作逾時，請重試');
                 }
-            }, 10000);
+            }, 30000);
 
             try {
                 const video = document.getElementById('video');
@@ -196,6 +198,7 @@
 
             } catch (err) {
                 clearTimeout(safetyTimer);
+                stopCamera();
                 console.error(err);
                 showStatus(statusBox, 'error', `❌ 失敗: ${friendlyError(err)}`);
                 btn.disabled = false; btn.textContent = '📸 重試';
@@ -422,9 +425,21 @@
             if (videoStream) videoStream.getTracks().forEach(t => t.stop());
         });
 
+        // ===== 停止相機 =====
+        function stopCamera() {
+            try {
+                if (videoStream) {
+                    videoStream.getTracks().forEach(t => t.stop());
+                    videoStream = null;
+                }
+                const video = document.getElementById('video');
+                if (video) video.srcObject = null;
+            } catch(e) { console.warn('停止相機失敗:', e); }
+        }
+
         // ===== 打卡成功畫面 =====
         function showCheckInSuccess(typeText, location, time) {
-            // 隱藏打卡區域，顯示成功畫面
+            stopCamera(); // 成功後立即釋放相機
             const container = document.querySelector('.container');
             if (container) container.innerHTML = `
                 <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80vh;padding:20px;text-align:center;">
@@ -458,7 +473,8 @@
             if (typeof liff !== 'undefined' && liff.isInClient && liff.isInClient()) {
                 liff.closeWindow();
             } else {
-                window.close();
+                // window.close() 在非 LIFF 環境通常被瀏覽器阻擋，改為導回首頁
+                window.location.href = 'index.html';
             }
         }
 
