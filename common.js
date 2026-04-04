@@ -158,12 +158,15 @@ function setBtnLoading(btn, loading, originalText) {
     }
 }
 
-// HTML 跳脫（防 XSS）
+// HTML 跳脫（防 XSS，含引號）
 function escapeHTML(str) {
     if (!str) return '';
-    const div = document.createElement('div');
-    div.textContent = String(str);
-    return div.innerHTML;
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 }
 
 // XSS 防護簡寫（供 HTML 模板使用）
@@ -1004,7 +1007,7 @@ window.showAnnouncementList = function() {
         const dateStr = (date.getMonth() + 1) + '/' + date.getDate();
         return '<div style="padding:14px;background:#fff;border-radius:12px;margin-bottom:8px;cursor:pointer;' +
             (isUnread ? 'border-left:4px solid #6366F1;' : 'border-left:4px solid #E2E8F0;opacity:.7;') +
-            '" onclick="event.stopPropagation();viewAnnouncement(\'' + a.id + '\')">' +
+            '" onclick="event.stopPropagation();viewAnnouncement(\'' + esc(a.id) + '\')">' +
             '<div style="display:flex;justify-content:space-between;align-items:center;">' +
             '<div style="font-size:14px;font-weight:700;">' + (icons[a.type] || '📋') + ' ' + escapeHTML(a.title) + '</div>' +
             '<span style="font-size:11px;color:#94A3B8;">' + dateStr + '</span></div>' +
@@ -2005,7 +2008,7 @@ function showPopupAnnouncement(a) {
         '<div style="text-align:center;font-size:12px;color:#EF4444;font-weight:700;margin-bottom:4px;">緊急公告</div>' +
         '<h3 style="text-align:center;font-size:18px;font-weight:800;color:' + typeColor + ';margin-bottom:12px;">' + escapeHTML(a.title) + '</h3>' +
         (a.content ? '<div style="font-size:14px;color:#374151;line-height:1.8;padding:14px;background:#F8FAFC;border-radius:12px;margin-bottom:16px;max-height:300px;overflow-y:auto;white-space:pre-wrap;">' + escapeHTML(a.content) + '</div>' : '') +
-        '<button id="forcedAckBtn" onclick="acknowledgeForcedAnnouncement(\'' + a.id + '\')" style="width:100%;padding:14px;border:none;border-radius:12px;background:' + typeColor + ';color:#fff;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit;">✅ 我已閱讀並確認</button>' +
+        '<button id="forcedAckBtn" onclick="acknowledgeForcedAnnouncement(\'' + esc(a.id) + '\')" style="width:100%;padding:14px;border:none;border-radius:12px;background:' + typeColor + ';color:#fff;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit;">✅ 我已閱讀並確認</button>' +
         '<p style="font-size:10px;color:#94A3B8;text-align:center;margin-top:8px;">確認後才能繼續使用系統</p>' +
     '</div>';
     document.body.appendChild(modal);

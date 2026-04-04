@@ -222,7 +222,8 @@
 
 <script>
 // === 全域錯誤監控 ===
-window.onerror = function(msg, src, line, col, err) {
+window._errLogCount = 0; window._errLogResetTs = 0;
+        window.onerror = function(msg, src, line, col, err) {
   try {
     fetch('https://nssuisyvlrqnqfxupklb.supabase.co/rest/v1/error_logs', {
       method: 'POST',
@@ -482,7 +483,8 @@ function renderCalendar() {
         // 檢查該星期幾是否有時段（day_of_week: null=每天, JSON陣列="[1,3]", 舊格式=單一數字）
         const hasSlot = allSlots.some(s => {
             if (!s.day_of_week) return true;
-            try { return JSON.parse(s.day_of_week).includes(dow); } catch(e) {}
+            try {
+            var _now = Date.now(); if (_now > window._errLogResetTs) { window._errLogCount = 0; window._errLogResetTs = _now + 60000; } if (++window._errLogCount > 5) return; return JSON.parse(s.day_of_week).includes(dow); } catch(e) {}
             return parseInt(s.day_of_week) === dow;
         });
         const disabled = isPast || isTooFar || !hasSlot;
