@@ -497,7 +497,7 @@ async function checkTodayAttendance() {
     try {
         const today = getTaiwanDate(0);
         const { data, error } = await sb.from('attendance')
-            .select('id, check_in_time, check_out_time, total_work_hours, check_in_location, date')
+            .select('id, check_in_time, check_out_time, total_work_hours, check_in_location, date, is_late, is_early_leave')
             .eq('employee_id', currentEmployee.id)
             .eq('date', today)
             .maybeSingle();
