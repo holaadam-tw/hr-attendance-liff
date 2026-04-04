@@ -423,17 +423,10 @@
             }
         });
 
-        window.addEventListener('beforeunload', () => {
-            if (videoStream) videoStream.getTracks().forEach(t => t.stop());
-        });
-
-        // ===== 停止相機 =====
+        // ===== 停止相機（使用 common.js stopVideoStream + 清除 video 元素） =====
         function stopCamera() {
             try {
-                if (videoStream) {
-                    videoStream.getTracks().forEach(t => t.stop());
-                    videoStream = null;
-                }
+                stopVideoStream();
                 const video = document.getElementById('video');
                 if (video) video.srcObject = null;
             } catch(e) { console.warn('停止相機失敗:', e); }

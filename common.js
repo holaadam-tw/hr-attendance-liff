@@ -20,6 +20,14 @@ let currentPlatformAdmin = null;   // 平台管理員資料
 let managedCompanies = [];         // 可管理的公司列表
 let videoStream = null;
 let cachedLocation = null;
+
+// 通用相機清理（釋放 MediaStream 資源）
+function stopVideoStream() {
+    if (videoStream) {
+        videoStream.getTracks().forEach(t => t.stop());
+        videoStream = null;
+    }
+}
 let currentBindMode = 'id_card';
 let todayAttendance = null;
 let officeLocations = [];
@@ -222,7 +230,8 @@ async function checkUserStatus() {
             // 載入可管理公司列表（含 role）
             const { data: pac } = await sb.from('platform_admin_companies')
                 .select('company_id, role, companies(id, name, features, status, industry)')
-                .eq('platform_admin_id', padmin.id);
+                .eq('platform_admin_id', padmin.id)
+                .limit(50);
             managedCompanies = (pac || []).map(r => ({
                 id: r.company_id,
                 name: r.companies?.name || '未命名',
@@ -252,12 +261,17 @@ async function checkUserStatus() {
                 sessionStorage.setItem('selectedCompanyId', selected.id);
             }
 
-            // 建立虛擬 employee 物件（平台管理員可能不在該公司有 employee 記錄）
-            const { data: empData } = await sb.from('employees')
-                .select('id, name, role, department, position, employee_number, line_user_id, company_id, is_active, hire_date')
-                .eq('line_user_id', liffProfile.userId)
-                .eq('company_id', currentCompanyId)
-                .maybeSingle();
+            // 並行載入：員工資料 + 設定 + 考勤
+            const [empResult, ,] = await Promise.all([
+                sb.from('employees')
+                    .select('id, name, role, department, position, employee_number, line_user_id, company_id, is_active, hire_date')
+                    .eq('line_user_id', liffProfile.userId)
+                    .eq('company_id', currentCompanyId)
+                    .maybeSingle(),
+                loadSettings(),
+                checkTodayAttendance()
+            ]);
+            const empData = empResult.data;
 
             currentEmployee = empData || {
                 id: null,
@@ -270,11 +284,6 @@ async function checkUserStatus() {
                 company_id: currentCompanyId
             };
             window.currentEmployee = currentEmployee;
-
-            // 並行載入設定和考勤
-            const parallelTasks = [loadSettings()];
-            if (currentEmployee.id) parallelTasks.push(checkTodayAttendance());
-            await Promise.all(parallelTasks);
             if (loadingEl) loadingEl.style.display = 'none';
             updateUserInfo(currentEmployee);
             // 顯示公司名稱
@@ -296,18 +305,23 @@ async function checkUserStatus() {
             currentCompanyId = data.company_id || null;
             window.currentCompanyId = currentCompanyId;
             window.currentEmployee = currentEmployee;
-            // 並行載入公司設定、system_settings、今日考勤
+            // 並行載入公司資料、system_settings、今日考勤
             if (currentCompanyId) {
-                try {
-                    const { data: company } = await sb.from('companies')
+                const [companyResult] = await Promise.all([
+                    sb.from('companies')
                         .select('name, features, status, industry')
                         .eq('id', currentCompanyId)
-                        .maybeSingle();
-                    currentCompanyFeatures = company?.features || null;
-                    currentCompanyName = company?.name || null;
-                    currentCompanyIndustry = company?.industry || 'general';
-                } catch(e) { console.error('載入公司資料失敗:', e); }
-                await Promise.all([loadSettings(), checkTodayAttendance()]);
+                        .maybeSingle()
+                        .then(r => r.data)
+                        .catch(() => null),
+                    loadSettings(),
+                    checkTodayAttendance()
+                ]);
+                if (companyResult) {
+                    currentCompanyFeatures = companyResult.features || null;
+                    currentCompanyName = companyResult.name || null;
+                    currentCompanyIndustry = companyResult.industry || 'general';
+                }
             }
             updateUserInfo(data);
             return true;
@@ -378,7 +392,8 @@ async function loadSettings(forceRefresh) {
         if (!_loadCompanyId) return;
         const { data, error } = await sb.from('system_settings')
             .select('key, value')
-            .eq('company_id', _loadCompanyId);
+            .eq('company_id', _loadCompanyId)
+            .limit(100);
         if (!error && data) {
             _settingsCache = {};
             data.forEach(row => { _settingsCache[row.key] = row.value; });
@@ -602,7 +617,8 @@ async function loadLunchSummary() {
     try {
         const { data, error } = await sb.from('lunch_orders')
             .select('id, is_vegetarian, status')
-            .eq('order_date', dateStr);
+            .eq('order_date', dateStr)
+            .limit(500);
 
         if (error) throw error;
 
@@ -635,7 +651,8 @@ async function checkLeaveAvailability(startDate, endDate) {
             .select('employee_id, start_date, end_date, status, employees(name)')
             .neq('employee_id', currentEmployee.id)
             .in('status', ['approved', 'pending'])
-            .or(`and(start_date.lte.${endDate},end_date.gte.${startDate})`);
+            .or(`and(start_date.lte.${endDate},end_date.gte.${startDate})`)
+            .limit(200);
 
         // 3. 查詢每一天的衝突人數
         const start = new Date(startDate), end = new Date(endDate);
@@ -820,7 +837,8 @@ async function submitMakeupPunch() {
         .select('id', { count: 'exact' })
         .eq('employee_id', currentEmployee.id)
         .gte('punch_date', monthStart).lte('punch_date', monthEnd)
-        .in('status', ['pending', 'approved']);
+        .in('status', ['pending', 'approved'])
+        .limit(10);
     if (monthCount && monthCount.length >= 3) {
         return showToast('❌ 本月補打卡已達上限（3 次/月）');
     }
@@ -967,7 +985,7 @@ async function loadAnnouncements() {
             let ackedIds = [];
             if (empId) {
                 const { data: acks } = await sb.from('announcement_acknowledgments')
-                    .select('announcement_id').eq('employee_id', empId);
+                    .select('announcement_id').eq('employee_id', empId).limit(100);
                 ackedIds = (acks || []).map(function(a) { return a.announcement_id; });
             }
             const unread = announcements.filter(function(a) { return ackedIds.indexOf(a.id) === -1; });
@@ -1100,7 +1118,8 @@ async function loadMonthlyAttendance() {
                 .eq('employee_id', currentEmployee.id)
                 .eq('status', 'approved')
                 .gte('start_date', monthStart)
-                .lte('start_date', monthEnd);
+                .lte('start_date', monthEnd)
+                .limit(50);
             if (leaveData) leaveDays = leaveData.reduce((s, r) => s + (parseFloat(r.days) || 0), 0);
         } catch(e) { console.warn('查詢當月請假天數失敗', e); }
         
@@ -1971,7 +1990,8 @@ async function checkForcedAnnouncements() {
             .eq('is_popup', true)
             .eq('type', 'urgent')
             .lte('publish_at', now)
-            .order('created_at', { ascending: false });
+            .order('created_at', { ascending: false })
+            .limit(20);
         if (currentCompanyId) query = query.eq('company_id', currentCompanyId);
 
         let { data: forced } = await query;
@@ -1984,7 +2004,8 @@ async function checkForcedAnnouncements() {
         const { data: acks } = await sb.from('announcement_acknowledgments')
             .select('announcement_id')
             .eq('employee_id', currentEmployee.id)
-            .in('announcement_id', ids);
+            .in('announcement_id', ids)
+            .limit(100);
 
         const ackedIds = (acks || []).map(function(a) { return a.announcement_id; });
         const unacked = forced.filter(function(a) { return ackedIds.indexOf(a.id) === -1; });
@@ -2048,6 +2069,12 @@ async function getInsuranceBracket(monthlySalary) {
         pension: Math.round(monthlySalary * 0.06)
     };
 }
+
+// ===== 頁面離開時清理相機資源 =====
+window.addEventListener('beforeunload', stopVideoStream);
+document.addEventListener('visibilitychange', function() {
+    if (document.hidden) stopVideoStream();
+});
 
 // ===== Debug 模式 =====
 // [BUG FIX] 移除 window.addEventListener('load') — 各頁面自行處理初始化

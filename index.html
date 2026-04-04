@@ -396,6 +396,21 @@
         };
         async function loadWeather() {
             try {
+                // sessionStorage 快取（30 分鐘有效）
+                const WEATHER_CACHE_KEY = 'weather_cache';
+                const WEATHER_CACHE_TTL = 30 * 60 * 1000;
+                const cached = sessionStorage.getItem(WEATHER_CACHE_KEY);
+                if (cached) {
+                    try {
+                        const c = JSON.parse(cached);
+                        if (Date.now() - c.ts < WEATHER_CACHE_TTL) {
+                            const el = document.getElementById('weatherInfo');
+                            if (el) { el.textContent = c.text; el.style.display = 'inline'; }
+                            return;
+                        }
+                    } catch(e) { sessionStorage.removeItem(WEATHER_CACHE_KEY); }
+                }
+
                 let lat = 25.033, lon = 121.565; // 預設台北
                 if (cachedLocation) {
                     lat = cachedLocation.latitude; lon = cachedLocation.longitude;
@@ -423,12 +438,15 @@
                         city = city.replace(/市$|縣$/, ''); // 台北市 → 台北
                     }
                 } catch(e) {}
+                const weatherText = `${city ? city + ' ' : ''}${desc} ${temp}°C`;
                 const el = document.getElementById('weatherInfo');
                 if (el) {
-                    el.textContent = `${city ? city + ' ' : ''}${desc} ${temp}°C`;
+                    el.textContent = weatherText;
                     el.style.display = 'inline';
                 }
-            } catch(e) { console.log('天氣載入失敗', e); }
+                // 寫入快取
+                try { sessionStorage.setItem(WEATHER_CACHE_KEY, JSON.stringify({ text: weatherText, ts: Date.now() })); } catch(e) {}
+            } catch(e) { console.warn('天氣載入失敗', e); }
         }
 
         // 載入目前訂單（顯示格子 + badge 數字）
