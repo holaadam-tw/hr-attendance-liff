@@ -317,7 +317,18 @@
                 const timeStr = inTime.toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', hour12: false });
                 document.getElementById('todayCheckinTime').textContent = timeStr;
 
-                const isLate = data.is_late || data.status === 'late';
+                // is_late 來自 DB（quick_check_in RPC 判定），fallback 用打卡時間 vs 班別開始時間
+                let isLate = data.is_late === true;
+                if (data.is_late == null) {
+                    // fallback：DB 無 is_late 時用上班時間判斷
+                    const workStart = getCachedSetting('work_hours')?.start || '08:00';
+                    const [sh, sm] = workStart.split(':').map(Number);
+                    const threshold = parseInt(getCachedSetting('late_threshold_minutes')?.toString() || '0');
+                    const inLocal = new Date(inTime.toLocaleString('en-US', { timeZone: 'Asia/Taipei' }));
+                    const scheduledMin = sh * 60 + sm + threshold;
+                    const actualMin = inLocal.getHours() * 60 + inLocal.getMinutes();
+                    isLate = actualMin > scheduledMin;
+                }
                 document.getElementById('todayCheckinStatus').textContent = isLate ? '⚠️ 遲到' : '✅ 準時';
                 document.getElementById('todayCheckinCard').style.background = isLate ? '#FEE2E2' : '#D1FAE5';
                 document.getElementById('todayCheckinTime').style.color = isLate ? '#EF4444' : '#059669';
