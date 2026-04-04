@@ -263,7 +263,8 @@ body {
 
 <script>
 // === 全域錯誤監控 ===
-window.onerror = function(msg, src, line, col, err) {
+window._errLogCount = 0; window._errLogResetTs = 0;
+        window.onerror = function(msg, src, line, col, err) {
   try {
     fetch('https://nssuisyvlrqnqfxupklb.supabase.co/rest/v1/error_logs', {
       method: 'POST',
@@ -367,7 +368,8 @@ function startPolling() {
             const newOrders = data.filter(o => !lastOrderIds.has(o.id));
             if (newOrders.length > 0) {
                 if (soundEnabled && bellSound) {
-                    try { bellSound.currentTime = 0; bellSound.play(); } catch(e) {}
+                    try {
+            var _now = Date.now(); if (_now > window._errLogResetTs) { window._errLogCount = 0; window._errLogResetTs = _now + 60000; } if (++window._errLogCount > 5) return; bellSound.currentTime = 0; bellSound.play(); } catch(e) {}
                 }
                 if (Notification.permission === 'granted') {
                     const o = newOrders[0];

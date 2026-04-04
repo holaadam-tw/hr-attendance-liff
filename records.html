@@ -269,8 +269,10 @@
     <script src="common.js"></script>
     <script>
         // === 全域錯誤監控 ===
+        window._errLogCount = 0; window._errLogResetTs = 0;
         window.onerror = function(msg, src, line, col, err) {
           try {
+            var _now = Date.now(); if (_now > window._errLogResetTs) { window._errLogCount = 0; window._errLogResetTs = _now + 60000; } if (++window._errLogCount > 5) return;
             fetch('https://nssuisyvlrqnqfxupklb.supabase.co/rest/v1/error_logs', {
               method: 'POST',
               headers: {
