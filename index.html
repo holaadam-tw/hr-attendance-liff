@@ -352,7 +352,8 @@
                 const outTime = new Date(data.check_out_time);
                 const timeStr = outTime.toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', hour12: false });
                 document.getElementById('todayCheckoutTime').textContent = timeStr;
-                document.getElementById('todayCheckoutStatus').textContent = '✅ 已下班';
+                const outLoc = data.check_out_location ? ` 📍 ${escapeHTML(data.check_out_location)}` : '';
+                document.getElementById('todayCheckoutStatus').textContent = '✅ 已下班' + outLoc;
             }
         }
 
