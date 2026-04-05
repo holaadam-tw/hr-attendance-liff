@@ -320,11 +320,13 @@
                     if (!rpcData.success) throw new Error(rpcData.error);
 
                     if (rpcData.location_name) localStorage.setItem('last_location', rpcData.location_name);
-                    const typeText = currentCheckInType === 'in' ? '上班' : '下班';
+                    // 用 RPC 回傳的 type 判斷（跨日打卡時使用者按上班但 RPC 執行下班）
+                    const actualType = rpcData.type === 'check_out' ? '下班' : '上班';
                     const locText = rpcData.location_name || '公司';
                     const nowTime = new Date().toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', hour12: false });
+                    const overnightHint = rpcData.overnight ? '（跨日補登下班）' : '';
 
-                    showCheckInSuccess(typeText, locText, nowTime);
+                    showCheckInSuccess(actualType + overnightHint, locText, nowTime);
 
                     if (currentCheckInType === 'in' && new Date().getHours() < 9) {
                         setTimeout(() => showLunchPopup(), 2000);

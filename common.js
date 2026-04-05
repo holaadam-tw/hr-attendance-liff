@@ -519,16 +519,36 @@ async function checkTodayAttendance() {
             .eq('employee_id', currentEmployee.id)
             .eq('date', today)
             .maybeSingle();
-        
+
         if (error) {
             console.error('❌ 檢查考勤錯誤:', error);
             todayAttendance = null;
         } else {
             todayAttendance = data;
         }
+
+        // 跨日打卡支援：今天沒記錄時，查昨天是否有未下班的記錄
+        if (!todayAttendance) {
+            const yesterday = getTaiwanDate(-1);
+            const { data: yData } = await sb.from('attendance')
+                .select('id, check_in_time, check_out_time, check_in_location, date')
+                .eq('employee_id', currentEmployee.id)
+                .eq('date', yesterday)
+                .is('check_out_time', null)
+                .maybeSingle();
+            if (yData) {
+                // 標記為跨日未下班，讓 updateCheckInButtons 知道要顯示下班按鈕
+                window._pendingCheckout = yData;
+            } else {
+                window._pendingCheckout = null;
+            }
+        } else {
+            window._pendingCheckout = null;
+        }
+
         updateCheckInButtons();
-    } catch(e) { 
-        console.error(e); 
+    } catch(e) {
+        console.error(e);
     }
 }
 
@@ -540,7 +560,13 @@ function updateCheckInButtons() {
 
     if (!btnIn || !btnOut || !statusBox) return;
 
-    if (!todayAttendance) {
+    if (!todayAttendance && window._pendingCheckout) {
+        // 跨日：昨天有未下班記錄，顯示下班按鈕
+        btnIn.classList.add('disabled');
+        btnOut.classList.remove('disabled');
+        const yLoc = window._pendingCheckout.check_in_location || lastLoc;
+        showStatus(statusBox, 'info', `🌙 昨日上班中 @ ${escapeHTML(yLoc)}（待下班打卡）`);
+    } else if (!todayAttendance) {
         btnIn.classList.remove('disabled');
         btnOut.classList.add('disabled');
         showStatus(statusBox, 'info', `📍 上次打卡地點：${lastLoc}`);
