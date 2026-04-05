@@ -607,19 +607,27 @@
         });
 
         // ===== 頁面返回時自動刷新打卡狀態 =====
-        // 從 checkin.html 返回 index.html 時，BFCache 不會重新執行 JS
-        // 用 visibilitychange + pageshow 確保資料更新
-        document.addEventListener('visibilitychange', async function() {
-            if (!document.hidden && currentEmployee?.id) {
-                await checkTodayAttendance();
-                loadTodayStatus();
-            }
+        // LINE LIFF WebView 回退行為不一定觸發 visibilitychange
+        // 多重保險：visibilitychange + pageshow + focus
+        let _lastRefresh = 0;
+        async function refreshAttendanceStatus() {
+            if (!currentEmployee?.id) return;
+            // 防抖：3 秒內不重複刷新
+            const now = Date.now();
+            if (now - _lastRefresh < 3000) return;
+            _lastRefresh = now;
+            await checkTodayAttendance();
+            loadTodayStatus();
+        }
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden) refreshAttendanceStatus();
         });
-        window.addEventListener('pageshow', async function(e) {
-            if (e.persisted && currentEmployee?.id) {
-                await checkTodayAttendance();
-                loadTodayStatus();
-            }
+        window.addEventListener('pageshow', function(e) {
+            // 不限 e.persisted — LINE LIFF 可能不用 BFCache 但也不完整重載
+            if (currentEmployee?.id) refreshAttendanceStatus();
+        });
+        window.addEventListener('focus', function() {
+            refreshAttendanceStatus();
         });
     </script>
 </body>
