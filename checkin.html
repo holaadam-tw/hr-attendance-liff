@@ -462,11 +462,8 @@
         }
 
         function goBack() {
-            if (typeof liff !== 'undefined' && liff.isInClient && liff.isInClient()) {
-                window.location.href = 'index.html';
-            } else {
-                window.location.href = 'index.html';
-            }
+            // 加 _t 參數避免 BFCache，確保 index.html 完整重載
+            window.location.href = 'index.html?_t=' + Date.now();
         }
 
         function closeLiff() {
