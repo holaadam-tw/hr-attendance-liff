@@ -261,15 +261,14 @@ async function checkUserStatus() {
                 sessionStorage.setItem('selectedCompanyId', selected.id);
             }
 
-            // 並行載入：員工資料 + 設定 + 考勤
-            const [empResult, ,] = await Promise.all([
+            // 先查員工 + 設定（並行），再查考勤（需要 currentEmployee.id）
+            const [empResult] = await Promise.all([
                 sb.from('employees')
                     .select('id, name, role, department, position, employee_number, line_user_id, company_id, is_active, hire_date')
                     .eq('line_user_id', liffProfile.userId)
                     .eq('company_id', currentCompanyId)
                     .maybeSingle(),
-                loadSettings(),
-                checkTodayAttendance()
+                loadSettings()
             ]);
             const empData = empResult.data;
 
@@ -284,6 +283,9 @@ async function checkUserStatus() {
                 company_id: currentCompanyId
             };
             window.currentEmployee = currentEmployee;
+
+            // 現在 currentEmployee 已設定，可以查考勤
+            if (currentEmployee.id) await checkTodayAttendance();
             if (loadingEl) loadingEl.style.display = 'none';
             updateUserInfo(currentEmployee);
             // 顯示公司名稱
