@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <link rel="icon" href="data:,">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>🔧 打卡診斷工具</title>
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="common.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #F1F5F9; color: #1E293B; padding: 12px; padding-bottom: 80px; }
+        h1 { font-size: 20px; text-align: center; margin: 12px 0; }
+        .card { background: #fff; border-radius: 14px; padding: 16px; margin-bottom: 12px; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+        .card h2 { font-size: 15px; font-weight: 800; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+        .row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid #F1F5F9; font-size: 13px; }
+        .row:last-child { border-bottom: none; }
+        .label { color: #64748B; }
+        .val { font-weight: 600; max-width: 60%; text-align: right; word-break: break-all; }
+        .ok { color: #059669; } .err { color: #DC2626; } .warn { color: #D97706; }
+        .mono { font-family: 'SF Mono', monospace; font-size: 11px; }
+        button.action { width: 100%; padding: 12px; border: none; border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer; margin-top: 8px; }
+        .btn-primary { background: linear-gradient(135deg, #4F46E5, #7C3AED); color: #fff; }
+        .btn-danger { background: #DC2626; color: #fff; }
+        .btn-sm { padding: 6px 12px; font-size: 12px; border-radius: 8px; border: 1px solid #E2E8F0; background: #F8FAFC; cursor: pointer; }
+        pre.json { background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 10px; font-size: 11px; overflow-x: auto; white-space: pre-wrap; word-break: break-all; max-height: 300px; overflow-y: auto; margin-top: 8px; }
+        .timing { display: inline-block; background: #DBEAFE; color: #1E40AF; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; }
+        .badge-ok { background: #D1FAE5; color: #065F46; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; }
+        .badge-err { background: #FEE2E2; color: #991B1B; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; }
+    </style>
+</head>
+<body>
+    <h1>🔧 打卡系統診斷</h1>
+
+    <button class="action btn-primary" onclick="runAllChecks()" id="runAllBtn">⚡ 一鍵全部檢查</button>
+
+    <!-- 1. 環境檢查 -->
+    <div class="card" id="envCard">
+        <h2>🔌 環境檢查 <button class="btn-sm" onclick="checkEnv()">刷新</button></h2>
+        <div id="envResult"><div class="row"><span class="label">點擊「一鍵全部檢查」開始</span></div></div>
+    </div>
+
+    <!-- 2. GPS 檢查 -->
+    <div class="card" id="gpsCard">
+        <h2>📍 GPS 檢查 <button class="btn-sm" onclick="checkGPS()">刷新</button></h2>
+        <div id="gpsResult"><div class="row"><span class="label">等待檢查...</span></div></div>
+    </div>
+
+    <!-- 3. 相機檢查 -->
+    <div class="card" id="cameraCard">
+        <h2>📸 相機檢查 <button class="btn-sm" onclick="checkCamera()">刷新</button></h2>
+        <div id="cameraResult"><div class="row"><span class="label">等待檢查...</span></div></div>
+    </div>
+
+    <!-- 4. 資料庫狀態 -->
+    <div class="card" id="dbCard">
+        <h2>🗄️ 資料庫狀態 <button class="btn-sm" onclick="checkDB()">刷新</button></h2>
+        <div id="dbResult"><div class="row"><span class="label">等待檢查...</span></div></div>
+    </div>
+
+    <!-- 5. RPC 測試 -->
+    <div class="card" id="rpcCard">
+        <h2>🧪 RPC 測試</h2>
+        <p style="color:#DC2626;font-size:12px;font-weight:700;margin-bottom:8px;">⚠️ 以下按鈕會實際執行打卡寫入資料庫！</p>
+        <button class="action btn-danger" onclick="testRPC('check_in')">測試上班打卡 RPC</button>
+        <button class="action btn-danger" onclick="testRPC('check_out')" style="margin-top:6px;">測試下班打卡 RPC</button>
+        <button class="action" onclick="testRPC(null)" style="background:#F59E0B;color:#fff;margin-top:6px;">測試自動判斷 RPC (p_action=null)</button>
+        <pre class="json" id="rpcResult" style="display:none;"></pre>
+    </div>
+
+    <!-- 6. 效能計時 -->
+    <div class="card" id="perfCard">
+        <h2>⏱️ 效能計時</h2>
+        <div id="perfResult"><div class="row"><span class="label">初始化時自動記錄</span></div></div>
+    </div>
+
+    <!-- 7. Storage 狀態 -->
+    <div class="card" id="storageCard">
+        <h2>📋 Storage / 快取 <button class="btn-sm" onclick="checkStorage()">刷新</button></h2>
+        <div id="storageResult"><div class="row"><span class="label">等待檢查...</span></div></div>
+    </div>
+
+    <script>
+        const _perf = {};
+        function esc(s) { return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+        function row(label, value, cls) {
+            return '<div class="row"><span class="label">' + esc(label) + '</span><span class="val ' + (cls||'') + '">' + value + '</span></div>';
+        }
+        function badge(ok, text) {
+            return '<span class="' + (ok ? 'badge-ok' : 'badge-err') + '">' + (ok ? '✅ ' : '❌ ') + esc(text) + '</span>';
+        }
+
+        // ===== 1. 環境檢查 =====
+        function checkEnv() {
+            const el = document.getElementById('envResult');
+            let h = '';
+            h += row('LIFF SDK', typeof liff !== 'undefined' ? badge(true, '已載入') : badge(false, '未載入'));
+            if (typeof liff !== 'undefined') {
+                h += row('LIFF 版本', esc(liff.getVersion ? liff.getVersion() : '?'));
+                h += row('isInClient', badge(liff.isInClient && liff.isInClient(), liff.isInClient ? liff.isInClient() : 'N/A'));
+                h += row('isLoggedIn', badge(liff.isLoggedIn && liff.isLoggedIn(), liff.isLoggedIn ? liff.isLoggedIn() : 'N/A'));
+            }
+            h += row('LINE userId', liffProfile?.userId ? '<span class="mono">' + esc(liffProfile.userId) + '</span>' : badge(false, '無'));
+            h += row('員工 ID', currentEmployee?.id ? '<span class="mono">' + esc(currentEmployee.id) + '</span>' : badge(false, '無'));
+            h += row('員工姓名', esc(currentEmployee?.name || '-'));
+            h += row('company_id', currentCompanyId ? '<span class="mono">' + esc(currentCompanyId) + '</span>' : badge(false, '無'));
+            h += row('公司名稱', esc(currentCompanyName || '-'));
+            h += row('User-Agent', '<span class="mono" style="font-size:10px;">' + esc(navigator.userAgent).substring(0, 80) + '...</span>');
+            el.innerHTML = h;
+        }
+
+        // ===== 2. GPS 檢查 =====
+        async function checkGPS() {
+            const el = document.getElementById('gpsResult');
+            el.innerHTML = row('狀態', '<span class="warn">定位中...</span>');
+            try {
+                const t0 = performance.now();
+                const loc = await getGPS();
+                const elapsed = Math.round(performance.now() - t0);
+                let h = '';
+                h += row('緯度', loc.latitude.toFixed(6));
+                h += row('經度', loc.longitude.toFixed(6));
+                h += row('精度', loc.accuracy.toFixed(0) + ' m ' + (loc.accuracy > 500 ? badge(false, '太差') : loc.accuracy < 2 ? badge(false, '疑似模擬') : badge(true, '正常')));
+                h += row('耗時', '<span class="timing">' + elapsed + 'ms</span>');
+
+                // 距離各打卡地點
+                if (officeLocations && officeLocations.length > 0) {
+                    h += '<div style="margin-top:8px;font-size:12px;font-weight:700;color:#475569;">打卡地點距離：</div>';
+                    for (const ol of officeLocations) {
+                        const dist = calculateDistance(loc.latitude, loc.longitude, ol.lat, ol.lng);
+                        const inRange = dist <= (ol.radius || 100);
+                        h += row(esc(ol.name) + ' (' + ol.radius + 'm)', Math.round(dist) + 'm ' + badge(inRange, inRange ? '在範圍內' : '超出範圍'));
+                    }
+                } else {
+                    h += row('打卡地點', badge(false, '未設定（允許任何位置）'));
+                }
+                el.innerHTML = h;
+            } catch(e) {
+                el.innerHTML = row('GPS 錯誤', badge(false, e.message || e.code));
+            }
+        }
+
+        // ===== 3. 相機檢查 =====
+        async function checkCamera() {
+            const el = document.getElementById('cameraResult');
+            let h = '';
+            h += row('getUserMedia', typeof navigator.mediaDevices?.getUserMedia === 'function' ? badge(true, '可用') : badge(false, '不可用'));
+
+            // 權限查詢
+            try {
+                const perm = await navigator.permissions.query({ name: 'camera' });
+                h += row('相機權限', perm.state === 'granted' ? badge(true, '已授權') : perm.state === 'denied' ? badge(false, '已拒絕') : '<span class="warn">⏳ 待詢問 (prompt)</span>');
+            } catch(e) {
+                h += row('相機權限', '<span class="warn">無法查詢（' + esc(e.message).substring(0, 30) + '）</span>');
+            }
+
+            h += row('input[capture]', badge(true, '永遠可用（fallback）'));
+
+            // 嘗試列出相機裝置
+            try {
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const cameras = devices.filter(d => d.kind === 'videoinput');
+                h += row('相機裝置數', cameras.length + ' 個');
+                cameras.forEach((c, i) => {
+                    h += row('相機 ' + (i+1), '<span class="mono" style="font-size:10px;">' + esc(c.label || 'unnamed') + '</span>');
+                });
+            } catch(e) {
+                h += row('裝置列表', badge(false, e.message));
+            }
+            el.innerHTML = h;
+        }
+
+        // ===== 4. 資料庫狀態 =====
+        async function checkDB() {
+            const el = document.getElementById('dbResult');
+            el.innerHTML = row('狀態', '<span class="warn">查詢中...</span>');
+            if (!currentEmployee?.id) { el.innerHTML = row('錯誤', badge(false, '未登入')); return; }
+
+            let h = '';
+            const today = getTaiwanDate(0);
+            const yesterday = getTaiwanDate(-1);
+
+            // 今天的 attendance
+            const t0 = performance.now();
+            const { data: att } = await sb.from('attendance')
+                .select('id, check_in_time, check_out_time, is_late, is_early_leave, date, check_in_location')
+                .eq('employee_id', currentEmployee.id)
+                .eq('date', today)
+                .maybeSingle();
+            const attMs = Math.round(performance.now() - t0);
+
+            h += '<div style="font-size:12px;font-weight:700;color:#475569;margin-bottom:4px;">今日考勤 (' + today + ') <span class="timing">' + attMs + 'ms</span></div>';
+            if (att) {
+                h += row('record id', '<span class="mono">' + esc(att.id).substring(0, 8) + '...</span>');
+                h += row('check_in_time', att.check_in_time ? badge(true, new Date(att.check_in_time).toLocaleTimeString('zh-TW', {timeZone:'Asia/Taipei',hour:'2-digit',minute:'2-digit',second:'2-digit'})) : badge(false, 'NULL'));
+                h += row('check_out_time', att.check_out_time ? badge(true, new Date(att.check_out_time).toLocaleTimeString('zh-TW', {timeZone:'Asia/Taipei',hour:'2-digit',minute:'2-digit',second:'2-digit'})) : '<span class="warn">NULL（未下班）</span>');
+                h += row('is_late', att.is_late === true ? badge(false, '遲到') : att.is_late === false ? badge(true, '準時') : '<span class="warn">NULL</span>');
+                h += row('is_early_leave', att.is_early_leave === true ? badge(false, '早退') : badge(true, String(att.is_early_leave)));
+                h += row('地點', esc(att.check_in_location || '-'));
+            } else {
+                h += row('記錄', badge(false, '今天無打卡記錄'));
+            }
+
+            // 昨天未下班
+            const { data: yAtt } = await sb.from('attendance')
+                .select('id, check_in_time, check_out_time, date')
+                .eq('employee_id', currentEmployee.id)
+                .eq('date', yesterday)
+                .is('check_out_time', null)
+                .maybeSingle();
+            h += '<div style="font-size:12px;font-weight:700;color:#475569;margin-top:10px;margin-bottom:4px;">昨日未下班 (' + yesterday + ')</div>';
+            h += row('跨日未下班', yAtt ? badge(false, '有！check_in=' + new Date(yAtt.check_in_time).toLocaleTimeString('zh-TW',{timeZone:'Asia/Taipei'})) : badge(true, '無'));
+
+            // settings
+            h += '<div style="font-size:12px;font-weight:700;color:#475569;margin-top:10px;margin-bottom:4px;">系統設定</div>';
+            h += row('office_locations', officeLocations?.length ? officeLocations.length + ' 個地點' : badge(false, '未設定'));
+            h += row('default_work_start', esc(getCachedSetting('default_work_start') || '未設定（預設 08:00）'));
+            h += row('default_work_end', esc(getCachedSetting('default_work_end') || '未設定（預設 17:00）'));
+            h += row('late_threshold_minutes', esc(getCachedSetting('late_threshold_minutes') || '未設定（預設 5）'));
+            h += row('early_leave_threshold', esc(getCachedSetting('early_leave_threshold_minutes') || '未設定（預設 0）'));
+
+            el.innerHTML = h;
+        }
+
+        // ===== 5. RPC 測試 =====
+        async function testRPC(action) {
+            const el = document.getElementById('rpcResult');
+            el.style.display = 'block';
+            el.textContent = '執行中...';
+
+            try {
+                const loc = await getGPS();
+                const params = {
+                    p_line_user_id: liffProfile.userId,
+                    p_latitude: loc.latitude,
+                    p_longitude: loc.longitude,
+                    p_photo_url: null,
+                    p_device_id: navigator.userAgent
+                };
+                if (action) params.p_action = action;
+
+                const t0 = performance.now();
+                const { data, error } = await sb.rpc('quick_check_in', params);
+                const elapsed = Math.round(performance.now() - t0);
+
+                if (error) {
+                    el.textContent = 'RPC Error (' + elapsed + 'ms):\n' + JSON.stringify(error, null, 2);
+                } else {
+                    el.textContent = 'RPC Result (' + elapsed + 'ms):\n' + JSON.stringify(data, null, 2);
+                }
+            } catch(e) {
+                el.textContent = 'Exception: ' + e.message;
+            }
+        }
+
+        // ===== 6. 效能計時 =====
+        function showPerf() {
+            const el = document.getElementById('perfResult');
+            let h = '';
+            const keys = ['liff.init', 'checkUserStatus', 'checkTodayAttendance', 'loadSettings', 'total'];
+            for (const k of keys) {
+                if (_perf[k] !== undefined) {
+                    const ms = _perf[k];
+                    const cls = ms > 10000 ? 'err' : ms > 3000 ? 'warn' : 'ok';
+                    h += row(k, '<span class="timing">' + ms + 'ms</span> ' + (ms > 10000 ? '🐌' : ms > 3000 ? '⚠️' : '⚡'));
+                }
+            }
+            if (!h) h = row('狀態', '<span class="warn">等待初始化完成...</span>');
+            el.innerHTML = h;
+        }
+
+        // ===== 7. Storage 狀態 =====
+        function checkStorage() {
+            const el = document.getElementById('storageResult');
+            let h = '';
+            const flag = sessionStorage.getItem('needRefreshAttendance');
+            h += row('needRefreshAttendance', flag ? '<span class="warn">' + esc(flag) + ' (' + Math.round((Date.now() - parseInt(flag))/1000) + '秒前)</span>' : badge(true, '無'));
+            h += row('selectedCompanyId', '<span class="mono">' + esc(sessionStorage.getItem('selectedCompanyId') || '-') + '</span>');
+            h += row('liff_redirect_page', esc(sessionStorage.getItem('liff_redirect_page') || '-'));
+            h += row('weather_cache', sessionStorage.getItem('weather_cache') ? '有' : '無');
+            h += row('system_settings_cache', sessionStorage.getItem('system_settings_cache') ? '有 (' + (sessionStorage.getItem('system_settings_cache')?.length || 0) + ' chars)' : '無');
+
+            h += '<div style="font-size:12px;font-weight:700;color:#475569;margin-top:10px;margin-bottom:4px;">JS 變數</div>';
+            h += row('todayAttendance', window.todayAttendance ? '<span class="mono" style="font-size:10px;">' + esc(JSON.stringify(todayAttendance)).substring(0, 120) + '...</span>' : '<span class="warn">null</span>');
+            h += row('_pendingCheckout', window._pendingCheckout ? esc(JSON.stringify(window._pendingCheckout)).substring(0, 80) : 'null');
+            h += row('_settingsCache keys', window._settingsCache ? Object.keys(window._settingsCache).join(', ') : '<span class="warn">null</span>');
+            el.innerHTML = h;
+        }
+
+        // ===== 一鍵全部 =====
+        async function runAllChecks() {
+            const btn = document.getElementById('runAllBtn');
+            btn.disabled = true; btn.textContent = '⏳ 檢查中...';
+            checkEnv();
+            await checkGPS();
+            await checkCamera();
+            await checkDB();
+            showPerf();
+            checkStorage();
+            btn.disabled = false; btn.textContent = '⚡ 一鍵全部檢查';
+        }
+
+        // ===== 初始化（帶計時） =====
+        window.addEventListener('load', async () => {
+            const totalStart = performance.now();
+
+            if (typeof initializeLiff === 'undefined') {
+                document.getElementById('envResult').innerHTML = row('錯誤', badge(false, 'common.js 未載入'));
+                return;
+            }
+
+            const t0 = performance.now();
+            const initialized = await initializeLiff();
+            _perf['liff.init'] = Math.round(performance.now() - t0);
+            showPerf();
+
+            if (!initialized) {
+                document.getElementById('envResult').innerHTML = row('LIFF', badge(false, '初始化失敗或未登入'));
+                return;
+            }
+
+            const t1 = performance.now();
+            await checkUserStatus();
+            _perf['checkUserStatus'] = Math.round(performance.now() - t1);
+
+            // 單獨計時 checkTodayAttendance
+            const t2 = performance.now();
+            await checkTodayAttendance();
+            _perf['checkTodayAttendance'] = Math.round(performance.now() - t2);
+
+            _perf['total'] = Math.round(performance.now() - totalStart);
+            showPerf();
+
+            // 自動執行所有檢查
+            checkEnv();
+            checkGPS();
+            checkCamera();
+            checkDB();
+            checkStorage();
+        });
+    </script>
+</body>
+</html>
