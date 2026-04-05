@@ -310,6 +310,26 @@ export function exportBonusCSV() {
     showToast(`✅ 獎金試算_${year}.csv（${rows.length - 1} 筆）`);
 }
 
+// ===== 薪資計算參數設定 =====
+export async function loadPayrollConfig() {
+    const el = (id) => document.getElementById(id);
+    const v = (key, def) => getCachedSetting(key) ?? def;
+    if (el('cfgLateDeduction')) el('cfgLateDeduction').value = v('late_deduction_per_time', 100);
+    if (el('cfgOtRate1')) el('cfgOtRate1').value = v('overtime_rate', 1.34);
+    if (el('cfgOtRate2')) el('cfgOtRate2').value = v('overtime_rate_2', 1.67);
+    if (el('cfgWorkDays')) el('cfgWorkDays').value = v('work_days_per_month', 22);
+}
+
+export async function savePayrollConfig() {
+    try {
+        await saveSetting('late_deduction_per_time', parseInt(document.getElementById('cfgLateDeduction')?.value) || 100, '遲到每次扣款金額');
+        await saveSetting('overtime_rate', parseFloat(document.getElementById('cfgOtRate1')?.value) || 1.34, '加班費倍率（前2h）');
+        await saveSetting('overtime_rate_2', parseFloat(document.getElementById('cfgOtRate2')?.value) || 1.67, '加班費倍率（2h後）');
+        await saveSetting('work_days_per_month', parseInt(document.getElementById('cfgWorkDays')?.value) || 22, '每月工作天數');
+        showToast('✅ 薪資計算參數已儲存');
+    } catch(e) { showToast('❌ 儲存失敗'); console.error(e); }
+}
+
 // ===== 薪資發放 =====
 export function initPayrollPage() {
     const yEl = document.getElementById('payrollYear');
@@ -323,6 +343,7 @@ export function initPayrollPage() {
     yEl.value = prev.getFullYear();
     mEl.value = prev.getMonth() + 1;
     loadSalarySettingList();
+    loadPayrollConfig();
 }
 
 export function toggleSalarySettingPanel() {
@@ -403,6 +424,14 @@ export async function loadPayrollData() {
 
         payrollBrackets = bracketRes.data || [];
 
+        // 讀取薪資計算設定（遲到扣款、加班倍率）
+        const payrollSettings = {
+            late_deduction_per_time: parseInt(getCachedSetting('late_deduction_per_time')) || 100,
+            overtime_rate: parseFloat(getCachedSetting('overtime_rate')) || 1.34,
+            overtime_rate_2: parseFloat(getCachedSetting('overtime_rate_2')) || 1.67,
+            work_days_per_month: parseInt(getCachedSetting('work_days_per_month')) || 22
+        };
+
         const salaryMap = {};
         (salaryRes.data || []).forEach(s => { salaryMap[s.employee_id] = s; });
 
@@ -449,7 +478,7 @@ export async function loadPayrollData() {
             const atts = attMap[emp.id] || [];
             const leaves = leaveMap[emp.id] || { total: 0, personal: 0 };
             const otHours = otMap[emp.id] || 0;
-            return calcEmployeePayroll(emp, ss, atts, leaves, otHours, year, month);
+            return calcEmployeePayroll(emp, ss, atts, leaves, otHours, year, month, payrollSettings);
         }).filter(Boolean);
 
         populatePayrollDropdown();
@@ -474,7 +503,8 @@ function prLookupBracket(salary) {
     return b || payrollBrackets[payrollBrackets.length - 1];
 }
 
-function calcEmployeePayroll(emp, ss, atts, leaves, otHours, year, month) {
+function calcEmployeePayroll(emp, ss, atts, leaves, otHours, year, month, payrollSettings) {
+    const _ps = payrollSettings || {};
     const salaryType = ss.salary_type || 'monthly';
     const baseSalary = ss.base_salary || 0;
     const mealAllowance = ss.meal_allowance || 0;
@@ -511,9 +541,11 @@ function calcEmployeePayroll(emp, ss, atts, leaves, otHours, year, month) {
 
     let otPay = 0;
     if (otHours > 0) {
+        const otRate1 = _ps.overtime_rate || 1.34;
+        const otRate2 = _ps.overtime_rate_2 || 1.67;
         const h1 = Math.min(otHours, 2);
         const h2 = Math.max(Math.min(otHours - 2, 2), 0);
-        otPay = Math.round(hourlyRate * 1.34 * h1) + Math.round(hourlyRate * 1.67 * h2);
+        otPay = Math.round(hourlyRate * otRate1 * h1) + Math.round(hourlyRate * otRate2 * h2);
     }
 
     const gross = monthSalary + otPay + fullAttAmount + mealAmount + posAmount;
@@ -530,7 +562,8 @@ function calcEmployeePayroll(emp, ss, atts, leaves, otHours, year, month) {
 
     const pensionSelf = Math.round(monthSalary * pensionRate / 100);
     const incomeTax = Math.round(gross * taxRate / 100);
-    const lateDed = lateCount * 100;
+    const lateDeductPerTime = _ps.late_deduction_per_time || 100;
+    const lateDed = lateCount * lateDeductPerTime;
     const personalLeaveDed = Math.round(dailyRate * personalLeaveDays);
     const adj = payrollAdjustments[emp.id]?.amount || 0;
     const totalDeduct = laborIns + healthIns + pensionSelf + incomeTax + lateDed + personalLeaveDed - adj;

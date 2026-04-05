@@ -45,6 +45,7 @@ import {
     BONUS_MATRIX, loadHybridBonusData, renderSelectedBonusCard,
     updatePerformance, updateAdjustment, toggleMatrixRef,
     saveAllBonuses, exportBonusCSV,
+    loadPayrollConfig, savePayrollConfig,
     initPayrollPage, toggleSalarySettingPanel, loadSalarySettingList,
     loadPayrollData, renderPayrollView, updatePayrollAdjustment,
     saveAllPayroll, publishPayroll, exportPayrollCSV,
@@ -188,6 +189,8 @@ window.updateAdjustment = updateAdjustment;
 window.toggleMatrixRef = toggleMatrixRef;
 window.saveAllBonuses = saveAllBonuses;
 window.exportBonusCSV = exportBonusCSV;
+window.loadPayrollConfig = loadPayrollConfig;
+window.savePayrollConfig = savePayrollConfig;
 window.initPayrollPage = initPayrollPage;
 window.toggleSalarySettingPanel = toggleSalarySettingPanel;
 window.loadSalarySettingList = loadSalarySettingList;
