@@ -174,10 +174,12 @@
                     }
                 }
 
+                const rpcAction = currentCheckInType === 'in' ? 'check_in' : 'check_out';
                 const { data: rpcData, error: rpcError } = await sb.rpc('quick_check_in', {
                     p_line_user_id: liffProfile.userId,
                     p_latitude: loc.latitude, p_longitude: loc.longitude,
-                    p_photo_url: publicUrl, p_device_id: navigator.userAgent
+                    p_photo_url: publicUrl, p_device_id: navigator.userAgent,
+                    p_action: rpcAction
                 });
 
                 if (rpcError) throw rpcError;
@@ -186,7 +188,7 @@
                 clearTimeout(safetyTimer);
                 if (rpcData.location_name) localStorage.setItem('last_location', rpcData.location_name);
 
-                const typeText = currentCheckInType === 'in' ? '上班' : '下班';
+                const typeText = rpcData.type === 'check_out' ? '下班' : '上班';
                 const locText = rpcData.location_name || '公司';
                 const nowTime = new Date().toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', hour12: false });
 
@@ -311,16 +313,17 @@
                         }
                     }
 
+                    const rpcAction2 = currentCheckInType === 'in' ? 'check_in' : 'check_out';
                     const { data: rpcData, error: rpcError } = await sb.rpc('quick_check_in', {
                         p_line_user_id: liffProfile.userId,
                         p_latitude: loc.latitude, p_longitude: loc.longitude,
-                        p_photo_url: publicUrl, p_device_id: navigator.userAgent
+                        p_photo_url: publicUrl, p_device_id: navigator.userAgent,
+                        p_action: rpcAction2
                     });
                     if (rpcError) throw rpcError;
                     if (!rpcData.success) throw new Error(rpcData.error);
 
                     if (rpcData.location_name) localStorage.setItem('last_location', rpcData.location_name);
-                    // 用 RPC 回傳的 type 判斷（跨日打卡時使用者按上班但 RPC 執行下班）
                     const actualType = rpcData.type === 'check_out' ? '下班' : '上班';
                     const locText = rpcData.location_name || '公司';
                     const nowTime = new Date().toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', hour12: false });
