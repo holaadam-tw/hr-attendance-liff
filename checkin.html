@@ -17,7 +17,7 @@
 
     <div class="container">
         <div id="checkInPage" class="page active">
-            <button class="btn btn-secondary" onclick="window.location.href='index.html'" style="width:auto;margin-bottom:10px;margin-top:0;">← 返回</button>
+            <button class="btn btn-secondary" onclick="goBack()" style="width:auto;margin-bottom:10px;margin-top:0;">← 返回</button>
             <div class="checkin-page">
                 <h2 id="checkInTitle" style="text-align:center;font-size:18px;font-weight:800;color:#0F172A;">📍 上班打卡</h2>
                 <div id="checkInStatus" class="status-box show info" style="margin-top:12px;">準備開啟相機...</div>
@@ -440,6 +440,7 @@
         // ===== 打卡成功畫面 =====
         function showCheckInSuccess(typeText, location, time) {
             stopCamera(); // 成功後立即釋放相機
+            sessionStorage.setItem('needRefreshAttendance', '1');
             const container = document.querySelector('.container');
             if (container) container.innerHTML = `
                 <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80vh;padding:20px;text-align:center;">
@@ -462,8 +463,14 @@
         }
 
         function goBack() {
-            // 加 _t 參數避免 BFCache，確保 index.html 完整重載
-            window.location.href = 'index.html?_t=' + Date.now();
+            // 設 flag 通知 index.html 刷新打卡狀態（不完整重載，避免 liff.init 慢）
+            sessionStorage.setItem('needRefreshAttendance', '1');
+            // 優先 history.back（BFCache 快），fallback 到 location.href
+            if (window.history.length > 1) {
+                window.history.back();
+            } else {
+                window.location.href = 'index.html';
+            }
         }
 
         function closeLiff() {
@@ -591,12 +598,12 @@
             }
             
             document.getElementById('lunchOverlay')?.remove();
-            setTimeout(() => { window.location.href = 'index.html'; }, 1200);
+            setTimeout(() => { goBack(); }, 1200);
         }
 
         function skipLunch() {
             document.getElementById('lunchOverlay')?.remove();
-            setTimeout(() => { window.location.href = 'index.html'; }, 500);
+            setTimeout(() => { goBack(); }, 500);
         }
     </script>
 </body>
