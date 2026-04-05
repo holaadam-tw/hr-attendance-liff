@@ -128,11 +128,12 @@
 
                     <!-- 薪資內容（有資料時顯示） -->
                     <div id="salaryContent" style="display:none;">
-                        <div style="background:var(--primary-gradient);border-radius:16px;padding:20px;text-align:center;margin-bottom:20px;">
+                        <div style="background:var(--primary-gradient);border-radius:16px;padding:20px;text-align:center;margin-bottom:12px;">
                             <div style="font-size:12px;color:rgba(255,255,255,0.7);font-weight:600;">實發薪資</div>
                             <div id="netSalary" style="font-size:36px;font-weight:900;color:#fff;margin-top:6px;letter-spacing:-1px;">NT$ 0</div>
                             <div id="paidDate" style="font-size:12px;color:rgba(255,255,255,0.6);margin-top:4px;"></div>
                         </div>
+                        <div id="salaryTypeInfo" style="text-align:center;font-size:13px;font-weight:700;color:#64748B;margin-bottom:16px;padding:8px;background:#F8FAFC;border-radius:10px;"></div>
 
                         <!-- 出勤概況 -->
                         <div class="att-overview">
@@ -476,6 +477,17 @@
             document.getElementById('sdWorkDays').textContent = workDays;
             document.getElementById('sdLate').textContent = lateCount;
             document.getElementById('sdLeave').textContent = leaveDays;
+
+            // 制度顯示
+            const typeInfoEl = document.getElementById('salaryTypeInfo');
+            if (typeInfoEl) {
+                const st = s.salary_type || cd.salary_type || 'monthly';
+                const origBase = cd.original_base || s.base_salary || 0;
+                const totalHours = cd.total_work_hours || 0;
+                if (st === 'hourly') typeInfoEl.textContent = `⏰ 時薪 ${formatNT(origBase)} · 本月工時 ${totalHours}h`;
+                else if (st === 'daily') typeInfoEl.textContent = `📅 日薪 ${formatNT(origBase)} · 本月出勤 ${workDays} 天`;
+                else typeInfoEl.textContent = `💼 月薪 ${formatNT(origBase)}`;
+            }
             
             // 額外統計（加班、夜班等）
             let extraHtml = '';
@@ -490,7 +502,7 @@
 
             // 收入明細（帶計算說明）
             const income = [
-                { label:'基本薪資', value: s.base_salary||0, desc: s.salary_type === 'monthly' ? '固定月薪' : (s.salary_type === 'daily' ? `日薪 × ${workDays}天` : `時薪 × 工時`) },
+                { label:'基本薪資', value: s.base_salary||0, desc: s.salary_type === 'monthly' ? '固定月薪' : (s.salary_type === 'daily' ? `日薪 ${formatNT(cd.original_base||0)} × ${workDays}天` : `時薪 ${formatNT(cd.original_base||0)} × ${cd.total_work_hours||0}h`) },
                 { label:'職務加給', value: s.position_allowance||0, desc: cd.position_mode === 'daily' ? `${formatNT(cd.position_daily||0)}/天 × ${workDays}天` : '每月固定' },
                 { label:'加班費', value: s.overtime_pay||0, desc: totalOT > 0 ? `${totalOT}小時` : '' },
                 { label:'全勤獎金', value: s.full_attendance_bonus||0, desc: (lateCount === 0 && leaveDays === 0) ? '✅ 達成' : '❌ 未達成' },

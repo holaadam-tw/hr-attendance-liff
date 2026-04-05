@@ -365,25 +365,88 @@ export async function loadSalarySettingList() {
         ]);
         const ssMap = {};
         (ssRes.data || []).forEach(s => { ssMap[s.employee_id] = s; });
-        const typeLabel = { monthly: '月薪', daily: '日薪', hourly: '時薪' };
         const emps = empRes.data || [];
         if (emps.length === 0) { listEl.innerHTML = '<p style="text-align:center;color:#94A3B8;">無員工</p>'; return; }
 
-        listEl.innerHTML = emps.map(emp => {
+        const calcHourlyDisplay = (type, base) => {
+            if (type === 'hourly') return `NT$${base}/h`;
+            if (type === 'daily') return `NT$${Math.round(base / 8)}/h`;
+            if (type === 'monthly') return `NT$${Math.round(base / 30 / 8)}/h`;
+            return '-';
+        };
+
+        let html = '<div style="display:grid;grid-template-columns:auto 1fr auto auto auto;gap:6px 8px;align-items:center;font-size:12px;">';
+        html += '<div style="font-weight:700;color:#64748B;">姓名</div><div style="font-weight:700;color:#64748B;">部門</div><div style="font-weight:700;color:#64748B;">制度</div><div style="font-weight:700;color:#64748B;">金額</div><div style="font-weight:700;color:#64748B;">時薪換算</div>';
+        emps.forEach(emp => {
             const ss = ssMap[emp.id];
-            const salaryText = ss ? `${typeLabel[ss.salary_type] || '月薪'} ${formatNT(ss.base_salary)}` : '<span style="color:#EF4444;">未設定</span>';
-            return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 4px;border-bottom:1px solid #F1F5F9;">
-                <div>
-                    <span style="font-weight:600;">${escapeHTML(emp.name)}</span>
-                    <span style="color:#94A3B8;font-size:11px;margin-left:4px;">${emp.department || ''}</span>
-                </div>
-                <div style="display:flex;align-items:center;gap:8px;">
-                    <span style="font-size:12px;color:#64748B;">${salaryText}</span>
-                    <button onclick="openSalarySettingModal('${emp.id}','${escapeHTML(emp.name)}')" style="padding:4px 10px;border:1px solid #D1FAE5;border-radius:6px;background:#ECFDF5;font-size:11px;font-weight:700;cursor:pointer;color:#059669;">設定</button>
-                </div>
-            </div>`;
-        }).join('');
+            const curType = ss?.salary_type || 'hourly';
+            const curBase = ss?.base_salary || (curType === 'hourly' ? 196 : '');
+            html += `<div style="font-weight:600;white-space:nowrap;">${escapeHTML(emp.name)}</div>`;
+            html += `<div style="color:#94A3B8;font-size:11px;">${emp.department || '-'}</div>`;
+            html += `<select data-emp-id="${emp.id}" data-field="type" onchange="onBatchSalaryTypeChange(this)" style="padding:6px;border:1px solid #E2E8F0;border-radius:6px;font-size:12px;font-weight:600;">
+                <option value="hourly"${curType === 'hourly' ? ' selected' : ''}>時薪</option>
+                <option value="monthly"${curType === 'monthly' ? ' selected' : ''}>月薪</option>
+                <option value="daily"${curType === 'daily' ? ' selected' : ''}>日薪</option>
+            </select>`;
+            html += `<input type="number" data-emp-id="${emp.id}" data-field="base" value="${curBase}" style="width:80px;padding:6px;border:1px solid #E2E8F0;border-radius:6px;font-size:12px;font-weight:700;text-align:right;" oninput="onBatchSalaryBaseChange(this)">`;
+            html += `<span data-emp-id="${emp.id}" data-field="hourly-display" style="font-size:11px;color:#64748B;">${curBase ? calcHourlyDisplay(curType, curBase) : '-'}</span>`;
+        });
+        html += '</div>';
+        html += `<button onclick="saveAllSalarySettings()" style="margin-top:12px;width:100%;padding:10px;border:none;border-radius:10px;background:linear-gradient(135deg,#059669,#10B981);color:#fff;font-weight:700;font-size:13px;cursor:pointer;">💾 全部儲存</button>`;
+        listEl.innerHTML = html;
     } catch(e) { listEl.innerHTML = '<p style="color:#EF4444;text-align:center;">載入失敗</p>'; console.error(e); }
+}
+
+export function onBatchSalaryTypeChange(sel) {
+    const empId = sel.dataset.empId;
+    const baseInput = document.querySelector(`input[data-emp-id="${empId}"][data-field="base"]`);
+    if (sel.value === 'hourly') { baseInput.value = 196; }
+    else { baseInput.value = ''; }
+    onBatchSalaryBaseChange(baseInput);
+}
+
+export function onBatchSalaryBaseChange(input) {
+    const empId = input.dataset.empId;
+    const typeSel = document.querySelector(`select[data-emp-id="${empId}"][data-field="type"]`);
+    const display = document.querySelector(`span[data-emp-id="${empId}"][data-field="hourly-display"]`);
+    const base = parseFloat(input.value) || 0;
+    const type = typeSel.value;
+    if (!base) { display.textContent = '-'; return; }
+    if (type === 'hourly') display.textContent = `NT$${base}/h`;
+    else if (type === 'daily') display.textContent = `NT$${Math.round(base / 8)}/h`;
+    else display.textContent = `NT$${Math.round(base / 30 / 8)}/h`;
+}
+
+export async function saveAllSalarySettings() {
+    const typeEls = document.querySelectorAll('select[data-field="type"]');
+    if (typeEls.length === 0) return;
+    const btn = document.querySelector('#salarySettingList button');
+    const origText = btn.textContent;
+    btn.disabled = true; btn.textContent = '⏳ 儲存中...';
+    let ok = 0, fail = 0;
+    try {
+        for (const sel of typeEls) {
+            const empId = sel.dataset.empId;
+            const salaryType = sel.value;
+            const baseInput = document.querySelector(`input[data-emp-id="${empId}"][data-field="base"]`);
+            const baseSalary = parseFloat(baseInput.value) || 0;
+            if (!baseSalary) { fail++; continue; }
+
+            await sb.from('salary_settings').update({ is_current: false }).eq('employee_id', empId).eq('is_current', true);
+            const { error } = await sb.from('salary_settings').insert({
+                employee_id: empId, salary_type: salaryType, base_salary: baseSalary, is_current: true
+            });
+            if (error) { fail++; console.error(error); continue; }
+
+            const hourlyRate = salaryType === 'hourly' ? baseSalary
+                : salaryType === 'daily' ? Math.round(baseSalary / 8 * 100) / 100
+                : Math.round(baseSalary / 30 / 8 * 100) / 100;
+            await sb.from('employees').update({ salary_type: salaryType, hourly_rate: hourlyRate }).eq('id', empId);
+            ok++;
+        }
+        showToast(fail ? `✅ ${ok} 筆儲存，❌ ${fail} 筆失敗（金額為空）` : `✅ ${ok} 筆薪資設定已儲存`);
+    } catch(e) { showToast('❌ 儲存失敗：' + e.message); console.error(e); }
+    finally { btn.disabled = false; btn.textContent = origText; }
 }
 
 export async function loadPayrollData() {
@@ -625,24 +688,48 @@ function renderAllPayrollTable() {
         el.innerHTML = '<p style="text-align:center;color:#94A3B8;padding:20px;">無資料（請確認員工已設定薪資）</p>';
         return;
     }
+    const typeLabel = { monthly: '月薪', daily: '日薪', hourly: '時薪' };
+    const thStyle = 'padding:10px 6px;font-weight:800;color:#475569;white-space:nowrap;';
     let html = '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12px;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.08);">';
     html += '<thead><tr style="background:#F1F5F9;">';
-    html += '<th style="padding:10px 8px;text-align:left;font-weight:800;color:#475569;">姓名</th>';
-    html += '<th style="padding:10px 4px;text-align:right;font-weight:800;color:#475569;">底薪</th>';
-    html += '<th style="padding:10px 4px;text-align:right;font-weight:800;color:#475569;">加班</th>';
-    html += '<th style="padding:10px 4px;text-align:right;font-weight:800;color:#475569;">扣款</th>';
-    html += '<th style="padding:10px 8px;text-align:right;font-weight:800;color:#059669;">實發</th>';
+    html += `<th style="${thStyle}text-align:left;">姓名</th>`;
+    html += `<th style="${thStyle}text-align:center;">制度</th>`;
+    html += `<th style="${thStyle}text-align:right;">工時</th>`;
+    html += `<th style="${thStyle}text-align:right;">底薪</th>`;
+    html += `<th style="${thStyle}text-align:right;">加班</th>`;
+    html += `<th style="${thStyle}text-align:right;color:#DC2626;">扣款</th>`;
+    html += `<th style="${thStyle}text-align:right;color:#059669;">實發</th>`;
     html += '</tr></thead><tbody>';
 
+    let sumBase = 0, sumOt = 0, sumDeduct = 0, sumNet = 0;
     payrollEmployees.forEach(emp => {
+        const cd = emp.calculation_details || {};
+        const st = cd.salary_type || emp.salary_type || 'monthly';
+        let baseDesc;
+        if (st === 'hourly') baseDesc = `${formatNT(cd.original_base || 0)}/h × ${cd.total_work_hours || 0}h`;
+        else if (st === 'daily') baseDesc = `${formatNT(cd.original_base || 0)}/日 × ${cd.actual_days || 0}天`;
+        else baseDesc = `固定 ${formatNT(emp.base_salary)}`;
+
+        sumBase += emp.base_salary; sumOt += emp.overtime_pay; sumDeduct += emp.total_deduction; sumNet += emp.net_salary;
+
         html += `<tr onclick="document.getElementById('payrollEmpDropdown').value='${emp.employee_id}';renderPayrollView();" style="cursor:pointer;border-bottom:1px solid #F1F5F9;transition:background 0.15s;" onmouseover="this.style.background='#F8FAFC'" onmouseout="this.style.background=''">`;
-        html += `<td style="padding:10px 8px;"><div style="font-weight:700;color:#0F172A;">${emp.name}</div><div style="font-size:11px;color:#94A3B8;">${emp.employee_number} · ${emp.department}</div></td>`;
-        html += `<td style="padding:10px 4px;text-align:right;color:#334155;">${Math.round(emp.base_salary).toLocaleString()}</td>`;
+        html += `<td style="padding:10px 6px;"><div style="font-weight:700;color:#0F172A;">${emp.name}</div><div style="font-size:11px;color:#94A3B8;">${emp.employee_number} · ${emp.department}</div></td>`;
+        html += `<td style="padding:10px 4px;text-align:center;"><span style="background:${st === 'hourly' ? '#DBEAFE' : st === 'monthly' ? '#D1FAE5' : '#FEF3C7'};color:${st === 'hourly' ? '#1D4ED8' : st === 'monthly' ? '#059669' : '#92400E'};padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">${typeLabel[st] || st}</span></td>`;
+        html += `<td style="padding:10px 4px;text-align:right;color:#64748B;font-size:11px;">${(cd.total_work_hours || 0)}h</td>`;
+        html += `<td style="padding:10px 4px;text-align:right;color:#334155;"><div>${Math.round(emp.base_salary).toLocaleString()}</div><div style="font-size:10px;color:#94A3B8;">${baseDesc}</div></td>`;
         html += `<td style="padding:10px 4px;text-align:right;color:#0369A1;">${emp.overtime_pay > 0 ? '+' + Math.round(emp.overtime_pay).toLocaleString() : '-'}</td>`;
         html += `<td style="padding:10px 4px;text-align:right;color:#DC2626;">-${Math.round(emp.total_deduction).toLocaleString()}</td>`;
-        html += `<td style="padding:10px 8px;text-align:right;font-weight:900;color:#059669;">${Math.round(emp.net_salary).toLocaleString()}</td>`;
+        html += `<td style="padding:10px 6px;text-align:right;font-weight:900;color:#059669;">${Math.round(emp.net_salary).toLocaleString()}</td>`;
         html += '</tr>';
     });
+
+    html += `<tr style="background:#F8FAFC;border-top:2px solid #E2E8F0;">`;
+    html += `<td colspan="3" style="padding:10px 6px;font-weight:800;color:#0F172A;">合計（${payrollEmployees.length} 人）</td>`;
+    html += `<td style="padding:10px 4px;text-align:right;font-weight:800;color:#334155;">${Math.round(sumBase).toLocaleString()}</td>`;
+    html += `<td style="padding:10px 4px;text-align:right;font-weight:800;color:#0369A1;">${sumOt > 0 ? '+' + Math.round(sumOt).toLocaleString() : '-'}</td>`;
+    html += `<td style="padding:10px 4px;text-align:right;font-weight:800;color:#DC2626;">-${Math.round(sumDeduct).toLocaleString()}</td>`;
+    html += `<td style="padding:10px 6px;text-align:right;font-weight:900;color:#059669;font-size:14px;">${Math.round(sumNet).toLocaleString()}</td>`;
+    html += '</tr>';
 
     html += '</tbody></table></div>';
     el.innerHTML = html;
@@ -842,6 +929,75 @@ export async function publishPayroll() {
     } finally {
         btn.disabled = false; btn.textContent = '📢 發布薪資（員工可見）';
     }
+}
+
+export function exportPayrollExcel() {
+    if (payrollEmployees.length === 0) { showToast('⚠️ 請先計算薪資'); return; }
+    if (typeof XLSX === 'undefined') { showToast('❌ SheetJS 載入失敗'); return; }
+    const year = parseInt(document.getElementById('payrollYear').value);
+    const month = parseInt(document.getElementById('payrollMonth').value);
+    const typeMap = { monthly: '月薪', daily: '日薪', hourly: '時薪' };
+
+    // Sheet 1: 薪資總表
+    const summaryHeader = ['工號','姓名','部門','制度','工時','底薪','加班費','全勤獎金','伙食津貼','職務加給','勞保','健保','勞退','所得稅','遲到扣款','事假扣款','手動調整','應發合計','扣款合計','實發金額'];
+    const summaryRows = payrollEmployees.map(emp => {
+        const cd = emp.calculation_details || {};
+        return [
+            emp.employee_number, emp.name, emp.department,
+            typeMap[emp.salary_type] || emp.salary_type,
+            Math.round((cd.total_work_hours || 0) * 10) / 10,
+            Math.round(emp.base_salary), Math.round(emp.overtime_pay), Math.round(emp.full_attendance_bonus),
+            Math.round(emp.meal_allowance), Math.round(emp.position_allowance),
+            Math.round(emp.labor_insurance), Math.round(emp.health_insurance), Math.round(emp.pension_self), Math.round(emp.income_tax),
+            Math.round(emp.late_deduction), Math.round(emp.personal_leave_deduction || 0),
+            Math.round(emp.manual_adjustment),
+            Math.round(emp.gross_salary), Math.round(emp.total_deduction), Math.round(emp.net_salary)
+        ];
+    });
+    // 合計列
+    const sumRow = ['','','合計','','',
+        summaryRows.reduce((s,r) => s + r[5], 0), summaryRows.reduce((s,r) => s + r[6], 0),
+        summaryRows.reduce((s,r) => s + r[7], 0), summaryRows.reduce((s,r) => s + r[8], 0),
+        summaryRows.reduce((s,r) => s + r[9], 0), summaryRows.reduce((s,r) => s + r[10], 0),
+        summaryRows.reduce((s,r) => s + r[11], 0), summaryRows.reduce((s,r) => s + r[12], 0),
+        summaryRows.reduce((s,r) => s + r[13], 0), summaryRows.reduce((s,r) => s + r[14], 0),
+        summaryRows.reduce((s,r) => s + r[15], 0), summaryRows.reduce((s,r) => s + r[16], 0),
+        summaryRows.reduce((s,r) => s + r[17], 0), summaryRows.reduce((s,r) => s + r[18], 0),
+        summaryRows.reduce((s,r) => s + r[19], 0)
+    ];
+    const ws1Data = [summaryHeader, ...summaryRows, sumRow];
+    const ws1 = XLSX.utils.aoa_to_sheet(ws1Data);
+    // 自動欄寬
+    ws1['!cols'] = summaryHeader.map((h, i) => ({ wch: Math.max(h.length * 2, ...ws1Data.map(r => String(r[i] ?? '').length + 2), 8) }));
+
+    // Sheet 2: 計算明細
+    const detailHeader = ['工號','姓名','制度','原始底薪/時薪','實際出勤天','遲到次數','請假天數','事假天數','加班時數','總工時','日薪率','時薪率','勞退自提%','稅率%','全勤'];
+    const detailRows = payrollEmployees.map(emp => {
+        const cd = emp.calculation_details || {};
+        return [
+            emp.employee_number, emp.name,
+            typeMap[cd.salary_type] || cd.salary_type,
+            cd.original_base, cd.actual_days, cd.late_count,
+            cd.leave_days, cd.personal_leave_days, cd.overtime_hours,
+            cd.total_work_hours, cd.daily_rate, cd.hourly_rate,
+            cd.pension_self_rate, cd.tax_rate,
+            cd.full_attendance ? '是' : '否'
+        ];
+    });
+    const ws2Data = [detailHeader, ...detailRows];
+    const ws2 = XLSX.utils.aoa_to_sheet(ws2Data);
+    ws2['!cols'] = detailHeader.map((h, i) => ({ wch: Math.max(h.length * 2, ...ws2Data.map(r => String(r[i] ?? '').length + 2), 8) }));
+
+    // 建立 Workbook
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws1, '薪資總表');
+    XLSX.utils.book_append_sheet(wb, ws2, '計算明細');
+
+    const fileName = `薪資報表_${year}年${month}月.xlsx`;
+    XLSX.writeFile(wb, fileName);
+
+    writeAuditLog('export', 'payroll', null, fileName, { rows: summaryRows.length });
+    showToast(`✅ ${fileName}（${summaryRows.length} 筆）`);
 }
 
 export function exportPayrollCSV() {

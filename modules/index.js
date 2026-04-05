@@ -47,8 +47,9 @@ import {
     saveAllBonuses, exportBonusCSV,
     loadPayrollConfig, savePayrollConfig,
     initPayrollPage, toggleSalarySettingPanel, loadSalarySettingList,
+    onBatchSalaryTypeChange, onBatchSalaryBaseChange, saveAllSalarySettings,
     loadPayrollData, renderPayrollView, updatePayrollAdjustment,
-    saveAllPayroll, publishPayroll, exportPayrollCSV,
+    saveAllPayroll, publishPayroll, exportPayrollExcel, exportPayrollCSV,
     loadInsuranceBrackets, showInsModal, closeInsModal,
     editInsBracket, saveInsBracket, deleteInsBracket, updateAllInsRates,
     switchPayTab
@@ -194,11 +195,15 @@ window.savePayrollConfig = savePayrollConfig;
 window.initPayrollPage = initPayrollPage;
 window.toggleSalarySettingPanel = toggleSalarySettingPanel;
 window.loadSalarySettingList = loadSalarySettingList;
+window.onBatchSalaryTypeChange = onBatchSalaryTypeChange;
+window.onBatchSalaryBaseChange = onBatchSalaryBaseChange;
+window.saveAllSalarySettings = saveAllSalarySettings;
 window.loadPayrollData = loadPayrollData;
 window.renderPayrollView = renderPayrollView;
 window.updatePayrollAdjustment = updatePayrollAdjustment;
 window.saveAllPayroll = saveAllPayroll;
 window.publishPayroll = publishPayroll;
+window.exportPayrollExcel = exportPayrollExcel;
 window.exportPayrollCSV = exportPayrollCSV;
 window.loadInsuranceBrackets = loadInsuranceBrackets;
 window.showInsModal = showInsModal;
