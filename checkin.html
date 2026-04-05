@@ -440,7 +440,7 @@
         // ===== 打卡成功畫面 =====
         function showCheckInSuccess(typeText, location, time) {
             stopCamera(); // 成功後立即釋放相機
-            sessionStorage.setItem('needRefreshAttendance', '1');
+            sessionStorage.setItem('needRefreshAttendance', String(Date.now()));
             const container = document.querySelector('.container');
             if (container) container.innerHTML = `
                 <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80vh;padding:20px;text-align:center;">
@@ -463,11 +463,14 @@
         }
 
         function goBack() {
-            // 設 flag 通知 index.html 刷新打卡狀態（不完整重載，避免 liff.init 慢）
-            sessionStorage.setItem('needRefreshAttendance', '1');
-            // 優先 history.back（BFCache 快），fallback 到 location.href
+            sessionStorage.setItem('needRefreshAttendance', String(Date.now()));
+            // 先試 history.back（BFCache 快），2 秒後若還在此頁則 fallback 到完整導航
             if (window.history.length > 1) {
                 window.history.back();
+                setTimeout(function() {
+                    // 還在 checkin.html → history.back 沒用（LIFF 可能回到聊天室）
+                    window.location.href = 'index.html';
+                }, 2000);
             } else {
                 window.location.href = 'index.html';
             }

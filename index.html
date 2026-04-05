@@ -607,8 +607,8 @@
         });
 
         // ===== 頁面返回時自動刷新打卡狀態 =====
-        // checkin.html 打卡成功後設 sessionStorage('needRefreshAttendance')
-        // index.html 回來時檢查 flag → 只重查考勤（不重新 liff.init，1-2 秒完成）
+        // checkin.html 打卡成功後設 sessionStorage('needRefreshAttendance', timestamp)
+        // index.html 多處檢查 flag → 只重查考勤（不重新 liff.init）
         let _lastRefresh = 0;
         async function refreshAttendanceStatus() {
             if (!currentEmployee?.id) return;
@@ -618,13 +618,22 @@
             await checkTodayAttendance();
             loadTodayStatus();
         }
-        // 檢查是否需要刷新（打卡成功返回）
         function checkRefreshFlag() {
-            if (sessionStorage.getItem('needRefreshAttendance')) {
+            const flag = sessionStorage.getItem('needRefreshAttendance');
+            if (!flag) return;
+            // 只處理 60 秒內的 flag（避免舊 flag 殘留）
+            const elapsed = Date.now() - parseInt(flag, 10);
+            if (isNaN(elapsed) || elapsed < 60000) {
                 sessionStorage.removeItem('needRefreshAttendance');
                 refreshAttendanceStatus();
+            } else {
+                sessionStorage.removeItem('needRefreshAttendance');
             }
         }
+        // 初始化完成後立即檢查（完整重載時走這條路）
+        // 放在 load 事件尾端，此時 currentEmployee 已設定好
+        setTimeout(checkRefreshFlag, 500);
+        // 三重備援（BFCache / 頁面切換 / 焦點恢復）
         document.addEventListener('visibilitychange', function() {
             if (!document.hidden) checkRefreshFlag();
         });
