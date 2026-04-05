@@ -605,6 +605,22 @@
                 } catch(e) { console.warn('非 LIFF 環境，功能格子使用預設值'); }
             }
         });
+
+        // ===== 頁面返回時自動刷新打卡狀態 =====
+        // 從 checkin.html 返回 index.html 時，BFCache 不會重新執行 JS
+        // 用 visibilitychange + pageshow 確保資料更新
+        document.addEventListener('visibilitychange', async function() {
+            if (!document.hidden && currentEmployee?.id) {
+                await checkTodayAttendance();
+                loadTodayStatus();
+            }
+        });
+        window.addEventListener('pageshow', async function(e) {
+            if (e.persisted && currentEmployee?.id) {
+                await checkTodayAttendance();
+                loadTodayStatus();
+            }
+        });
     </script>
 </body>
 </html>

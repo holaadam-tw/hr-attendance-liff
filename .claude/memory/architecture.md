@@ -126,8 +126,7 @@ async function saveSetting(key, value, description) {
 - 2026-04-03: 034_add_benmi_office_location.sql — 本米土城店 GPS 24.976995,121.442323 半徑 300m
 - 2026-04-03: 全部 19 個 HTML 加 <link rel="icon" href="data:,"> 消除 favicon 404
 - 2026-04-03: .github/workflows/ci.yml — push main/dev 或 PR 自動跑 npm test
-<<<<<<< Updated upstream
-=======
 - 2026-04-04: 程式碼品質優化（OpenSpec 歸檔 archive/2026-04-04_code-quality）：common.js 98 var→let/const、5 處 innerHTML 加 escapeHTML、5 個空 catch 加 console.error、9 處 SELECT * 改指定欄位、11 個 console.log 清除、admin.html 4 img 加 alt
 - 2026-04-05: 036_fix_overnight_checkout.sql — 跨日打卡修正：RPC 查 2 天內未下班記錄（今天→昨天）；跨日下班不判定早退；前端 _pendingCheckout 顯示下班按鈕+🌙提示；checkin.html 用 rpcData.type 判斷顯示
+- 2026-04-05: index.html 打卡狀態返回刷新：加 visibilitychange + pageshow 事件自動重查 checkTodayAttendance + loadTodayStatus
 
