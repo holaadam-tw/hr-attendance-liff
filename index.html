@@ -607,27 +607,32 @@
         });
 
         // ===== 頁面返回時自動刷新打卡狀態 =====
-        // LINE LIFF WebView 回退行為不一定觸發 visibilitychange
-        // 多重保險：visibilitychange + pageshow + focus
+        // checkin.html 打卡成功後設 sessionStorage('needRefreshAttendance')
+        // index.html 回來時檢查 flag → 只重查考勤（不重新 liff.init，1-2 秒完成）
         let _lastRefresh = 0;
         async function refreshAttendanceStatus() {
             if (!currentEmployee?.id) return;
-            // 防抖：3 秒內不重複刷新
             const now = Date.now();
-            if (now - _lastRefresh < 3000) return;
+            if (now - _lastRefresh < 2000) return;
             _lastRefresh = now;
             await checkTodayAttendance();
             loadTodayStatus();
         }
+        // 檢查是否需要刷新（打卡成功返回）
+        function checkRefreshFlag() {
+            if (sessionStorage.getItem('needRefreshAttendance')) {
+                sessionStorage.removeItem('needRefreshAttendance');
+                refreshAttendanceStatus();
+            }
+        }
         document.addEventListener('visibilitychange', function() {
-            if (!document.hidden) refreshAttendanceStatus();
+            if (!document.hidden) checkRefreshFlag();
         });
-        window.addEventListener('pageshow', function(e) {
-            // 不限 e.persisted — LINE LIFF 可能不用 BFCache 但也不完整重載
-            if (currentEmployee?.id) refreshAttendanceStatus();
+        window.addEventListener('pageshow', function() {
+            checkRefreshFlag();
         });
         window.addEventListener('focus', function() {
-            refreshAttendanceStatus();
+            checkRefreshFlag();
         });
     </script>
 </body>
