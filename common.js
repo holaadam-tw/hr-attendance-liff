@@ -1120,8 +1120,9 @@ async function loadMonthlyAttendance() {
     list.innerHTML = '<p class="text-center-gray">查詢中...</p>';
     
     try {
+        const lineUserId = currentEmployee?.line_user_id || liffProfile?.userId;
         const { data, error } = await sb.rpc('get_monthly_attendance', {
-            p_line_user_id: liffProfile.userId,
+            p_line_user_id: lineUserId,
             p_year: year,
             p_month: month
         });
