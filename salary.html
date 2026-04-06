@@ -734,7 +734,13 @@
                     if (typeof sb !== 'undefined' && liffProfile) {
                         const now = new Date();
                         const y = now.getFullYear(), m = now.getMonth() + 1;
-                        const { data } = await sb.rpc('get_monthly_attendance', { p_line_user_id: liffProfile.userId, p_year: y, p_month: m });
+                        const ms = `${y}-${String(m).padStart(2,'0')}-01`;
+                        const ed = new Date(y, m, 0).getDate();
+                        const me = `${y}-${String(m).padStart(2,'0')}-${String(ed).padStart(2,'0')}`;
+                        const { data } = await sb.from('attendance')
+                            .select('id, date')
+                            .eq('employee_id', currentEmployee.id)
+                            .gte('date', ms).lte('date', me);
                         if (data) {
                             const days = data.length;
                             document.getElementById('calcDays').value = days;
