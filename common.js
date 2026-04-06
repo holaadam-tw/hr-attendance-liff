@@ -1166,18 +1166,16 @@ async function loadMonthlyAttendance() {
                 : '<span class="badge badge-success">正常</span>';
             const hours = r.total_work_hours ? `${parseFloat(r.total_work_hours).toFixed(1)}h` : '-';
             
-            // 安全解析時間
+            // 安全解析時間（RPC 回傳 TIMESTAMPTZ → ISO 字串）
             let checkInTime = '-';
             let checkOutTime = '-';
             let lateMinutes = '';
             try {
                 if (r.check_in_time) {
-                    const parts = r.check_in_time.split(' ');
-                    checkInTime = parts.length > 1 ? parts[1].substring(0,5) : r.check_in_time.substring(0,5);
+                    checkInTime = new Date(r.check_in_time).toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', hour12: false });
                 }
                 if (r.check_out_time) {
-                    const parts = r.check_out_time.split(' ');
-                    checkOutTime = parts.length > 1 ? parts[1].substring(0,5) : r.check_out_time.substring(0,5);
+                    checkOutTime = new Date(r.check_out_time).toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', hour12: false });
                 }
                 // 計算遲到時間（假設上班時間 08:00）
                 if (r.is_late && r.check_in_time) {
@@ -1194,7 +1192,7 @@ async function loadMonthlyAttendance() {
             return `
                 <div class="attendance-item ${r.is_late ? 'late' : 'normal'}">
                     <div class="date">
-                        <span>${escapeHTML(r.date)}</span>
+                        <span>${escapeHTML(String(r.date).substring(0,10))}</span>
                         <span>${badge} <span style="font-size:12px;color:#6b7280;">${hours}</span></span>
                     </div>
                     <div class="details">

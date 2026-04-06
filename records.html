@@ -362,7 +362,7 @@
         }
 
         function getStatus(ds) {
-            const att = attData.find(r => r.date === ds);
+            const att = attData.find(r => String(r.date).substring(0, 10) === ds);
             const lv = lvData.find(r => ds >= r.start_date && ds <= (r.end_date || r.start_date));
             const d = new Date(ds), dow = d.getDay();
             const now = new Date(); now.setHours(0,0,0,0);
