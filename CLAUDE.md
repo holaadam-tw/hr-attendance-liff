@@ -61,6 +61,11 @@ bash scripts/qa_check.sh
 
 **FAIL 必須修正才能 commit，WARN 需確認是否為預期行為。**
 
+### Bug 追蹤（每次修 bug / 測試後必做）
+- 修 bug 後更新 `docs/BUG_TRACKER.md` 的狀態（標記已修復 + commit hash）
+- 測試後在 BUG_TRACKER.md 標記通過/未通過
+- 詳細測試清單與每日 SOP 見 `docs/BUG_TRACKER.md`
+
 ---
 
 ## 回歸測試清單（每次 commit 前必須確認）
