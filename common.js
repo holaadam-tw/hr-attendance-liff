@@ -1464,8 +1464,9 @@ const ROLE_PERMISSIONS = {
 };
 
 function getCurrentRole() {
-    if (isPlatformAdmin && !window.viewAsEmployee) return 'platform_admin';
-    return (currentEmployee && currentEmployee.role) || 'user';
+    // isPlatformAdmin 可能由 auth.js 設定在 window 上（ES module 無法直接改 common.js 的 let 變數）
+    if ((isPlatformAdmin || window.isPlatformAdmin) && !window.viewAsEmployee) return 'platform_admin';
+    return (window.currentAdminEmployee?.role || currentEmployee?.role) || 'user';
 }
 
 function getRolePermissions() {
