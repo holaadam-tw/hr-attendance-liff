@@ -1305,15 +1305,42 @@ function renderLocationList() {
     `).join('');
 }
 
+function parseCoordsInput(value) {
+    const parts = value.split(',').map(s => s.trim());
+    if (parts.length !== 2) return null;
+    const lat = parseFloat(parts[0]);
+    const lng = parseFloat(parts[1]);
+    if (isNaN(lat) || isNaN(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) return null;
+    return { lat, lng };
+}
+
+function validateCoordsInput(input) {
+    const errEl = document.getElementById('newLocCoordsErr');
+    if (!errEl) return;
+    const v = input.value.trim();
+    if (!v) { errEl.style.display = 'none'; return; }
+    const parsed = parseCoordsInput(v);
+    if (parsed) {
+        errEl.style.display = 'none';
+        input.style.borderColor = '#10B981';
+    } else {
+        errEl.textContent = '格式錯誤，請輸入「緯度, 經度」例：24.976995, 121.442323';
+        errEl.style.display = 'block';
+        input.style.borderColor = '#DC2626';
+    }
+}
+
 function getCurrentGPSForSetting() {
     showToast('📍 定位中...');
     navigator.geolocation.getCurrentPosition(
         (pos) => {
-            // [BUG FIX] 同時支援 settings 和 admin 頁面的座標輸入框
-            const latEl = document.getElementById('newLocLat') || document.getElementById('adminNewLocLat');
-            const lngEl = document.getElementById('newLocLng') || document.getElementById('adminNewLocLng');
-            if (latEl) latEl.value = pos.coords.latitude;
-            if (lngEl) lngEl.value = pos.coords.longitude;
+            const coordsEl = document.getElementById('newLocCoords') || document.getElementById('adminNewLocCoords');
+            if (coordsEl) {
+                coordsEl.value = `${pos.coords.latitude}, ${pos.coords.longitude}`;
+                coordsEl.style.borderColor = '#10B981';
+                const errEl = document.getElementById('newLocCoordsErr');
+                if (errEl) errEl.style.display = 'none';
+            }
             showToast('✅ 已填入座標');
         },
         (err) => showToast('❌ 定位失敗: ' + err.message),
@@ -1322,31 +1349,28 @@ function getCurrentGPSForSetting() {
 }
 
 async function addNewLocation() {
-    // [BUG FIX] 同時支援 settings 和 admin 頁面的元素 ID
     const nameEl = document.getElementById('newLocName') || document.getElementById('adminNewLocName');
     const addressEl = document.getElementById('newLocAddress') || document.getElementById('adminNewLocAddress');
     const radiusEl = document.getElementById('newLocRadius') || document.getElementById('adminNewLocRadius');
-    const latEl = document.getElementById('newLocLat') || document.getElementById('adminNewLocLat');
-    const lngEl = document.getElementById('newLocLng') || document.getElementById('adminNewLocLng');
+    const coordsEl = document.getElementById('newLocCoords') || document.getElementById('adminNewLocCoords');
 
     const name = nameEl?.value.trim();
     const address = addressEl?.value.trim() || '';
     const radius = parseInt(radiusEl?.value);
-    const lat = parseFloat(latEl?.value);
-    const lng = parseFloat(lngEl?.value);
+    const parsed = parseCoordsInput(coordsEl?.value || '');
 
-    if (!name || !lat || !lng) return showToast('⚠️ 資料不完整');
+    if (!name) return showToast('⚠️ 請輸入地點名稱');
+    if (!parsed) return showToast('⚠️ 座標格式錯誤，請輸入「緯度, 經度」');
     if (!radius || radius < 50) return showToast('⚠️ 打卡半徑至少 50 公尺');
 
-    const loc = { name, lat, lng, radius };
+    const loc = { name, lat: parsed.lat, lng: parsed.lng, radius };
     if (address) loc.address = address;
     const newLocations = [...officeLocations, loc];
     await saveLocationsToDB(newLocations);
 
     if (nameEl) nameEl.value = '';
     if (addressEl) addressEl.value = '';
-    if (latEl) latEl.value = '';
-    if (lngEl) lngEl.value = '';
+    if (coordsEl) { coordsEl.value = ''; coordsEl.style.borderColor = ''; }
 }
 
 function editLocation(index) {
@@ -1361,15 +1385,12 @@ function editLocation(index) {
     const newAddress = prompt('地址（可留空）：', loc.address || '');
     if (newAddress === null) return;
 
-    let newLat = prompt('緯度：', loc.lat);
-    if (newLat === null) return;
-    newLat = parseFloat(newLat);
-    if (isNaN(newLat)) return showToast('⚠️ 緯度格式錯誤');
-
-    let newLng = prompt('經度：', loc.lng);
-    if (newLng === null) return;
-    newLng = parseFloat(newLng);
-    if (isNaN(newLng)) return showToast('⚠️ 經度格式錯誤');
+    const coordsStr = prompt('座標（緯度, 經度）：', `${loc.lat}, ${loc.lng}`);
+    if (coordsStr === null) return;
+    const parsed = parseCoordsInput(coordsStr);
+    if (!parsed) return showToast('⚠️ 座標格式錯誤，請輸入「緯度, 經度」');
+    const newLat = parsed.lat;
+    const newLng = parsed.lng;
 
     let newRadius = prompt('打卡半徑 (公尺)：', loc.radius);
     if (newRadius === null) return;

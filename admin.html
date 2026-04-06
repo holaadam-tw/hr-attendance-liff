@@ -227,14 +227,12 @@
                     </div>
                     <div class="form-group">
                         <label>座標 (緯度, 經度)</label>
-                        <div style="display:flex; gap:10px;">
-                            <input type="text" id="newLocLat" placeholder="緯度 例：24.1002">
-                            <input type="text" id="newLocLng" placeholder="經度 例：120.6885">
-                        </div>
+                        <input type="text" id="newLocCoords" placeholder="24.976995, 121.442323" oninput="validateCoordsInput(this)">
+                        <div id="newLocCoordsErr" style="display:none;font-size:12px;color:#DC2626;margin-top:4px;"></div>
                         <button class="btn btn-primary" onclick="getCurrentGPSForSetting()" style="margin-top:10px; font-size:14px; padding:10px;">
                             📍 抓取目前位置
                         </button>
-                        <p style="font-size:12px;color:#94A3B8;margin-top:6px;">💡 也可在 Google Maps 找到地點，右鍵複製座標後貼入</p>
+                        <p style="font-size:12px;color:#94A3B8;margin-top:6px;">💡 從 Google Maps 右鍵複製座標，直接貼上即可</p>
                     </div>
                     <button class="btn btn-success" onclick="addNewLocation()">💾 儲存新地點</button>
                 </div>
