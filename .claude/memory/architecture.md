@@ -130,7 +130,8 @@ async function saveSetting(key, value, description) {
 - 2026-04-03: 全部 19 個 HTML 加 <link rel="icon" href="data:,"> 消除 favicon 404
 - 2026-04-03: .github/workflows/ci.yml — push main/dev 或 PR 自動跑 npm test
 - 2026-04-04: 程式碼品質優化（OpenSpec 歸檔 archive/2026-04-04_code-quality）：common.js 98 var→let/const、5 處 innerHTML 加 escapeHTML、5 個空 catch 加 console.error、9 處 SELECT * 改指定欄位、11 個 console.log 清除、admin.html 4 img 加 alt
-- 2026-04-06: 考勤月曆 bug 連修 4 輪：①RPC 欄位不完整→重建 041 SQL ②直接 SELECT 被 RLS 擋→改回 RPC ③日期比對 substring(0,10) ④UTC vs 本地時區→字串比較
+- 2026-04-06: 考勤月曆 bug 連修 5 輪：①RPC 欄位不完整→重建 041 SQL ②直接 SELECT 被 RLS 擋→改回 RPC ③日期比對 substring(0,10) ④UTC vs 本地時區→字串比較 ⑤getStatus _todayStr 提升+RPC error log
+- 2026-04-06: 薪資模擬測試工具 tests/payroll-simulation.js：大正(月薪)+本米(時薪) 8 項自動驗證 16/16 通過
 - 2026-04-06: v2.7 薪資系統強化 — 時薪制/月薪制完整支援：040 SQL employees 加 salary_type/hourly_rate；批次薪資設定 UI（可編輯表格）；報表增強（制度/工時/合計列）；SheetJS Excel 匯出（雙 Sheet）；salary.html 制度顯示優化
 - 2026-04-05: 036_fix_overnight_checkout.sql — 跨日打卡修正：RPC 查 2 天內未下班記錄（今天→昨天）；跨日下班不判定早退；前端 _pendingCheckout 顯示下班按鈕+🌙提示；checkin.html 用 rpcData.type 判斷顯示
 - 2026-04-05: index.html 打卡狀態返回刷新：加 visibilitychange + pageshow 事件自動重查 checkTodayAttendance + loadTodayStatus
