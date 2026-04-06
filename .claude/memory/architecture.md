@@ -40,6 +40,9 @@ async function saveSetting(key, value, description) {
 - `checkUserStatus()` 依賴 `liffProfile`（由 `initializeLiff()` 設定），不能直接呼叫
 - 獨立頁面不要自行查 employees 覆蓋 `currentCompanyId`，用 `checkUserStatus()` 統一設定
 - `toISOString()` 會轉 UTC，台灣 UTC+8 日期會偏移
+- **new Date("YYYY-MM-DD") 是 UTC 00:00**：在台灣（UTC+8）與本地 `new Date().setHours(0,0,0,0)` 比較時，「今天」會被誤判為 future。日期比較一律用字串（`ds > getTaiwanDate()`），不用 Date 物件
+- **SELECT 指定欄位必須覆蓋所有消費端**：改 SELECT * 為指定欄位時，必須 grep 所有用到回傳資料的地方，確認每個欄位都有列出（已踩坑 3 次）
+- **有 RLS 的表不能直接用 anon key SELECT**：前端用 anon key 時 JWT 沒有 line_user_id，`get_my_employee_id()` 回傳 NULL → RLS 擋住查詢。必須透過 `SECURITY DEFINER` RPC 繞過（041_fix_get_monthly_attendance.sql）
 - **order.html currentStoreId vs company_id**：`currentStoreId` = `store_profiles.id`，但 `system_settings`/`loyalty_*` 表用 `companies.id`。須用 `window._storeCompanyId`（= `store.company_id`）查詢這些表
 - SQL RPC 存入 TIMESTAMPTZ 欄位時必須用 `now()`（UTC），不能用 `now() AT TIME ZONE 'Asia/Taipei'`（會變無時區 TIMESTAMP 被當 UTC 存入，導致 +8 偏移）；日期/時間判定另用 `(now() AT TIME ZONE 'Asia/Taipei')::date/::time`
 - system_settings company_id 是 NOT NULL
@@ -127,6 +130,7 @@ async function saveSetting(key, value, description) {
 - 2026-04-03: 全部 19 個 HTML 加 <link rel="icon" href="data:,"> 消除 favicon 404
 - 2026-04-03: .github/workflows/ci.yml — push main/dev 或 PR 自動跑 npm test
 - 2026-04-04: 程式碼品質優化（OpenSpec 歸檔 archive/2026-04-04_code-quality）：common.js 98 var→let/const、5 處 innerHTML 加 escapeHTML、5 個空 catch 加 console.error、9 處 SELECT * 改指定欄位、11 個 console.log 清除、admin.html 4 img 加 alt
+- 2026-04-06: 考勤月曆 bug 連修 4 輪：①RPC 欄位不完整→重建 041 SQL ②直接 SELECT 被 RLS 擋→改回 RPC ③日期比對 substring(0,10) ④UTC vs 本地時區→字串比較
 - 2026-04-06: v2.7 薪資系統強化 — 時薪制/月薪制完整支援：040 SQL employees 加 salary_type/hourly_rate；批次薪資設定 UI（可編輯表格）；報表增強（制度/工時/合計列）；SheetJS Excel 匯出（雙 Sheet）；salary.html 制度顯示優化
 - 2026-04-05: 036_fix_overnight_checkout.sql — 跨日打卡修正：RPC 查 2 天內未下班記錄（今天→昨天）；跨日下班不判定早退；前端 _pendingCheckout 顯示下班按鈕+🌙提示；checkin.html 用 rpcData.type 判斷顯示
 - 2026-04-05: index.html 打卡狀態返回刷新：加 visibilitychange + pageshow 事件自動重查 checkTodayAttendance + loadTodayStatus
