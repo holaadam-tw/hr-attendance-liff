@@ -1120,15 +1120,11 @@ async function loadMonthlyAttendance() {
     list.innerHTML = '<p class="text-center-gray">查詢中...</p>';
     
     try {
-        const startDate = `${year}-${String(month).padStart(2,'0')}-01`;
-        const endDay = new Date(year, month, 0).getDate();
-        const endDate = `${year}-${String(month).padStart(2,'0')}-${String(endDay).padStart(2,'0')}`;
-        const { data, error } = await sb.from('attendance')
-            .select('id, date, check_in_time, check_out_time, total_work_hours, is_late, is_early_leave, check_in_location, check_out_location, photo_url')
-            .eq('employee_id', currentEmployee.id)
-            .gte('date', startDate)
-            .lte('date', endDate)
-            .order('date');
+        const { data, error } = await sb.rpc('get_monthly_attendance', {
+            p_line_user_id: liffProfile.userId,
+            p_year: year,
+            p_month: month
+        });
         
         if (error) throw error;
         if (!data || data.length === 0) {

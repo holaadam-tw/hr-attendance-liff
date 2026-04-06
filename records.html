@@ -351,12 +351,7 @@
             let attResult, lvResult;
             try {
                 [attResult, lvResult] = await Promise.all([
-                    sb.from('attendance')
-                        .select('id, date, check_in_time, check_out_time, total_work_hours, is_late, is_early_leave, check_in_location, check_out_location, photo_url')
-                        .eq('employee_id', currentEmployee.id)
-                        .gte('date', ms)
-                        .lte('date', me)
-                        .order('date'),
+                    sb.rpc('get_monthly_attendance', { p_line_user_id: liffProfile.userId, p_year: attYear, p_month: attMonth+1 }),
                     sb.from('leave_requests').select('*').eq('employee_id', currentEmployee.id).eq('status','approved').gte('start_date', ms).lte('start_date', me)
                 ]);
             } catch(e) { console.error('考勤查詢錯誤:', e); attResult = { data: null }; lvResult = { data: null }; }
