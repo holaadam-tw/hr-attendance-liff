@@ -1,6 +1,7 @@
 {
   "scripts": {
-    "test": "node tests/smoke-test.js"
+    "test": "node tests/smoke-test.js",
+    "test:payroll": "node tests/payroll-simulation.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.101.1",

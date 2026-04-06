@@ -363,14 +363,13 @@
             renderAttCal();
         }
 
+        let _todayStr = ''; // renderAttCal 設定，避免 getStatus 重複呼叫
         function getStatus(ds) {
             const att = attData.find(r => String(r.date).substring(0, 10) === ds);
             const lv = lvData.find(r => ds >= r.start_date && ds <= (r.end_date || r.start_date));
-            // 用字串比較避免 UTC vs 本地時區差異
-            const todayStr = getTaiwanDate();
-            const dow = new Date(ds + 'T12:00:00').getDay(); // 加 T12:00 避免 UTC 日期偏移
+            const dow = new Date(ds + 'T12:00:00').getDay();
 
-            if (ds > todayStr) return { s: 'future', l: '' };
+            if (ds > _todayStr) return { s: 'future', l: '' };
             if (dow === 0 || dow === 6) return att ? { s: 'ok', l: '加班', att } : { s: 'off', l: '休' };
             if (lv) {
                 const m = { annual:'特休', sick:'病假', personal:'事假', compensatory:'補休', maternity:'產假', marriage:'婚假' };
@@ -401,6 +400,7 @@
             const fd = new Date(attYear, attMonth, 1).getDay();
             const dim = new Date(attYear, attMonth+1, 0).getDate();
             const todayS = getTaiwanDate();
+            _todayStr = todayS;
 
             let cOk=0, cLate=0, cLv=0, cAb=0, tH=0;
 
