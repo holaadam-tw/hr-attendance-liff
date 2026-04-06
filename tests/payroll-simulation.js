@@ -42,6 +42,10 @@ const COMPANIES = {
   },
 };
 
+// 公司別名
+const COMPANY_ALIASES = { dajheng: 'dajeng', dazheng: 'dajeng', dj: 'dajeng', bm: 'benmi' };
+function resolveCompany(key) { return COMPANY_ALIASES[key] || key; }
+
 // ─── 薪資計算（完全複製 payroll.js calcEmployeePayroll 邏輯） ───
 function calcPayroll(emp, ss, atts, leaves, otHours, payrollSettings) {
   const _ps = payrollSettings || {};
@@ -196,7 +200,7 @@ async function main() {
   function ok(msg) { passed++; console.log(`  ✅ ${msg}`); }
   function fail(msg) { failed++; console.log(`  ❌ ${msg}`); }
 
-  const targets = companyArg === 'all' ? Object.keys(COMPANIES) : [companyArg];
+  const targets = companyArg === 'all' ? Object.keys(COMPANIES) : [resolveCompany(companyArg)];
 
   for (const key of targets) {
     const company = COMPANIES[key];
