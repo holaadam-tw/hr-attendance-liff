@@ -582,11 +582,12 @@ function calcEmployeePayroll(emp, ss, atts, leaves, otHours, year, month, payrol
     const totalWorkHours = atts.reduce((s, a) => s + (a.total_work_hours || 0), 0);
     const leaveDays = leaves.total;
     const personalLeaveDays = leaves.personal;
+    const expectedDays = _ps.work_days_per_month || 22;
 
     let monthSalary, dailyRate, hourlyRate;
     if (salaryType === 'monthly') {
         monthSalary = baseSalary;
-        dailyRate = Math.round(baseSalary / 30);
+        dailyRate = Math.round(baseSalary / expectedDays);
         hourlyRate = Math.round(dailyRate / 8);
     } else if (salaryType === 'daily') {
         dailyRate = baseSalary;
@@ -598,9 +599,13 @@ function calcEmployeePayroll(emp, ss, atts, leaves, otHours, year, month, payrol
         monthSalary = Math.round(hourlyRate * totalWorkHours);
     }
 
+    // 缺勤扣款（僅月薪制：缺勤天數 × 日薪）
+    const absentDays = salaryType === 'monthly' ? Math.max(0, expectedDays - actualDays - leaveDays) : 0;
+    const absenceDed = salaryType === 'monthly' ? Math.round(absentDays * dailyRate) : 0;
+
     const mealAmount = mealAllowance;
     const posAmount = posAllowance;
-    const hasFullAtt = (lateCount === 0 && leaveDays === 0);
+    const hasFullAtt = (lateCount === 0 && leaveDays === 0 && absentDays === 0);
     const fullAttAmount = hasFullAtt ? fullAttBonus : 0;
 
     let otPay = 0;
@@ -630,7 +635,7 @@ function calcEmployeePayroll(emp, ss, atts, leaves, otHours, year, month, payrol
     const lateDed = lateCount * lateDeductPerTime;
     const personalLeaveDed = Math.round(dailyRate * personalLeaveDays);
     const adj = payrollAdjustments[emp.id]?.amount || 0;
-    const totalDeduct = laborIns + healthIns + pensionSelf + incomeTax + lateDed + personalLeaveDed - adj;
+    const totalDeduct = laborIns + healthIns + pensionSelf + incomeTax + lateDed + personalLeaveDed + absenceDed - adj;
     const net = gross - totalDeduct;
 
     return {
@@ -639,14 +644,15 @@ function calcEmployeePayroll(emp, ss, atts, leaves, otHours, year, month, payrol
         salary_type: salaryType, base_salary: monthSalary,
         overtime_pay: otPay, full_attendance_bonus: fullAttAmount,
         meal_allowance: mealAmount, position_allowance: posAmount, night_allowance: 0,
-        late_deduction: lateDed, absence_deduction: 0, personal_leave_deduction: personalLeaveDed,
+        late_deduction: lateDed, absence_deduction: absenceDed, personal_leave_deduction: personalLeaveDed,
         labor_insurance: laborIns, health_insurance: healthIns,
         pension_self: pensionSelf, income_tax: incomeTax,
         manual_adjustment: adj, adjustment_note: payrollAdjustments[emp.id]?.note || '',
         total_deduction: totalDeduct, gross_salary: gross, net_salary: net,
         calculation_details: {
             salary_type: salaryType, original_base: baseSalary,
-            actual_days: actualDays, late_count: lateCount,
+            expected_days: expectedDays, actual_days: actualDays, absent_days: absentDays,
+            late_count: lateCount,
             leave_days: leaveDays, personal_leave_days: personalLeaveDays,
             overtime_hours: otHours, total_work_hours: Math.round(totalWorkHours * 10) / 10,
             daily_rate: dailyRate, hourly_rate: hourlyRate,
@@ -755,7 +761,7 @@ function renderPayrollCard(empId) {
     const typeLabel = { monthly: '月薪制', daily: '日薪制', hourly: '時薪制' };
 
     const incomeItems = [
-        { label: '基本薪資', value: emp.base_salary, desc: cd.salary_type === 'monthly' ? '固定月薪' : cd.salary_type === 'daily' ? `日薪 ${cd.original_base?.toLocaleString()} × ${cd.actual_days}天` : `時薪 ${cd.original_base?.toLocaleString()} × ${cd.total_work_hours}h` },
+        { label: '基本薪資', value: emp.base_salary, desc: cd.salary_type === 'monthly' ? `固定月薪（應出勤 ${cd.expected_days || '-'}天）` : cd.salary_type === 'daily' ? `日薪 ${cd.original_base?.toLocaleString()} × ${cd.actual_days}天` : `時薪 ${cd.original_base?.toLocaleString()} × ${cd.total_work_hours}h` },
         { label: '加班費', value: emp.overtime_pay, desc: cd.overtime_hours > 0 ? `${cd.overtime_hours}小時` : '' },
         { label: '全勤獎金', value: emp.full_attendance_bonus, desc: cd.full_attendance ? '✅ 達成' : '❌ 未達成' },
         { label: '伙食津貼', value: emp.meal_allowance, desc: '每月固定' },
@@ -763,6 +769,7 @@ function renderPayrollCard(empId) {
     ].filter(i => i.value > 0);
 
     const deductItems = [
+        { label: '缺勤扣款', value: emp.absence_deduction, desc: cd.absent_days > 0 ? `${cd.absent_days}天 × 日薪 ${cd.daily_rate?.toLocaleString()}` : '' },
         { label: '勞保自付', value: emp.labor_insurance, desc: '投保級距×12.5%×20%' },
         { label: '健保自付', value: emp.health_insurance, desc: '投保級距×5.17%×30%' },
         { label: '勞退自提', value: emp.pension_self, desc: cd.pension_self_rate > 0 ? `月薪×${cd.pension_self_rate}%` : '' },
@@ -781,9 +788,11 @@ function renderPayrollCard(empId) {
     html += `<div style="text-align:right;"><div style="font-size:11px;color:#94A3B8;">實發薪資</div><div style="font-size:22px;font-weight:900;color:#059669;">${formatNT(emp.net_salary)}</div></div>`;
     html += `</div>`;
 
-    html += `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px;">`;
-    html += `<div style="text-align:center;background:#F8FAFC;border-radius:10px;padding:10px;"><div style="font-size:11px;color:#94A3B8;">出勤</div><div style="font-size:16px;font-weight:800;color:#0F172A;">${cd.actual_days}天</div></div>`;
-    html += `<div style="text-align:center;background:#F8FAFC;border-radius:10px;padding:10px;"><div style="font-size:11px;color:#94A3B8;">遲到</div><div style="font-size:16px;font-weight:800;color:${cd.late_count > 0 ? '#DC2626' : '#059669'};">${cd.late_count}次</div></div>`;
+    html += `<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:16px;">`;
+    html += `<div style="text-align:center;background:#F8FAFC;border-radius:10px;padding:8px 4px;"><div style="font-size:10px;color:#94A3B8;">應出勤</div><div style="font-size:15px;font-weight:800;color:#0F172A;">${cd.expected_days || '-'}天</div></div>`;
+    html += `<div style="text-align:center;background:#F8FAFC;border-radius:10px;padding:8px 4px;"><div style="font-size:10px;color:#94A3B8;">實到</div><div style="font-size:15px;font-weight:800;color:#059669;">${cd.actual_days}天</div></div>`;
+    html += `<div style="text-align:center;background:${cd.absent_days > 0 ? '#FEF2F2' : '#F8FAFC'};border-radius:10px;padding:8px 4px;"><div style="font-size:10px;color:#94A3B8;">缺勤</div><div style="font-size:15px;font-weight:800;color:${cd.absent_days > 0 ? '#DC2626' : '#059669'};">${cd.absent_days || 0}天</div></div>`;
+    html += `<div style="text-align:center;background:#F8FAFC;border-radius:10px;padding:8px 4px;"><div style="font-size:10px;color:#94A3B8;">遲到</div><div style="font-size:15px;font-weight:800;color:${cd.late_count > 0 ? '#DC2626' : '#059669'};">${cd.late_count}次</div></div>`;
     html += `<div style="text-align:center;background:#F8FAFC;border-radius:10px;padding:10px;"><div style="font-size:11px;color:#94A3B8;">請假</div><div style="font-size:16px;font-weight:800;color:#0F172A;">${cd.leave_days}天</div></div>`;
     html += `<div style="text-align:center;background:#F8FAFC;border-radius:10px;padding:10px;"><div style="font-size:11px;color:#94A3B8;">加班</div><div style="font-size:16px;font-weight:800;color:#0369A1;">${cd.overtime_hours}h</div></div>`;
     html += `</div>`;

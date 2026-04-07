@@ -63,10 +63,12 @@ function calcPayroll(emp, ss, atts, leaves, otHours, payrollSettings) {
   const leaveDays = leaves.total;
   const personalLeaveDays = leaves.personal;
 
+  const expectedDays = _ps.work_days_per_month || 22;
+
   let monthSalary, dailyRate, hourlyRate;
   if (salaryType === 'monthly') {
     monthSalary = baseSalary;
-    dailyRate = Math.round(baseSalary / 30);
+    dailyRate = Math.round(baseSalary / expectedDays);
     hourlyRate = Math.round(dailyRate / 8);
   } else if (salaryType === 'daily') {
     dailyRate = baseSalary;
@@ -78,6 +80,10 @@ function calcPayroll(emp, ss, atts, leaves, otHours, payrollSettings) {
     monthSalary = Math.round(hourlyRate * totalWorkHours);
   }
 
+  // 缺勤扣款（僅月薪制）
+  const absentDays = salaryType === 'monthly' ? Math.max(0, expectedDays - actualDays - leaveDays) : 0;
+  const absenceDed = salaryType === 'monthly' ? Math.round(absentDays * dailyRate) : 0;
+
   let otPay = 0;
   if (otHours > 0) {
     const otRate1 = _ps.overtime_rate || 1.34;
@@ -87,7 +93,7 @@ function calcPayroll(emp, ss, atts, leaves, otHours, payrollSettings) {
     otPay = Math.round(hourlyRate * otRate1 * h1) + Math.round(hourlyRate * otRate2 * h2);
   }
 
-  const hasFullAtt = (lateCount === 0 && leaveDays === 0);
+  const hasFullAtt = (lateCount === 0 && leaveDays === 0 && absentDays === 0);
   const fullAttAmount = hasFullAtt ? fullAttBonus : 0;
   const gross = monthSalary + otPay + fullAttAmount + mealAllowance + posAllowance;
 
@@ -98,16 +104,18 @@ function calcPayroll(emp, ss, atts, leaves, otHours, payrollSettings) {
   const lateDeductPerTime = _ps.late_deduction_per_time || 100;
   const lateDed = lateCount * lateDeductPerTime;
   const personalLeaveDed = Math.round(dailyRate * personalLeaveDays);
-  const totalDeduct = laborIns + healthIns + pensionSelf + incomeTax + lateDed + personalLeaveDed;
+  const totalDeduct = laborIns + healthIns + pensionSelf + incomeTax + lateDed + personalLeaveDed + absenceDed;
   const net = gross - totalDeduct;
 
   return {
     name: emp.name, salary_type: salaryType,
-    actual_days: actualDays, late_count: lateCount, total_work_hours: Math.round(totalWorkHours * 10) / 10,
+    expected_days: expectedDays, actual_days: actualDays, absent_days: absentDays,
+    late_count: lateCount, total_work_hours: Math.round(totalWorkHours * 10) / 10,
     leave_days: leaveDays, personal_leave_days: personalLeaveDays, overtime_hours: otHours,
     base_salary: monthSalary, hourly_rate: hourlyRate, daily_rate: dailyRate,
     overtime_pay: otPay, full_attendance_bonus: fullAttAmount,
     meal_allowance: mealAllowance, position_allowance: posAllowance,
+    absence_deduction: absenceDed,
     labor_insurance: laborIns, health_insurance: healthIns,
     pension_self: pensionSelf, income_tax: incomeTax,
     late_deduction: lateDed, personal_leave_deduction: personalLeaveDed,
@@ -252,6 +260,8 @@ async function main() {
       console.log(`\n  👤 ${emp.name}（${emp.employee_number || '-'}）${typeLabel[result.salary_type]}`);
       console.log(`     出勤 ${result.actual_days}天 · 工時 ${result.total_work_hours}h · 遲到 ${result.late_count}次 · 請假 ${result.leave_days}天 · 加班 ${result.overtime_hours}h`);
       const allowance = (result.meal_allowance || 0) + (result.position_allowance || 0) + (result.full_attendance_bonus || 0) + (result.overtime_pay || 0);
+      const absentInfo = result.absent_days > 0 ? ` · 缺勤 ${result.absent_days}天（扣 ${result.absence_deduction.toLocaleString()}）` : '';
+      console.log(`     應出勤 ${result.expected_days}天 · 實到 ${result.actual_days}天${absentInfo}`);
       console.log(`     底薪 ${result.base_salary.toLocaleString()} + 津貼 ${allowance.toLocaleString()} = 應發 ${result.gross_salary.toLocaleString()} - 扣款 ${result.total_deduction.toLocaleString()} = 實發 ${result.net_salary.toLocaleString()}`);
     });
 
