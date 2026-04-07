@@ -431,15 +431,55 @@
             } catch(e) { console.warn('停止相機失敗:', e); }
         }
 
-        // ===== 打卡成功 → 跳轉考勤頁 =====
-        function showCheckInSuccess(typeText, location, time) {
-            stopCamera(); // 成功後立即釋放相機
+        // ===== 打卡成功 → 跳轉 =====
+        async function showCheckInSuccess(typeText, location, time) {
+            stopCamera();
             sessionStorage.setItem('needRefreshAttendance', String(Date.now()));
-            // 儲存成功訊息，records.html 會讀取並顯示 banner
             sessionStorage.setItem('checkinSuccessMsg', `✅ 已完成${typeText}打卡 - 時間：${time}　📍 ${location}`);
             sessionStorage.setItem('checkinSuccessType', typeText.includes('上班') ? 'in' : 'out');
-            // 跳轉到考勤記錄頁
-            window.location.href = 'records.html#attendance';
+
+            // 上班打卡 → 檢查是否跳轉便當訂購
+            if (typeText.includes('上班')) {
+                try {
+                    const shouldGoLunch = await checkShouldGoLunch();
+                    if (shouldGoLunch) {
+                        sessionStorage.setItem('fromCheckin', '1');
+                        window.location.href = 'services.html';
+                        return;
+                    }
+                } catch (e) { console.error('Lunch check error:', e); }
+            }
+
+            // 下班打卡或不需跳便當 → 跳首頁
+            window.location.href = 'index.html';
+        }
+
+        // 檢查是否應跳轉便當訂購
+        async function checkShouldGoLunch() {
+            // 1. 檢查 lunch 功能開啟
+            if (currentCompanyFeatures && !currentCompanyFeatures.lunch) return false;
+
+            // 2. 檢查截止時間
+            let deadlineHour = 9;
+            const dlSetting = getCachedSetting('lunch_deadline');
+            if (dlSetting) {
+                const parsed = parseInt(dlSetting, 10);
+                if (!isNaN(parsed)) deadlineHour = parsed;
+            }
+            const nowHour = parseInt(new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour: 'numeric', hour12: false }), 10);
+            if (nowHour >= deadlineHour) return false;
+
+            // 3. 檢查今天是否已訂過
+            if (currentEmployee) {
+                const { data } = await sb.from('lunch_orders')
+                    .select('id, status')
+                    .eq('employee_id', currentEmployee.id)
+                    .eq('order_date', getTaiwanDate())
+                    .maybeSingle();
+                if (data && data.status !== 'cancelled') return false;
+            }
+
+            return true;
         }
 
         function goBack() {

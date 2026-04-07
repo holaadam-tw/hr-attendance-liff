@@ -126,6 +126,24 @@
                 <div class="stat-card" style="background:#F3F4F6;"><div class="stat-num" style="color:#6B7280;" id="dLeave">0</div><div class="stat-label" style="color:#6B7280;">請假</div></div>
             </div>
 
+            <!-- 便當訂購統計 -->
+            <div id="lunchStatCard" style="display:none;margin-bottom:16px;cursor:pointer;" onclick="toggleLunchDetail()">
+                <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;background:#FFFBEB;border:2px solid #FCD34D;border-radius:14px;">
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <span style="font-size:20px;">🍱</span>
+                        <span style="font-weight:700;font-size:14px;color:#92400E;">便當訂購</span>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <span id="lunchOrderCount" style="font-size:22px;font-weight:900;color:#92400E;">0</span>
+                        <span style="font-size:12px;color:#B45309;">份</span>
+                        <span id="lunchDetailArrow" style="font-size:12px;color:#B45309;">▼</span>
+                    </div>
+                </div>
+                <div id="lunchDetailPanel" style="display:none;margin-top:8px;background:#FFFEF5;border:1px solid #FDE68A;border-radius:12px;padding:12px;font-size:13px;max-height:300px;overflow-y:auto;">
+                    <div id="lunchDetailContent"></div>
+                </div>
+            </div>
+
             <!-- 篩選 -->
             <div class="filter-row">
                 <select id="filterDept" onchange="applyDailyFilter()">
@@ -254,6 +272,7 @@
                 updateDeptFilter();
                 renderDailyTable();
                 document.getElementById('lastRefresh').textContent = '更新：' + new Date().toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+                loadLunchStats(dateStr);
             } catch (e) {
                 console.error('Load daily data error:', e);
                 document.getElementById('dailyTableBody').innerHTML = '<tr><td colspan="6" style="text-align:center;color:#ef4444;padding:20px;">載入失敗：' + escapeHTML(e.message || '') + '</td></tr>';
@@ -568,6 +587,79 @@
             }
 
             showToast('✅ 已匯出 Excel');
+        }
+
+        // ===== 便當訂購統計 =====
+        let lunchData = [];
+
+        async function loadLunchStats(dateStr) {
+            const card = document.getElementById('lunchStatCard');
+            if (!card) return;
+
+            // 檢查 lunch 功能是否開啟
+            let lunchEnabled = false;
+            if (typeof currentCompanyFeatures === 'object' && currentCompanyFeatures) {
+                lunchEnabled = !!currentCompanyFeatures.lunch;
+            }
+            if (!lunchEnabled) { card.style.display = 'none'; return; }
+
+            try {
+                const { data, error } = await sb.from('lunch_orders')
+                    .select('employee_id, is_vegetarian, status, notes, employees!inner(name, company_id)')
+                    .eq('employees.company_id', window.currentCompanyId)
+                    .eq('order_date', dateStr);
+
+                if (error) throw error;
+
+                lunchData = (data || []).filter(o => o.status !== 'cancelled');
+                const ordered = lunchData.length;
+                document.getElementById('lunchOrderCount').textContent = ordered;
+                card.style.display = 'block';
+
+                // 明細內容
+                const contentEl = document.getElementById('lunchDetailContent');
+                if (!contentEl) return;
+
+                let html = '';
+                if (lunchData.length > 0) {
+                    html += '<div style="font-weight:700;color:#92400E;margin-bottom:8px;">已訂購（' + ordered + ' 份）</div>';
+                    lunchData.forEach(o => {
+                        const type = o.is_vegetarian ? '🥗 素食' : '🍖 葷食';
+                        const name = o.employees?.name || '未知';
+                        html += '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #FDE68A;"><span>' + escapeHTML(name) + '</span><span style="color:#B45309;">' + type + '</span></div>';
+                    });
+                }
+
+                // 未訂購的人
+                const orderedIds = new Set(lunchData.map(o => o.employee_id));
+                const allCancelled = (data || []).filter(o => o.status === 'cancelled');
+                allCancelled.forEach(o => orderedIds.add(o.employee_id)); // 取消的也算已處理
+                const notOrdered = dailyData.filter(r => r.status !== 'off_day' && r.status !== 'on_leave' && !orderedIds.has(r.employee_id));
+                if (notOrdered.length > 0) {
+                    html += '<div style="font-weight:700;color:#DC2626;margin-top:10px;margin-bottom:6px;">未訂購（' + notOrdered.length + ' 人）</div>';
+                    notOrdered.forEach(r => {
+                        html += '<div style="padding:3px 0;color:#94A3B8;">' + escapeHTML(r.employee_name) + '</div>';
+                    });
+                }
+
+                contentEl.innerHTML = html || '<div style="color:#94A3B8;text-align:center;">無訂購資料</div>';
+
+            } catch (e) {
+                console.error('Load lunch stats error:', e);
+                card.style.display = 'none';
+            }
+        }
+
+        function toggleLunchDetail() {
+            const panel = document.getElementById('lunchDetailPanel');
+            const arrow = document.getElementById('lunchDetailArrow');
+            if (panel.style.display === 'none') {
+                panel.style.display = 'block';
+                arrow.textContent = '▲';
+            } else {
+                panel.style.display = 'none';
+                arrow.textContent = '▼';
+            }
         }
 
         // ===== 初始化 =====

@@ -136,6 +136,24 @@ body{font-family:'Noto Sans TC',-apple-system,sans-serif;background:var(--bg);co
                     <div class="stat-card" style="background:#F3F4F6;"><div class="stat-num" style="color:#6B7280;" id="dLeave">0</div><div class="stat-label" style="color:#6B7280;">請假</div></div>
                 </div>
 
+                <!-- 便當訂購統計 -->
+                <div id="lunchStatCard" style="display:none;margin-bottom:16px;cursor:pointer;" onclick="toggleLunchDetail()">
+                    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;background:#FFFBEB;border:2px solid #FCD34D;border-radius:14px;">
+                        <div style="display:flex;align-items:center;gap:8px;">
+                            <span style="font-size:20px;">🍱</span>
+                            <span style="font-weight:700;font-size:14px;color:#92400E;">便當訂購</span>
+                        </div>
+                        <div style="display:flex;align-items:center;gap:8px;">
+                            <span id="lunchOrderCount" style="font-size:22px;font-weight:900;color:#92400E;">0</span>
+                            <span style="font-size:12px;color:#B45309;">份</span>
+                            <span id="lunchDetailArrow" style="font-size:12px;color:#B45309;">▼</span>
+                        </div>
+                    </div>
+                    <div id="lunchDetailPanel" style="display:none;margin-top:8px;background:#FFFEF5;border:1px solid #FDE68A;border-radius:12px;padding:12px;font-size:13px;max-height:300px;overflow-y:auto;">
+                        <div id="lunchDetailContent"></div>
+                    </div>
+                </div>
+
                 <div class="filter-row">
                     <select id="filterDept" onchange="applyDailyFilter()">
                         <option value="">全部部門</option>
@@ -269,6 +287,7 @@ async function init() {
         document.getElementById('loadingView').style.display = 'none';
         document.getElementById('mainView').style.display = 'block';
 
+        await checkLunchFeature();
         loadDailyData();
         startAutoRefresh();
 
@@ -308,6 +327,7 @@ async function loadDailyData() {
         updateDeptFilter();
         renderDailyTable();
         document.getElementById('lastRefresh').textContent = '更新：' + new Date().toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+        loadLunchStats(dateStr);
     } catch (e) {
         console.error('Load daily error:', e);
         document.getElementById('dailyTableBody').innerHTML = '<tr><td colspan="6" style="text-align:center;color:#ef4444;padding:20px;">載入失敗：' + esc(e.message || '') + '</td></tr>';
@@ -505,6 +525,68 @@ function exportExcel() {
         XLSX.writeFile(wb, companyName + '_打卡統計_' + mYear + '年' + (mMonth + 1) + '月.xlsx');
     }
     showToast('✅ 已匯出 Excel');
+}
+
+// === 便當訂購統計 ===
+let lunchData = [];
+let lunchFeatureEnabled = false;
+
+async function checkLunchFeature() {
+    try {
+        const { data } = await sb.from('companies').select('features').eq('id', companyId).maybeSingle();
+        if (data && data.features && data.features.lunch) lunchFeatureEnabled = true;
+    } catch(e) {}
+}
+
+async function loadLunchStats(dateStr) {
+    const card = document.getElementById('lunchStatCard');
+    if (!card || !lunchFeatureEnabled) { if (card) card.style.display = 'none'; return; }
+
+    try {
+        const { data, error } = await sb.from('lunch_orders')
+            .select('employee_id, is_vegetarian, status, employees!inner(name, company_id)')
+            .eq('employees.company_id', companyId)
+            .eq('order_date', dateStr);
+
+        if (error) throw error;
+
+        lunchData = (data || []).filter(o => o.status !== 'cancelled');
+        document.getElementById('lunchOrderCount').textContent = lunchData.length;
+        card.style.display = 'block';
+
+        const contentEl = document.getElementById('lunchDetailContent');
+        if (!contentEl) return;
+
+        let html = '';
+        if (lunchData.length > 0) {
+            html += '<div style="font-weight:700;color:#92400E;margin-bottom:8px;">已訂購（' + lunchData.length + ' 份）</div>';
+            lunchData.forEach(o => {
+                const type = o.is_vegetarian ? '🥗 素食' : '🍖 葷食';
+                const name = o.employees?.name || '未知';
+                html += '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #FDE68A;"><span>' + esc(name) + '</span><span style="color:#B45309;">' + type + '</span></div>';
+            });
+        }
+
+        const orderedIds = new Set(lunchData.map(o => o.employee_id));
+        (data || []).filter(o => o.status === 'cancelled').forEach(o => orderedIds.add(o.employee_id));
+        const notOrdered = dailyData.filter(r => r.status !== 'off_day' && r.status !== 'on_leave' && !orderedIds.has(r.employee_id));
+        if (notOrdered.length > 0) {
+            html += '<div style="font-weight:700;color:#DC2626;margin-top:10px;margin-bottom:6px;">未訂購（' + notOrdered.length + ' 人）</div>';
+            notOrdered.forEach(r => { html += '<div style="padding:3px 0;color:#94A3B8;">' + esc(r.employee_name) + '</div>'; });
+        }
+
+        contentEl.innerHTML = html || '<div style="color:#94A3B8;text-align:center;">無訂購資料</div>';
+    } catch(e) {
+        console.error('Load lunch error:', e);
+        card.style.display = 'none';
+    }
+}
+
+function toggleLunchDetail() {
+    const panel = document.getElementById('lunchDetailPanel');
+    const arrow = document.getElementById('lunchDetailArrow');
+    if (panel.style.display === 'none') { panel.style.display = 'block'; arrow.textContent = '▲'; }
+    else { panel.style.display = 'none'; arrow.textContent = '▼'; }
 }
 
 // === 啟動 ===

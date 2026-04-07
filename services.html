@@ -386,6 +386,12 @@
                 showToast(selectedLunchType === 'none' ? '🚫 已確認不訂購' : '✅ 訂購成功！');
                 checkMyOrder();
                 loadLunchSummary();
+                // 從打卡跳過來的 → 訂完跳首頁
+                if (sessionStorage.getItem('fromCheckin') === '1') {
+                    sessionStorage.removeItem('fromCheckin');
+                    sessionStorage.setItem('lunchToast', selectedLunchType === 'none' ? '🚫 便當：今日不訂購' : '✅ 便當訂購成功');
+                    setTimeout(() => { window.location.href = 'index.html'; }, 800);
+                }
             } catch(e) { showToast('❌ 訂購失敗：' + friendlyError(e)); }
         }
 

@@ -575,6 +575,13 @@
                     // [優化] loadTodayStatus 直接使用已取得的 todayAttendance，不再額外查詢
                     loadTodayStatus();
 
+                    // 便當訂購成功 toast（從 services.html 跳回）
+                    var _lt = sessionStorage.getItem('lunchToast');
+                    if (_lt) { sessionStorage.removeItem('lunchToast'); setTimeout(function() { showToast(_lt); }, 300); }
+                    // 打卡成功 toast（從 checkin.html 跳回）
+                    var _cm = sessionStorage.getItem('checkinSuccessMsg');
+                    if (_cm) { sessionStorage.removeItem('checkinSuccessMsg'); sessionStorage.removeItem('checkinSuccessType'); setTimeout(function() { showToast(_cm); }, 300); }
+
                     if (window.isPlatformAdmin) {
                         var vt = document.getElementById('viewToggle');
                         if (vt) vt.style.display = '';
