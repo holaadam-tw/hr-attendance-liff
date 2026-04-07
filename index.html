@@ -523,6 +523,12 @@
                 window.location.href = (goto === 'loyalty' ? 'loyalty.html' : 'order.html') + '?store=' + store;
                 return true;
             }
+            // 員工自助登記：跳轉到 employee_register.html
+            if (goto === 'register') {
+                var company = new URLSearchParams(window.location.search).get('company') || '';
+                window.location.href = 'employee_register.html?company=' + company;
+                return true;
+            }
             if (pages[goto]) { window.location.href = pages[goto]; return true; }
             return false;
         }

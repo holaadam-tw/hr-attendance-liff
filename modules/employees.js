@@ -130,6 +130,9 @@ export async function loadEmployeeList() {
     const listEl = document.getElementById('employeeList');
     if (!listEl) return;
 
+    // 同時更新待審核 badge
+    loadPendingCount();
+
     try {
         const { data, error } = await sb.from('employees')
             .select('*')
@@ -281,6 +284,278 @@ export async function saveSalarySetting() {
         if (typeof writeAuditLog === 'function') writeAuditLog('update', 'salary_settings', currentSalaryEmpId, '薪資設定', { employee_id: currentSalaryEmpId, base_salary: base, salary_type: record.salary_type });
     } catch (e) {
         showToast('❌ 儲存失敗: ' + friendlyError(e));
+    }
+}
+
+// ===== 員工登記 QR Code =====
+export async function showRegisterQRCode() {
+    const modal = document.getElementById('registerQrModal');
+    const qrcodeDiv = document.getElementById('registerQrcode');
+    qrcodeDiv.innerHTML = '';
+
+    let companyName = '';
+    const companyId = window.currentAdminEmployee?.company_id || window.currentCompanyId;
+
+    try {
+        const { data } = await sb.from('companies').select('name').eq('id', companyId).maybeSingle();
+        if (data) companyName = data.name;
+    } catch (e) {
+        console.error('Failed to fetch company info for register QR', e);
+    }
+
+    const liffUrl = `https://liff.line.me/${CONFIG.LIFF_ID}?goto=register&company=${companyId}`;
+
+    new QRCode(qrcodeDiv, {
+        text: liffUrl, width: 200, height: 200,
+        colorDark: "#059669", colorLight: "#ffffff",
+        correctLevel: QRCode.CorrectLevel.H
+    });
+
+    const nameEl = document.getElementById('regQrCompanyName');
+    if (nameEl) nameEl.textContent = companyName;
+
+    modal.style.display = 'flex';
+}
+
+export function closeRegisterQrModal() {
+    document.getElementById('registerQrModal').style.display = 'none';
+}
+
+export function downloadRegisterQR() {
+    const canvas = document.querySelector('#registerQrcode canvas');
+    if (!canvas) { showToast('⚠️ QR Code 尚未產生'); return; }
+    const link = document.createElement('a');
+    link.download = 'employee_register_qr.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+}
+
+// ===== 員工 Tab 切換 =====
+let currentEmpTab = 'active';
+
+export function switchEmployeeTab(tab) {
+    currentEmpTab = tab;
+    const activeBtn = document.getElementById('empTabActive');
+    const pendingBtn = document.getElementById('empTabPending');
+    const activeSection = document.getElementById('activeEmployeeSection');
+    const pendingSection = document.getElementById('pendingEmployeeSection');
+
+    if (tab === 'active') {
+        activeBtn.style.background = '#4F46E5';
+        activeBtn.style.color = '#fff';
+        pendingBtn.style.background = '#fff';
+        pendingBtn.style.color = '#64748B';
+        activeSection.style.display = 'block';
+        pendingSection.style.display = 'none';
+        loadEmployeeList();
+    } else {
+        activeBtn.style.background = '#fff';
+        activeBtn.style.color = '#64748B';
+        pendingBtn.style.background = '#4F46E5';
+        pendingBtn.style.color = '#fff';
+        activeSection.style.display = 'none';
+        pendingSection.style.display = 'block';
+        loadPendingEmployees();
+    }
+}
+
+// ===== 待審核員工列表 =====
+export async function loadPendingEmployees() {
+    const listEl = document.getElementById('pendingEmployeeList');
+    if (!listEl) return;
+
+    try {
+        const { data, error } = await sb.from('employees')
+            .select('id, name, phone, department, position, hire_date, line_user_id, emergency_contact, emergency_phone, created_at, status')
+            .eq('company_id', window.currentCompanyId)
+            .eq('status', 'pending')
+            .eq('is_active', false)
+            .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        // 更新 badge
+        const badge = document.getElementById('pendingBadge');
+        if (badge) {
+            if (data && data.length > 0) {
+                badge.textContent = data.length;
+                badge.style.display = 'inline-block';
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+
+        if (!data || data.length === 0) {
+            listEl.innerHTML = '<p style="text-align:center;color:#999;padding:40px 0;">🎉 目前沒有待審核的員工</p>';
+            return;
+        }
+
+        let html = '';
+        data.forEach(emp => {
+            const createdDate = emp.created_at ? new Date(emp.created_at).toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei' }) : '未知';
+            html += `
+                <div class="attendance-item" style="border-left:4px solid #F59E0B;">
+                    <div class="date">
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <span style="font-weight:700;">${escapeHTML(emp.name)}</span>
+                            <span style="padding:3px 10px; border-radius:15px; font-size:11px; background:#FEF3C7; color:#92400E; font-weight:bold;">
+                                ⏳ 待審核
+                            </span>
+                        </div>
+                    </div>
+                    <div class="details" style="margin-top:6px;">
+                        <span>📱 ${escapeHTML(emp.phone || '未填')}</span>
+                        <span>${escapeHTML(emp.department || '未選')} · ${escapeHTML(emp.position || '未填')}</span>
+                    </div>
+                    <div style="font-size:12px;color:#666;margin-top:5px;">
+                        到職: ${emp.hire_date || '未填'} · 登記: ${createdDate}
+                    </div>
+                    ${emp.emergency_contact ? `<div style="font-size:12px;color:#666;margin-top:3px;">🆘 緊急聯絡: ${escapeHTML(emp.emergency_contact)} ${escapeHTML(emp.emergency_phone || '')}</div>` : ''}
+                    <div style="margin-top:10px;display:flex;gap:8px;">
+                        <button onclick="approveEmployee('${emp.id}', '${escapeHTML(emp.name)}')" style="flex:1;padding:10px;border:none;border-radius:8px;background:#10B981;color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">
+                            ✅ 通過
+                        </button>
+                        <button onclick="rejectEmployee('${emp.id}', '${escapeHTML(emp.name)}')" style="flex:1;padding:10px;border:none;border-radius:8px;background:#EF4444;color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">
+                            ❌ 拒絕
+                        </button>
+                    </div>
+                </div>
+            `;
+        });
+
+        listEl.innerHTML = html;
+
+    } catch (err) {
+        console.error('Load pending employees error:', err);
+        listEl.innerHTML = '<p style="text-align:center;color:#ef4444;">載入失敗</p>';
+    }
+}
+
+// ===== 審核通過 =====
+export async function approveEmployee(empId, empName) {
+    if (!confirm(`確定通過「${empName}」的登記申請？`)) return;
+
+    try {
+        // 產生工號（自動遞增）
+        const { data: maxEmp } = await sb.from('employees')
+            .select('employee_number')
+            .eq('company_id', window.currentCompanyId)
+            .not('employee_number', 'is', null)
+            .order('employee_number', { ascending: false })
+            .limit(10);
+
+        let nextNum = 'E001';
+        if (maxEmp && maxEmp.length > 0) {
+            // 找最大數字工號
+            let maxN = 0;
+            maxEmp.forEach(e => {
+                const m = (e.employee_number || '').match(/\d+/);
+                if (m) {
+                    const n = parseInt(m[0], 10);
+                    if (n > maxN) maxN = n;
+                }
+            });
+            nextNum = 'E' + String(maxN + 1).padStart(3, '0');
+        }
+
+        const { error } = await sb.from('employees').update({
+            is_active: true,
+            status: 'approved',
+            employee_number: nextNum,
+            updated_at: new Date().toISOString()
+        }).eq('id', empId);
+
+        if (error) throw error;
+
+        showToast(`✅ ${empName} 已通過審核（工號：${nextNum}）`);
+
+        // 嘗試推送 LINE 通知
+        try {
+            const { data: emp } = await sb.from('employees')
+                .select('line_user_id')
+                .eq('id', empId)
+                .maybeSingle();
+
+            if (emp && emp.line_user_id) {
+                await sb.functions.invoke('send-line-message', {
+                    body: {
+                        userId: emp.line_user_id,
+                        message: `✅ 您的員工登記已通過審核！\n工號：${nextNum}\n您現在可以開始使用系統了。`
+                    }
+                });
+            }
+        } catch (notifyErr) {
+            console.error('LINE notify failed (non-critical):', notifyErr);
+        }
+
+        loadPendingEmployees();
+
+    } catch (err) {
+        console.error('Approve error:', err);
+        showToast('❌ 審核失敗: ' + friendlyError(err));
+    }
+}
+
+// ===== 拒絕登記 =====
+export async function rejectEmployee(empId, empName) {
+    if (!confirm(`確定拒絕「${empName}」的登記申請？\n拒絕後該筆資料將被刪除。`)) return;
+
+    try {
+        const { data: emp } = await sb.from('employees')
+            .select('line_user_id')
+            .eq('id', empId)
+            .maybeSingle();
+
+        const { error } = await sb.from('employees').delete().eq('id', empId);
+
+        if (error) throw error;
+
+        showToast(`❌ 已拒絕 ${empName} 的登記`);
+
+        // 嘗試推送 LINE 通知
+        try {
+            if (emp && emp.line_user_id) {
+                await sb.functions.invoke('send-line-message', {
+                    body: {
+                        userId: emp.line_user_id,
+                        message: `❌ 很抱歉，您的員工登記申請未通過審核。\n如有疑問請聯繫管理員。`
+                    }
+                });
+            }
+        } catch (notifyErr) {
+            console.error('LINE notify failed (non-critical):', notifyErr);
+        }
+
+        loadPendingEmployees();
+
+    } catch (err) {
+        console.error('Reject error:', err);
+        showToast('❌ 操作失敗: ' + friendlyError(err));
+    }
+}
+
+// ===== 載入待審核數量（用於 badge 更新） =====
+export async function loadPendingCount() {
+    try {
+        const { count, error } = await sb.from('employees')
+            .select('id', { count: 'exact', head: true })
+            .eq('company_id', window.currentCompanyId)
+            .eq('status', 'pending')
+            .eq('is_active', false);
+
+        if (!error) {
+            const badge = document.getElementById('pendingBadge');
+            if (badge) {
+                if (count > 0) {
+                    badge.textContent = count;
+                    badge.style.display = 'inline-block';
+                } else {
+                    badge.style.display = 'none';
+                }
+            }
+        }
+    } catch (e) {
+        console.error('Load pending count error:', e);
     }
 }
 

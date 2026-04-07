@@ -250,15 +250,39 @@
                             ➕ 新增
                         </button>
                         <button class="btn btn-primary" onclick="showJoinQRCode()" style="font-size:13px; padding:8px 14px; width:auto; margin:0;">
-                            📱 QR Code
+                            📱 綁定 QR
+                        </button>
+                        <button onclick="showRegisterQRCode()" style="font-size:13px; padding:8px 14px; width:auto; margin:0; border:2px solid #10B981; border-radius:8px; background:#F0FDF4; color:#059669; font-weight:700; cursor:pointer;">
+                            📱 登記 QR
                         </button>
                     </div>
                 </div>
-                <div class="form-group" style="margin-bottom:15px;">
-                    <input type="text" id="employeeSearch" placeholder="🔍 搜尋姓名或工號" onkeyup="searchEmployees()">
+
+                <!-- 員工 Tab 切換 -->
+                <div style="display:flex; gap:0; margin-bottom:15px; border-radius:10px; overflow:hidden; border:2px solid #E2E8F0;">
+                    <button id="empTabActive" onclick="switchEmployeeTab('active')" style="flex:1; padding:10px; border:none; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit; background:#4F46E5; color:#fff;">
+                        在職員工
+                    </button>
+                    <button id="empTabPending" onclick="switchEmployeeTab('pending')" style="flex:1; padding:10px; border:none; font-size:13px; font-weight:700; cursor:pointer; font-family:inherit; background:#fff; color:#64748B; position:relative;">
+                        待審核 <span id="pendingBadge" style="display:none; position:absolute; top:4px; right:8px; background:#EF4444; color:#fff; font-size:10px; min-width:18px; height:18px; border-radius:9px; line-height:18px; text-align:center; padding:0 4px;"></span>
+                    </button>
                 </div>
-                <div id="employeeList">
-                    <p style="text-align:center;color:#666;">載入中...</p>
+
+                <!-- 在職員工列表 -->
+                <div id="activeEmployeeSection">
+                    <div class="form-group" style="margin-bottom:15px;">
+                        <input type="text" id="employeeSearch" placeholder="🔍 搜尋姓名或工號" onkeyup="searchEmployees()">
+                    </div>
+                    <div id="employeeList">
+                        <p style="text-align:center;color:#666;">載入中...</p>
+                    </div>
+                </div>
+
+                <!-- 待審核員工列表 -->
+                <div id="pendingEmployeeSection" style="display:none;">
+                    <div id="pendingEmployeeList">
+                        <p style="text-align:center;color:#666;">載入中...</p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -351,6 +375,32 @@
                             3. 完成綁定即可使用系統
                         </p>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 員工登記 QR Code Modal -->
+        <div id="registerQrModal" class="modal" style="display:none;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>📱 員工自助登記 QR Code</h3>
+                    <button class="modal-close" onclick="closeRegisterQrModal()">&times;</button>
+                </div>
+                <div class="modal-body" style="text-align:center;">
+                    <p id="regQrCompanyName" style="margin:0 0 5px; font-size:16px; font-weight:bold; color:#1f2937;"></p>
+                    <div id="registerQrcode" style="margin:20px auto; display:inline-block;"></div>
+                    <div style="margin-top:15px; padding:12px; background:#F0FDF4; border-radius:8px; border-left:4px solid #10B981; text-align:left;">
+                        <p style="margin:0; font-size:13px; color:#065F46;">
+                            <strong>自助登記流程：</strong><br>
+                            1. 員工用 LINE 掃描此 QR Code<br>
+                            2. 填寫個人資料（姓名、手機、部門等）<br>
+                            3. 送出後等待管理員審核<br>
+                            4. 審核通過後員工會收到 LINE 通知
+                        </p>
+                    </div>
+                    <button onclick="downloadRegisterQR()" class="btn btn-primary" style="margin-top:15px; width:auto; padding:10px 24px; font-size:13px;">
+                        📥 下載 QR Code
+                    </button>
                 </div>
             </div>
         </div>

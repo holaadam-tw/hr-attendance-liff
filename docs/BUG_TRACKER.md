@@ -1,6 +1,6 @@
 # RunPiston Bug 追蹤 & 測試清單
 
-> 更新日期：2026-04-06
+> 更新日期：2026-04-07
 > 每次修改後更新此檔案
 
 ---
@@ -38,6 +38,7 @@
 | 13 | 集點完整流程 | 點餐→KDS完成→查點數→兌換→核銷 | 點數正確，兌換碼核銷成功 |
 | 14 | 預約集點 | 餐飲訂位→確認到店→查會員點數 | 自動加點 |
 | 15 | 手動送點 | loyalty_admin→送點→選會員→送點 | 點數增加 |
+| 21 | 員工自助登記 | admin→登記QR→掃碼→填表→送出→admin審核 | 登記 pending→審核 approved→LINE 通知 |
 
 ---
 
@@ -48,7 +49,7 @@
 | 16 | error_logs | Supabase Dashboard | 每天 |
 | 17 | GitHub Actions CI | push dev 自動跑 | 每次 push |
 | 18 | QA 腳本 | bash scripts/qa_check.sh | 每次 commit 前 |
-| 19 | 冒煙測試 | npm test（48 項） | 每次 commit 前 |
+| 19 | 冒煙測試 | npm test（49 項） | 每次 commit 前 |
 | 20 | 打卡診斷 | checkin-debug.html | 有問題時 |
 
 ---
