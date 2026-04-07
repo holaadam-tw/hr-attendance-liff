@@ -17,7 +17,10 @@
 
     <div class="container">
         <div id="checkInPage" class="page active">
-            <button class="btn btn-secondary" onclick="goBack()" style="width:auto;margin-bottom:10px;margin-top:0;">← 返回</button>
+            <div style="display:flex;gap:8px;margin-bottom:10px;">
+                <button class="btn btn-secondary" onclick="goBack()" style="width:auto;margin:0;padding:8px 16px;font-size:13px;font-weight:700;color:#1E293B;border:2px solid #CBD5E1;background:#F8FAFC;">← 返回首頁</button>
+                <button onclick="closeLiff()" style="width:auto;margin:0;padding:8px 16px;font-size:13px;font-weight:700;color:#64748B;border:2px solid #E2E8F0;border-radius:10px;background:#fff;cursor:pointer;font-family:inherit;">✕ 關閉</button>
+            </div>
             <div class="checkin-page">
                 <h2 id="checkInTitle" style="text-align:center;font-size:18px;font-weight:800;color:#0F172A;">📍 上班打卡</h2>
                 <div id="checkInStatus" class="status-box show info" style="margin-top:12px;">準備開啟相機...</div>
