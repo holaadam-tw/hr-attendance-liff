@@ -477,7 +477,7 @@ export async function loadPayrollData() {
 
     try {
         const [empRes, salaryRes, attRes, leaveRes, otRes, existRes, bracketRes] = await Promise.all([
-            sb.from('employees').select('id, name, employee_number, department, is_active').eq('company_id', window.currentCompanyId).eq('is_active', true),
+            sb.from('employees').select('id, name, employee_number, department, is_active, status, resigned_date').eq('company_id', window.currentCompanyId).in('status', ['approved', 'resigned']),
             sb.from('salary_settings').select('*, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).eq('is_current', true),
             sb.from('attendance').select('employee_id, date, is_late, total_work_hours, overtime_hours, check_in_time, check_out_time, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).gte('date', startDate).lte('date', endDate),
             sb.from('leave_requests').select('employee_id, days, leave_type, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).eq('status', 'approved').gte('start_date', startDate).lte('end_date', endDate),
@@ -539,6 +539,11 @@ export async function loadPayrollData() {
         payrollEmployees = (empRes.data || []).map(emp => {
             const ss = salaryMap[emp.id];
             if (!ss) return null;
+            // 已離職且離職日在該月份之前 → 跳過
+            if (emp.status === 'resigned' && emp.resigned_date) {
+                const resignMonth = new Date(emp.resigned_date + 'T00:00:00+08:00');
+                if (resignMonth.getFullYear() < year || (resignMonth.getFullYear() === year && resignMonth.getMonth() + 1 < month)) return null;
+            }
             const atts = attMap[emp.id] || [];
             const leaves = leaveMap[emp.id] || { total: 0, personal: 0 };
             const otHours = otMap[emp.id] || 0;
@@ -640,7 +645,7 @@ function calcEmployeePayroll(emp, ss, atts, leaves, otHours, year, month, payrol
 
     return {
         employee_id: emp.id, name: emp.name, employee_number: emp.employee_number,
-        department: emp.department || '', year, month,
+        department: emp.department || '', year, month, is_resigned: emp.status === 'resigned',
         salary_type: salaryType, base_salary: monthSalary,
         overtime_pay: otPay, full_attendance_bonus: fullAttAmount,
         meal_allowance: mealAmount, position_allowance: posAmount, night_allowance: 0,
@@ -729,7 +734,7 @@ function renderAllPayrollTable() {
         const allowTip = allowParts.length > 0 ? allowParts.join(' + ') : '無';
 
         html += `<tr onclick="document.getElementById('payrollEmpDropdown').value='${emp.employee_id}';renderPayrollView();" style="cursor:pointer;border-bottom:1px solid #F1F5F9;transition:background 0.15s;" onmouseover="this.style.background='#F8FAFC'" onmouseout="this.style.background=''">`;
-        html += `<td style="padding:10px 6px;"><div style="font-weight:700;color:#0F172A;">${emp.name}</div><div style="font-size:11px;color:#94A3B8;">${emp.employee_number} · ${emp.department}</div></td>`;
+        html += `<td style="padding:10px 6px;"><div style="font-weight:700;color:#0F172A;">${emp.name}${emp.is_resigned ? ' <span style="font-size:10px;color:#94A3B8;">（已離職）</span>' : ''}</div><div style="font-size:11px;color:#94A3B8;">${emp.employee_number} · ${emp.department}</div></td>`;
         html += `<td style="padding:10px 4px;text-align:center;"><span style="background:${st === 'hourly' ? '#DBEAFE' : st === 'monthly' ? '#D1FAE5' : '#FEF3C7'};color:${st === 'hourly' ? '#1D4ED8' : st === 'monthly' ? '#059669' : '#92400E'};padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">${typeLabel[st] || st}</span></td>`;
         html += `<td style="padding:10px 4px;text-align:right;color:#334155;"><div>${Math.round(emp.base_salary).toLocaleString()}</div><div style="font-size:10px;color:#94A3B8;">${baseDesc}</div></td>`;
         html += `<td style="padding:10px 4px;text-align:right;color:#0369A1;" title="${escapeHTML(allowTip)}">${allowance > 0 ? '+' + Math.round(allowance).toLocaleString() : '-'}</td>`;

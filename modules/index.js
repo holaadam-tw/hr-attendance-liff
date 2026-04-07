@@ -21,7 +21,9 @@ import {
     onSalaryTypeChange, saveSalarySetting, openEditEmployeeModal,
     closeEditEmployeeModal, saveEditEmployee, loadDepartmentOptions, addNewDepartment,
     showRegisterQRCode, closeRegisterQrModal, downloadRegisterQR,
-    switchEmployeeTab, loadPendingEmployees, approveEmployee, rejectEmployee, loadPendingCount
+    switchEmployeeTab, loadPendingEmployees, approveEmployee, rejectEmployee, loadPendingCount,
+    showResignModal, closeResignModal, confirmResign, restoreEmployee,
+    loadResignedEmployees, loadAllEmployees
 } from './employees.js';
 
 import {
@@ -141,6 +143,12 @@ window.loadPendingEmployees = loadPendingEmployees;
 window.approveEmployee = approveEmployee;
 window.rejectEmployee = rejectEmployee;
 window.loadPendingCount = loadPendingCount;
+window.showResignModal = showResignModal;
+window.closeResignModal = closeResignModal;
+window.confirmResign = confirmResign;
+window.restoreEmployee = restoreEmployee;
+window.loadResignedEmployees = loadResignedEmployees;
+window.loadAllEmployees = loadAllEmployees;
 
 // leave
 window.switchApprovalType = switchApprovalType;

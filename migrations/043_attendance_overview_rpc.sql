@@ -203,8 +203,7 @@ BEGIN
         ) AS total_work_hours
     FROM employees e
     WHERE e.company_id = p_company_id
-      AND e.is_active = true
-      AND COALESCE(e.status, 'approved') = 'approved'
-    ORDER BY e.department, e.name;
+      AND COALESCE(e.status, 'approved') IN ('approved', 'resigned')
+    ORDER BY e.is_active DESC, e.department, e.name;
 END;
 $$;

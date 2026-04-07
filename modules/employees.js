@@ -172,6 +172,7 @@ export async function loadEmployeeList() {
                                 ${emp.role === 'admin' ? '取消管理員' : '設為管理員'}
                             </button>
                         ` : ''}
+                        <button onclick="showResignModal('${emp.id}', '${escapeHTML(emp.name)}')" style="padding:7px 12px;border:1px solid #FCA5A5;border-radius:8px;background:#FEF2F2;font-size:11px;font-weight:700;cursor:pointer;color:#DC2626;">📤 離職</button>
                     </div>
                 </div>
             `;
@@ -337,28 +338,38 @@ let currentEmpTab = 'active';
 
 export function switchEmployeeTab(tab) {
     currentEmpTab = tab;
-    const activeBtn = document.getElementById('empTabActive');
-    const pendingBtn = document.getElementById('empTabPending');
-    const activeSection = document.getElementById('activeEmployeeSection');
-    const pendingSection = document.getElementById('pendingEmployeeSection');
+    const tabs = ['active', 'pending', 'resigned', 'all'];
+    const sections = {
+        active: 'activeEmployeeSection',
+        pending: 'pendingEmployeeSection',
+        resigned: 'resignedEmployeeSection',
+        all: 'allEmployeeSection'
+    };
 
-    if (tab === 'active') {
-        activeBtn.style.background = '#4F46E5';
-        activeBtn.style.color = '#fff';
-        pendingBtn.style.background = '#fff';
-        pendingBtn.style.color = '#64748B';
-        activeSection.style.display = 'block';
-        pendingSection.style.display = 'none';
-        loadEmployeeList();
-    } else {
-        activeBtn.style.background = '#fff';
-        activeBtn.style.color = '#64748B';
-        pendingBtn.style.background = '#4F46E5';
-        pendingBtn.style.color = '#fff';
-        activeSection.style.display = 'none';
-        pendingSection.style.display = 'block';
-        loadPendingEmployees();
-    }
+    // 更新 tab 按鈕樣式
+    tabs.forEach(t => {
+        const btn = document.getElementById('empTab_' + t);
+        if (!btn) return;
+        if (t === tab) {
+            btn.style.background = '#4F46E5';
+            btn.style.color = '#fff';
+        } else {
+            btn.style.background = '#fff';
+            btn.style.color = '#64748B';
+        }
+    });
+
+    // 顯示/隱藏區塊
+    tabs.forEach(t => {
+        const el = document.getElementById(sections[t]);
+        if (el) el.style.display = t === tab ? 'block' : 'none';
+    });
+
+    // 載入對應資料
+    if (tab === 'active') loadEmployeeList();
+    else if (tab === 'pending') loadPendingEmployees();
+    else if (tab === 'resigned') loadResignedEmployees();
+    else if (tab === 'all') loadAllEmployees();
 }
 
 // ===== 待審核員工列表 =====
@@ -518,6 +529,171 @@ export async function loadPendingCount() {
         }
     } catch (e) {
         console.error('Load pending count error:', e);
+    }
+}
+
+// ===== 離職管理 =====
+export function showResignModal(empId, empName) {
+    document.getElementById('resignEmpId').value = empId;
+    document.getElementById('resignEmpName').textContent = empName + ' 離職處理';
+    document.getElementById('resignDate').value = fmtDate(new Date());
+    document.getElementById('resignReason').value = '';
+    document.getElementById('resignNote').value = '';
+    document.getElementById('resignModal').style.display = 'flex';
+}
+
+export function closeResignModal() {
+    document.getElementById('resignModal').style.display = 'none';
+}
+
+export async function confirmResign() {
+    const empId = document.getElementById('resignEmpId').value;
+    const resignDate = document.getElementById('resignDate').value;
+    const reason = document.getElementById('resignReason').value;
+    const note = document.getElementById('resignNote').value.trim();
+
+    if (!resignDate) { showToast('⚠️ 請選擇離職日期'); return; }
+    if (!reason) { showToast('⚠️ 請選擇離職原因'); return; }
+
+    try {
+        const { error } = await sb.from('employees').update({
+            is_active: false,
+            status: 'resigned',
+            resigned_date: resignDate,
+            resign_reason: reason,
+            resign_note: note || null,
+            updated_at: new Date().toISOString()
+        }).eq('id', empId);
+
+        if (error) throw error;
+
+        showToast('✅ 已設為離職');
+        closeResignModal();
+        loadEmployeeList();
+    } catch (err) {
+        console.error('Resign error:', err);
+        showToast('❌ 操作失敗: ' + friendlyError(err));
+    }
+}
+
+export async function restoreEmployee(empId, empName) {
+    if (!confirm(`確定將「${empName}」恢復為在職？`)) return;
+
+    try {
+        const { error } = await sb.from('employees').update({
+            is_active: true,
+            status: 'approved',
+            resigned_date: null,
+            resign_reason: null,
+            resign_note: null,
+            updated_at: new Date().toISOString()
+        }).eq('id', empId);
+
+        if (error) throw error;
+        showToast(`✅ ${empName} 已恢復在職`);
+        loadResignedEmployees();
+    } catch (err) {
+        console.error('Restore error:', err);
+        showToast('❌ 操作失敗: ' + friendlyError(err));
+    }
+}
+
+// ===== 已離職員工列表 =====
+export async function loadResignedEmployees() {
+    const listEl = document.getElementById('resignedEmployeeList');
+    if (!listEl) return;
+
+    try {
+        const { data, error } = await sb.from('employees')
+            .select('id, name, employee_number, department, position, hire_date, resigned_date, resign_reason, resign_note, status')
+            .eq('company_id', window.currentCompanyId)
+            .eq('status', 'resigned')
+            .order('resigned_date', { ascending: false });
+
+        if (error) throw error;
+
+        if (!data || data.length === 0) {
+            listEl.innerHTML = '<p style="text-align:center;color:#999;padding:40px;">目前沒有已離職的員工</p>';
+            return;
+        }
+
+        const reasonMap = { voluntary:'自願離職', terminated:'資遣', retired:'退休', contract_end:'合約到期', other:'其他' };
+        let html = '';
+        data.forEach(emp => {
+            html += `
+                <div class="attendance-item" style="border-left:4px solid #94A3B8; opacity:0.85;">
+                    <div class="date">
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <span style="font-weight:700;">${escapeHTML(emp.name)} - ${escapeHTML(emp.employee_number || '-')}</span>
+                            <span style="padding:3px 10px; border-radius:15px; font-size:11px; background:#F3F4F6; color:#6B7280; font-weight:bold;">已離職</span>
+                        </div>
+                    </div>
+                    <div class="details" style="margin-top:6px;">
+                        <span>${escapeHTML(emp.department || '-')} · ${escapeHTML(emp.position || '-')}</span>
+                    </div>
+                    <div style="font-size:12px;color:#666;margin-top:5px;">
+                        離職日：${emp.resigned_date || '-'} · 原因：${reasonMap[emp.resign_reason] || emp.resign_reason || '-'}
+                    </div>
+                    ${emp.resign_note ? `<div style="font-size:12px;color:#94A3B8;margin-top:3px;">備註：${escapeHTML(emp.resign_note)}</div>` : ''}
+                    <div style="margin-top:8px;">
+                        <button onclick="restoreEmployee('${emp.id}', '${escapeHTML(emp.name)}')" style="padding:7px 14px;border:1px solid #BBF7D0;border-radius:8px;background:#F0FDF4;font-size:11px;font-weight:700;cursor:pointer;color:#059669;">🔄 恢復在職</button>
+                    </div>
+                </div>
+            `;
+        });
+
+        listEl.innerHTML = html;
+    } catch (err) {
+        console.error('Load resigned error:', err);
+        listEl.innerHTML = '<p style="text-align:center;color:#ef4444;">載入失敗</p>';
+    }
+}
+
+// ===== 全部員工列表 =====
+export async function loadAllEmployees() {
+    const listEl = document.getElementById('allEmployeeList');
+    if (!listEl) return;
+
+    try {
+        const { data, error } = await sb.from('employees')
+            .select('id, name, employee_number, department, position, is_active, status, hire_date, resigned_date')
+            .eq('company_id', window.currentCompanyId)
+            .in('status', ['approved', 'resigned'])
+            .order('is_active', { ascending: false })
+            .order('name');
+
+        if (error) throw error;
+
+        if (!data || data.length === 0) {
+            listEl.innerHTML = '<p style="text-align:center;color:#999;padding:40px;">無員工資料</p>';
+            return;
+        }
+
+        let html = '';
+        data.forEach(emp => {
+            const isResigned = emp.status === 'resigned';
+            html += `
+                <div class="attendance-item" style="${isResigned ? 'border-left:4px solid #94A3B8;opacity:0.75;' : ''}">
+                    <div class="date">
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <span style="font-weight:700;">${escapeHTML(emp.name)} - ${escapeHTML(emp.employee_number || '-')}</span>
+                            <span style="padding:3px 10px; border-radius:15px; font-size:11px; background:${isResigned ? '#F3F4F6' : '#DCFCE7'}; color:${isResigned ? '#6B7280' : '#059669'}; font-weight:bold;">
+                                ${isResigned ? '已離職' : '在職'}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="details" style="margin-top:4px;">
+                        <span>${escapeHTML(emp.department || '-')} · ${escapeHTML(emp.position || '-')}</span>
+                        <span style="font-size:12px;color:#94A3B8;">${isResigned ? '離職：' + (emp.resigned_date || '-') : '到職：' + (emp.hire_date || '-')}</span>
+                    </div>
+                </div>
+            `;
+        });
+
+        listEl.innerHTML = html;
+    } catch (err) {
+        console.error('Load all error:', err);
+        listEl.innerHTML = '<p style="text-align:center;color:#ef4444;">載入失敗</p>';
     }
 }
 
