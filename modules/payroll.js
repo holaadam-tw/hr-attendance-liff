@@ -47,8 +47,9 @@ export function switchPayTab(tab, btn) {
     }
     // 載入對應資料
     if (tab === 'payroll') initPayrollPage();
+    if (tab === 'calc' && typeof window.adminCalcSalary === 'function') window.adminCalcSalary();
     if (tab === 'bonus') loadHybridBonusData();
-    if (tab === 'insurance') loadInsuranceBrackets();
+    if (tab === 'setting') { loadInsuranceBrackets(); if (typeof window.loadSettingTabSalary === 'function') window.loadSettingTabSalary(); }
 }
 
 // ===== 保險模組狀態 =====
