@@ -695,14 +695,14 @@ function renderAllPayrollTable() {
     html += '<thead><tr style="background:#F1F5F9;">';
     html += `<th style="${thStyle}text-align:left;">姓名</th>`;
     html += `<th style="${thStyle}text-align:center;">制度</th>`;
-    html += `<th style="${thStyle}text-align:right;">工時</th>`;
     html += `<th style="${thStyle}text-align:right;">底薪</th>`;
-    html += `<th style="${thStyle}text-align:right;">加班</th>`;
+    html += `<th style="${thStyle}text-align:right;">津貼</th>`;
+    html += `<th style="${thStyle}text-align:right;">應發</th>`;
     html += `<th style="${thStyle}text-align:right;color:#DC2626;">扣款</th>`;
     html += `<th style="${thStyle}text-align:right;color:#059669;">實發</th>`;
     html += '</tr></thead><tbody>';
 
-    let sumBase = 0, sumOt = 0, sumDeduct = 0, sumNet = 0;
+    let sumGross = 0, sumAllowance = 0, sumDeduct = 0, sumNet = 0;
     payrollEmployees.forEach(emp => {
         const cd = emp.calculation_details || {};
         const st = cd.salary_type || emp.salary_type || 'monthly';
@@ -711,23 +711,33 @@ function renderAllPayrollTable() {
         else if (st === 'daily') baseDesc = `${formatNT(cd.original_base || 0)}/日 × ${cd.actual_days || 0}天`;
         else baseDesc = `固定 ${formatNT(emp.base_salary)}`;
 
-        sumBase += emp.base_salary; sumOt += emp.overtime_pay; sumDeduct += emp.total_deduction; sumNet += emp.net_salary;
+        const allowance = (emp.meal_allowance || 0) + (emp.position_allowance || 0) + (emp.full_attendance_bonus || 0) + (emp.overtime_pay || 0) + (emp.night_allowance || 0);
+        sumGross += emp.gross_salary; sumAllowance += allowance; sumDeduct += emp.total_deduction; sumNet += emp.net_salary;
+
+        // 津貼明細 tooltip
+        const allowParts = [];
+        if (emp.meal_allowance > 0) allowParts.push('伙食 ' + Math.round(emp.meal_allowance).toLocaleString());
+        if (emp.position_allowance > 0) allowParts.push('職務 ' + Math.round(emp.position_allowance).toLocaleString());
+        if (emp.full_attendance_bonus > 0) allowParts.push('全勤 ' + Math.round(emp.full_attendance_bonus).toLocaleString());
+        if (emp.overtime_pay > 0) allowParts.push('加班 ' + Math.round(emp.overtime_pay).toLocaleString());
+        const allowTip = allowParts.length > 0 ? allowParts.join(' + ') : '無';
 
         html += `<tr onclick="document.getElementById('payrollEmpDropdown').value='${emp.employee_id}';renderPayrollView();" style="cursor:pointer;border-bottom:1px solid #F1F5F9;transition:background 0.15s;" onmouseover="this.style.background='#F8FAFC'" onmouseout="this.style.background=''">`;
         html += `<td style="padding:10px 6px;"><div style="font-weight:700;color:#0F172A;">${emp.name}</div><div style="font-size:11px;color:#94A3B8;">${emp.employee_number} · ${emp.department}</div></td>`;
         html += `<td style="padding:10px 4px;text-align:center;"><span style="background:${st === 'hourly' ? '#DBEAFE' : st === 'monthly' ? '#D1FAE5' : '#FEF3C7'};color:${st === 'hourly' ? '#1D4ED8' : st === 'monthly' ? '#059669' : '#92400E'};padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;">${typeLabel[st] || st}</span></td>`;
-        html += `<td style="padding:10px 4px;text-align:right;color:#64748B;font-size:11px;">${(cd.total_work_hours || 0)}h</td>`;
         html += `<td style="padding:10px 4px;text-align:right;color:#334155;"><div>${Math.round(emp.base_salary).toLocaleString()}</div><div style="font-size:10px;color:#94A3B8;">${baseDesc}</div></td>`;
-        html += `<td style="padding:10px 4px;text-align:right;color:#0369A1;">${emp.overtime_pay > 0 ? '+' + Math.round(emp.overtime_pay).toLocaleString() : '-'}</td>`;
+        html += `<td style="padding:10px 4px;text-align:right;color:#0369A1;" title="${escapeHTML(allowTip)}">${allowance > 0 ? '+' + Math.round(allowance).toLocaleString() : '-'}</td>`;
+        html += `<td style="padding:10px 4px;text-align:right;font-weight:700;color:#334155;">${Math.round(emp.gross_salary).toLocaleString()}</td>`;
         html += `<td style="padding:10px 4px;text-align:right;color:#DC2626;">-${Math.round(emp.total_deduction).toLocaleString()}</td>`;
         html += `<td style="padding:10px 6px;text-align:right;font-weight:900;color:#059669;">${Math.round(emp.net_salary).toLocaleString()}</td>`;
         html += '</tr>';
     });
 
     html += `<tr style="background:#F8FAFC;border-top:2px solid #E2E8F0;">`;
-    html += `<td colspan="3" style="padding:10px 6px;font-weight:800;color:#0F172A;">合計（${payrollEmployees.length} 人）</td>`;
-    html += `<td style="padding:10px 4px;text-align:right;font-weight:800;color:#334155;">${Math.round(sumBase).toLocaleString()}</td>`;
-    html += `<td style="padding:10px 4px;text-align:right;font-weight:800;color:#0369A1;">${sumOt > 0 ? '+' + Math.round(sumOt).toLocaleString() : '-'}</td>`;
+    html += `<td colspan="2" style="padding:10px 6px;font-weight:800;color:#0F172A;">合計（${payrollEmployees.length} 人）</td>`;
+    html += `<td style="padding:10px 4px;text-align:right;font-weight:800;color:#334155;"></td>`;
+    html += `<td style="padding:10px 4px;text-align:right;font-weight:800;color:#0369A1;">${sumAllowance > 0 ? '+' + Math.round(sumAllowance).toLocaleString() : '-'}</td>`;
+    html += `<td style="padding:10px 4px;text-align:right;font-weight:800;color:#334155;">${Math.round(sumGross).toLocaleString()}</td>`;
     html += `<td style="padding:10px 4px;text-align:right;font-weight:800;color:#DC2626;">-${Math.round(sumDeduct).toLocaleString()}</td>`;
     html += `<td style="padding:10px 6px;text-align:right;font-weight:900;color:#059669;font-size:14px;">${Math.round(sumNet).toLocaleString()}</td>`;
     html += '</tr>';

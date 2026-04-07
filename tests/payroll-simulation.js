@@ -251,7 +251,8 @@ async function main() {
       const typeLabel = { monthly: '月薪', hourly: '時薪', daily: '日薪' };
       console.log(`\n  👤 ${emp.name}（${emp.employee_number || '-'}）${typeLabel[result.salary_type]}`);
       console.log(`     出勤 ${result.actual_days}天 · 工時 ${result.total_work_hours}h · 遲到 ${result.late_count}次 · 請假 ${result.leave_days}天 · 加班 ${result.overtime_hours}h`);
-      console.log(`     底薪 ${result.base_salary.toLocaleString()} + 加班 ${result.overtime_pay.toLocaleString()} - 扣款 ${result.total_deduction.toLocaleString()} = 實發 ${result.net_salary.toLocaleString()}`);
+      const allowance = (result.meal_allowance || 0) + (result.position_allowance || 0) + (result.full_attendance_bonus || 0) + (result.overtime_pay || 0);
+      console.log(`     底薪 ${result.base_salary.toLocaleString()} + 津貼 ${allowance.toLocaleString()} = 應發 ${result.gross_salary.toLocaleString()} - 扣款 ${result.total_deduction.toLocaleString()} = 實發 ${result.net_salary.toLocaleString()}`);
     });
 
     console.log(`\n  💰 ${company.name} 薪資總額：NT$ ${Math.round(totalNet).toLocaleString()}`);
