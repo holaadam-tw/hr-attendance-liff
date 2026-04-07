@@ -6,7 +6,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#4F46E5">
 <title>員工登記</title>
-<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;900&display=swap" rel="stylesheet">
 <style>
@@ -64,7 +63,7 @@ input:focus,select:focus{outline:none;border-color:var(--primary);box-shadow:0 0
   <!-- 載入中 -->
   <div id="loadingView" class="loading-view">
     <div class="spinner"></div>
-    <p style="color:var(--text-muted);">系統初始化中...</p>
+    <p style="color:var(--text-muted);">載入中...</p>
   </div>
 
   <!-- 錯誤頁面 -->
@@ -73,15 +72,6 @@ input:focus,select:focus{outline:none;border-color:var(--primary);box-shadow:0 0
       <div style="font-size:48px;margin-bottom:16px;">⚠️</div>
       <h2 style="justify-content:center;" id="errorTitle">無法載入</h2>
       <p style="color:var(--text-muted);font-size:13px;" id="errorMsg">請確認連結是否正確</p>
-    </div>
-  </div>
-
-  <!-- 已登記過 -->
-  <div id="alreadyView" class="hidden">
-    <div class="card" style="text-align:center;padding:40px 24px;">
-      <div style="font-size:48px;margin-bottom:16px;">📌</div>
-      <h2 style="justify-content:center;">您已登記過</h2>
-      <p id="alreadyMsg" style="color:var(--text-muted);font-size:13px;margin-bottom:12px;"></p>
     </div>
   </div>
 
@@ -148,7 +138,7 @@ input:focus,select:focus{outline:none;border-color:var(--primary);box-shadow:0 0
       <h2 style="justify-content:center;font-size:20px;">登記成功！</h2>
       <p style="color:var(--text-muted);font-size:13px;margin-top:8px;line-height:1.6;">
         您的登記資料已送出，<br>請等待管理員審核。<br>
-        審核通過後會透過 LINE 通知您。
+        審核通過後請使用 LINE 綁定帳號即可開始使用。
       </p>
     </div>
   </div>
@@ -182,10 +172,8 @@ window.onerror = function(msg, src, line, col, err) {
 
 const SUPABASE_URL = 'https://nssuisyvlrqnqfxupklb.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5zc3Vpc3l2bHJxbnFmeHVwa2xiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkyOTAwMzUsImV4cCI6MjA4NDg2NjAzNX0.q_B6v3gf1TOCuAq7z0xIw10wDueCSJn0p37VzdMfmbc';
-const LIFF_ID = '2008962829-bnsS1bbB';
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-let lineProfile = null;
 let companyId = null;
 let companyName = '';
 
@@ -195,31 +183,11 @@ async function init() {
         // 從 URL 取得 company_id
         const params = new URLSearchParams(window.location.search);
         companyId = params.get('company');
-        const gotoParam = params.get('goto');
-
-        // 若從 index.html 跳轉過來，goto=register&company=xxx
-        if (!companyId && gotoParam === 'register') {
-            companyId = params.get('company');
-        }
 
         if (!companyId) {
             showError('缺少公司資訊', '請掃描管理員提供的 QR Code 進入此頁面。');
             return;
         }
-
-        // 初始化 LIFF
-        await liff.init({ liffId: LIFF_ID });
-
-        if (!liff.isLoggedIn()) {
-            if (!liff.isInClient()) {
-                showError('請從 LINE 開啟', '此頁面需要透過 LINE 應用程式開啟，請掃描 QR Code 或從 LINE 點選連結。');
-                return;
-            }
-            liff.login();
-            return;
-        }
-
-        lineProfile = await liff.getProfile();
 
         // 驗證公司是否存在
         const { data: company, error: compErr } = await sb.from('companies')
@@ -235,23 +203,8 @@ async function init() {
         companyName = company.name;
         document.getElementById('companyNameBadge').textContent = companyName;
 
-        // 檢查是否已登記過
-        const { data: existing } = await sb.from('employees')
-            .select('id, name, status, is_active')
-            .eq('line_user_id', lineProfile.userId)
-            .eq('company_id', companyId)
-            .maybeSingle();
-
-        if (existing) {
-            showAlreadyRegistered(existing);
-            return;
-        }
-
         // 載入部門選項
         await loadDepartments();
-
-        // 自動帶入 LINE 顯示名稱
-        document.getElementById('regName').value = lineProfile.displayName || '';
 
         // 預設到職日為今天
         const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Taipei' });
@@ -294,22 +247,6 @@ async function loadDepartments() {
     } catch (e) {
         console.error('Load departments error:', e);
     }
-}
-
-// ===== 顯示已登記 =====
-function showAlreadyRegistered(emp) {
-    const statusMap = { pending: '待審核', approved: '已通過', rejected: '已拒絕' };
-    let msg = '您已在「' + esc(companyName) + '」登記過。';
-    if (emp.status === 'pending') {
-        msg += '<br>目前狀態：<strong>⏳ 待審核</strong>，請耐心等候管理員審核。';
-    } else if (emp.status === 'approved' || emp.is_active) {
-        msg += '<br>目前狀態：<strong>✅ 已通過</strong>，您可以正常使用系統。';
-    } else if (emp.status === 'rejected') {
-        msg += '<br>目前狀態：<strong>❌ 已拒絕</strong>，請聯繫管理員。';
-    }
-    document.getElementById('alreadyMsg').innerHTML = msg;
-    document.getElementById('loadingView').classList.add('hidden');
-    document.getElementById('alreadyView').classList.remove('hidden');
 }
 
 // ===== 顯示錯誤 =====
@@ -367,15 +304,25 @@ async function submitRegistration() {
     btn.textContent = '送出中...';
 
     try {
-        // 再次檢查是否已登記（防止重複提交）
+        // 檢查同手機+同公司是否已登記（用手機號碼防重複）
         const { data: existing } = await sb.from('employees')
-            .select('id, status')
-            .eq('line_user_id', lineProfile.userId)
+            .select('id, name, status, is_active, phone')
+            .eq('phone', phone)
             .eq('company_id', companyId)
             .maybeSingle();
 
         if (existing) {
-            if (existing.status === 'rejected') {
+            if (existing.status === 'pending') {
+                showToast('此手機號碼已登記過，正在等待審核', true);
+                btn.disabled = false;
+                btn.textContent = '📨 送出登記';
+                return;
+            } else if (existing.status === 'approved' || existing.is_active) {
+                showToast('此手機號碼已是在職員工', true);
+                btn.disabled = false;
+                btn.textContent = '📨 送出登記';
+                return;
+            } else if (existing.status === 'rejected') {
                 // 被拒絕過的可以重新登記 → 更新資料
                 const { error } = await sb.from('employees').update({
                     name: name,
@@ -391,32 +338,33 @@ async function submitRegistration() {
                 }).eq('id', existing.id);
 
                 if (error) throw error;
-            } else {
-                showAlreadyRegistered(existing);
+
+                document.getElementById('formView').classList.add('hidden');
+                document.getElementById('successView').classList.remove('hidden');
                 return;
             }
-        } else {
-            // 新增登記
-            const employeeData = {
-                name: name,
-                phone: phone,
-                department: department || null,
-                position: position || null,
-                hire_date: hireDate || null,
-                emergency_contact: emergencyContact || null,
-                emergency_phone: emergencyPhone || null,
-                line_user_id: lineProfile.userId,
-                company_id: companyId,
-                is_active: false,
-                status: 'pending',
-                role: 'user',
-                employment_type: 'fulltime',
-                created_at: new Date().toISOString()
-            };
-
-            const { error } = await sb.from('employees').insert([employeeData]);
-            if (error) throw error;
         }
+
+        // 新增登記（不綁定 LINE）
+        const employeeData = {
+            name: name,
+            phone: phone,
+            department: department || null,
+            position: position || null,
+            hire_date: hireDate || null,
+            emergency_contact: emergencyContact || null,
+            emergency_phone: emergencyPhone || null,
+            line_user_id: null,
+            company_id: companyId,
+            is_active: false,
+            status: 'pending',
+            role: 'user',
+            employment_type: 'fulltime',
+            created_at: new Date().toISOString()
+        };
+
+        const { error } = await sb.from('employees').insert([employeeData]);
+        if (error) throw error;
 
         // 顯示成功
         document.getElementById('formView').classList.add('hidden');

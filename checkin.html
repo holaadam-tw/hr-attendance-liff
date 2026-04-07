@@ -192,13 +192,8 @@
                 const locText = rpcData.location_name || '公司';
                 const nowTime = new Date().toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', hour12: false });
 
-                // 顯示成功結果畫面
+                // 跳轉考勤頁（showCheckInSuccess 內部會 redirect）
                 showCheckInSuccess(typeText, locText, nowTime);
-
-                // 上班打卡且9點前 → 3 秒後彈出便當訂購
-                if (currentCheckInType === 'in' && new Date().getHours() < 9) {
-                    setTimeout(() => showLunchPopup(), 2000);
-                }
 
             } catch (err) {
                 clearTimeout(safetyTimer);
@@ -330,10 +325,6 @@
                     const overnightHint = rpcData.overnight ? '（跨日補登下班）' : '';
 
                     showCheckInSuccess(actualType + overnightHint, locText, nowTime);
-
-                    if (currentCheckInType === 'in' && new Date().getHours() < 9) {
-                        setTimeout(() => showLunchPopup(), 2000);
-                    }
                 } catch(err) {
                     console.error(err);
                     showStatus(statusBox, 'error', `❌ 失敗: ${friendlyError(err)}`);
@@ -437,29 +428,15 @@
             } catch(e) { console.warn('停止相機失敗:', e); }
         }
 
-        // ===== 打卡成功畫面 =====
+        // ===== 打卡成功 → 跳轉考勤頁 =====
         function showCheckInSuccess(typeText, location, time) {
             stopCamera(); // 成功後立即釋放相機
             sessionStorage.setItem('needRefreshAttendance', String(Date.now()));
-            const container = document.querySelector('.container');
-            if (container) container.innerHTML = `
-                <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80vh;padding:20px;text-align:center;">
-                    <div style="font-size:72px;margin-bottom:16px;">${typeText === '上班' ? '🌅' : '🌙'}</div>
-                    <h1 style="font-size:24px;font-weight:800;color:#0F172A;margin-bottom:8px;">
-                        ${typeText}打卡成功！
-                    </h1>
-                    <div style="background:#F0FDF4;border:2px solid #86EFAC;border-radius:16px;padding:20px 32px;margin:16px 0;">
-                        <div style="font-size:36px;font-weight:900;color:#15803D;letter-spacing:2px;">${time}</div>
-                        <div style="font-size:14px;color:#16A34A;margin-top:4px;">📍 ${location}</div>
-                    </div>
-                    <button onclick="goBack()" style="width:100%;max-width:300px;padding:16px;background:linear-gradient(135deg,#4F46E5,#7C3AED);border:none;border-radius:14px;color:#fff;font-size:16px;font-weight:700;cursor:pointer;margin-top:24px;box-shadow:0 4px 12px rgba(79,70,229,0.3);">
-                        🏠 返回首頁
-                    </button>
-                    <button onclick="closeLiff()" style="width:100%;max-width:300px;padding:12px;background:transparent;border:1px solid #E2E8F0;border-radius:12px;color:#64748B;font-size:14px;cursor:pointer;margin-top:10px;">
-                        ✕ 關閉視窗
-                    </button>
-                </div>
-            `;
+            // 儲存成功訊息，records.html 會讀取並顯示 banner
+            sessionStorage.setItem('checkinSuccessMsg', `✅ 已完成${typeText}打卡 - 時間：${time}　📍 ${location}`);
+            sessionStorage.setItem('checkinSuccessType', typeText.includes('上班') ? 'in' : 'out');
+            // 跳轉到考勤記錄頁
+            window.location.href = 'records.html#attendance';
         }
 
         function goBack() {

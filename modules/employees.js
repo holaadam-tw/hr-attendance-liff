@@ -303,10 +303,12 @@ export async function showRegisterQRCode() {
         console.error('Failed to fetch company info for register QR', e);
     }
 
-    const liffUrl = `https://liff.line.me/${CONFIG.LIFF_ID}?goto=register&company=${companyId}`;
+    // 直接指向 employee_register.html（不需 LIFF）
+    const baseUrl = window.location.origin + window.location.pathname.replace(/\/[^/]*$/, '/');
+    const registerUrl = `${baseUrl}employee_register.html?company=${companyId}`;
 
     new QRCode(qrcodeDiv, {
-        text: liffUrl, width: 200, height: 200,
+        text: registerUrl, width: 200, height: 200,
         colorDark: "#059669", colorLight: "#ffffff",
         correctLevel: QRCode.CorrectLevel.H
     });
@@ -468,26 +470,6 @@ export async function approveEmployee(empId, empName) {
         if (error) throw error;
 
         showToast(`✅ ${empName} 已通過審核（工號：${nextNum}）`);
-
-        // 嘗試推送 LINE 通知
-        try {
-            const { data: emp } = await sb.from('employees')
-                .select('line_user_id')
-                .eq('id', empId)
-                .maybeSingle();
-
-            if (emp && emp.line_user_id) {
-                await sb.functions.invoke('send-line-message', {
-                    body: {
-                        userId: emp.line_user_id,
-                        message: `✅ 您的員工登記已通過審核！\n工號：${nextNum}\n您現在可以開始使用系統了。`
-                    }
-                });
-            }
-        } catch (notifyErr) {
-            console.error('LINE notify failed (non-critical):', notifyErr);
-        }
-
         loadPendingEmployees();
 
     } catch (err) {
@@ -501,31 +483,11 @@ export async function rejectEmployee(empId, empName) {
     if (!confirm(`確定拒絕「${empName}」的登記申請？\n拒絕後該筆資料將被刪除。`)) return;
 
     try {
-        const { data: emp } = await sb.from('employees')
-            .select('line_user_id')
-            .eq('id', empId)
-            .maybeSingle();
-
         const { error } = await sb.from('employees').delete().eq('id', empId);
 
         if (error) throw error;
 
         showToast(`❌ 已拒絕 ${empName} 的登記`);
-
-        // 嘗試推送 LINE 通知
-        try {
-            if (emp && emp.line_user_id) {
-                await sb.functions.invoke('send-line-message', {
-                    body: {
-                        userId: emp.line_user_id,
-                        message: `❌ 很抱歉，您的員工登記申請未通過審核。\n如有疑問請聯繫管理員。`
-                    }
-                });
-            }
-        } catch (notifyErr) {
-            console.error('LINE notify failed (non-critical):', notifyErr);
-        }
-
         loadPendingEmployees();
 
     } catch (err) {

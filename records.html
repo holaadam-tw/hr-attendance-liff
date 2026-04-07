@@ -56,6 +56,21 @@
     <div id="loadingPage" class="loading-screen"><div class="spinner"></div><p>系統載入中...</p></div>
 
     <div class="container">
+        <!-- 打卡成功 Banner -->
+        <div id="checkinSuccessBanner" style="display:none; margin:10px 16px 0; padding:14px 18px; background:linear-gradient(135deg,#059669,#10B981); color:#fff; border-radius:14px; font-size:14px; font-weight:700; box-shadow:0 4px 12px rgba(16,185,129,0.3); transition:opacity 0.5s; position:relative;">
+            <span id="checkinSuccessText"></span>
+            <button onclick="document.getElementById('checkinSuccessBanner').style.display='none'" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:#fff;font-size:18px;cursor:pointer;opacity:0.7;">✕</button>
+        </div>
+        <!-- 便當訂購提示 -->
+        <div id="lunchPromptBanner" style="display:none; margin:8px 16px 0; padding:14px 18px; background:#FFFBEB; border:2px solid #FCD34D; border-radius:14px; font-size:13px; color:#92400E;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                <span style="font-size:20px;">🍱</span>
+                <span style="font-weight:700;">今日便當尚未訂購</span>
+                <span id="lunchDeadlineText" style="font-size:11px;color:#B45309;margin-left:auto;"></span>
+            </div>
+            <button onclick="window.location.href='services.html'" style="width:100%;padding:10px;border:none;border-radius:10px;background:#F59E0B;color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">前往訂購便當</button>
+        </div>
+
         <!-- 頁面導航 -->
         <div class="flex-gap-8" style="padding:10px 16px 0;">
             <button class="recTab rec-tab active" onclick="showPage('leavePage')">📝 請假</button>
@@ -535,12 +550,92 @@
             }
         }
 
+        // ===== 打卡成功 Banner 顯示 =====
+        function showCheckinBanner() {
+            const msg = sessionStorage.getItem('checkinSuccessMsg');
+            if (!msg) return;
+            sessionStorage.removeItem('checkinSuccessMsg');
+            const checkinType = sessionStorage.getItem('checkinSuccessType') || 'in';
+            sessionStorage.removeItem('checkinSuccessType');
+
+            const banner = document.getElementById('checkinSuccessBanner');
+            const text = document.getElementById('checkinSuccessText');
+            if (banner && text) {
+                text.textContent = msg;
+                banner.style.display = 'block';
+                // 5 秒後淡出
+                setTimeout(() => {
+                    banner.style.opacity = '0';
+                    setTimeout(() => { banner.style.display = 'none'; }, 500);
+                }, 5000);
+            }
+
+            // 上班打卡 → 檢查便當提示
+            if (checkinType === 'in') {
+                checkLunchPrompt();
+            }
+        }
+
+        // ===== 便當訂購提示 =====
+        async function checkLunchPrompt() {
+            try {
+                // 檢查 lunch 功能是否開啟
+                if (typeof getFeatureVisibility === 'function') {
+                    const lunchEnabled = await getFeatureVisibility('lunch');
+                    if (!lunchEnabled) return;
+                } else if (typeof currentCompanyFeatures === 'object' && currentCompanyFeatures) {
+                    if (!currentCompanyFeatures.lunch) return;
+                }
+
+                const today = getTaiwanDate();
+
+                // 檢查今天是否已訂過便當
+                const { data: existingOrder } = await sb.from('lunch_orders')
+                    .select('id, status')
+                    .eq('employee_id', currentEmployee.id)
+                    .eq('order_date', today)
+                    .maybeSingle();
+
+                if (existingOrder && existingOrder.status !== 'cancelled') return; // 已訂過
+
+                // 讀取截止時間
+                let deadlineHour = 9;
+                const deadlineSetting = getCachedSetting('lunch_deadline');
+                if (deadlineSetting) {
+                    const parsed = parseInt(deadlineSetting, 10);
+                    if (!isNaN(parsed)) deadlineHour = parsed;
+                }
+
+                // 檢查是否已超過截止時間
+                const nowHour = parseInt(new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour: 'numeric', hour12: false }), 10);
+                if (nowHour >= deadlineHour) return; // 已超過截止
+
+                // 顯示便當提示
+                const banner = document.getElementById('lunchPromptBanner');
+                const deadlineText = document.getElementById('lunchDeadlineText');
+                if (banner) banner.style.display = 'block';
+                if (deadlineText) deadlineText.textContent = `截止 ${deadlineHour}:00`;
+            } catch (e) {
+                console.error('Check lunch prompt error:', e);
+            }
+        }
+
         window.addEventListener('load', async () => {
             if (typeof initializeLiff === 'undefined') return;
             const hash = window.location.hash || '#leave';
             let pid = hash==='#attendance'?'attendancePage':hash==='#salary'?'salaryPage':hash==='#makeup'?'makeupPunchPage':hash==='#overtime'?'overtimePage':'leavePage';
             const ok = await initializeLiff({ requireLineApp: true });
-            if (ok) { const li = await checkUserStatus(); if(li){populateYearSelect('salaryYear');showPage(pid);}else window.location.href='index.html'; }
+            if (ok) {
+                const li = await checkUserStatus();
+                if (li) {
+                    populateYearSelect('salaryYear');
+                    showPage(pid);
+                    // 打卡成功後跳轉來的 → 顯示 banner
+                    showCheckinBanner();
+                } else {
+                    window.location.href = 'index.html';
+                }
+            }
         });
     </script>
 
