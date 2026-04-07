@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <link rel="icon" href="data:,">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>📊 打卡總覽 - 會計查看</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+    <style>
+:root { --primary:#4F46E5; --bg:#F8FAFC; --card:#fff; --text:#1E293B; --text-muted:#64748B; --border:#E2E8F0; }
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Noto Sans TC',-apple-system,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+.container{max-width:800px;margin:0 auto;padding:20px;}
+.card{background:var(--card);border-radius:16px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,0.06);margin-bottom:16px;}
+.btn{padding:10px 16px;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;}
+.hidden{display:none;}
+.spinner{width:40px;height:40px;border:4px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 16px;}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.watermark{position:fixed;bottom:10px;left:50%;transform:translateX(-50%);padding:6px 20px;background:rgba(79,70,229,0.08);color:rgba(79,70,229,0.5);border-radius:20px;font-size:11px;font-weight:600;pointer-events:none;z-index:100;white-space:nowrap;}
+
+.ov-tabs{display:flex;gap:0;border-radius:10px;overflow:hidden;border:2px solid #E2E8F0;margin-bottom:16px;}
+.ov-tab{flex:1;padding:12px;border:none;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;background:#fff;color:#64748B;transition:all 0.2s;}
+.ov-tab.active{background:#4F46E5;color:#fff;}
+
+.stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px;}
+.stat-card{text-align:center;padding:12px 8px;border-radius:12px;}
+.stat-num{font-size:24px;font-weight:900;}
+.stat-label{font-size:11px;font-weight:600;margin-top:2px;}
+
+.filter-row{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;}
+.filter-row select{flex:1;min-width:100px;padding:10px 12px;border:2px solid #E2E8F0;border-radius:10px;font-size:13px;font-family:inherit;background:#fff;}
+
+.emp-table{width:100%;border-collapse:collapse;font-size:12px;}
+.emp-table th{background:#F8FAFC;padding:10px 8px;text-align:left;font-weight:700;color:#64748B;border-bottom:2px solid #E2E8F0;position:sticky;top:0;z-index:1;white-space:nowrap;}
+.emp-table td{padding:10px 8px;border-bottom:1px solid #F1F5F9;vertical-align:middle;}
+.emp-table tr:hover{background:#F8FAFC;}
+
+.status-badge{padding:3px 8px;border-radius:12px;font-size:10px;font-weight:700;white-space:nowrap;display:inline-block;}
+.s-working{background:#DBEAFE;color:#1D4ED8;}
+.s-completed{background:#DCFCE7;color:#15803D;}
+.s-not-checked{background:#FEE2E2;color:#DC2626;}
+.s-late{background:#FEF3C7;color:#92400E;}
+.s-on-leave{background:#F3F4F6;color:#6B7280;}
+.s-absent{background:#FEE2E2;color:#991B1B;}
+.s-off-day{background:#F3F4F6;color:#9CA3AF;}
+
+.time-cell{font-family:'SF Mono',monospace;font-size:12px;}
+.late-flag{color:#EA580C;font-size:10px;font-weight:700;}
+.early-flag{color:#DC2626;font-size:10px;font-weight:700;}
+.loc-hint{font-size:10px;color:#94A3B8;display:block;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+.refresh-bar{display:flex;align-items:center;justify-content:space-between;font-size:11px;color:#94A3B8;margin-bottom:8px;}
+.refresh-dot{width:8px;height:8px;border-radius:50%;background:#10B981;display:inline-block;margin-right:4px;animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.4;}}
+
+.month-nav{display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:16px;}
+.month-nav button{background:none;border:none;font-size:20px;cursor:pointer;padding:6px 10px;border-radius:8px;}
+.month-nav span{font-size:16px;font-weight:700;min-width:120px;text-align:center;}
+
+.expand-row{display:none;}
+.expand-row.show{display:table-row;}
+.expand-cell{padding:8px 16px !important;background:#FAFBFC;}
+.detail-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:4px;font-size:11px;}
+.detail-day{padding:4px 6px;border-radius:6px;text-align:center;}
+
+.table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:12px;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,0.05);}
+
+.export-btn{padding:8px 16px;border:2px solid #10B981;border-radius:10px;background:#F0FDF4;color:#059669;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;}
+
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1E293B;color:#fff;padding:10px 24px;border-radius:10px;font-size:14px;font-weight:600;z-index:9999;opacity:0;transition:opacity 0.3s;pointer-events:none;}
+.toast.show{opacity:1;}
+    </style>
+</head>
+<body>
+
+    <!-- 載入中 -->
+    <div id="loadingView" style="display:flex;align-items:center;justify-content:center;min-height:100vh;">
+        <div style="text-align:center;">
+            <div class="spinner"></div>
+            <p style="color:var(--text-muted);">載入中...</p>
+        </div>
+    </div>
+
+    <!-- 錯誤頁面 -->
+    <div id="errorView" class="hidden" style="display:none;">
+        <div class="container">
+            <div class="card" style="text-align:center;padding:60px 24px;margin-top:40px;">
+                <div style="font-size:48px;margin-bottom:16px;">⚠️</div>
+                <h2 id="errorTitle">無法載入</h2>
+                <p style="color:var(--text-muted);font-size:13px;margin-top:8px;" id="errorMsg">請確認連結是否正確</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 主頁面 -->
+    <div id="mainView" class="hidden" style="display:none;">
+        <div class="container">
+            <!-- 頁頭 -->
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
+                <div>
+                    <h2 style="margin:0;font-size:18px;font-weight:800;">📊 打卡總覽</h2>
+                    <div style="font-size:12px;color:var(--text-muted);margin-top:2px;" id="companyLabel"></div>
+                </div>
+                <button class="export-btn" onclick="exportExcel()">📥 匯出 Excel</button>
+            </div>
+
+            <!-- Tab 切換 -->
+            <div class="ov-tabs">
+                <button class="ov-tab active" id="tabDaily" onclick="switchTab('daily')">📅 今日總覽</button>
+                <button class="ov-tab" id="tabMonthly" onclick="switchTab('monthly')">📊 月度統計</button>
+            </div>
+
+            <!-- ====== 今日總覽 ====== -->
+            <div id="dailyView">
+                <div class="card" style="padding:16px;margin-bottom:12px;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;">
+                        <div>
+                            <div style="font-size:18px;font-weight:900;color:#0F172A;" id="dailyDateLabel">-</div>
+                            <div style="font-size:12px;color:#94A3B8;margin-top:2px;" id="dailyDayLabel">-</div>
+                        </div>
+                        <input type="date" id="dailyDatePicker" onchange="onDailyDateChange()" style="padding:8px 12px;border:2px solid #E2E8F0;border-radius:10px;font-size:13px;font-family:inherit;">
+                    </div>
+                </div>
+
+                <div class="stat-grid">
+                    <div class="stat-card" style="background:#ECFDF5;"><div class="stat-num" style="color:#059669;" id="dExpected">0</div><div class="stat-label" style="color:#059669;">應出勤</div></div>
+                    <div class="stat-card" style="background:#DBEAFE;"><div class="stat-num" style="color:#1D4ED8;" id="dChecked">0</div><div class="stat-label" style="color:#1D4ED8;">已打卡</div></div>
+                    <div class="stat-card" style="background:#FEE2E2;"><div class="stat-num" style="color:#DC2626;" id="dNotChecked">0</div><div class="stat-label" style="color:#DC2626;">未打卡</div></div>
+                </div>
+                <div class="stat-grid">
+                    <div class="stat-card" style="background:#FEF3C7;"><div class="stat-num" style="color:#92400E;" id="dLate">0</div><div class="stat-label" style="color:#92400E;">遲到</div></div>
+                    <div class="stat-card" style="background:#FFF1F2;"><div class="stat-num" style="color:#BE123C;" id="dEarly">0</div><div class="stat-label" style="color:#BE123C;">早退</div></div>
+                    <div class="stat-card" style="background:#F3F4F6;"><div class="stat-num" style="color:#6B7280;" id="dLeave">0</div><div class="stat-label" style="color:#6B7280;">請假</div></div>
+                </div>
+
+                <div class="filter-row">
+                    <select id="filterDept" onchange="applyDailyFilter()">
+                        <option value="">全部部門</option>
+                    </select>
+                    <select id="filterStatus" onchange="applyDailyFilter()">
+                        <option value="">全部狀態</option>
+                        <option value="working">上班中</option>
+                        <option value="not_checked">未打卡</option>
+                        <option value="completed">已完成</option>
+                        <option value="late">遲到</option>
+                        <option value="on_leave">請假</option>
+                        <option value="absent">缺勤</option>
+                    </select>
+                </div>
+
+                <div class="refresh-bar">
+                    <span><span class="refresh-dot"></span>每 30 秒自動刷新</span>
+                    <span id="lastRefresh">-</span>
+                </div>
+
+                <div class="table-wrap">
+                    <table class="emp-table">
+                        <thead>
+                            <tr><th>員工</th><th>部門</th><th>上班</th><th>下班</th><th>工時</th><th>狀態</th></tr>
+                        </thead>
+                        <tbody id="dailyTableBody">
+                            <tr><td colspan="6" style="text-align:center;color:#999;padding:40px;">載入中...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- ====== 月度統計 ====== -->
+            <div id="monthlyView" style="display:none;">
+                <div class="month-nav">
+                    <button onclick="changeMonth(-1)">◀</button>
+                    <span id="monthLabel">-</span>
+                    <button onclick="changeMonth(1)">▶</button>
+                </div>
+
+                <div class="table-wrap">
+                    <table class="emp-table">
+                        <thead>
+                            <tr><th>員工</th><th>部門</th><th style="text-align:center;">應到</th><th style="text-align:center;">實到</th><th style="text-align:center;">遲到</th><th style="text-align:center;">早退</th><th style="text-align:center;">請假</th><th style="text-align:center;">缺勤</th><th style="text-align:right;">工時</th></tr>
+                        </thead>
+                        <tbody id="monthlyTableBody">
+                            <tr><td colspan="9" style="text-align:center;color:#999;padding:40px;">載入中...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Watermark -->
+        <div class="watermark" id="watermark">會計查看模式</div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+<script>
+// === 全域錯誤監控 ===
+window._errLogCount = 0; window._errLogResetTs = 0;
+window.onerror = function(msg, src, line, col, err) {
+  try {
+    var _now = Date.now(); if (_now > window._errLogResetTs) { window._errLogCount = 0; window._errLogResetTs = _now + 60000; } if (++window._errLogCount > 5) return;
+    fetch('https://nssuisyvlrqnqfxupklb.supabase.co/rest/v1/error_logs', {
+      method: 'POST',
+      headers: {
+        'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5zc3Vpc3l2bHJxbnFmeHVwa2xiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkyOTAwMzUsImV4cCI6MjA4NDg2NjAzNX0.q_B6v3gf1TOCuAq7z0xIw10wDueCSJn0p37VzdMfmbc',
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal'
+      },
+      body: JSON.stringify({ message: String(msg).substring(0, 1000), page: location.pathname, line: line, user_id: null, user_agent: navigator.userAgent })
+    }).catch(function(){});
+  } catch(e) {}
+};
+
+// === Supabase ===
+const SUPABASE_URL = 'https://nssuisyvlrqnqfxupklb.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5zc3Vpc3l2bHJxbnFmeHVwa2xiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkyOTAwMzUsImV4cCI6MjA4NDg2NjAzNX0.q_B6v3gf1TOCuAq7z0xIw10wDueCSJn0p37VzdMfmbc';
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let companyId = null;
+let companyName = '';
+let dailyData = [];
+let monthlyData = [];
+let mYear = new Date().getFullYear();
+let mMonth = new Date().getMonth();
+let refreshTimer = null;
+let currentTab = 'daily';
+
+// === 工具函數 ===
+function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = String(s); return d.innerHTML; }
+function showToast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2500); }
+function getTaiwanDate() { return new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Taipei' }); }
+
+function showError(title, msg) {
+    document.getElementById('errorTitle').textContent = title;
+    document.getElementById('errorMsg').textContent = msg;
+    document.getElementById('loadingView').style.display = 'none';
+    document.getElementById('errorView').style.display = 'block';
+}
+
+// === 初始化 ===
+async function init() {
+    try {
+        const params = new URLSearchParams(window.location.search);
+        companyId = params.get('company');
+
+        if (!companyId) {
+            showError('請提供公司代碼', '使用方式：在網址後加上 ?company=公司ID\n請向管理員索取連結。');
+            return;
+        }
+
+        // 查公司名稱
+        const { data: company, error } = await sb.from('companies').select('id, name').eq('id', companyId).maybeSingle();
+        if (error || !company) {
+            showError('公司不存在', '此連結無效，請確認公司代碼是否正確。');
+            return;
+        }
+
+        companyName = company.name;
+        document.getElementById('companyLabel').textContent = companyName;
+        document.getElementById('watermark').textContent = '會計查看模式 - ' + companyName;
+        document.title = '📊 打卡總覽 - ' + companyName;
+
+        // 設定今日日期
+        document.getElementById('dailyDatePicker').value = getTaiwanDate();
+
+        // 顯示主頁面
+        document.getElementById('loadingView').style.display = 'none';
+        document.getElementById('mainView').style.display = 'block';
+
+        loadDailyData();
+        startAutoRefresh();
+
+    } catch (e) {
+        console.error('Init error:', e);
+        showError('初始化失敗', '系統發生錯誤，請重新整理。');
+    }
+}
+
+// === Tab 切換 ===
+function switchTab(tab) {
+    currentTab = tab;
+    document.getElementById('tabDaily').classList.toggle('active', tab === 'daily');
+    document.getElementById('tabMonthly').classList.toggle('active', tab === 'monthly');
+    document.getElementById('dailyView').style.display = tab === 'daily' ? 'block' : 'none';
+    document.getElementById('monthlyView').style.display = tab === 'monthly' ? 'block' : 'none';
+    if (tab === 'daily') { loadDailyData(); startAutoRefresh(); }
+    else { stopAutoRefresh(); loadMonthlyData(); }
+}
+
+// === 今日總覽 ===
+function getDailyDate() { return document.getElementById('dailyDatePicker').value || getTaiwanDate(); }
+function onDailyDateChange() { loadDailyData(); }
+
+async function loadDailyData() {
+    const dateStr = getDailyDate();
+    const dayNames = ['週日','週一','週二','週三','週四','週五','週六'];
+    const d = new Date(dateStr + 'T00:00:00+08:00');
+    document.getElementById('dailyDateLabel').textContent = '📅 ' + dateStr;
+    document.getElementById('dailyDayLabel').textContent = dayNames[d.getDay()];
+
+    try {
+        const { data, error } = await sb.rpc('get_company_daily_attendance', { p_company_id: companyId, p_date: dateStr });
+        if (error) throw error;
+        dailyData = data || [];
+        updateDailyStats();
+        updateDeptFilter();
+        renderDailyTable();
+        document.getElementById('lastRefresh').textContent = '更新：' + new Date().toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+    } catch (e) {
+        console.error('Load daily error:', e);
+        document.getElementById('dailyTableBody').innerHTML = '<tr><td colspan="6" style="text-align:center;color:#ef4444;padding:20px;">載入失敗：' + esc(e.message || '') + '</td></tr>';
+    }
+}
+
+function updateDailyStats() {
+    const d = dailyData.filter(r => r.status !== 'off_day');
+    document.getElementById('dExpected').textContent = d.length;
+    document.getElementById('dChecked').textContent = d.filter(r => r.status === 'working' || r.status === 'completed').length;
+    document.getElementById('dNotChecked').textContent = d.filter(r => r.status === 'not_checked' || r.status === 'absent').length;
+    document.getElementById('dLate').textContent = d.filter(r => r.is_late).length;
+    document.getElementById('dEarly').textContent = d.filter(r => r.is_early_leave).length;
+    document.getElementById('dLeave').textContent = d.filter(r => r.status === 'on_leave').length;
+}
+
+function updateDeptFilter() {
+    const select = document.getElementById('filterDept');
+    const current = select.value;
+    const depts = [...new Set(dailyData.map(r => r.department).filter(Boolean))].sort();
+    let html = '<option value="">全部部門</option>';
+    depts.forEach(d => { html += '<option value="' + esc(d) + '"' + (d === current ? ' selected' : '') + '>' + esc(d) + '</option>'; });
+    select.innerHTML = html;
+}
+
+function applyDailyFilter() { renderDailyTable(); }
+
+function getFilteredDaily() {
+    let filtered = dailyData.filter(r => r.status !== 'off_day');
+    const dept = document.getElementById('filterDept').value;
+    const status = document.getElementById('filterStatus').value;
+    if (dept) filtered = filtered.filter(r => r.department === dept);
+    if (status) { filtered = status === 'late' ? filtered.filter(r => r.is_late) : filtered.filter(r => r.status === status); }
+    return filtered;
+}
+
+function fmtTime(ts) {
+    if (!ts) return '--';
+    return new Date(ts).toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', hour12: false });
+}
+
+function fmtHours(h) {
+    if (!h || h <= 0) return '--';
+    return Math.round(h * 10) / 10 + 'h';
+}
+
+function statusBadge(row) {
+    const map = { working:['上班中','s-working'], completed:['✅ 完成','s-completed'], not_checked:['❌ 未打卡','s-not-checked'], on_leave:['🌴 請假','s-on-leave'], absent:['❌ 缺勤','s-absent'], off_day:['休','s-off-day'] };
+    let label, cls;
+    if (row.is_late && (row.status === 'working' || row.status === 'completed')) {
+        label = '⚠️ 遲到·' + (row.status === 'working' ? '上班中' : '完成'); cls = 's-late';
+    } else { const m = map[row.status] || ['未知','']; label = m[0]; cls = m[1]; }
+    if (row.is_early_leave) label += ' 早退';
+    if (row.leave_type && row.status === 'on_leave') {
+        const lt = { annual:'特休', sick:'病假', personal:'事假', compensatory:'補休', maternity:'產假', marriage:'婚假' };
+        label = '🌴 ' + (lt[row.leave_type] || row.leave_type);
+    }
+    return '<span class="status-badge ' + cls + '">' + label + '</span>';
+}
+
+function renderDailyTable() {
+    const rows = getFilteredDaily();
+    const tbody = document.getElementById('dailyTableBody');
+    if (rows.length === 0) { tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#999;padding:40px;">無資料</td></tr>'; return; }
+    let html = '';
+    rows.forEach(r => {
+        html += '<tr>' +
+            '<td style="font-weight:700;white-space:nowrap;">' + esc(r.employee_name) + '</td>' +
+            '<td style="color:#64748B;font-size:11px;">' + esc(r.department || '-') + '</td>' +
+            '<td class="time-cell">' + fmtTime(r.check_in_time) + (r.is_late ? ' <span class="late-flag">遲到</span>' : '') +
+                (r.check_in_location ? '<span class="loc-hint" title="' + esc(r.check_in_location) + '">📍' + esc(r.check_in_location) + '</span>' : '') + '</td>' +
+            '<td class="time-cell">' + fmtTime(r.check_out_time) + (r.is_early_leave ? ' <span class="early-flag">早退</span>' : '') + '</td>' +
+            '<td class="time-cell">' + fmtHours(r.total_work_hours) + '</td>' +
+            '<td>' + statusBadge(r) + '</td>' +
+        '</tr>';
+    });
+    tbody.innerHTML = html;
+}
+
+// === 自動刷新 ===
+function startAutoRefresh() { stopAutoRefresh(); refreshTimer = setInterval(() => { if (currentTab === 'daily') loadDailyData(); }, 30000); }
+function stopAutoRefresh() { if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null; } }
+
+// === 月度統計 ===
+function changeMonth(delta) {
+    mMonth += delta;
+    if (mMonth > 11) { mMonth = 0; mYear++; }
+    if (mMonth < 0) { mMonth = 11; mYear--; }
+    loadMonthlyData();
+}
+
+async function loadMonthlyData() {
+    document.getElementById('monthLabel').textContent = mYear + '年' + (mMonth + 1) + '月';
+    try {
+        const { data, error } = await sb.rpc('get_company_monthly_attendance', { p_company_id: companyId, p_year: mYear, p_month: mMonth + 1 });
+        if (error) throw error;
+        monthlyData = data || [];
+        renderMonthlyTable();
+    } catch (e) {
+        console.error('Load monthly error:', e);
+        document.getElementById('monthlyTableBody').innerHTML = '<tr><td colspan="9" style="text-align:center;color:#ef4444;padding:20px;">載入失敗：' + esc(e.message || '') + '</td></tr>';
+    }
+}
+
+function renderMonthlyTable() {
+    const tbody = document.getElementById('monthlyTableBody');
+    if (monthlyData.length === 0) { tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#999;padding:40px;">無資料</td></tr>'; return; }
+
+    let totE=0, totA=0, totL=0, totEl=0, totLv=0, totAb=0, totH=0;
+    let html = '';
+    monthlyData.forEach(r => {
+        totE += r.expected_days; totA += r.actual_days; totL += r.late_days; totEl += r.early_leave_days; totLv += r.leave_days; totAb += r.absent_days; totH += parseFloat(r.total_work_hours) || 0;
+        html += '<tr style="cursor:pointer;" onclick="toggleMonthDetail(\'' + r.employee_id + '\')">' +
+            '<td style="font-weight:700;white-space:nowrap;">' + esc(r.employee_name) + ' <span style="font-size:10px;color:#94A3B8;">▼</span></td>' +
+            '<td style="color:#64748B;font-size:11px;">' + esc(r.department || '-') + '</td>' +
+            '<td style="text-align:center;">' + r.expected_days + '</td>' +
+            '<td style="text-align:center;color:#059669;font-weight:700;">' + r.actual_days + '</td>' +
+            '<td style="text-align:center;' + (r.late_days > 0 ? 'color:#EA580C;font-weight:700;' : '') + '">' + r.late_days + '</td>' +
+            '<td style="text-align:center;' + (r.early_leave_days > 0 ? 'color:#DC2626;font-weight:700;' : '') + '">' + r.early_leave_days + '</td>' +
+            '<td style="text-align:center;' + (r.leave_days > 0 ? 'color:#2563EB;font-weight:700;' : '') + '">' + r.leave_days + '</td>' +
+            '<td style="text-align:center;' + (r.absent_days > 0 ? 'color:#DC2626;font-weight:700;' : '') + '">' + r.absent_days + '</td>' +
+            '<td style="text-align:right;font-weight:700;">' + fmtHours(r.total_work_hours) + '</td>' +
+        '</tr><tr class="expand-row" id="detail_' + r.employee_id + '"><td colspan="9" class="expand-cell"><div id="detailContent_' + r.employee_id + '">載入中...</div></td></tr>';
+    });
+    html += '<tr style="background:#F0F9FF;font-weight:800;"><td>合計</td><td></td>' +
+        '<td style="text-align:center;">' + totE + '</td><td style="text-align:center;color:#059669;">' + totA + '</td>' +
+        '<td style="text-align:center;color:#EA580C;">' + totL + '</td><td style="text-align:center;color:#DC2626;">' + totEl + '</td>' +
+        '<td style="text-align:center;color:#2563EB;">' + totLv + '</td><td style="text-align:center;color:#DC2626;">' + totAb + '</td>' +
+        '<td style="text-align:right;">' + fmtHours(totH) + '</td></tr>';
+    tbody.innerHTML = html;
+}
+
+// === 展開明細 ===
+async function toggleMonthDetail(empId) {
+    const row = document.getElementById('detail_' + empId);
+    if (!row) return;
+    if (row.classList.contains('show')) { row.classList.remove('show'); return; }
+    row.classList.add('show');
+    const contentEl = document.getElementById('detailContent_' + empId);
+    try {
+        const startDate = mYear + '-' + String(mMonth + 1).padStart(2, '0') + '-01';
+        const endDate = new Date(mYear, mMonth + 1, 0);
+        const endStr = mYear + '-' + String(mMonth + 1).padStart(2, '0') + '-' + String(endDate.getDate()).padStart(2, '0');
+        const { data, error } = await sb.from('attendance')
+            .select('date, check_in_time, check_out_time, is_late, is_early_leave, total_work_hours, check_in_location')
+            .eq('employee_id', empId).gte('date', startDate).lte('date', endStr).order('date');
+        if (error) throw error;
+        const attMap = {}; (data || []).forEach(a => { attMap[a.date] = a; });
+        let html = '<div class="detail-grid">';
+        for (let day = 1; day <= endDate.getDate(); day++) {
+            const ds = mYear + '-' + String(mMonth + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+            const d = new Date(ds + 'T00:00:00+08:00');
+            const dow = d.getDay(); const a = attMap[ds];
+            let bg = '#F3F4F6', text = '--', color = '#9CA3AF';
+            if (dow === 0 || dow === 6) { bg = '#F9FAFB'; text = '休'; color = '#CBD5E1'; }
+            if (a) {
+                if (a.is_late) { bg = '#FEF3C7'; color = '#92400E'; text = fmtTime(a.check_in_time) + ' ⚠️'; }
+                else { bg = '#ECFDF5'; color = '#059669'; text = fmtTime(a.check_in_time); }
+                if (a.check_out_time) text += '~' + fmtTime(a.check_out_time);
+                if (a.total_work_hours > 0) text += ' (' + fmtHours(a.total_work_hours) + ')';
+            }
+            html += '<div class="detail-day" style="background:' + bg + ';color:' + color + ';"><div style="font-weight:700;font-size:12px;">' + day + '日</div><div style="font-size:10px;">' + text + '</div></div>';
+        }
+        html += '</div>';
+        contentEl.innerHTML = html;
+    } catch (e) {
+        console.error('Load detail error:', e);
+        contentEl.innerHTML = '<span style="color:#ef4444;">載入失敗</span>';
+    }
+}
+
+// === 匯出 Excel ===
+function exportExcel() {
+    if (typeof XLSX === 'undefined') { showToast('⚠️ Excel 工具未載入'); return; }
+    const wb = XLSX.utils.book_new();
+    if (currentTab === 'daily') {
+        const rows = getFilteredDaily().map(r => ({
+            '員工': r.employee_name, '部門': r.department || '', '職位': r.position || '',
+            '上班時間': fmtTime(r.check_in_time), '下班時間': fmtTime(r.check_out_time),
+            '工時': r.total_work_hours > 0 ? Math.round(r.total_work_hours * 10) / 10 : '',
+            '遲到': r.is_late ? '是' : '', '早退': r.is_early_leave ? '是' : '',
+            '打卡地點': r.check_in_location || '',
+            '狀態': { working:'上班中', completed:'完成', not_checked:'未打卡', on_leave:'請假', absent:'缺勤' }[r.status] || r.status
+        }));
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), '今日打卡');
+        XLSX.writeFile(wb, companyName + '_打卡總覽_' + getDailyDate() + '.xlsx');
+    } else {
+        const rows = monthlyData.map(r => ({
+            '員工': r.employee_name, '部門': r.department || '',
+            '應出勤': r.expected_days, '實到': r.actual_days, '遲到': r.late_days,
+            '早退': r.early_leave_days, '請假': r.leave_days, '缺勤': r.absent_days,
+            '總工時': Math.round((parseFloat(r.total_work_hours) || 0) * 10) / 10
+        }));
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), '月度統計');
+        XLSX.writeFile(wb, companyName + '_打卡統計_' + mYear + '年' + (mMonth + 1) + '月.xlsx');
+    }
+    showToast('✅ 已匯出 Excel');
+}
+
+// === 啟動 ===
+window.addEventListener('beforeunload', stopAutoRefresh);
+init();
+</script>
+</body>
+</html>

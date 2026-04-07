@@ -50,7 +50,7 @@
 | 16 | error_logs | Supabase Dashboard | 每天 |
 | 17 | GitHub Actions CI | push dev 自動跑 | 每次 push |
 | 18 | QA 腳本 | bash scripts/qa_check.sh | 每次 commit 前 |
-| 19 | 冒煙測試 | npm test（50 項） | 每次 commit 前 |
+| 19 | 冒煙測試 | npm test（51 項） | 每次 commit 前 |
 | 20 | 打卡診斷 | checkin-debug.html | 有問題時 |
 
 ---

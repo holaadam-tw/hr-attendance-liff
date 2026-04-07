@@ -15,8 +15,8 @@ echo ""
 
 # === 1. 全域變數衝突 ===
 echo "--- 1. 全域變數衝突檢查 ---"
-# 排除獨立頁面（不載入 common.js）：booking_service.html, kds.html, register.html, booking.html, order.html
-CONFLICTS=$(grep -rn "^let \|^const \|^var " *.html 2>/dev/null | grep -E "currentEmployee|currentCompanyId|liffProfile|sb |officeLocations" | grep -v "booking_service\.html\|kds\.html\|register\.html\|booking\.html\|order\.html" || true)
+# 排除獨立頁面（不載入 common.js）
+CONFLICTS=$(grep -rn "^let \|^const \|^var " *.html 2>/dev/null | grep -E "currentEmployee|currentCompanyId|liffProfile|sb |officeLocations" | grep -v "booking_service\.html\|kds\.html\|register\.html\|booking\.html\|order\.html\|attendance_public\.html\|employee_register\.html" || true)
 if [ -n "$CONFLICTS" ]; then
     echo "FAIL: HTML 檔案中有與 common.js 重複的全域變數宣告："
     echo "$CONFLICTS"
