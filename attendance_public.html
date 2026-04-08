@@ -106,6 +106,7 @@ body{font-family:'Noto Sans TC',-apple-system,sans-serif;background:var(--bg);co
                     <div style="font-size:12px;color:var(--text-muted);margin-top:2px;" id="companyLabel"></div>
                 </div>
                 <div style="display:flex;gap:6px;">
+                    <button onclick="showPubCheckinQR()" style="padding:8px 12px;border:2px solid #7C3AED;border-radius:10px;background:#F5F3FF;color:#7C3AED;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;">📲 打卡 QR</button>
                     <button onclick="showPublicRegisterQR()" style="padding:8px 12px;border:2px solid #10B981;border-radius:10px;background:#F0FDF4;color:#059669;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;">📱 登記 QR</button>
                     <button class="export-btn" onclick="exportExcel()">📥 匯出</button>
                 </div>
@@ -210,6 +211,54 @@ body{font-family:'Noto Sans TC',-apple-system,sans-serif;background:var(--bg);co
                 </div>
             </div>
         </div>
+
+        <!-- 打卡 QR Code Modal -->
+        <div id="pubCheckinQRModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:999;overflow-y:auto;padding:20px;">
+            <div style="background:#fff;border-radius:20px;padding:24px;max-width:560px;width:100%;margin:40px auto;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+                    <h3 style="margin:0;font-size:18px;font-weight:900;">📲 打卡 QR Code</h3>
+                    <button onclick="document.getElementById('pubCheckinQRModal').style.display='none'" style="background:none;border:none;font-size:22px;cursor:pointer;color:#94A3B8;">&times;</button>
+                </div>
+                <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap;">
+                    <div style="flex:1;min-width:200px;max-width:240px;text-align:center;background:#D1FAE5;border:3px solid #059669;border-radius:16px;padding:16px;">
+                        <div style="font-size:28px;font-weight:900;color:#059669;margin-bottom:4px;">☀️ 上班打卡</div>
+                        <div style="font-size:12px;color:#065F46;margin-bottom:12px;">📍 早上來公司掃這個</div>
+                        <div id="pubCkQR_in" style="display:inline-block;background:#fff;padding:8px;border-radius:12px;"></div>
+                        <button onclick="downloadPubCkQR('in')" style="display:block;margin:12px auto 0;padding:8px 20px;border:2px solid #059669;border-radius:8px;background:#fff;color:#059669;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">📥 下載 PNG</button>
+                    </div>
+                    <div style="flex:1;min-width:200px;max-width:240px;text-align:center;background:#EDE9FE;border:3px solid #7C3AED;border-radius:16px;padding:16px;">
+                        <div style="font-size:28px;font-weight:900;color:#7C3AED;margin-bottom:4px;">🌙 下班打卡</div>
+                        <div style="font-size:12px;color:#4C1D95;margin-bottom:12px;">🏠 下班離開掃這個</div>
+                        <div id="pubCkQR_out" style="display:inline-block;background:#fff;padding:8px;border-radius:12px;"></div>
+                        <button onclick="downloadPubCkQR('out')" style="display:block;margin:12px auto 0;padding:8px 20px;border:2px solid #7C3AED;border-radius:8px;background:#fff;color:#7C3AED;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">📥 下載 PNG</button>
+                    </div>
+                </div>
+                <div style="margin-top:16px;padding:10px;background:#FEF3C7;border-radius:10px;text-align:center;font-size:12px;color:#92400E;font-weight:700;">
+                    ⚠️ 請確認時間：早上掃左邊（上班），下班掃右邊（下班），勿掃錯！
+                </div>
+                <button onclick="printPubCheckinQR()" style="width:100%;margin-top:12px;padding:12px;border:2px solid #4F46E5;border-radius:10px;background:#F5F3FF;color:#4F46E5;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">🖨️ 列印兩張</button>
+                <div style="margin-top:10px;padding:10px;background:#F8FAFC;border-radius:10px;font-size:11px;color:#64748B;line-height:1.6;">
+                    <b>使用說明：</b>下載或列印 QR Code → 貼在打卡地點 → 員工用 LINE 掃碼直接進入打卡頁面
+                </div>
+            </div>
+        </div>
+
+        <!-- 打卡 QR 列印區 -->
+        <div id="pubCkQRPrint" style="display:none;">
+            <div style="page-break-after:always;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;text-align:center;">
+                <div style="font-size:48px;font-weight:900;color:#059669;margin-bottom:12px;">☀️ 上班打卡</div>
+                <div style="font-size:18px;color:#065F46;margin-bottom:24px;">📍 早上來公司掃這個</div>
+                <div id="pubCkQR_in_print"></div>
+                <div style="font-size:14px;color:#94A3B8;margin-top:24px;">請用 LINE 掃描 QR Code</div>
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;text-align:center;">
+                <div style="font-size:48px;font-weight:900;color:#7C3AED;margin-bottom:12px;">🌙 下班打卡</div>
+                <div style="font-size:18px;color:#4C1D95;margin-bottom:24px;">🏠 下班離開掃這個</div>
+                <div id="pubCkQR_out_print"></div>
+                <div style="font-size:14px;color:#94A3B8;margin-top:24px;">請用 LINE 掃描 QR Code</div>
+            </div>
+        </div>
+        <style>@media print { body > *:not(#pubCkQRPrint) { display:none !important; } #pubCkQRPrint { display:block !important; } }</style>
 
         <!-- 員工登記 QR Code Modal -->
         <div id="pubRegisterQrModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:999;align-items:center;justify-content:center;padding:20px;">
@@ -547,6 +596,40 @@ function exportExcel() {
         XLSX.writeFile(wb, companyName + '_打卡統計_' + mYear + '年' + (mMonth + 1) + '月.xlsx');
     }
     showToast('✅ 已匯出 Excel');
+}
+
+// === 打卡 QR Code ===
+var LIFF_ID = '2008962829-bnsS1bbB';
+
+function showPubCheckinQR() {
+    var modal = document.getElementById('pubCheckinQRModal');
+    document.getElementById('pubCkQR_in').innerHTML = '';
+    document.getElementById('pubCkQR_out').innerHTML = '';
+    var urlIn = 'https://liff.line.me/' + LIFF_ID + '?goto=checkin&action=check_in';
+    var urlOut = 'https://liff.line.me/' + LIFF_ID + '?goto=checkin&action=check_out';
+    new QRCode(document.getElementById('pubCkQR_in'), { text: urlIn, width: 200, height: 200, colorDark: '#059669', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.H });
+    new QRCode(document.getElementById('pubCkQR_out'), { text: urlOut, width: 200, height: 200, colorDark: '#7C3AED', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.H });
+    modal.style.display = 'block';
+}
+
+function downloadPubCkQR(type) {
+    var canvas = document.querySelector('#pubCkQR_' + type + ' canvas');
+    if (!canvas) return;
+    var link = document.createElement('a');
+    link.download = (type === 'out' ? '下班打卡_QR.png' : '上班打卡_QR.png');
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+}
+
+function printPubCheckinQR() {
+    var urlIn = 'https://liff.line.me/' + LIFF_ID + '?goto=checkin&action=check_in';
+    var urlOut = 'https://liff.line.me/' + LIFF_ID + '?goto=checkin&action=check_out';
+    var pIn = document.getElementById('pubCkQR_in_print');
+    var pOut = document.getElementById('pubCkQR_out_print');
+    pIn.innerHTML = ''; pOut.innerHTML = '';
+    new QRCode(pIn, { text: urlIn, width: 400, height: 400, colorDark: '#059669', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.H });
+    new QRCode(pOut, { text: urlOut, width: 400, height: 400, colorDark: '#7C3AED', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.H });
+    setTimeout(function() { window.print(); }, 300);
 }
 
 // === 員工登記 QR Code ===
