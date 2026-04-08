@@ -346,9 +346,13 @@ async function submitRegistration() {
         }
 
         // 新增登記（不綁定 LINE）
+        // 產生臨時工號（審核通過後會被正式工號覆蓋）
+        const tempNumber = 'REG-' + Date.now().toString(36).toUpperCase();
+
         const employeeData = {
             name: name,
             phone: phone,
+            employee_number: tempNumber,
             department: department || null,
             position: position || null,
             hire_date: hireDate || null,
@@ -372,7 +376,9 @@ async function submitRegistration() {
 
     } catch (e) {
         console.error('Registration error:', e);
-        showToast('送出失敗：' + (e.message || '請稍後再試'), true);
+        const errMsg = e.message || e.details || e.hint || '請稍後再試';
+        console.error('Error details:', JSON.stringify(e));
+        showToast('送出失敗：' + errMsg, true);
         btn.disabled = false;
         btn.textContent = '📨 送出登記';
     }
