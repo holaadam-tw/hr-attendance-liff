@@ -70,3 +70,46 @@ EXCEPTION WHEN OTHERS THEN
     RETURN jsonb_build_object('success', false, 'error', SQLERRM);
 END;
 $$;
+
+-- ============================================================
+-- 員工查詢自己的補打卡記錄（繞過 RLS）
+-- ============================================================
+DROP FUNCTION IF EXISTS get_my_makeup_requests(text, integer);
+
+CREATE OR REPLACE FUNCTION get_my_makeup_requests(
+    p_line_user_id TEXT,
+    p_limit INTEGER DEFAULT 10
+) RETURNS TABLE (
+    id UUID,
+    punch_date DATE,
+    punch_type TEXT,
+    punch_time TIME,
+    status TEXT,
+    reason TEXT,
+    rejection_reason TEXT,
+    note TEXT,
+    created_at TIMESTAMPTZ
+)
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_employee_id UUID;
+BEGIN
+    SELECT e.id INTO v_employee_id
+    FROM employees e
+    WHERE e.line_user_id = p_line_user_id AND e.is_active = true
+    LIMIT 1;
+
+    IF v_employee_id IS NULL THEN RETURN; END IF;
+
+    RETURN QUERY
+    SELECT r.id, r.punch_date, r.punch_type, r.punch_time,
+           r.status, r.reason, r.rejection_reason, r.note, r.created_at
+    FROM makeup_punch_requests r
+    WHERE r.employee_id = v_employee_id
+    ORDER BY r.created_at DESC
+    LIMIT p_limit;
+END;
+$$;

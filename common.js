@@ -898,14 +898,14 @@ async function submitMakeupPunch() {
 
 async function loadMakeupHistory() {
     const list = document.getElementById('makeupHistoryList');
-    if (!currentEmployee || !list) return;
-    
+    if (!currentEmployee || !liffProfile || !list) return;
+
     try {
-        const { data } = await sb.from('makeup_punch_requests')
-            .select('id, punch_date, punch_type, punch_time, status, reason, rejection_reason, created_at')
-            .eq('employee_id', currentEmployee.id)
-            .order('created_at', { ascending: false })
-            .limit(10);
+        // 使用 RPC 繞過 RLS
+        const { data } = await sb.rpc('get_my_makeup_requests', {
+            p_line_user_id: liffProfile.userId,
+            p_limit: 10
+        });
         
         if (!data || data.length === 0) {
             list.innerHTML = '<p class="text-center-muted-sm">尚無補打卡記錄</p>';
