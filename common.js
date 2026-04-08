@@ -766,11 +766,16 @@ async function submitLeave() {
     }
 
     try {
-        const { error } = await sb.from('leave_requests').insert({
-            employee_id: currentEmployee.id, leave_type: type,
-            start_date: start, end_date: end, reason: reason, status: 'pending'
+        // 使用 SECURITY DEFINER RPC 繞過 RLS（048 SQL）
+        const { data: rpcResult, error: rpcError } = await sb.rpc('submit_leave_request', {
+            p_line_user_id: liffProfile.userId,
+            p_leave_type: type,
+            p_start_date: start,
+            p_end_date: end,
+            p_reason: reason || ''
         });
-        if (error) throw error;
+        if (rpcError) throw rpcError;
+        if (rpcResult && !rpcResult.success) throw new Error(rpcResult.error);
         showToast('✅ 申請成功');
         loadLeaveHistory();
         if (statusEl) {
@@ -794,24 +799,12 @@ async function submitLeave() {
 
 async function loadLeaveHistory() {
     const list = document.getElementById('leaveHistoryList');
-    if (!currentEmployee || !list) return;
+    if (!currentEmployee || !liffProfile || !list) return;
     try {
-        // 先嘗試 RPC，如果失敗直接查表（包含 rejected）
+        // 使用 SECURITY DEFINER RPC 繞過 RLS（048 SQL）
         let records = [];
-        try {
-            const { data } = await sb.rpc('get_leave_history', { p_line_user_id: liffProfile.userId, p_limit: 10 });
-            if (data) records = data;
-        } catch(e) { console.warn('get_leave_history RPC 失敗，改用直接查表', e); }
-
-        // 如果 RPC 沒有資料，直接查表（含 rejected）
-        if (records.length === 0) {
-            const { data } = await sb.from('leave_requests')
-                .select('id, leave_type, status, start_date, end_date, days, reason, rejection_reason, created_at')
-                .eq('employee_id', currentEmployee.id)
-                .order('created_at', { ascending: false })
-                .limit(10);
-            if (data) records = data;
-        }
+        const { data } = await sb.rpc('get_leave_history', { p_line_user_id: liffProfile.userId, p_limit: 10 });
+        if (data) records = data;
         
         if (!records || records.length === 0) { 
             list.innerHTML = '<p class="text-center-muted">尚無記錄</p>';
