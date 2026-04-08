@@ -858,7 +858,8 @@ async function submitMakeupPunch() {
 
     if (!date || !time || !reasonType) return showToast('❌ 請填寫完整');
 
-    const reason = `[${{'forgot':'忘記打卡','field':'外出公務','phone_dead':'手機沒電','system_error':'系統故障','other':'其他'}[reasonType] || reasonType}] ${reasonText || ''}`.trim();
+    const reasonLabel = {'forgot':'忘記打卡','field':'外出公務','phone_dead':'手機沒電','system_error':'系統故障','other':'其他'}[reasonType] || reasonType;
+    const reason = `[${reasonLabel}] ${reasonText || ''}`.trim();
 
     const statusEl = document.getElementById('mpStatus');
     const mpBtn = document.querySelector('#makeupPunchPage .btn-primary') || document.querySelector('[onclick="submitMakeupPunch()"]');
@@ -871,7 +872,8 @@ async function submitMakeupPunch() {
             p_punch_date: date,
             p_punch_type: type,
             p_punch_time: time,
-            p_reason: reason
+            p_reason: reason,
+            p_note: reasonText || null
         });
 
         if (rpcError) throw rpcError;

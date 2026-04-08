@@ -2,32 +2,47 @@
 -- 047: 補打卡申請 RPC（繞過 RLS）
 --
 -- 問題：makeup_punch_requests 有 RLS，前端 anon key 寫不進去
--- 解法：SECURITY DEFINER RPC，用 line_user_id 查員工後 INSERT
+-- 修正：SECURITY DEFINER RPC + punch_type 正規化 + note 欄位
 -- ============================================================
+
+-- 加 note 欄位（如果不存在）
+ALTER TABLE makeup_punch_requests ADD COLUMN IF NOT EXISTS note TEXT;
+
+-- 先 DROP 舊版（參數數量不同會衝突）
+DROP FUNCTION IF EXISTS submit_makeup_punch(text, date, text, time, text);
+DROP FUNCTION IF EXISTS submit_makeup_punch(text, date, text, time, text, text);
 
 CREATE OR REPLACE FUNCTION submit_makeup_punch(
     p_line_user_id TEXT,
     p_punch_date DATE,
     p_punch_type TEXT,
     p_punch_time TIME,
-    p_reason TEXT
+    p_reason TEXT,
+    p_note TEXT DEFAULT NULL
 ) RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 DECLARE
     v_employee_id UUID;
-    v_company_id UUID;
     v_month_count INTEGER;
+    v_normalized_type TEXT;
 BEGIN
+    -- 正規化 punch_type（前端可能傳 check_in/check_out 或 clock_in/clock_out）
+    v_normalized_type := CASE
+        WHEN p_punch_type IN ('check_in', 'clock_in') THEN 'clock_in'
+        WHEN p_punch_type IN ('check_out', 'clock_out') THEN 'clock_out'
+        ELSE p_punch_type
+    END;
+
     -- 查詢員工
-    SELECT id, company_id INTO v_employee_id, v_company_id
+    SELECT id INTO v_employee_id
     FROM employees
     WHERE line_user_id = p_line_user_id AND is_active = true
     LIMIT 1;
 
     IF v_employee_id IS NULL THEN
-        RETURN jsonb_build_object('success', false, 'error', '找不到員工資料');
+        RETURN jsonb_build_object('success', false, 'error', '找不到員工');
     END IF;
 
     -- 每月補打卡限制 3 次
@@ -44,9 +59,9 @@ BEGIN
 
     -- 新增申請
     INSERT INTO makeup_punch_requests (
-        employee_id, punch_date, punch_type, punch_time, reason, status
+        employee_id, punch_date, punch_type, punch_time, reason, note, status
     ) VALUES (
-        v_employee_id, p_punch_date, p_punch_type, p_punch_time, p_reason, 'pending'
+        v_employee_id, p_punch_date, v_normalized_type, p_punch_time, p_reason, p_note, 'pending'
     );
 
     RETURN jsonb_build_object('success', true);
