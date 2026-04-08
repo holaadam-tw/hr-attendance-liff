@@ -9,19 +9,42 @@
 
 ---
 
+## 強制自我驗證流程
+
+每次寫程式必須執行：
+1. `git diff` 列出改動
+2. 對照 `docs/BUG_TRACKER.md` 列影響場景（至少 3 個）
+3. 每個場景做 logic walkthrough
+4. 驗證報告寫進 commit message
+5. **任何場景失敗不准 commit**
+
 ## 開發作業規則
 
-### 完成標準
-- 每次寫完程式，必須在 bash 環境執行並驗證
-- 不允許只輸出程式碼而不執行
-- 執行後必須對照預期結果，明確說明哪些通過、哪些沒通過
-- 不能只說「執行成功」，必須給具體 output
+1. 寫完程式必須在 bash 執行並驗證
+2. 不允許只輸出程式碼而不執行
+3. 執行後對照預期結果，明確說明通過/未通過
+4. 給具體 output，不能只說執行成功
+5. 前端無法 bash 執行的，改用 code review + logic walkthrough 替代
 
 ### 驗收格式
 每個功能完成後輸出：
 - ✅ / ❌ 各測試案例結果
 - 實際執行輸出（非預期中的結果要解釋原因）
 - 若無法在 bash 執行（例如前端 LIFF 頁面），明確說明並改用 code review + logic walkthrough 替代
+
+## 同步檢查
+
+修改後同步更新：
+- `docs/BUG_TRACKER.md`（功能狀態）
+- `.claude/memory/architecture.md`（技術決策）
+- `SKILL.md`（如果功能架構改變）
+
+## 自動執行
+
+修完後直接 `git add`, `commit`, `push origin dev`，不動 main branch。
+合併到 main 必須 user 明確確認。
+
+---
 
 ## Git 規則
 - **所有變更先在 dev 分支進行**，測試沒問題才合併到 main
