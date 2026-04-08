@@ -244,57 +244,49 @@ export async function loadMakeupApprovals(status) {
     if (!listEl) return;
     listEl.innerHTML = '<p style="text-align:center;color:#666;">載入中...</p>';
     try {
-        const { data } = await sb.from('makeup_punch_requests')
-            .select('*, employees(name, department, employee_number)')
-            .eq('status', status).order('created_at', { ascending: false }).limit(20);
+        // 使用 SECURITY DEFINER RPC 繞過 RLS（049 SQL）
+        const { data, error } = await sb.rpc('get_pending_makeup_requests', {
+            p_company_id: window.currentCompanyId
+        });
+        if (error) throw error;
+
         if (!data || data.length === 0) {
-            const labels = { pending: '待審核', approved: '已通過', rejected: '已拒絕' };
-            listEl.innerHTML = `<p style="text-align:center;color:#999;">無${labels[status]}的補打卡申請</p>`;
+            listEl.innerHTML = '<p style="text-align:center;color:#999;">無待審核的補打卡申請</p>';
             return;
         }
         const typeMap = { clock_in: '☀️ 上班', clock_out: '🌙 下班' };
         listEl.innerHTML = data.map(r => `
             <div style="background:#fff;border-radius:14px;padding:14px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,0.06);">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                    <span style="font-weight:800;font-size:14px;">${r.employees?.name || '?'}</span>
-                    <span style="font-size:11px;color:#94A3B8;">${r.employees?.department || ''} · ${r.employees?.employee_number || ''}</span>
+                    <span style="font-weight:800;font-size:14px;">${escapeHTML(r.employee_name || '?')}</span>
+                    <span style="font-size:11px;color:#94A3B8;">${escapeHTML(r.department || '')} · ${escapeHTML(r.employee_number || '')}</span>
                 </div>
                 <div style="display:flex;gap:8px;margin-bottom:8px;font-size:13px;">
                     <span style="padding:4px 10px;background:#EFF6FF;border-radius:8px;color:#2563EB;font-weight:700;">📅 ${r.punch_date}</span>
                     <span style="padding:4px 10px;background:#F5F3FF;border-radius:8px;color:#7C3AED;font-weight:700;">${typeMap[r.punch_type] || r.punch_type} ${r.punch_time || ''}</span>
                 </div>
-                <div style="font-size:12px;color:#64748B;margin-bottom:8px;">${r.reason || ''}</div>
-                ${status === 'pending' ? `
-                    <div style="display:flex;gap:8px;">
-                        <button onclick="approveMakeupPunch('${r.id}','approved')" style="flex:1;padding:10px;border:none;border-radius:10px;background:#ECFDF5;color:#059669;font-weight:700;font-size:13px;cursor:pointer;">✅ 通過</button>
-                        <button onclick="rejectMakeupPunchPrompt('${r.id}')" style="flex:1;padding:10px;border:none;border-radius:10px;background:#FEF2F2;color:#DC2626;font-weight:700;font-size:13px;cursor:pointer;">❌ 拒絕</button>
-                    </div>` : ''}
-                ${r.status === 'approved' ? '<div style="font-size:11px;color:#059669;margin-top:4px;">✅ 已自動寫入出勤記錄</div>' : ''}
-                ${r.rejection_reason ? `<div style="font-size:11px;color:#DC2626;margin-top:4px;">❌ ${r.rejection_reason}</div>` : ''}
+                <div style="font-size:12px;color:#64748B;margin-bottom:8px;">${escapeHTML(r.reason || '')}</div>
+                <div style="display:flex;gap:8px;">
+                    <button onclick="approveMakeupPunch('${r.id}')" style="flex:1;padding:10px;border:none;border-radius:10px;background:#ECFDF5;color:#059669;font-weight:700;font-size:13px;cursor:pointer;">✅ 通過</button>
+                    <button onclick="rejectMakeupPunchPrompt('${r.id}')" style="flex:1;padding:10px;border:none;border-radius:10px;background:#FEF2F2;color:#DC2626;font-weight:700;font-size:13px;cursor:pointer;">❌ 拒絕</button>
+                </div>
             </div>
         `).join('');
     } catch (e) { console.error(e); listEl.innerHTML = '<p style="text-align:center;color:#ef4444;">載入失敗</p>'; }
 }
 
-export async function approveMakeupPunch(id, status) {
+export async function approveMakeupPunch(id) {
     try {
-        const { data: req } = await sb.from('makeup_punch_requests').select('*').eq('id', id).single();
-        await sb.from('makeup_punch_requests').update({
-            status, approver_id: window.currentAdminEmployee?.id, approved_at: new Date().toISOString()
-        }).eq('id', id);
-        if (status === 'approved' && req) {
-            const col = req.punch_type === 'clock_in' ? 'check_in_time' : 'check_out_time';
-            const timeVal = `${req.punch_date}T${req.punch_time}:00`;
-            const { data: existing } = await sb.from('attendance').select('id').eq('employee_id', req.employee_id).eq('date', req.punch_date).maybeSingle();
-            if (existing) {
-                await sb.from('attendance').update({ [col]: timeVal, is_manual: true, notes: `補打卡 - ${req.reason || ''}` }).eq('id', existing.id);
-            } else {
-                await sb.from('attendance').insert({ employee_id: req.employee_id, date: req.punch_date, [col]: timeVal, is_manual: true, status: 'present', notes: `補打卡 - ${req.reason || ''}` });
-            }
-            sendUserNotify(req.employee_id, `✅ 您的補打卡申請已通過\n📅 ${req.punch_date} ${req.punch_type === 'clock_in' ? '上班' : '下班'} ${req.punch_time}`);
-        }
-        showToast(status === 'approved' ? '✅ 已通過並寫入出勤' : '❌ 已拒絕');
-        writeAuditLog(status === 'approved' ? 'approve' : 'reject', 'makeup_punch_requests', id, req?.employees?.name || '');
+        const approverId = window.currentAdminEmployee?.id || null;
+        const { data: result, error } = await sb.rpc('approve_makeup_request', {
+            p_request_id: id,
+            p_approver_id: approverId
+        });
+        if (error) throw error;
+        if (result && !result.success) throw new Error(result.error);
+
+        showToast('✅ 已通過並寫入出勤');
+        writeAuditLog('approve', 'makeup_punch_requests', id, '');
         loadMakeupApprovals('pending');
     } catch (e) { console.error(e); showToast('❌ 審核失敗: ' + friendlyError(e)); }
 }
@@ -307,13 +299,18 @@ export function rejectMakeupPunchPrompt(id) {
 
 export async function rejectMakeupPunch(id, reason) {
     try {
-        await sb.from('makeup_punch_requests').update({
-            status: 'rejected', rejection_reason: reason || '不符合規定',
-            approver_id: window.currentAdminEmployee?.id, approved_at: new Date().toISOString()
-        }).eq('id', id);
+        const approverId = window.currentAdminEmployee?.id || null;
+        const { data: result, error } = await sb.rpc('reject_makeup_request', {
+            p_request_id: id,
+            p_approver_id: approverId,
+            p_reason: reason || '不符合規定'
+        });
+        if (error) throw error;
+        if (result && !result.success) throw new Error(result.error);
+
         showToast('❌ 已拒絕');
         loadMakeupApprovals('pending');
-    } catch (e) { showToast('❌ 操作失敗'); }
+    } catch (e) { showToast('❌ 操作失敗: ' + friendlyError(e)); }
 }
 
 // ===== 加班審核 =====
