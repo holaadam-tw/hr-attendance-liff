@@ -7,6 +7,7 @@
     <title>📊 打卡總覽 - 會計查看</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;900&display=swap" rel="stylesheet">
     <style>
 :root { --primary:#4F46E5; --bg:#F8FAFC; --card:#fff; --text:#1E293B; --text-muted:#64748B; --border:#E2E8F0; }
@@ -104,7 +105,10 @@ body{font-family:'Noto Sans TC',-apple-system,sans-serif;background:var(--bg);co
                     <h2 style="margin:0;font-size:18px;font-weight:800;">📊 打卡總覽</h2>
                     <div style="font-size:12px;color:var(--text-muted);margin-top:2px;" id="companyLabel"></div>
                 </div>
-                <button class="export-btn" onclick="exportExcel()">📥 匯出 Excel</button>
+                <div style="display:flex;gap:6px;">
+                    <button onclick="showPublicRegisterQR()" style="padding:8px 12px;border:2px solid #10B981;border-radius:10px;background:#F0FDF4;color:#059669;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;">📱 登記 QR</button>
+                    <button class="export-btn" onclick="exportExcel()">📥 匯出</button>
+                </div>
             </div>
 
             <!-- Tab 切換 -->
@@ -203,6 +207,24 @@ body{font-family:'Noto Sans TC',-apple-system,sans-serif;background:var(--bg);co
                             <tr><td colspan="9" style="text-align:center;color:#999;padding:40px;">載入中...</td></tr>
                         </tbody>
                     </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 員工登記 QR Code Modal -->
+        <div id="pubRegisterQrModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:999;align-items:center;justify-content:center;padding:20px;">
+            <div style="background:#fff;border-radius:20px;padding:24px;max-width:400px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+                    <h3 style="margin:0;font-size:16px;">📱 員工自助登記 QR Code</h3>
+                    <button onclick="document.getElementById('pubRegisterQrModal').style.display='none'" style="background:none;border:none;font-size:20px;cursor:pointer;color:#94A3B8;">&times;</button>
+                </div>
+                <div style="text-align:center;">
+                    <p id="pubRegQrCompanyName" style="margin:0 0 5px;font-size:16px;font-weight:bold;color:#1f2937;"></p>
+                    <div id="pubRegisterQrcode" style="margin:20px auto;display:inline-block;"></div>
+                    <div style="margin-top:15px;padding:12px;background:#F0FDF4;border-radius:8px;border-left:4px solid #10B981;text-align:left;">
+                        <p style="margin:0;font-size:13px;color:#065F46;"><strong>自助登記流程：</strong><br>1. 員工掃描此 QR Code<br>2. 填寫個人資料<br>3. 等待管理員審核</p>
+                    </div>
+                    <button onclick="downloadPubRegisterQR()" style="margin-top:15px;padding:10px 24px;border:2px solid #10B981;border-radius:10px;background:#F0FDF4;color:#059669;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">📥 下載 QR Code</button>
                 </div>
             </div>
         </div>
@@ -525,6 +547,29 @@ function exportExcel() {
         XLSX.writeFile(wb, companyName + '_打卡統計_' + mYear + '年' + (mMonth + 1) + '月.xlsx');
     }
     showToast('✅ 已匯出 Excel');
+}
+
+// === 員工登記 QR Code ===
+function showPublicRegisterQR() {
+    const modal = document.getElementById('pubRegisterQrModal');
+    const qrcodeDiv = document.getElementById('pubRegisterQrcode');
+    qrcodeDiv.innerHTML = '';
+
+    const baseUrl = window.location.origin + window.location.pathname.replace(/\/[^/]*$/, '/');
+    const registerUrl = baseUrl + 'employee_register.html?company=' + companyId;
+
+    new QRCode(qrcodeDiv, { text: registerUrl, width: 200, height: 200, colorDark: '#059669', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.H });
+    document.getElementById('pubRegQrCompanyName').textContent = companyName;
+    modal.style.display = 'flex';
+}
+
+function downloadPubRegisterQR() {
+    const canvas = document.querySelector('#pubRegisterQrcode canvas');
+    if (!canvas) return;
+    const link = document.createElement('a');
+    link.download = 'employee_register_qr.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
 }
 
 // === 便當訂購統計 ===
