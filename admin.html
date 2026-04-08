@@ -180,6 +180,9 @@
                 <div class="menu-item" data-require="admin" onclick="window.location.href='attendance_overview.html'">
                     <div class="icon">📊</div><div class="label">打卡總覽</div>
                 </div>
+                <div class="menu-item" data-require="admin" onclick="showCheckinQRModal()">
+                    <div class="icon">📲</div><div class="label">打卡 QR Code</div>
+                </div>
                 <div class="menu-item" data-require="admin" onclick="showPage('approvalCenterPage')">
                     <div class="icon">📋</div><div class="label">審核中心</div>
                 </div>
@@ -590,6 +593,40 @@
                     <div style="display:flex;gap:10px;">
                         <button onclick="confirmResign()" class="btn btn-success" style="flex:1;background:#DC2626;">📤 確認離職</button>
                         <button onclick="closeResignModal()" class="btn btn-secondary" style="flex:1;">取消</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 打卡 QR Code Modal -->
+        <div id="checkinQRModal" class="modal" style="display:none;">
+            <div class="modal-content" style="max-width:480px;">
+                <div class="modal-header">
+                    <h3>📲 打卡 QR Code</h3>
+                    <button class="modal-close" onclick="document.getElementById('checkinQRModal').style.display='none'">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p style="font-size:13px;color:#64748B;margin-bottom:16px;text-align:center;">印出貼在打卡地點，員工用 LINE 掃碼直接進入打卡頁面</p>
+                    <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap;">
+                        <!-- 上班 QR -->
+                        <div style="text-align:center;">
+                            <div style="font-size:14px;font-weight:800;color:#059669;margin-bottom:8px;">🌅 上班打卡</div>
+                            <div id="checkinQR_in" style="display:inline-block;"></div>
+                            <button onclick="downloadCheckinQR('in')" style="display:block;margin:10px auto 0;padding:8px 16px;border:2px solid #059669;border-radius:8px;background:#F0FDF4;color:#059669;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">📥 下載 PNG</button>
+                        </div>
+                        <!-- 下班 QR -->
+                        <div style="text-align:center;">
+                            <div style="font-size:14px;font-weight:800;color:#7C3AED;margin-bottom:8px;">🌙 下班打卡</div>
+                            <div id="checkinQR_out" style="display:inline-block;"></div>
+                            <button onclick="downloadCheckinQR('out')" style="display:block;margin:10px auto 0;padding:8px 16px;border:2px solid #7C3AED;border-radius:8px;background:#F5F3FF;color:#7C3AED;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">📥 下載 PNG</button>
+                        </div>
+                    </div>
+                    <div style="margin-top:16px;padding:12px;background:#FEF3C7;border-radius:8px;border-left:4px solid #F59E0B;font-size:12px;color:#92400E;line-height:1.6;">
+                        <strong>使用說明：</strong><br>
+                        1. 下載 QR Code 圖片並列印<br>
+                        2. 貼在公司打卡地點<br>
+                        3. 員工用 LINE 掃碼 → 自動開啟打卡頁面<br>
+                        4. 需要 LINE 登入才能打卡（防止代打）
                     </div>
                 </div>
             </div>
@@ -2204,6 +2241,34 @@
             } else {
                 document.getElementById('calcOTRows').innerHTML = '<div style="text-align:center;color:#94A3B8;font-size:13px;padding:12px;">無加班</div>';
             }
+        };
+
+        // ===== 打卡 QR Code =====
+        window.showCheckinQRModal = function() {
+            var modal = document.getElementById('checkinQRModal');
+            var qrIn = document.getElementById('checkinQR_in');
+            var qrOut = document.getElementById('checkinQR_out');
+            qrIn.innerHTML = '';
+            qrOut.innerHTML = '';
+
+            var liffId = CONFIG.LIFF_ID;
+            var urlIn = 'https://liff.line.me/' + liffId + '?goto=checkin&action=check_in';
+            var urlOut = 'https://liff.line.me/' + liffId + '?goto=checkin&action=check_out';
+
+            new QRCode(qrIn, { text: urlIn, width: 180, height: 180, colorDark: '#059669', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.H });
+            new QRCode(qrOut, { text: urlOut, width: 180, height: 180, colorDark: '#7C3AED', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.H });
+
+            modal.style.display = 'flex';
+        };
+
+        window.downloadCheckinQR = function(type) {
+            var containerId = type === 'out' ? 'checkinQR_out' : 'checkinQR_in';
+            var canvas = document.querySelector('#' + containerId + ' canvas');
+            if (!canvas) return;
+            var link = document.createElement('a');
+            link.download = (type === 'out' ? '下班打卡_QR.png' : '上班打卡_QR.png');
+            link.href = canvas.toDataURL('image/png');
+            link.click();
         };
 
         // 薪資設定 tab — 載入員工薪資設定到 setting tab

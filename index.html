@@ -501,11 +501,17 @@
                 'attendance': 'records.html#attendance',
                 'requests': 'requests.html',
                 'salary': 'salary.html',
-                'checkin': 'checkin.html',
                 'services': 'services.html',
                 'fieldwork': 'fieldwork.html',
                 'admin': 'admin.html'
             };
+            // 打卡 QR Code 跳轉：goto=checkin&action=check_in/check_out
+            if (goto === 'checkin') {
+                var action = new URLSearchParams(window.location.search).get('action') || '';
+                var typeParam = action === 'check_out' ? 'out' : 'in';
+                window.location.href = 'checkin.html?type=' + typeParam;
+                return true;
+            }
             // loyalty/order 特殊處理：傳遞 LINE userId 到目標頁
             if (goto === 'loyalty' || goto === 'order') {
                 var store = new URLSearchParams(window.location.search).get('store') || window.currentCompanyId || '';
