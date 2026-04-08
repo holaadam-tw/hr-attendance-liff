@@ -1935,15 +1935,16 @@ async function submitOvertime() {
     setBtnLoading(otBtn, true);
 
     try {
-        const { error } = await sb.from('overtime_requests').insert({
-            employee_id: currentEmployee.id,
-            ot_date: date,
-            planned_hours: hours,
-            reason: reason || '',
-            compensation_type: compType,
-            status: 'pending'
+        // 使用 SECURITY DEFINER RPC 繞過 RLS（050 SQL）
+        const { data: rpcResult, error: rpcError } = await sb.rpc('submit_overtime_request', {
+            p_line_user_id: liffProfile.userId,
+            p_ot_date: date,
+            p_hours: hours,
+            p_reason: reason || '',
+            p_compensation_type: compType
         });
-        if (error) throw error;
+        if (rpcError) throw rpcError;
+        if (rpcResult && !rpcResult.success) throw new Error(rpcResult.error);
 
         showToast('✅ 加班申請已提交');
         if (statusEl) { statusEl.className = 'status-box show success'; statusEl.textContent = '✅ 申請已提交，等待審核'; }
@@ -1960,14 +1961,14 @@ async function submitOvertime() {
 
 async function loadOvertimeHistory() {
     const list = document.getElementById('overtimeHistoryList');
-    if (!currentEmployee || !list) return;
-    
+    if (!currentEmployee || !liffProfile || !list) return;
+
     try {
-        const { data } = await sb.from('overtime_requests')
-            .select('id, ot_date, planned_hours, compensation_type, status, reason, approved_hours, actual_hours, final_hours, rejection_reason, created_at')
-            .eq('employee_id', currentEmployee.id)
-            .order('created_at', { ascending: false })
-            .limit(10);
+        // 使用 SECURITY DEFINER RPC 繞過 RLS（050 SQL）
+        const { data } = await sb.rpc('get_my_overtime_requests', {
+            p_line_user_id: liffProfile.userId,
+            p_limit: 10
+        });
         
         if (!data || data.length === 0) {
             list.innerHTML = '<p class="text-center-muted-sm">尚無加班記錄</p>';

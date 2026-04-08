@@ -325,61 +325,70 @@ export async function loadOtApprovals(status) {
     if (!el) return;
     el.innerHTML = '<p style="text-align:center;color:#666;">載入中...</p>';
     try {
-        const { data } = await sb.from('overtime_requests')
-            .select('*, employees(name, department, employee_number)')
-            .eq('status', status).order('created_at', { ascending: false }).limit(20);
-        if (!data || data.length === 0) { el.innerHTML = `<p style="text-align:center;color:#999;">無資料</p>`; return; }
+        // 使用 SECURITY DEFINER RPC 繞過 RLS（050 SQL）
+        const { data, error } = await sb.rpc('get_pending_overtime_requests', {
+            p_company_id: window.currentCompanyId
+        });
+        if (error) throw error;
+
+        if (!data || data.length === 0) { el.innerHTML = '<p style="text-align:center;color:#999;">無待審核的加班申請</p>'; return; }
         const compMap = { pay: '💰 加班費', comp_leave: '🏖️ 換補休' };
         el.innerHTML = data.map(r => `
             <div style="background:#fff;border-radius:14px;padding:14px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,0.06);">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-                    <b>${r.employees?.name || '?'}</b>
-                    <span style="font-size:11px;color:#94A3B8;">${r.employees?.department || ''}</span>
+                    <b>${escapeHTML(r.employee_name || '?')}</b>
+                    <span style="font-size:11px;color:#94A3B8;">${escapeHTML(r.department || '')}</span>
                 </div>
                 <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;font-size:12px;">
                     <span style="padding:3px 8px;background:#EFF6FF;border-radius:6px;color:#2563EB;font-weight:700;">📅 ${r.ot_date}</span>
-                    <span style="padding:3px 8px;background:#F5F3FF;border-radius:6px;color:#7C3AED;font-weight:700;">⏰ ${r.planned_hours}h</span>
+                    <span style="padding:3px 8px;background:#F5F3FF;border-radius:6px;color:#7C3AED;font-weight:700;">⏰ ${r.planned_hours || 0}h</span>
                     <span style="padding:3px 8px;background:#ECFDF5;border-radius:6px;color:#059669;font-weight:700;">${compMap[r.compensation_type] || ''}</span>
                 </div>
-                <div style="font-size:12px;color:#64748B;margin-bottom:6px;">${r.reason || ''}</div>
-                ${status === 'pending' ? `
-                    <div style="margin-bottom:8px;">
-                        <label style="font-size:12px;font-weight:700;">核准時數：</label>
-                        <input type="number" id="otAH_${r.id}" value="${r.planned_hours}" min="0" max="12" step="0.5" style="width:70px;padding:4px;border:1px solid #E5E7EB;border-radius:6px;">h
-                    </div>
-                    <div style="display:flex;gap:8px;">
-                        <button onclick="approveOt('${r.id}')" style="flex:1;padding:10px;border:none;border-radius:10px;background:#ECFDF5;color:#059669;font-weight:700;cursor:pointer;">✅ 通過</button>
-                        <button onclick="rejectOtPrompt('${r.id}')" style="flex:1;padding:10px;border:none;border-radius:10px;background:#FEF2F2;color:#DC2626;font-weight:700;cursor:pointer;">❌ 拒絕</button>
-                    </div>` : ''}
-                ${r.approved_hours ? `<div style="font-size:11px;color:#059669;">核准 ${r.approved_hours}h${r.final_hours != null ? ' · 計薪 ' + r.final_hours + 'h' : ''}</div>` : ''}
-                ${r.rejection_reason ? `<div style="font-size:11px;color:#DC2626;">❌ ${r.rejection_reason}</div>` : ''}
+                <div style="font-size:12px;color:#64748B;margin-bottom:6px;">${escapeHTML(r.reason || '')}</div>
+                <div style="margin-bottom:8px;">
+                    <label style="font-size:12px;font-weight:700;">核准時數：</label>
+                    <input type="number" id="otAH_${r.id}" value="${r.planned_hours || 0}" min="0" max="12" step="0.5" style="width:70px;padding:4px;border:1px solid #E5E7EB;border-radius:6px;">h
+                </div>
+                <div style="display:flex;gap:8px;">
+                    <button onclick="approveOt('${r.id}')" style="flex:1;padding:10px;border:none;border-radius:10px;background:#ECFDF5;color:#059669;font-weight:700;cursor:pointer;">✅ 通過</button>
+                    <button onclick="rejectOtPrompt('${r.id}')" style="flex:1;padding:10px;border:none;border-radius:10px;background:#FEF2F2;color:#DC2626;font-weight:700;cursor:pointer;">❌ 拒絕</button>
+                </div>
             </div>
         `).join('');
-    } catch (e) { el.innerHTML = '<p style="text-align:center;color:#ef4444;">載入失敗</p>'; }
+    } catch (e) { console.error(e); el.innerHTML = '<p style="text-align:center;color:#ef4444;">載入失敗</p>'; }
 }
 
 export async function approveOt(id) {
     const h = parseFloat(document.getElementById(`otAH_${id}`)?.value) || 0;
     if (h <= 0) return showToast('❌ 核准時數需大於 0');
     try {
-        const { data: req } = await sb.from('overtime_requests').select('*, employees(name, id)').eq('id', id).single();
-        await sb.from('overtime_requests').update({
-            status: 'approved', approved_hours: h, approver_id: window.currentAdminEmployee?.id, approved_at: new Date().toISOString()
-        }).eq('id', id);
-        writeAuditLog('approve', 'overtime_requests', id, req?.employees?.name, { approved_hours: h });
-        if (req?.employees?.id) sendUserNotify(req.employees.id, `✅ 加班已通過\n📅 ${req.ot_date} 核准 ${h}h`);
+        const approverId = window.currentAdminEmployee?.id || null;
+        const { data: result, error } = await sb.rpc('approve_overtime_request', {
+            p_request_id: id,
+            p_approver_id: approverId,
+            p_approved_hours: h
+        });
+        if (error) throw error;
+        if (result && !result.success) throw new Error(result.error);
+
+        writeAuditLog('approve', 'overtime_requests', id, '', { approved_hours: h });
         showToast('✅ 已通過'); loadOtApprovals('pending');
-    } catch (e) { showToast('❌ 審核失敗'); }
+    } catch (e) { console.error(e); showToast('❌ 審核失敗: ' + friendlyError(e)); }
 }
 export function rejectOtPrompt(id) { const r = prompt('拒絕原因：'); if (r === null) return; rejectOt(id, r); }
 export async function rejectOt(id, reason) {
     try {
-        await sb.from('overtime_requests').update({
-            status: 'rejected', rejection_reason: reason || '不符合規定',
-            approver_id: window.currentAdminEmployee?.id, approved_at: new Date().toISOString()
-        }).eq('id', id);
+        const approverId = window.currentAdminEmployee?.id || null;
+        const { data: result, error } = await sb.rpc('reject_overtime_request', {
+            p_request_id: id,
+            p_approver_id: approverId,
+            p_reason: reason || '不符合規定'
+        });
+        if (error) throw error;
+        if (result && !result.success) throw new Error(result.error);
+
         showToast('❌ 已拒絕'); loadOtApprovals('pending');
-    } catch (e) { showToast('❌ 操作失敗'); }
+    } catch (e) { showToast('❌ 操作失敗: ' + friendlyError(e)); }
 }
 
 // ===== 換班審核 =====
