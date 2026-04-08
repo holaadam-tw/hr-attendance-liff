@@ -849,28 +849,15 @@ async function loadLeaveHistory() {
 
 // ===== 補打卡申請 =====
 async function submitMakeupPunch() {
-    if (!currentEmployee) return showToast('❌ 請先登入');
+    if (!currentEmployee || !liffProfile) return showToast('❌ 請先登入');
     const date = document.getElementById('mpDate')?.value;
     const type = document.getElementById('mpType')?.value; // clock_in / clock_out
     const time = document.getElementById('mpTime')?.value;
     const reasonType = document.getElementById('mpReasonType')?.value;
     const reasonText = document.getElementById('mpReasonText')?.value;
-    
+
     if (!date || !time || !reasonType) return showToast('❌ 請填寫完整');
-    
-    // ⭐ 每月補打卡限制 3 次
-    const monthStart = date.substring(0, 7) + '-01';
-    const monthEnd = date.substring(0, 7) + '-31';
-    const { data: monthCount } = await sb.from('makeup_punch_requests')
-        .select('id', { count: 'exact' })
-        .eq('employee_id', currentEmployee.id)
-        .gte('punch_date', monthStart).lte('punch_date', monthEnd)
-        .in('status', ['pending', 'approved'])
-        .limit(10);
-    if (monthCount && monthCount.length >= 3) {
-        return showToast('❌ 本月補打卡已達上限（3 次/月）');
-    }
-    
+
     const reason = `[${{'forgot':'忘記打卡','field':'外出公務','phone_dead':'手機沒電','system_error':'系統故障','other':'其他'}[reasonType] || reasonType}] ${reasonText || ''}`.trim();
 
     const statusEl = document.getElementById('mpStatus');
@@ -878,15 +865,17 @@ async function submitMakeupPunch() {
     setBtnLoading(mpBtn, true);
 
     try {
-        const { error } = await sb.from('makeup_punch_requests').insert({
-            employee_id: currentEmployee.id,
-            punch_date: date,
-            punch_type: type,
-            punch_time: time,
-            reason: reason,
-            status: 'pending'
+        // 使用 SECURITY DEFINER RPC 繞過 RLS（047 SQL）
+        const { data: rpcResult, error: rpcError } = await sb.rpc('submit_makeup_punch', {
+            p_line_user_id: liffProfile.userId,
+            p_punch_date: date,
+            p_punch_type: type,
+            p_punch_time: time,
+            p_reason: reason
         });
-        if (error) throw error;
+
+        if (rpcError) throw rpcError;
+        if (rpcResult && !rpcResult.success) throw new Error(rpcResult.error);
 
         showToast('✅ 補打卡申請已提交');
         if (statusEl) { statusEl.className = 'status-box show success'; statusEl.textContent = '✅ 申請已提交，等待審核'; }
