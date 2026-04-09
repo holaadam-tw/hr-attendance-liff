@@ -7,6 +7,7 @@
 <meta name="theme-color" content="#4F46E5">
 <title>員工登記</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;900&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -205,10 +206,23 @@ async function init() {
         companyName = company.name;
         document.getElementById('companyNameBadge').textContent = companyName;
 
-        // 從 sessionStorage 讀取 LINE profile（由 index.html LIFF 傳入）
-        lineUserId = sessionStorage.getItem('register_line_user_id') || null;
-        lineDisplayName = sessionStorage.getItem('register_line_name') || '';
-        // 讀完即清除，避免殘留
+        // === 取得 LINE profile（優先 LIFF 直接取，fallback sessionStorage）===
+        try {
+            await liff.init({ liffId: '2008962829-bnsS1bbB' });
+            if (liff.isLoggedIn()) {
+                const profile = await liff.getProfile();
+                lineUserId = profile.userId;
+                lineDisplayName = profile.displayName || '';
+            }
+        } catch (e) {
+            console.log('LIFF init skipped:', e.message);
+        }
+        // fallback: 從 sessionStorage 讀取（由 index.html LIFF 跳轉時寫入）
+        if (!lineUserId) {
+            lineUserId = sessionStorage.getItem('register_line_user_id') || null;
+            lineDisplayName = sessionStorage.getItem('register_line_name') || '';
+        }
+        // 清除 sessionStorage，避免殘留
         sessionStorage.removeItem('register_line_user_id');
         sessionStorage.removeItem('register_line_name');
 
