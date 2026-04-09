@@ -294,16 +294,19 @@
 
                 <!-- 員工 Tab 切換（4 tab） -->
                 <div style="display:flex; gap:0; margin-bottom:15px; border-radius:10px; overflow:hidden; border:2px solid #E2E8F0; flex-wrap:wrap;">
-                    <button id="empTab_active" onclick="switchEmployeeTab('active')" style="flex:1; min-width:60px; padding:10px 6px; border:none; font-size:12px; font-weight:700; cursor:pointer; font-family:inherit; background:#4F46E5; color:#fff;">
+                    <button id="empTab_active" onclick="switchEmployeeTab('active')" style="flex:1; min-width:50px; padding:10px 4px; border:none; font-size:11px; font-weight:700; cursor:pointer; font-family:inherit; background:#4F46E5; color:#fff;">
                         在職
                     </button>
-                    <button id="empTab_pending" onclick="switchEmployeeTab('pending')" style="flex:1; min-width:60px; padding:10px 6px; border:none; font-size:12px; font-weight:700; cursor:pointer; font-family:inherit; background:#fff; color:#64748B; position:relative;">
+                    <button id="empTab_unbind" onclick="switchEmployeeTab('unbind')" style="flex:1; min-width:50px; padding:10px 4px; border:none; font-size:11px; font-weight:700; cursor:pointer; font-family:inherit; background:#fff; color:#64748B; position:relative;">
+                        待綁定 <span id="unbindBadge" style="display:none; position:absolute; top:4px; right:4px; background:#F59E0B; color:#fff; font-size:9px; min-width:16px; height:16px; border-radius:8px; line-height:16px; text-align:center; padding:0 3px;"></span>
+                    </button>
+                    <button id="empTab_pending" onclick="switchEmployeeTab('pending')" style="flex:1; min-width:50px; padding:10px 4px; border:none; font-size:11px; font-weight:700; cursor:pointer; font-family:inherit; background:#fff; color:#64748B; position:relative;">
                         待審核 <span id="pendingBadge" style="display:none; position:absolute; top:4px; right:4px; background:#EF4444; color:#fff; font-size:9px; min-width:16px; height:16px; border-radius:8px; line-height:16px; text-align:center; padding:0 3px;"></span>
                     </button>
-                    <button id="empTab_resigned" onclick="switchEmployeeTab('resigned')" style="flex:1; min-width:60px; padding:10px 6px; border:none; font-size:12px; font-weight:700; cursor:pointer; font-family:inherit; background:#fff; color:#64748B;">
+                    <button id="empTab_resigned" onclick="switchEmployeeTab('resigned')" style="flex:1; min-width:50px; padding:10px 4px; border:none; font-size:11px; font-weight:700; cursor:pointer; font-family:inherit; background:#fff; color:#64748B;">
                         已離職
                     </button>
-                    <button id="empTab_all" onclick="switchEmployeeTab('all')" style="flex:1; min-width:60px; padding:10px 6px; border:none; font-size:12px; font-weight:700; cursor:pointer; font-family:inherit; background:#fff; color:#64748B;">
+                    <button id="empTab_all" onclick="switchEmployeeTab('all')" style="flex:1; min-width:50px; padding:10px 4px; border:none; font-size:11px; font-weight:700; cursor:pointer; font-family:inherit; background:#fff; color:#64748B;">
                         全部
                     </button>
                 </div>
@@ -314,6 +317,13 @@
                         <input type="text" id="employeeSearch" placeholder="🔍 搜尋姓名或工號" onkeyup="searchEmployees()">
                     </div>
                     <div id="employeeList">
+                        <p style="text-align:center;color:#666;">載入中...</p>
+                    </div>
+                </div>
+
+                <!-- 待綁定 LINE 員工列表 -->
+                <div id="unbindEmployeeSection" style="display:none;">
+                    <div id="unbindEmployeeList">
                         <p style="text-align:center;color:#666;">載入中...</p>
                     </div>
                 </div>
@@ -551,9 +561,10 @@
                         </select>
                     </div>
                     <div class="form-group">
-                        <label>LINE 綁定驗證碼</label>
-                        <input type="text" id="editEmpVerifyCode" placeholder="員工用此碼綁定 LINE（例如：1234）" maxlength="10">
-                        <div style="font-size:11px;color:#64748B;margin-top:4px;">員工從 LINE 進入時，輸入工號+此驗證碼即可綁定</div>
+                        <label>LINE 綁定</label>
+                        <div id="editEmpLineStatus" style="font-size:13px;color:#64748B;margin-bottom:6px;">載入中...</div>
+                        <input type="text" id="editEmpLineUserId" placeholder="貼上員工的 LINE User ID" style="font-family:monospace;font-size:13px;">
+                        <div style="font-size:11px;color:#64748B;margin-top:4px;">員工從 LINE 開啟系統 → 複製 LINE ID → 貼在此處</div>
                     </div>
                     <div style="display:flex;gap:10px;margin-top:20px;">
                         <button onclick="saveEditEmployee()" class="btn btn-success" style="flex:1;">💾 儲存</button>

@@ -337,9 +337,10 @@ let currentEmpTab = 'active';
 
 export function switchEmployeeTab(tab) {
     currentEmpTab = tab;
-    const tabs = ['active', 'pending', 'resigned', 'all'];
+    const tabs = ['active', 'unbind', 'pending', 'resigned', 'all'];
     const sections = {
         active: 'activeEmployeeSection',
+        unbind: 'unbindEmployeeSection',
         pending: 'pendingEmployeeSection',
         resigned: 'resignedEmployeeSection',
         all: 'allEmployeeSection'
@@ -366,9 +367,104 @@ export function switchEmployeeTab(tab) {
 
     // 載入對應資料
     if (tab === 'active') loadEmployeeList();
+    else if (tab === 'unbind') loadUnbindEmployees();
     else if (tab === 'pending') loadPendingEmployees();
     else if (tab === 'resigned') loadResignedEmployees();
     else if (tab === 'all') loadAllEmployees();
+}
+
+// ===== 待綁定 LINE 員工列表 =====
+export async function loadUnbindEmployees() {
+    const listEl = document.getElementById('unbindEmployeeList');
+    if (!listEl) return;
+
+    try {
+        const { data, error } = await sb.from('employees')
+            .select('id, name, employee_number, department, position')
+            .eq('company_id', window.currentCompanyId)
+            .eq('is_active', true)
+            .eq('status', 'approved')
+            .is('line_user_id', null)
+            .order('employee_number', { ascending: true });
+
+        if (error) throw error;
+
+        // 更新 badge
+        const badge = document.getElementById('unbindBadge');
+        if (badge) {
+            if (data && data.length > 0) {
+                badge.textContent = data.length;
+                badge.style.display = 'inline-block';
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+
+        if (!data || data.length === 0) {
+            listEl.innerHTML = '<p style="text-align:center;color:#999;padding:40px 0;">🎉 所有員工都已綁定 LINE</p>';
+            return;
+        }
+
+        let html = '';
+        data.forEach(emp => {
+            html += `
+                <div class="attendance-item" style="border-left:4px solid #F59E0B;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                    <div style="min-width:0;flex:1;">
+                        <div style="font-weight:700;font-size:14px;">${escapeHTML(emp.name)}</div>
+                        <div style="font-size:12px;color:#64748B;">${escapeHTML(emp.employee_number || '')} · ${escapeHTML(emp.department || '')} · ${escapeHTML(emp.position || '')}</div>
+                    </div>
+                    <div style="display:flex;gap:6px;align-items:center;">
+                        <input type="text" id="bindLineInput_${emp.id}" placeholder="LINE User ID" style="width:140px;padding:8px;border:1px solid #E2E8F0;border-radius:8px;font-size:12px;font-family:monospace;">
+                        <button onclick="quickBindLine('${emp.id}', '${escapeHTML(emp.name)}')" style="padding:8px 14px;border:none;border-radius:8px;background:#4F46E5;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;">
+                            綁定
+                        </button>
+                    </div>
+                </div>`;
+        });
+        listEl.innerHTML = html;
+
+    } catch (err) {
+        console.error('Load unbind error:', err);
+        listEl.innerHTML = '<p style="text-align:center;color:#ef4444;">載入失敗</p>';
+    }
+}
+
+// ===== 快速綁定 LINE =====
+export async function quickBindLine(empId, empName) {
+    const input = document.getElementById('bindLineInput_' + empId);
+    const lineUserId = input?.value.trim();
+    if (!lineUserId) { showToast('⚠️ 請輸入 LINE User ID'); return; }
+    if (!lineUserId.startsWith('U') || lineUserId.length < 30) {
+        showToast('⚠️ LINE User ID 格式不正確（應為 U 開頭的長字串）');
+        return;
+    }
+
+    try {
+        // 檢查是否已被其他員工使用
+        const { data: existing } = await sb.from('employees')
+            .select('id, name')
+            .eq('line_user_id', lineUserId)
+            .eq('is_active', true)
+            .maybeSingle();
+
+        if (existing && existing.id !== empId) {
+            showToast(`⚠️ 此 LINE ID 已被「${existing.name}」使用`);
+            return;
+        }
+
+        const { error } = await sb.from('employees').update({
+            line_user_id: lineUserId,
+            is_bound: true,
+            updated_at: new Date().toISOString()
+        }).eq('id', empId);
+
+        if (error) throw error;
+        showToast(`✅ ${empName} 已綁定 LINE`);
+        loadUnbindEmployees();
+    } catch (err) {
+        console.error('Quick bind error:', err);
+        showToast('❌ 綁定失敗: ' + friendlyError(err));
+    }
 }
 
 // ===== 待審核員工列表 =====
@@ -708,8 +804,17 @@ export async function openEditEmployeeModal(empId) {
             document.getElementById('editEmpPosition').value = data.position || '';
             document.getElementById('editEmpHireDate').value = data.hire_date || '';
             document.getElementById('editEmpType').value = data.employment_type || 'fulltime';
-            const vcEl = document.getElementById('editEmpVerifyCode');
-            if (vcEl) vcEl.value = data.verify_code || '';
+            // LINE 綁定狀態
+            const lineStatusEl = document.getElementById('editEmpLineStatus');
+            const lineInputEl = document.getElementById('editEmpLineUserId');
+            if (lineInputEl) lineInputEl.value = data.line_user_id || '';
+            if (lineStatusEl) {
+                if (data.line_user_id) {
+                    lineStatusEl.innerHTML = '<span style="color:#10B981;font-weight:600;">✅ 已綁定</span>';
+                } else {
+                    lineStatusEl.innerHTML = '<span style="color:#F59E0B;font-weight:600;">⚠️ 未綁定 LINE</span>';
+                }
+            }
         }
     } catch (e) { }
     document.getElementById('editEmployeeModal').style.display = 'flex';
@@ -722,14 +827,15 @@ export function closeEditEmployeeModal() {
 export async function saveEditEmployee() {
     const empId = document.getElementById('editEmpId').value;
     if (!empId) return;
-    const vcVal = (document.getElementById('editEmpVerifyCode')?.value || '').trim();
+    const lineVal = (document.getElementById('editEmpLineUserId')?.value || '').trim();
     const updates = {
         name: document.getElementById('editEmpName').value.trim(),
         department: document.getElementById('editEmpDept').value,
         position: document.getElementById('editEmpPosition').value.trim(),
         hire_date: document.getElementById('editEmpHireDate').value,
         employment_type: document.getElementById('editEmpType').value,
-        verify_code: vcVal || null
+        line_user_id: lineVal || null,
+        is_bound: !!lineVal
     };
     if (!updates.name) { showToast('⚠️ 姓名不可為空'); return; }
     try {

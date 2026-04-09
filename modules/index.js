@@ -22,6 +22,7 @@ import {
     closeEditEmployeeModal, saveEditEmployee, loadDepartmentOptions, addNewDepartment,
     showRegisterQRCode, closeRegisterQrModal, downloadRegisterQR,
     switchEmployeeTab, loadPendingEmployees, approveEmployee, rejectEmployee, loadPendingCount,
+    loadUnbindEmployees, quickBindLine,
     showResignModal, closeResignModal, confirmResign, restoreEmployee,
     loadResignedEmployees, loadAllEmployees
 } from './employees.js';
@@ -143,6 +144,8 @@ window.loadPendingEmployees = loadPendingEmployees;
 window.approveEmployee = approveEmployee;
 window.rejectEmployee = rejectEmployee;
 window.loadPendingCount = loadPendingCount;
+window.loadUnbindEmployees = loadUnbindEmployees;
+window.quickBindLine = quickBindLine;
 window.showResignModal = showResignModal;
 window.closeResignModal = closeResignModal;
 window.confirmResign = confirmResign;
