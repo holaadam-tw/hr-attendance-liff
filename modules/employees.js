@@ -304,9 +304,8 @@ export async function showRegisterQRCode() {
         console.error('Failed to fetch company info for register QR', e);
     }
 
-    // 直接指向 employee_register.html（不需 LIFF）
-    const baseUrl = window.location.origin + window.location.pathname.replace(/\/[^/]*$/, '/');
-    const registerUrl = `${baseUrl}employee_register.html?company=${companyId}`;
+    // 透過 LIFF URL 開啟，自動帶入 LINE userId
+    const registerUrl = `https://liff.line.me/2008962829-bnsS1bbB?goto=register&company=${companyId}`;
 
     new QRCode(qrcodeDiv, {
         text: registerUrl, width: 200, height: 200,
@@ -473,6 +472,7 @@ export async function approveEmployee(empId, empName) {
 
         const { error } = await sb.from('employees').update({
             is_active: true,
+            is_bound: true,
             status: 'approved',
             employee_number: nextNum,
             updated_at: new Date().toISOString()

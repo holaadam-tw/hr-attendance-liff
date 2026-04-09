@@ -34,32 +34,14 @@
     </div>
 
     <div class="container">
-        <!-- 綁定頁面 -->
-        <div id="bindPage" class="page">
-            <div class="card">
-                <div class="bind-header">
-                    <span class="logo">🔐</span>
-                    <h2>員工身份綁定</h2>
-                    <p>初次使用請驗證身份</p>
-                </div>
-                <div class="tabs">
-                    <button class="tab-btn active" id="tabIdCard" onclick="switchBindMode('id_card')">身份證驗證</button>
-                    <button class="tab-btn inactive" id="tabCode" onclick="switchBindMode('code')">驗證碼驗證</button>
-                </div>
-                <div class="form-group">
-                    <label>員工工號 (ID) *</label>
-                    <input type="text" id="bindEmpId" placeholder="例如：EMP001" autocomplete="off">
-                </div>
-                <div id="modeIdCard" class="form-group">
-                    <label>身份證後 4 碼 *</label>
-                    <input type="tel" id="bindIdLast4" maxlength="4" placeholder="例如：1234" autocomplete="off">
-                </div>
-                <div id="modeCode" class="form-group hidden">
-                    <label>一次性驗證碼 *</label>
-                    <input type="text" id="bindCode" placeholder="請輸入 HR 提供的驗證碼" autocomplete="off">
-                </div>
-                <button class="btn btn-primary" onclick="handleBind()">🔗 立即綁定</button>
-                <div id="bindStatus" class="status-box"></div>
+        <!-- 未註冊/待審核提示頁 -->
+        <div id="unboundPage" class="page">
+            <div class="card" style="text-align:center;padding:40px 24px;">
+                <div id="unboundIcon" style="font-size:48px;margin-bottom:16px;">📋</div>
+                <h2 id="unboundTitle" style="font-size:18px;font-weight:800;color:#0F172A;margin-bottom:12px;justify-content:center;">尚未註冊</h2>
+                <p id="unboundMsg" style="color:#64748B;font-size:14px;line-height:1.8;">
+                    請掃描管理員提供的「員工登記 QR Code」<br>填寫資料後等待審核通過即可使用。
+                </p>
             </div>
         </div>
 
@@ -529,12 +511,7 @@
                 window.location.href = (goto === 'loyalty' ? 'loyalty.html' : 'order.html') + '?store=' + store;
                 return true;
             }
-            // 員工自助登記：跳轉到 employee_register.html
-            if (goto === 'register') {
-                var company = new URLSearchParams(window.location.search).get('company') || '';
-                window.location.href = 'employee_register.html?company=' + company;
-                return true;
-            }
+            // goto=register 已提前到 checkUserStatus 之前處理（見 window.load）
             if (pages[goto]) { window.location.href = pages[goto]; return true; }
             return false;
         }
@@ -548,6 +525,18 @@
             const initialized = await initializeLiff({ requireLineApp: true });
             if (initialized) {
                 checkLiffParams();
+
+                // goto=register 提前處理（員工尚未註冊，不需等 checkUserStatus）
+                const _gotoParams = new URLSearchParams(window.location.search);
+                if (_gotoParams.get('goto') === 'register') {
+                    const _regCompany = _gotoParams.get('company') || '';
+                    if (liffProfile) {
+                        sessionStorage.setItem('register_line_user_id', liffProfile.userId);
+                        sessionStorage.setItem('register_line_name', liffProfile.displayName || '');
+                    }
+                    window.location.href = 'employee_register.html?company=' + _regCompany;
+                    return;
+                }
 
                 // LIFF 初始化完成後立即顯示骨架屏（比 checkUserStatus 快）
                 const skeleton = document.getElementById('skeletonScreen');
@@ -611,9 +600,17 @@
                     }
                     Promise.all(tasks.map(p => Promise.resolve(p).catch(e => console.error(e))));
                 } else {
-                    // 未綁定：隱藏 skeleton，直接顯示綁定頁面
+                    // 未註冊或待審核：顯示對應提示
                     if (skeleton) skeleton.style.display = 'none';
-                    showPage('bindPage');
+                    if (window._pendingEmployeeStatus === 'pending') {
+                        const icon = document.getElementById('unboundIcon');
+                        const title = document.getElementById('unboundTitle');
+                        const msg = document.getElementById('unboundMsg');
+                        if (icon) icon.textContent = '⏳';
+                        if (title) title.textContent = '等待管理員審核';
+                        if (msg) msg.innerHTML = '您的登記資料已送出，<br>管理員審核通過後即可使用所有功能。';
+                    }
+                    showPage('unboundPage');
                 }
             } else {
                 // 無 LIFF 環境（電腦瀏覽器直開）：仍載入設定並套用格子顯示

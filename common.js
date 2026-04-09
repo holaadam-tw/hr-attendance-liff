@@ -28,7 +28,6 @@ function stopVideoStream() {
         videoStream = null;
     }
 }
-let currentBindMode = 'id_card';
 let todayAttendance = null;
 let officeLocations = [];
 let isProcessing = false;
@@ -294,15 +293,21 @@ async function checkUserStatus() {
             return true;
         }
 
-        // === 一般員工流程（原邏輯）===
+        // === 一般員工流程 ===
         const { data, error } = await sb.from('employees')
-            .select('id, name, role, department, position, employee_number, line_user_id, company_id, is_active, hire_date')
+            .select('id, name, role, department, position, employee_number, line_user_id, company_id, is_active, status, hire_date')
             .eq('line_user_id', liffProfile.userId)
             .maybeSingle();
 
         if (loadingEl) loadingEl.style.display = 'none';
 
         if (data) {
+            // 待審核員工 → 設 flag 讓 index.html 顯示等待訊息
+            if (data.status === 'pending' || !data.is_active) {
+                window._pendingEmployeeStatus = data.status || 'pending';
+                return false;
+            }
+
             currentEmployee = data;
             currentCompanyId = data.company_id || null;
             window.currentCompanyId = currentCompanyId;
@@ -585,56 +590,8 @@ function updateCheckInButtons() {
     }
 }
 
-// ===== 綁定功能 =====
-function switchBindMode(mode) {
-    currentBindMode = mode;
-    const modeIdCard = document.getElementById('modeIdCard');
-    const modeCode = document.getElementById('modeCode');
-    const tabIdCard = document.getElementById('tabIdCard');
-    const tabCode = document.getElementById('tabCode');
-    
-    if (modeIdCard) modeIdCard.classList.toggle('hidden', mode !== 'id_card');
-    if (modeCode) modeCode.classList.toggle('hidden', mode !== 'code');
-    if (tabIdCard) tabIdCard.className = mode === 'id_card' ? 'tab-btn active' : 'tab-btn inactive';
-    if (tabCode) tabCode.className = mode === 'code' ? 'tab-btn active' : 'tab-btn inactive';
-}
-
-async function handleBind() {
-    const empId = document.getElementById('bindEmpId')?.value.trim();
-    const idLast4 = document.getElementById('bindIdLast4')?.value.trim();
-    const code = document.getElementById('bindCode')?.value.trim();
-    const statusBox = document.getElementById('bindStatus');
-
-    if (!empId) return showStatus(statusBox, 'error', '請輸入員編');
-
-    const params = {
-        p_line_user_id: liffProfile.userId,
-        p_employee_number: empId, 
-        p_device_info: navigator.userAgent,
-        p_id_card_last_4: document.getElementById('modeIdCard')?.classList.contains('hidden') ? null : idLast4,
-        p_verification_code: document.getElementById('modeCode')?.classList.contains('hidden') ? null : code
-    };
-
-    showStatus(statusBox, 'info', '驗證中...');
-    try {
-        const { data, error } = await sb.rpc('bind_employee', params);
-        if (error) console.error('[handleBind] rpc error:', error);
-        if (error) throw error;
-
-        // RPC 回傳格式可能是 {success:true}, true, 或 null（無 error 即成功）
-        if (data && data.error) {
-            showStatus(statusBox, 'error', data.error);
-        } else if (data === false || (data && data.success === false)) {
-            showStatus(statusBox, 'error', (data && data.message) || '綁定失敗，請檢查資料');
-        } else {
-            showStatus(statusBox, 'success', '✅ 綁定成功！');
-            setTimeout(() => { window.location.href = 'index.html'; }, 1500);
-        }
-    } catch (err) {
-        console.error('綁定錯誤:', err);
-        showStatus(statusBox, 'error', friendlyError(err));
-    }
-}
+// ===== 綁定功能已移除 =====
+// 員工登記時自動帶入 line_user_id，admin 審核通過即完成綁定
 
 // ===== 便當功能 =====
 async function loadLunchSummary() {

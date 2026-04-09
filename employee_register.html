@@ -138,7 +138,7 @@ input:focus,select:focus{outline:none;border-color:var(--primary);box-shadow:0 0
       <h2 style="justify-content:center;font-size:20px;">登記成功！</h2>
       <p style="color:var(--text-muted);font-size:13px;margin-top:8px;line-height:1.6;">
         您的登記資料已送出，<br>請等待管理員審核。<br>
-        審核通過後請使用 LINE 綁定帳號即可開始使用。
+        審核通過後即可從 LINE 使用所有功能。
       </p>
     </div>
   </div>
@@ -176,6 +176,8 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let companyId = null;
 let companyName = '';
+let lineUserId = null;
+let lineDisplayName = '';
 
 // ===== 初始化 =====
 async function init() {
@@ -203,12 +205,43 @@ async function init() {
         companyName = company.name;
         document.getElementById('companyNameBadge').textContent = companyName;
 
+        // 從 sessionStorage 讀取 LINE profile（由 index.html LIFF 傳入）
+        lineUserId = sessionStorage.getItem('register_line_user_id') || null;
+        lineDisplayName = sessionStorage.getItem('register_line_name') || '';
+        // 讀完即清除，避免殘留
+        sessionStorage.removeItem('register_line_user_id');
+        sessionStorage.removeItem('register_line_name');
+
+        // 如果有 line_user_id，檢查是否已註冊
+        if (lineUserId) {
+            const { data: existByLine } = await sb.from('employees')
+                .select('id, name, status, is_active')
+                .eq('line_user_id', lineUserId)
+                .eq('company_id', companyId)
+                .maybeSingle();
+
+            if (existByLine) {
+                if (existByLine.status === 'pending') {
+                    showError('已登記過', '您的登記資料正在等待管理員審核，請耐心等候。');
+                    return;
+                } else if (existByLine.is_active) {
+                    showError('已是員工', '您已經是在職員工，請直接從 LINE 開啟員工系統。');
+                    return;
+                }
+            }
+        }
+
         // 載入部門選項
         await loadDepartments();
 
         // 預設到職日為今天
         const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Taipei' });
         document.getElementById('regHireDate').value = today;
+
+        // 自動帶入 LINE 顯示名稱
+        if (lineDisplayName) {
+            document.getElementById('regName').value = lineDisplayName;
+        }
 
         // 顯示表單
         document.getElementById('loadingView').classList.add('hidden');
@@ -304,6 +337,26 @@ async function submitRegistration() {
     btn.textContent = '送出中...';
 
     try {
+        // 檢查同 LINE 帳號是否已登記（優先用 line_user_id）
+        if (lineUserId) {
+            const { data: existByLine } = await sb.from('employees')
+                .select('id, name, status, is_active')
+                .eq('line_user_id', lineUserId)
+                .eq('company_id', companyId)
+                .maybeSingle();
+
+            if (existByLine) {
+                if (existByLine.status === 'pending') {
+                    showToast('此 LINE 帳號已登記過，正在等待審核', true);
+                } else if (existByLine.is_active) {
+                    showToast('此 LINE 帳號已是在職員工', true);
+                }
+                btn.disabled = false;
+                btn.textContent = '📨 送出登記';
+                return;
+            }
+        }
+
         // 檢查同手機+同公司是否已登記（用手機號碼防重複）
         const { data: existing } = await sb.from('employees')
             .select('id, name, status, is_active, phone')
@@ -323,8 +376,8 @@ async function submitRegistration() {
                 btn.textContent = '📨 送出登記';
                 return;
             } else if (existing.status === 'rejected') {
-                // 被拒絕過的可以重新登記 → 更新資料
-                const { error } = await sb.from('employees').update({
+                // 被拒絕過的可以重新登記 → 更新資料（含 line_user_id）
+                const updateData = {
                     name: name,
                     phone: phone,
                     department: department || null,
@@ -335,7 +388,9 @@ async function submitRegistration() {
                     status: 'pending',
                     is_active: false,
                     updated_at: new Date().toISOString()
-                }).eq('id', existing.id);
+                };
+                if (lineUserId) updateData.line_user_id = lineUserId;
+                const { error } = await sb.from('employees').update(updateData).eq('id', existing.id);
 
                 if (error) throw error;
 
@@ -345,7 +400,7 @@ async function submitRegistration() {
             }
         }
 
-        // 新增登記（不綁定 LINE）
+        // 新增登記（自動帶入 LINE userId）
         // 產生臨時工號（審核通過後會被正式工號覆蓋）
         const tempNumber = 'REG-' + Date.now().toString(36).toUpperCase();
 
@@ -358,7 +413,7 @@ async function submitRegistration() {
             hire_date: hireDate || null,
             emergency_contact: emergencyContact || null,
             emergency_phone: emergencyPhone || null,
-            line_user_id: null,
+            line_user_id: lineUserId,
             company_id: companyId,
             is_active: false,
             status: 'pending',
