@@ -415,12 +415,25 @@
                 const isLoggedIn = await checkUserStatus();
                 if (isLoggedIn) {
                     checkGPSPermission();
+                    // 預先請求相機權限（延遲 500ms 避免跟 LIFF init 搶資源）
+                    setTimeout(preRequestCameraPermission, 500);
                     openCamera();
                 } else {
                     window.location.href = 'index.html';
                 }
             }
         });
+
+        // ===== 預先請求相機權限 =====
+        async function preRequestCameraPermission() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                stream.getTracks().forEach(t => t.stop());
+                console.log('[相機] 權限預先請求成功');
+            } catch (e) {
+                console.log('[相機] 預先請求失敗，將使用 fallback:', e.message);
+            }
+        }
 
         // ===== 停止相機（使用 common.js stopVideoStream + 清除 video 元素） =====
         function stopCamera() {
