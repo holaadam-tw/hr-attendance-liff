@@ -708,6 +708,8 @@ export async function openEditEmployeeModal(empId) {
             document.getElementById('editEmpPosition').value = data.position || '';
             document.getElementById('editEmpHireDate').value = data.hire_date || '';
             document.getElementById('editEmpType').value = data.employment_type || 'fulltime';
+            const vcEl = document.getElementById('editEmpVerifyCode');
+            if (vcEl) vcEl.value = data.verify_code || '';
         }
     } catch (e) { }
     document.getElementById('editEmployeeModal').style.display = 'flex';
@@ -720,12 +722,14 @@ export function closeEditEmployeeModal() {
 export async function saveEditEmployee() {
     const empId = document.getElementById('editEmpId').value;
     if (!empId) return;
+    const vcVal = (document.getElementById('editEmpVerifyCode')?.value || '').trim();
     const updates = {
         name: document.getElementById('editEmpName').value.trim(),
         department: document.getElementById('editEmpDept').value,
         position: document.getElementById('editEmpPosition').value.trim(),
         hire_date: document.getElementById('editEmpHireDate').value,
-        employment_type: document.getElementById('editEmpType').value
+        employment_type: document.getElementById('editEmpType').value,
+        verify_code: vcVal || null
     };
     if (!updates.name) { showToast('⚠️ 姓名不可為空'); return; }
     try {

@@ -550,6 +550,11 @@
                             <option value="parttime">兼職</option>
                         </select>
                     </div>
+                    <div class="form-group">
+                        <label>LINE 綁定驗證碼</label>
+                        <input type="text" id="editEmpVerifyCode" placeholder="員工用此碼綁定 LINE（例如：1234）" maxlength="10">
+                        <div style="font-size:11px;color:#64748B;margin-top:4px;">員工從 LINE 進入時，輸入工號+此驗證碼即可綁定</div>
+                    </div>
                     <div style="display:flex;gap:10px;margin-top:20px;">
                         <button onclick="saveEditEmployee()" class="btn btn-success" style="flex:1;">💾 儲存</button>
                         <button onclick="closeEditEmployeeModal()" class="btn btn-secondary" style="flex:1;">取消</button>

@@ -43,6 +43,30 @@
                     請掃描管理員提供的「員工登記 QR Code」<br>填寫資料後等待審核通過即可使用。
                 </p>
             </div>
+            <!-- 綁定現有員工 -->
+            <div id="bindExistingSection" class="card" style="text-align:center;padding:24px;">
+                <button id="showBindFormBtn" onclick="document.getElementById('bindExistingForm').classList.toggle('hidden');this.style.display='none';"
+                    style="background:none;border:2px solid #E2E8F0;border-radius:12px;padding:12px 20px;font-size:14px;font-weight:600;color:#4F46E5;cursor:pointer;font-family:inherit;width:100%;">
+                    🔗 我已是員工，綁定 LINE
+                </button>
+                <div id="bindExistingForm" class="hidden" style="text-align:left;margin-top:16px;">
+                    <div style="margin-bottom:12px;">
+                        <label style="display:block;font-size:13px;font-weight:600;margin-bottom:4px;">員工工號</label>
+                        <input type="text" id="bindExistEmpNum" placeholder="例如：E001" autocomplete="off"
+                            style="width:100%;padding:12px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;font-family:inherit;">
+                    </div>
+                    <div style="margin-bottom:16px;">
+                        <label style="display:block;font-size:13px;font-weight:600;margin-bottom:4px;">驗證碼</label>
+                        <input type="text" id="bindExistCode" placeholder="請輸入管理員提供的驗證碼" autocomplete="off" maxlength="10"
+                            style="width:100%;padding:12px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;font-family:inherit;">
+                    </div>
+                    <button onclick="handleBindExisting()" id="bindExistBtn"
+                        style="width:100%;padding:14px;border:none;border-radius:12px;background:#4F46E5;color:#fff;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;">
+                        🔗 綁定
+                    </button>
+                    <div id="bindExistStatus" style="margin-top:12px;font-size:13px;text-align:center;"></div>
+                </div>
+            </div>
         </div>
 
         <!-- 首頁 -->
@@ -458,6 +482,44 @@
             } catch(e) { console.log('載入訂單數失敗', e); }
         }
 
+        // ===== 綁定現有員工 =====
+        async function handleBindExisting() {
+            const empNum = document.getElementById('bindExistEmpNum')?.value.trim();
+            const code = document.getElementById('bindExistCode')?.value.trim();
+            const statusEl = document.getElementById('bindExistStatus');
+            const btn = document.getElementById('bindExistBtn');
+
+            if (!empNum) { statusEl.innerHTML = '<span style="color:#EF4444;">請輸入員工工號</span>'; return; }
+            if (!code) { statusEl.innerHTML = '<span style="color:#EF4444;">請輸入驗證碼</span>'; return; }
+
+            btn.disabled = true;
+            btn.textContent = '綁定中...';
+            statusEl.innerHTML = '<span style="color:#64748B;">驗證中...</span>';
+
+            try {
+                const { data, error } = await sb.rpc('bind_existing_employee', {
+                    p_line_user_id: liffProfile.userId,
+                    p_employee_number: empNum,
+                    p_verify_code: code
+                });
+                if (error) throw error;
+
+                if (data && data.success) {
+                    statusEl.innerHTML = '<span style="color:#10B981;">✅ 綁定成功！</span>';
+                    setTimeout(() => { window.location.reload(); }, 1200);
+                } else {
+                    statusEl.innerHTML = '<span style="color:#EF4444;">' + ((data && data.error) || '綁定失敗') + '</span>';
+                    btn.disabled = false;
+                    btn.textContent = '🔗 綁定';
+                }
+            } catch (err) {
+                console.error('Bind existing error:', err);
+                statusEl.innerHTML = '<span style="color:#EF4444;">' + friendlyError(err) + '</span>';
+                btn.disabled = false;
+                btn.textContent = '🔗 綁定';
+            }
+        }
+
         function checkLiffParams() {
             try {
                 if (liff && liff.isInClient()) {
@@ -609,6 +671,9 @@
                         if (icon) icon.textContent = '⏳';
                         if (title) title.textContent = '等待管理員審核';
                         if (msg) msg.innerHTML = '您的登記資料已送出，<br>管理員審核通過後即可使用所有功能。';
+                        // 待審核不需要綁定按鈕
+                        const bindSection = document.getElementById('bindExistingSection');
+                        if (bindSection) bindSection.style.display = 'none';
                     }
                     showPage('unboundPage');
                 }
