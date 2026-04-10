@@ -534,23 +534,27 @@ async function checkTodayAttendance() {
             todayAttendance = data;
         }
 
-        // 跨日打卡支援：今天沒記錄時，查昨天是否有未下班的記錄
+        // 昨日未下班偵測：區分「跨日班」與「一般日班忘打下班」
+        window._pendingCheckout = null;
+        window._yesterdayForgotCheckout = null;
         if (!todayAttendance) {
             const yesterday = getTaiwanDate(-1);
             const { data: yData } = await sb.from('attendance')
-                .select('id, check_in_time, check_out_time, check_in_location, date')
+                .select('id, check_in_time, check_out_time, check_in_location, date, shift_type_id, shift_types(is_overnight)')
                 .eq('employee_id', currentEmployee.id)
                 .eq('date', yesterday)
                 .is('check_out_time', null)
                 .maybeSingle();
             if (yData) {
-                // 標記為跨日未下班，讓 updateCheckInButtons 知道要顯示下班按鈕
-                window._pendingCheckout = yData;
-            } else {
-                window._pendingCheckout = null;
+                const isOvernight = yData.shift_types?.is_overnight === true;
+                if (isOvernight) {
+                    // 跨日班 → 要求先補打下班
+                    window._pendingCheckout = yData;
+                } else {
+                    // 一般日班忘打下班 → 今天仍可正常上班打卡，僅提示補打卡
+                    window._yesterdayForgotCheckout = yData;
+                }
             }
-        } else {
-            window._pendingCheckout = null;
         }
 
         updateCheckInButtons();
@@ -568,11 +572,18 @@ function updateCheckInButtons() {
     if (!btnIn || !btnOut || !statusBox) return;
 
     if (!todayAttendance && window._pendingCheckout) {
-        // 跨日：昨天有未下班記錄，顯示下班按鈕
+        // 跨日班：昨天有未下班記錄，必須先補打下班
         btnIn.classList.add('disabled');
         btnOut.classList.remove('disabled');
         const yLoc = window._pendingCheckout.check_in_location || lastLoc;
         showStatus(statusBox, 'info', `🌙 昨日上班中 @ ${escapeHTML(yLoc)}（待下班打卡）`);
+    } else if (!todayAttendance && window._yesterdayForgotCheckout) {
+        // 一般日班昨日忘打下班：今天仍可正常上班打卡，同時提示補打卡
+        btnIn.classList.remove('disabled');
+        btnOut.classList.add('disabled');
+        const yDate = window._yesterdayForgotCheckout.date || '';
+        const mdLabel = yDate ? yDate.slice(5).replace('-', '/') : '昨日';
+        showStatus(statusBox, 'error', `⚠️ ${mdLabel} 未打下班卡，請申請補打卡 <a href="records.html#makeup" style="color:#B91C1C;text-decoration:underline;font-weight:700;margin-left:6px;">前往補打卡</a>`, true);
     } else if (!todayAttendance) {
         btnIn.classList.remove('disabled');
         btnOut.classList.add('disabled');
