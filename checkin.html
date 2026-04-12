@@ -66,6 +66,16 @@
         </div>
     </div>
 
+    <!-- 打卡錯誤 Modal -->
+    <div id="checkinErrorModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9999;align-items:center;justify-content:center;padding:20px;">
+        <div style="background:#fff;border-radius:20px;padding:28px;max-width:320px;width:100%;text-align:center;">
+            <div style="font-size:48px;margin-bottom:16px;">❌</div>
+            <h3 id="checkinErrorTitle" style="margin:0 0 8px;font-size:18px;color:#DC2626;"></h3>
+            <p id="checkinErrorMessage" style="font-size:14px;color:#666;line-height:1.6;margin-bottom:20px;"></p>
+            <div id="checkinErrorActions" style="display:flex;flex-direction:column;gap:10px;"></div>
+        </div>
+    </div>
+
     <script src="common.js"></script>
     <script>
         // === 全域錯誤監控 ===
@@ -185,10 +195,15 @@
                     p_action: rpcAction
                 });
 
-                if (rpcError) throw rpcError;
-                if (!rpcData.success) throw new Error(rpcData.error);
-
                 clearTimeout(safetyTimer);
+
+                if (rpcError || !rpcData?.success) {
+                    stopCamera();
+                    const mapped = mapCheckinError(rpcError, rpcData);
+                    showCheckinError(mapped.title, mapped.message, mapped.canRetry);
+                    return;
+                }
+
                 if (rpcData.location_name) localStorage.setItem('last_location', rpcData.location_name);
 
                 const typeText = rpcData.type === 'check_out' ? '下班' : '上班';
@@ -202,8 +217,8 @@
                 clearTimeout(safetyTimer);
                 stopCamera();
                 console.error(err);
-                showStatus(statusBox, 'error', `❌ 失敗: ${friendlyError(err)}`);
-                btn.disabled = false; btn.textContent = '📸 重試';
+                const mapped = mapCheckinError(null, null);
+                showCheckinError('系統錯誤', err.message || mapped.message, true);
             }
         }
 
@@ -318,8 +333,12 @@
                         p_photo_url: publicUrl, p_device_id: navigator.userAgent,
                         p_action: rpcAction2
                     });
-                    if (rpcError) throw rpcError;
-                    if (!rpcData.success) throw new Error(rpcData.error);
+
+                    if (rpcError || !rpcData?.success) {
+                        const mapped = mapCheckinError(rpcError, rpcData);
+                        showCheckinError(mapped.title, mapped.message, mapped.canRetry);
+                        return;
+                    }
 
                     if (rpcData.location_name) localStorage.setItem('last_location', rpcData.location_name);
                     const actualType = rpcData.type === 'check_out' ? '下班' : '上班';
@@ -330,11 +349,58 @@
                     showCheckInSuccess(actualType + overnightHint, locText, nowTime);
                 } catch(err) {
                     console.error(err);
-                    showStatus(statusBox, 'error', `❌ 失敗: ${friendlyError(err)}`);
-                    btn.disabled = false; btn.textContent = '📸 開啟相機拍照';
+                    showCheckinError('系統錯誤', err.message || '打卡失敗，請重試', true);
                 }
             };
             img.src = URL.createObjectURL(file);
+        }
+
+        // ===== 打卡錯誤 Modal =====
+        function showCheckinError(title, message, canRetry) {
+            const modal = document.getElementById('checkinErrorModal');
+            document.getElementById('checkinErrorTitle').textContent = title;
+            document.getElementById('checkinErrorMessage').textContent = message;
+
+            const actionsEl = document.getElementById('checkinErrorActions');
+            let btns = '';
+            if (canRetry) {
+                btns += '<button onclick="closeCheckinError(); captureAndCheckIn();" ' +
+                    'style="width:100%;padding:12px;background:linear-gradient(135deg,#667eea,#764ba2);border:none;border-radius:12px;color:#fff;font-size:15px;font-weight:700;cursor:pointer;">' +
+                    '🔄 重試</button>';
+            }
+            btns += '<button onclick="closeCheckinError(); goBack();" ' +
+                'style="width:100%;padding:12px;background:#F1F5F9;border:1px solid #CBD5E1;border-radius:12px;color:#475569;font-size:14px;font-weight:600;cursor:pointer;">' +
+                '← 返回首頁</button>';
+            actionsEl.innerHTML = btns;
+
+            // 解除按鈕轉圈狀態
+            const btn = document.getElementById('captureBtn');
+            if (btn) {
+                btn.disabled = false;
+                btn.textContent = useCaptureInput ? '📸 開啟相機拍照' : '📸 重試';
+            }
+            modal.style.display = 'flex';
+        }
+
+        function closeCheckinError() {
+            document.getElementById('checkinErrorModal').style.display = 'none';
+        }
+
+        // 將 RPC 錯誤訊息轉為使用者友善訊息 + 是否可重試
+        function mapCheckinError(rpcError, rpcData) {
+            const msg = rpcData?.error || rpcError?.message || '未知錯誤';
+            const minDist = rpcData?.min_distance;
+
+            if (msg.includes('找不到員工資料')) return { title: '帳號未綁定', message: '帳號未綁定，請聯繫管理員', canRetry: false };
+            if (msg.includes('今日已打上班卡')) return { title: '重複打卡', message: '今日已完成上班打卡', canRetry: false };
+            if (msg.includes('今日已完成')) return { title: '重複打卡', message: '今日已完成上下班打卡', canRetry: false };
+            if (msg.includes('不在打卡範圍')) return { title: '不在範圍內', message: '請移至公司附近再打卡' + (minDist ? `（目前距離約 ${minDist} 公尺）` : ''), canRetry: true };
+            if (msg.includes('已超過下班打卡時間') || msg.includes('已超過下班')) return { title: '超過時限', message: '已超過下班打卡時間，請申請補卡', canRetry: false };
+            if (msg.includes('跨日班尚未下班')) return { title: '跨日班未完成', message: '請先完成昨日下班打卡', canRetry: true };
+            if (msg.includes('請先打上班卡')) return { title: '尚未上班', message: '請先完成上班打卡', canRetry: false };
+            if (rpcError && !rpcData) return { title: '網路連線失敗', message: '請檢查網路連線後重試', canRetry: true };
+
+            return { title: '打卡失敗', message: msg, canRetry: true };
         }
 
         function showCameraError(err) {
