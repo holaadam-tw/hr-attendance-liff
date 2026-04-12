@@ -84,6 +84,13 @@ bash scripts/qa_check.sh
 
 **FAIL 必須修正才能 commit，WARN 需確認是否為預期行為。**
 
+### RLS 檢查機制
+
+每次修改 common.js / modules/*.js 時，Hook 會自動檢查 RLS 表殘留。
+
+新功能涉及資料表時，主動派工給 rls-checker：
+「@rls-checker 確認本次 RLS 處理完整」
+
 ### Bug 追蹤（每次修 bug / 測試後必做）
 - 修 bug 後更新 `docs/BUG_TRACKER.md` 的狀態（標記已修復 + commit hash）
 - 測試後在 BUG_TRACKER.md 標記通過/未通過
