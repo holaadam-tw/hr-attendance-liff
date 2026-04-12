@@ -77,24 +77,26 @@ export async function approveLeave(requestId, newStatus) {
         if (rejectionReason === null) return;
     }
     try {
-        const updateData = { status: newStatus, approver_id: window.currentAdminEmployee?.id, approved_at: new Date().toISOString() };
-        if (newStatus === 'rejected') updateData.rejection_reason = rejectionReason || '不符合規定';
-
-        const { data: reqData } = await sb.from('leave_requests').select('*, employees(name, id)').eq('id', requestId).single();
-        const { error } = await sb.from('leave_requests').update(updateData).eq('id', requestId);
+        const { data: result, error } = await sb.rpc('approve_leave_request', {
+            p_request_id: requestId,
+            p_status: newStatus,
+            p_approver_id: window.currentAdminEmployee?.id,
+            p_rejection_reason: newStatus === 'rejected' ? (rejectionReason || '不符合規定') : null
+        });
         if (error) throw error;
+        if (!result?.success) throw new Error(result?.error || '審核失敗');
 
-        if (reqData?.employees?.id) {
+        if (result.employee_id) {
             const typeMap = { annual: '特休', sick: '病假', personal: '事假', compensatory: '補休' };
-            const typeName = typeMap[reqData.leave_type] || reqData.leave_type;
+            const typeName = typeMap[result.leave_type] || result.leave_type;
             if (newStatus === 'approved') {
-                sendUserNotify(reqData.employees.id, `✅ 您的${typeName}申請已通過\n📅 ${reqData.start_date} ~ ${reqData.end_date}`);
+                sendUserNotify(result.employee_id, `✅ 您的${typeName}申請已通過\n📅 ${result.start_date} ~ ${result.end_date}`);
             } else {
-                sendUserNotify(reqData.employees.id, `❌ 您的${typeName}申請已被拒絕\n📅 ${reqData.start_date} ~ ${reqData.end_date}\n原因：${updateData.rejection_reason}`);
+                sendUserNotify(result.employee_id, `❌ 您的${typeName}申請已被拒絕\n📅 ${result.start_date} ~ ${result.end_date}\n原因：${rejectionReason || '不符合規定'}`);
             }
         }
         showToast(`✅ 請假申請已${newStatus === 'approved' ? '通過' : '拒絕'}`);
-        writeAuditLog(newStatus === 'approved' ? 'approve' : 'reject', 'leave_requests', requestId, reqData?.employees?.name);
+        writeAuditLog(newStatus === 'approved' ? 'approve' : 'reject', 'leave_requests', requestId, result?.employee_name);
         loadLeaveApprovals('pending');
     } catch (err) {
         console.error(err);
