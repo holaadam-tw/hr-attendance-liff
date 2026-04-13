@@ -1,4 +1,4 @@
-# RunPiston 專案記憶
+# RunPiston 開發規則（每次 session 自動載入）
 
 請在每次對話開始時，主動讀取以下記憶檔案：
 - .claude/memory/MEMORY.md
@@ -9,14 +9,98 @@
 
 ---
 
-## 強制自我驗證流程
+## 🔥 強制規則（不可跳過）
 
-每次寫程式必須執行：
-1. `git diff` 列出改動
-2. 對照 `docs/BUG_TRACKER.md` 列影響場景（至少 3 個）
-3. 每個場景做 logic walkthrough
-4. 驗證報告寫進 commit message
-5. **任何場景失敗不准 commit**
+### 任務開始前
+
+1. **讀規則文件**：
+   - `docs/DANGER_ZONES.md` — 高風險區域與已知陷阱
+   - `docs/TEST_SCENARIOS.md` — 測試場景清單
+   - `docs/BUG_TRACKER.md` — 已知 bug 與修復狀態
+
+2. **同步檢查**：
+   - 如果任務涉及核心檔案（common.js / modules/auth.js / modules/store.js），先 grep 確認現有邏輯
+   - 不要在不讀現有程式碼的情況下新增功能
+
+### 改程式中
+
+1. **Supabase 查詢鐵則**：
+   - 任何 `sb.from()` 查詢必須有多租戶隔離
+   - 隔離方式：
+     - 直接 filter: `.eq('company_id', window.currentCompanyId)`
+     - 關聯 filter: `.select('*, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId)`
+     - 員工自查: `.eq('employee_id', currentEmployee.id)`（ID 來源已隔離）
+   - **絕對禁止**：無 filter 的 SELECT
+
+2. **RLS 表禁止直接寫入**：
+   - attendance / makeup_punch_requests / overtime_requests / leave_requests / schedules
+   - 必須用 SECURITY DEFINER RPC
+
+3. **PostgreSQL RECORD NULL 陷阱**：
+   - 禁止 `IF v_record IS NOT NULL`
+   - 用 `IF v_record.id IS NOT NULL` 或 BOOLEAN 旗標
+
+4. **Hook 自動檢查**：
+   - 每次 Edit/Write 後 `.claude/hooks/check-rls-bypass.sh` 和 `.claude/hooks/check-multitenant.sh` 會自動跑
+   - **看到 ⚠️ 警告必須立刻檢查**
+   - 如果是新出現的警告，必須修正
+   - 已知低風險警告（員工自查）可以忽略：
+     - common.js:524, 614, 646, 1097
+     - modules/employees.js:233, 801
+     - modules/leave.js:280
+
+### 改程式後（自我驗證 5 步）
+
+每次修改必須：
+1. `git diff` 列出所有改動
+2. 找出至少 3 個受影響的情境
+3. 對每個情境做 logic walkthrough
+4. 跑 `bash scripts/qa_check.sh`（必須 0 FAIL）
+5. 跑 `npm test`（必須 53 通過）
+
+**如果任一情境走不通 → 不可 commit**
+
+### 任務完成前
+
+1. **複雜任務**（改動 3 個以上檔案，或涉及多租戶/RLS/RPC）：
+   - 必須跑 `@rls-checker` 做最終審查
+   - 等報告回來才 commit
+
+2. **commit 訊息**：
+   - 必須說明：改了什麼、為什麼、測試了什麼
+   - 不可只寫「fix bug」
+
+3. **Git 流程**：
+   - 永遠在 `dev` 分支改
+   - `git push origin dev` 後由使用者手動合併 main
+   - **絕對禁止直接改 main**
+
+---
+
+## 核心檔案職責
+
+| 檔案 | 職責 | 修改前必讀 |
+|------|------|-----------|
+| common.js | LIFF 初始化、全域變數、共用函數 | ✅ |
+| modules/auth.js | 認證、綁定、角色切換 | ✅ |
+| modules/store.js | 商店、預約、會員 | ✅ |
+| modules/payroll.js | 薪資計算 | ✅ |
+| modules/leave.js | 請假、便當、考勤設定 | ✅ |
+| modules/schedules.js | 排班、換班 | ✅ |
+| modules/employees.js | 員工管理 | ✅ |
+| modules/audit.js | 審計日誌、報表匯出 | ✅ |
+| modules/settings.js | 業主設定、客戶、公告 | ✅ |
+
+## 重要系統資訊
+
+- **LINE LIFF ID**: 2008962829-bnsS1bbB
+- **LINE 官方帳號**: @130oqrak
+- **大正科技 ID**: 8a669e2c-7521-43e9-9300-5c004c57e9db
+- **本米 ID**: fb1f6b5f-dcd5-4262-a7de-e7c357662639
+- **Supabase**: https://nssuisyvlrqnqfxupklb.supabase.co
+- **GitHub Pages**: https://holaadam-tw.github.io/hr-attendance-liff/
+
+---
 
 ## 開發作業規則
 
@@ -139,3 +223,17 @@ bash scripts/qa_check.sh
 | modules/payroll.js | salary.html, admin.html |
 | index.html | index.html, checkin.html |
 | admin.html | admin.html |
+
+---
+
+## 今天完成的系統（2026-04-13）
+
+- ✅ 24 個多租戶隔離漏洞修復（批次 1/2/3 + 補充）
+- ✅ check-multitenant.sh Hook 自動檢查 company_id
+- ✅ check-rls-bypass.sh Hook 自動檢查 RPC 直接寫入
+- ✅ 公務機打卡重新設計（LIFF 認證取代 URL token）
+- ✅ 排班管理系統 + 週班表公開查看
+- ✅ 免打卡員工選項
+- ✅ 加班/補打卡入口按鈕
+- ✅ quick_check_in v_schedule bug 修復
+- ✅ 固定班預設 08:00/17:00
