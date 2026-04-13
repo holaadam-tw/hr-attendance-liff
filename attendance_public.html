@@ -114,8 +114,9 @@ body{font-family:'Noto Sans TC',-apple-system,sans-serif;background:var(--bg);co
 
             <!-- Tab 切換 -->
             <div class="ov-tabs">
-                <button class="ov-tab active" id="tabDaily" onclick="switchTab('daily')">📅 今日總覽</button>
-                <button class="ov-tab" id="tabMonthly" onclick="switchTab('monthly')">📊 月度統計</button>
+                <button class="ov-tab active" id="tabDaily" onclick="switchTab('daily')">📅 今日</button>
+                <button class="ov-tab" id="tabMonthly" onclick="switchTab('monthly')">📊 月度</button>
+                <button class="ov-tab" id="tabSchedule" onclick="switchTab('schedule')">📋 週班表</button>
             </div>
 
             <!-- ====== 今日總覽 ====== -->
@@ -206,6 +207,27 @@ body{font-family:'Noto Sans TC',-apple-system,sans-serif;background:var(--bg);co
                         </thead>
                         <tbody id="monthlyTableBody">
                             <tr><td colspan="9" style="text-align:center;color:#999;padding:40px;">載入中...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- ====== 週班表 ====== -->
+            <div id="scheduleView" style="display:none;">
+                <div style="display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:16px;">
+                    <button onclick="changeScheduleWeek(-1)" style="background:none;border:none;font-size:20px;cursor:pointer;padding:6px 10px;border-radius:8px;">◀</button>
+                    <span id="schedWeekLabel" style="font-size:16px;font-weight:700;min-width:200px;text-align:center;">-</span>
+                    <button onclick="changeScheduleWeek(1)" style="background:none;border:none;font-size:20px;cursor:pointer;padding:6px 10px;border-radius:8px;">▶</button>
+                </div>
+                <div class="table-wrap">
+                    <table class="emp-table" style="min-width:600px;">
+                        <thead>
+                            <tr id="schedHeaderRow">
+                                <th style="min-width:70px;position:sticky;left:0;background:#F8FAFC;z-index:2;">員工</th>
+                            </tr>
+                        </thead>
+                        <tbody id="schedBody">
+                            <tr><td colspan="8" style="text-align:center;color:#999;padding:40px;">載入中...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -373,10 +395,13 @@ function switchTab(tab) {
     currentTab = tab;
     document.getElementById('tabDaily').classList.toggle('active', tab === 'daily');
     document.getElementById('tabMonthly').classList.toggle('active', tab === 'monthly');
+    document.getElementById('tabSchedule').classList.toggle('active', tab === 'schedule');
     document.getElementById('dailyView').style.display = tab === 'daily' ? 'block' : 'none';
     document.getElementById('monthlyView').style.display = tab === 'monthly' ? 'block' : 'none';
+    document.getElementById('scheduleView').style.display = tab === 'schedule' ? 'block' : 'none';
     if (tab === 'daily') { loadDailyData(); startAutoRefresh(); }
-    else { stopAutoRefresh(); loadMonthlyData(); }
+    else if (tab === 'monthly') { stopAutoRefresh(); loadMonthlyData(); }
+    else { stopAutoRefresh(); loadScheduleData(); }
 }
 
 // === 今日總覽 ===
@@ -725,6 +750,122 @@ function toggleLunchDetail() {
     const arrow = document.getElementById('lunchDetailArrow');
     if (panel.style.display === 'none') { panel.style.display = 'block'; arrow.textContent = '▲'; }
     else { panel.style.display = 'none'; arrow.textContent = '▼'; }
+}
+
+// === 週班表 ===
+let schedWeekStart = null;
+(function() {
+    const n = new Date();
+    const dow = n.getDay();
+    schedWeekStart = new Date(n);
+    schedWeekStart.setDate(n.getDate() - ((dow + 6) % 7));
+    schedWeekStart.setHours(0, 0, 0, 0);
+})();
+
+function getSchedWeekDates() {
+    const dates = [];
+    for (let i = 0; i < 7; i++) {
+        const d = new Date(schedWeekStart);
+        d.setDate(d.getDate() + i);
+        dates.push(d);
+    }
+    return dates;
+}
+
+function fmtDate(d) {
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+function changeScheduleWeek(delta) {
+    schedWeekStart.setDate(schedWeekStart.getDate() + delta * 7);
+    loadScheduleData();
+}
+
+async function loadScheduleData() {
+    if (!companyId) return;
+    const dates = getSchedWeekDates();
+    const startStr = fmtDate(dates[0]);
+    const endStr = fmtDate(dates[6]);
+    document.getElementById('schedWeekLabel').textContent = startStr + ' ~ ' + endStr;
+    document.getElementById('schedBody').innerHTML = '<tr><td colspan="8" style="text-align:center;padding:30px;color:#94A3B8;">載入中...</td></tr>';
+
+    try {
+        const { data, error } = await sb.rpc('get_weekly_schedules', {
+            p_company_id: companyId,
+            p_start_date: startStr
+        });
+        if (error) throw error;
+        renderScheduleView(data, dates);
+    } catch (e) {
+        console.error('排班載入失敗:', e);
+        document.getElementById('schedBody').innerHTML = '<tr><td colspan="8" style="text-align:center;color:#ef4444;padding:20px;">載入失敗：' + esc(e.message || '') + '</td></tr>';
+    }
+}
+
+function renderScheduleView(data, dates) {
+    const wd = ['日', '一', '二', '三', '四', '五', '六'];
+    const employees = data?.employees || [];
+    const schedules = data?.schedules || [];
+    const shiftTypes = data?.shift_types || [];
+
+    // 班別 lookup
+    const stMap = {};
+    shiftTypes.forEach(st => { stMap[st.id] = st; });
+
+    // 排班 lookup
+    const schMap = {};
+    schedules.forEach(s => { schMap[s.employee_id + '_' + s.date] = s; });
+
+    // Header
+    let headHtml = '<th style="min-width:70px;position:sticky;left:0;background:#F8FAFC;z-index:2;">員工</th>';
+    dates.forEach(d => {
+        const dow = d.getDay();
+        const isWeekend = dow === 0 || dow === 6;
+        headHtml += '<th style="text-align:center;min-width:80px;' + (isWeekend ? 'color:#DC2626;' : '') + '">' +
+            wd[dow] + '<br><span style="font-size:11px;font-weight:500;">' + String(d.getMonth() + 1) + '/' + String(d.getDate()) + '</span></th>';
+    });
+    document.getElementById('schedHeaderRow').innerHTML = headHtml;
+
+    // Body
+    if (employees.length === 0) {
+        document.getElementById('schedBody').innerHTML = '<tr><td colspan="8" style="text-align:center;color:#94A3B8;padding:30px;">尚無員工資料</td></tr>';
+        return;
+    }
+
+    let bodyHtml = '';
+    employees.forEach(emp => {
+        bodyHtml += '<tr>';
+        bodyHtml += '<td style="font-weight:700;font-size:12px;white-space:nowrap;position:sticky;left:0;background:#fff;z-index:1;">' + esc(emp.name) + '</td>';
+        dates.forEach(d => {
+            const key = emp.id + '_' + fmtDate(d);
+            const sch = schMap[key];
+            if (sch && sch.is_off_day) {
+                bodyHtml += '<td style="text-align:center;"><span style="display:inline-block;padding:4px 8px;border-radius:8px;font-size:11px;font-weight:700;background:#ECFDF5;color:#059669;">休</span></td>';
+            } else if (sch && sch.shift_type_id && stMap[sch.shift_type_id]) {
+                const st = stMap[sch.shift_type_id];
+                const startT = (st.start_time || '').substring(0, 5);
+                const endT = (st.end_time || '').substring(0, 5);
+                bodyHtml += '<td style="text-align:center;"><div style="padding:4px 6px;border-radius:8px;background:#DBEAFE;font-size:11px;">' +
+                    '<div style="font-weight:700;color:#1E40AF;">' + esc(st.name) + '</div>' +
+                    '<div style="color:#64748B;font-size:10px;">' + startT + '-' + endT + '</div></div></td>';
+            } else if (emp.shift_mode === 'fixed') {
+                const fs = (emp.fixed_shift_start || '').substring(0, 5) || '08:00';
+                const fe = (emp.fixed_shift_end || '').substring(0, 5) || '17:00';
+                const dow = d.getDay();
+                if (dow === 0 || dow === 6) {
+                    bodyHtml += '<td style="text-align:center;"><span style="display:inline-block;padding:4px 8px;border-radius:8px;font-size:11px;font-weight:700;background:#F3F4F6;color:#9CA3AF;">-</span></td>';
+                } else {
+                    bodyHtml += '<td style="text-align:center;"><div style="padding:4px 6px;border-radius:8px;background:#F0FDF4;font-size:11px;">' +
+                        '<div style="font-weight:700;color:#15803D;">固定</div>' +
+                        '<div style="color:#64748B;font-size:10px;">' + fs + '-' + fe + '</div></div></td>';
+                }
+            } else {
+                bodyHtml += '<td style="text-align:center;color:#CBD5E1;">-</td>';
+            }
+        });
+        bodyHtml += '</tr>';
+    });
+    document.getElementById('schedBody').innerHTML = bodyHtml;
 }
 
 // === 啟動 ===
