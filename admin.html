@@ -183,6 +183,9 @@
                 <div class="menu-item" data-require="admin" onclick="showCheckinQRModal()">
                     <div class="icon">📲</div><div class="label">打卡 QR Code</div>
                 </div>
+                <div class="menu-item" data-require="admin" onclick="showKioskModal()">
+                    <div class="icon">📱</div><div class="label">公務機打卡</div>
+                </div>
                 <div class="menu-item" data-require="admin" onclick="showPage('approvalCenterPage')">
                     <div class="icon">📋</div><div class="label">審核中心</div>
                 </div>
@@ -667,6 +670,33 @@
                         2. 貼在公司打卡地點<br>
                         3. 員工用 LINE 掃碼 → 自動開啟打卡頁面<br>
                         4. 需要 LINE 登入才能打卡（防止代打）
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 公務機打卡 Modal -->
+        <div id="kioskModal" class="modal" style="display:none;">
+            <div class="modal-content" style="max-width:480px;">
+                <div class="modal-header">
+                    <h3>📱 公務機打卡</h3>
+                    <button class="modal-close" onclick="document.getElementById('kioskModal').style.display='none'">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p style="font-size:13px;color:#64748B;margin-bottom:16px;text-align:center;">在公務機（手機/平板）開啟此連結，員工輸入驗證碼即可打卡</p>
+                    <div id="kioskTokenStatus" style="text-align:center;margin-bottom:16px;"></div>
+                    <div id="kioskQRContainer" style="text-align:center;margin-bottom:16px;"></div>
+                    <div id="kioskURLDisplay" style="background:#F1F5F9;border-radius:10px;padding:12px;font-size:12px;color:#334155;word-break:break-all;margin-bottom:12px;display:none;"></div>
+                    <div style="display:flex;gap:10px;">
+                        <button id="kioskCopyBtn" onclick="copyKioskURL()" style="flex:1;padding:10px;background:#4F46E5;border:none;border-radius:10px;color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;display:none;">📋 複製連結</button>
+                        <button id="kioskRegenBtn" onclick="generateKioskToken()" style="flex:1;padding:10px;background:#F59E0B;border:none;border-radius:10px;color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">🔄 產生新驗證碼</button>
+                    </div>
+                    <div style="margin-top:16px;padding:12px;background:#DBEAFE;border-radius:8px;border-left:4px solid #3B82F6;font-size:12px;color:#1E40AF;line-height:1.6;">
+                        <strong>使用說明：</strong><br>
+                        1. 點「產生新驗證碼」取得公務機連結<br>
+                        2. 在公務機開啟連結，加到主畫面<br>
+                        3. 員工輸入驗證碼（4碼）或手機號碼 → 拍照 → 打卡<br>
+                        4. 重新產生驗證碼會讓舊連結失效
                     </div>
                 </div>
             </div>
@@ -2138,6 +2168,79 @@
     <script src="common.js?v=20260325"></script>
     <script type="module" src="modules/index.js?v=20260325"></script>
     <script type="module" src="admin_fixes.js?v=20260325"></script>
+    <script>
+    // ===== 公務機打卡 =====
+    window._kioskToken = null;
+    window._kioskURL = null;
+
+    window.showKioskModal = async function() {
+        document.getElementById('kioskModal').style.display = 'flex';
+        // 載入現有 token
+        var statusEl = document.getElementById('kioskTokenStatus');
+        statusEl.innerHTML = '<span style="color:#94A3B8;">載入中...</span>';
+        try {
+            var setting = getCachedSetting('kiosk_token');
+            if (!setting) {
+                var res = await sb.from('system_settings').select('value').eq('key', 'kiosk_token').eq('company_id', window.currentCompanyId).maybeSingle();
+                setting = res.data?.value;
+            }
+            if (setting) {
+                window._kioskToken = setting;
+                showKioskURL(setting);
+            } else {
+                statusEl.innerHTML = '<span style="color:#F59E0B;">尚未產生公務機驗證碼</span>';
+            }
+        } catch (e) {
+            statusEl.innerHTML = '<span style="color:#EF4444;">載入失敗</span>';
+        }
+    };
+
+    window.generateKioskToken = async function() {
+        var token = Array.from(crypto.getRandomValues(new Uint8Array(16))).map(function(b) { return b.toString(16).padStart(2, '0'); }).join('');
+        try {
+            await saveSetting('kiosk_token', token, '公務機打卡驗證碼');
+            window._kioskToken = token;
+            showKioskURL(token);
+            showToast('✅ 已產生新的公務機驗證碼');
+        } catch (e) {
+            showToast('❌ 產生失敗: ' + (e.message || e));
+        }
+    };
+
+    function showKioskURL(token) {
+        var base = window.location.origin + window.location.pathname.replace('admin.html', '');
+        var url = base + 'kiosk.html?company=' + window.currentCompanyId + '&token=' + token;
+        window._kioskURL = url;
+
+        document.getElementById('kioskTokenStatus').innerHTML = '<span style="color:#10B981;font-weight:600;">✅ 已啟用</span>';
+        document.getElementById('kioskURLDisplay').style.display = 'block';
+        document.getElementById('kioskURLDisplay').textContent = url;
+        document.getElementById('kioskCopyBtn').style.display = 'block';
+
+        // QR Code
+        var qrEl = document.getElementById('kioskQRContainer');
+        qrEl.innerHTML = '';
+        if (typeof QRCode !== 'undefined') {
+            new QRCode(qrEl, { text: url, width: 200, height: 200, colorDark: '#1E293B', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.H });
+        }
+    }
+
+    window.copyKioskURL = function() {
+        if (!window._kioskURL) return;
+        navigator.clipboard.writeText(window._kioskURL).then(function() {
+            showToast('✅ 已複製連結');
+        }).catch(function() {
+            // fallback
+            var ta = document.createElement('textarea');
+            ta.value = window._kioskURL;
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+            showToast('✅ 已複製連結');
+        });
+    };
+    </script>
     <script>
     // ===== 工時模式切換 =====
     window.toggleShiftFields = function() {

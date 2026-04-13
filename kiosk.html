@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <link rel="icon" href="data:,">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>公務機打卡</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0F172A; color: #fff; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; -webkit-user-select: none; user-select: none; }
+        .kiosk-container { width: 100%; max-width: 400px; padding: 20px; }
+        .kiosk-header { text-align: center; margin-bottom: 24px; }
+        .kiosk-header h1 { font-size: 20px; font-weight: 800; color: #F8FAFC; }
+        .kiosk-header .company-name { font-size: 15px; color: #94A3B8; margin-top: 4px; }
+        .kiosk-header .clock { font-size: 48px; font-weight: 900; color: #fff; margin: 16px 0 8px; font-variant-numeric: tabular-nums; }
+        .kiosk-header .date { font-size: 14px; color: #64748B; }
+
+        /* 輸入顯示 */
+        .input-display { background: #1E293B; border: 2px solid #334155; border-radius: 16px; padding: 16px; text-align: center; margin-bottom: 16px; min-height: 60px; display: flex; align-items: center; justify-content: center; }
+        .input-display .value { font-size: 28px; font-weight: 700; letter-spacing: 4px; color: #F8FAFC; font-variant-numeric: tabular-nums; }
+        .input-display .placeholder { font-size: 14px; color: #64748B; }
+
+        /* 數字鍵盤 */
+        .keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; }
+        .key { background: #1E293B; border: 2px solid #334155; border-radius: 14px; padding: 18px; font-size: 24px; font-weight: 700; color: #F8FAFC; cursor: pointer; text-align: center; transition: all 0.1s; font-family: inherit; }
+        .key:active { background: #334155; transform: scale(0.95); }
+        .key-clear { background: #7F1D1D; border-color: #991B1B; color: #FCA5A5; }
+        .key-clear:active { background: #991B1B; }
+        .key-confirm { background: #064E3B; border-color: #059669; color: #6EE7B7; }
+        .key-confirm:active { background: #059669; }
+        .key-confirm.disabled { opacity: 0.3; pointer-events: none; }
+
+        /* 員工確認畫面 */
+        .employee-card { background: #1E293B; border-radius: 20px; padding: 24px; text-align: center; margin-bottom: 16px; }
+        .employee-card .name { font-size: 28px; font-weight: 900; color: #F8FAFC; margin-bottom: 8px; }
+        .employee-card .info { font-size: 14px; color: #94A3B8; }
+        .action-buttons { display: flex; gap: 12px; margin-bottom: 12px; }
+        .action-btn { flex: 1; padding: 16px; border: none; border-radius: 14px; font-size: 16px; font-weight: 800; cursor: pointer; font-family: inherit; }
+        .btn-checkin { background: linear-gradient(135deg, #059669, #10B981); color: #fff; }
+        .btn-checkout { background: linear-gradient(135deg, #7C3AED, #8B5CF6); color: #fff; }
+        .btn-checkin:active, .btn-checkout:active { transform: scale(0.97); }
+        .btn-cancel { width: 100%; padding: 14px; background: #334155; border: 2px solid #475569; border-radius: 14px; color: #94A3B8; font-size: 14px; font-weight: 700; cursor: pointer; font-family: inherit; }
+
+        /* 結果畫面 */
+        .result-card { background: #1E293B; border-radius: 20px; padding: 32px; text-align: center; }
+        .result-card .icon { font-size: 56px; margin-bottom: 12px; }
+        .result-card .msg { font-size: 20px; font-weight: 800; color: #F8FAFC; margin-bottom: 4px; }
+        .result-card .time { font-size: 36px; font-weight: 900; color: #10B981; margin: 8px 0; }
+        .result-card .countdown { font-size: 13px; color: #64748B; margin-top: 12px; }
+
+        /* 錯誤畫面 */
+        .error-card { background: #1E293B; border-radius: 20px; padding: 24px; text-align: center; }
+        .error-card .icon { font-size: 48px; margin-bottom: 12px; }
+        .error-card .msg { font-size: 16px; color: #FCA5A5; margin-bottom: 16px; }
+
+        /* 拍照 */
+        .camera-section { margin-bottom: 16px; text-align: center; }
+        .camera-section video { width: 100%; max-width: 320px; border-radius: 16px; background: #000; }
+        .photo-btn { width: 100%; padding: 16px; background: linear-gradient(135deg, #3B82F6, #2563EB); border: none; border-radius: 14px; color: #fff; font-size: 16px; font-weight: 800; cursor: pointer; font-family: inherit; margin-bottom: 12px; }
+        .photo-btn:disabled { opacity: 0.5; }
+        .photo-btn:active { transform: scale(0.97); }
+
+        .hidden { display: none !important; }
+
+        /* 提示 */
+        .hint { font-size: 12px; color: #475569; text-align: center; margin-top: 8px; }
+    </style>
+</head>
+<body>
+    <div class="kiosk-container">
+        <!-- 頁頭 -->
+        <div class="kiosk-header">
+            <h1 id="kioskTitle">公務機打卡</h1>
+            <div id="companyName" class="company-name"></div>
+            <div id="kioskClock" class="clock">--:--</div>
+            <div id="kioskDate" class="date"></div>
+        </div>
+
+        <!-- Step 1: 輸入驗證碼 -->
+        <div id="stepInput">
+            <div class="input-display">
+                <span id="inputValue" class="value" style="display:none;"></span>
+                <span id="inputPlaceholder" class="placeholder">輸入驗證碼或手機號碼</span>
+            </div>
+            <div class="keypad">
+                <button class="key" onclick="pressKey('1')">1</button>
+                <button class="key" onclick="pressKey('2')">2</button>
+                <button class="key" onclick="pressKey('3')">3</button>
+                <button class="key" onclick="pressKey('4')">4</button>
+                <button class="key" onclick="pressKey('5')">5</button>
+                <button class="key" onclick="pressKey('6')">6</button>
+                <button class="key" onclick="pressKey('7')">7</button>
+                <button class="key" onclick="pressKey('8')">8</button>
+                <button class="key" onclick="pressKey('9')">9</button>
+                <button class="key key-clear" onclick="clearInput()">清除</button>
+                <button class="key" onclick="pressKey('0')">0</button>
+                <button id="confirmBtn" class="key key-confirm disabled" onclick="lookupEmployee()">確認</button>
+            </div>
+            <div class="hint">輸入員工驗證碼（4碼）或手機號碼</div>
+        </div>
+
+        <!-- Step 2: 確認員工 + 拍照 + 打卡 -->
+        <div id="stepEmployee" class="hidden">
+            <div class="employee-card">
+                <div id="empName" class="name"></div>
+                <div id="empInfo" class="info"></div>
+            </div>
+            <div class="camera-section">
+                <video id="kioskVideo" autoplay playsinline muted style="display:none;"></video>
+                <canvas id="kioskCanvas" style="display:none;"></canvas>
+                <input type="file" id="kioskCaptureInput" accept="image/jpeg,image/png" capture="user" style="display:none">
+            </div>
+            <button id="photoBtn" class="photo-btn" onclick="takePhoto()">📸 拍照</button>
+            <div class="action-buttons" id="actionBtns" style="display:none;">
+                <button class="action-btn btn-checkin" onclick="doCheckin('check_in')">☀️ 上班打卡</button>
+                <button class="action-btn btn-checkout" onclick="doCheckin('check_out')">🌙 下班打卡</button>
+            </div>
+            <button class="btn-cancel" onclick="resetToInput()">← 取消</button>
+        </div>
+
+        <!-- Step 3: 結果 -->
+        <div id="stepResult" class="hidden">
+            <div class="result-card">
+                <div id="resultIcon" class="icon"></div>
+                <div id="resultName" class="msg"></div>
+                <div id="resultMsg" style="font-size:16px;color:#94A3B8;"></div>
+                <div id="resultTime" class="time"></div>
+                <div id="resultCountdown" class="countdown"></div>
+            </div>
+        </div>
+
+        <!-- 錯誤畫面 -->
+        <div id="stepError" class="hidden">
+            <div class="error-card">
+                <div class="icon">❌</div>
+                <div id="errorMsg" class="msg"></div>
+                <button class="btn-cancel" onclick="resetToInput()">← 重新輸入</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    // ===== 全域錯誤監控 =====
+    window._errLogCount = 0; window._errLogResetTs = 0;
+    window.onerror = function(msg, src, line, col, err) {
+        try {
+            var _now = Date.now(); if (_now > window._errLogResetTs) { window._errLogCount = 0; window._errLogResetTs = _now + 60000; } if (++window._errLogCount > 5) return;
+            fetch('https://nssuisyvlrqnqfxupklb.supabase.co/rest/v1/error_logs', {
+                method: 'POST',
+                headers: {
+                    'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5zc3Vpc3l2bHJxbnFmeHVwa2xiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkyOTAwMzUsImV4cCI6MjA4NDg2NjAzNX0.q_B6v3gf1TOCuAq7z0xIw10wDueCSJn0p37VzdMfmbc',
+                    'Content-Type': 'application/json',
+                    'Prefer': 'return=minimal'
+                },
+                body: JSON.stringify({ message: String(msg).substring(0, 1000), page: 'kiosk.html', line: line, user_id: null, user_agent: navigator.userAgent })
+            }).catch(function(){});
+        } catch(e) {}
+    };
+
+    const SUPABASE_URL = 'https://nssuisyvlrqnqfxupklb.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5zc3Vpc3l2bHJxbnFmeHVwa2xiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkyOTAwMzUsImV4cCI6MjA4NDg2NjAzNX0.q_B6v3gf1TOCuAq7z0xIw10wDueCSJn0p37VzdMfmbc';
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // URL 參數
+    const params = new URLSearchParams(window.location.search);
+    const companyId = params.get('company');
+    const kioskToken = params.get('token');
+
+    let inputStr = '';
+    let currentEmployee = null;
+    let photoBlob = null;
+    let videoStream = null;
+    let idleTimer = null;
+
+    // ===== 時鐘 =====
+    function updateClock() {
+        const now = new Date();
+        const time = now.toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', hour12: false });
+        const date = now.toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short' });
+        document.getElementById('kioskClock').textContent = time;
+        document.getElementById('kioskDate').textContent = date;
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // ===== 初始化 =====
+    window.addEventListener('load', async () => {
+        if (!companyId || !kioskToken) {
+            document.getElementById('stepInput').innerHTML = '<div class="error-card"><div class="icon">⚠️</div><div class="msg">缺少公司代碼或驗證碼<br><br><span style="font-size:13px;color:#64748B;">請從管理後台取得公務機連結</span></div></div>';
+            return;
+        }
+
+        // 載入公司名稱（透過 RPC 驗證 token 後回傳）
+        try {
+            const { data } = await sb.rpc('kiosk_get_company', {
+                p_company_id: companyId,
+                p_kiosk_token: kioskToken
+            });
+            if (data?.success && data.name) {
+                document.getElementById('companyName').textContent = data.name;
+                document.getElementById('kioskTitle').textContent = data.name + ' 公務機打卡';
+            } else if (!data?.success) {
+                document.getElementById('stepInput').innerHTML = '<div class="error-card"><div class="icon">⚠️</div><div class="msg">' + (data?.error || '驗證失敗') + '<br><br><span style="font-size:13px;color:#64748B;">請從管理後台重新取得公務機連結</span></div></div>';
+                return;
+            }
+        } catch (e) { }
+    });
+
+    // ===== 閒置計時 =====
+    function resetIdleTimer() {
+        clearTimeout(idleTimer);
+        idleTimer = setTimeout(() => {
+            if (inputStr.length > 0) clearInput();
+        }, 30000);
+    }
+
+    // ===== 數字鍵盤 =====
+    function pressKey(n) {
+        if (inputStr.length >= 12) return;
+        inputStr += n;
+        updateInputDisplay();
+        resetIdleTimer();
+    }
+
+    function clearInput() {
+        inputStr = '';
+        updateInputDisplay();
+    }
+
+    function updateInputDisplay() {
+        const valEl = document.getElementById('inputValue');
+        const phEl = document.getElementById('inputPlaceholder');
+        const confirmBtn = document.getElementById('confirmBtn');
+        if (inputStr.length > 0) {
+            valEl.textContent = inputStr;
+            valEl.style.display = '';
+            phEl.style.display = 'none';
+            confirmBtn.classList.remove('disabled');
+        } else {
+            valEl.style.display = 'none';
+            phEl.style.display = '';
+            confirmBtn.classList.add('disabled');
+        }
+    }
+
+    // ===== 查詢員工 =====
+    async function lookupEmployee() {
+        if (!inputStr) return;
+        const confirmBtn = document.getElementById('confirmBtn');
+        confirmBtn.textContent = '...';
+        confirmBtn.classList.add('disabled');
+
+        try {
+            const { data, error } = await sb.rpc('kiosk_lookup_employee', {
+                p_company_id: companyId,
+                p_identifier: inputStr,
+                p_kiosk_token: kioskToken
+            });
+
+            if (error) throw error;
+            if (!data?.success) {
+                showError(data?.error || '查詢失敗');
+                return;
+            }
+
+            currentEmployee = data;
+            showEmployeeStep();
+        } catch (e) {
+            showError(e.message || '網路錯誤，請重試');
+        } finally {
+            confirmBtn.textContent = '確認';
+            confirmBtn.classList.remove('disabled');
+        }
+    }
+
+    // ===== 員工確認畫面 =====
+    function showEmployeeStep() {
+        document.getElementById('stepInput').classList.add('hidden');
+        document.getElementById('stepEmployee').classList.remove('hidden');
+        document.getElementById('empName').textContent = currentEmployee.name;
+        document.getElementById('empInfo').textContent =
+            (currentEmployee.employee_number || '') + ' · ' + (currentEmployee.department || '未分配');
+        photoBlob = null;
+        document.getElementById('actionBtns').style.display = 'none';
+        document.getElementById('photoBtn').textContent = '📸 拍照';
+        document.getElementById('photoBtn').disabled = false;
+        openCamera();
+    }
+
+    // ===== 相機 =====
+    async function openCamera() {
+        const video = document.getElementById('kioskVideo');
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 480 }, height: { ideal: 360 } } });
+            video.srcObject = stream;
+            videoStream = stream;
+            video.style.display = 'block';
+        } catch (e) {
+            // fallback: 使用 file input
+            video.style.display = 'none';
+        }
+    }
+
+    function stopCamera() {
+        if (videoStream) {
+            videoStream.getTracks().forEach(t => t.stop());
+            videoStream = null;
+        }
+        const video = document.getElementById('kioskVideo');
+        if (video) video.srcObject = null;
+    }
+
+    function takePhoto() {
+        const video = document.getElementById('kioskVideo');
+        if (video.srcObject && video.videoWidth > 0) {
+            // getUserMedia 模式
+            const canvas = document.getElementById('kioskCanvas');
+            const w = Math.min(video.videoWidth, 640);
+            const h = Math.round(w * video.videoHeight / video.videoWidth);
+            canvas.width = w; canvas.height = h;
+            canvas.getContext('2d').drawImage(video, 0, 0, w, h);
+            canvas.toBlob(blob => {
+                photoBlob = blob;
+                stopCamera();
+                onPhotoReady();
+            }, 'image/jpeg', 0.6);
+        } else {
+            // fallback: file input
+            document.getElementById('kioskCaptureInput').click();
+        }
+    }
+
+    // file input handler
+    document.addEventListener('DOMContentLoaded', () => {
+        document.getElementById('kioskCaptureInput').addEventListener('change', function() {
+            if (!this.files || !this.files[0]) return;
+            const file = this.files[0];
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.getElementById('kioskCanvas');
+                const w = Math.min(img.width, 640);
+                const h = Math.round(w * img.height / img.width);
+                canvas.width = w; canvas.height = h;
+                canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+                canvas.toBlob(blob => {
+                    photoBlob = blob;
+                    onPhotoReady();
+                }, 'image/jpeg', 0.6);
+                URL.revokeObjectURL(img.src);
+            };
+            img.src = URL.createObjectURL(file);
+            this.value = '';
+        });
+    });
+
+    function onPhotoReady() {
+        document.getElementById('photoBtn').textContent = '✅ 已拍照';
+        document.getElementById('photoBtn').disabled = true;
+        document.getElementById('actionBtns').style.display = 'flex';
+    }
+
+    // ===== 打卡 =====
+    async function doCheckin(action) {
+        const btns = document.querySelectorAll('.action-btn');
+        btns.forEach(b => { b.disabled = true; b.style.opacity = '0.5'; });
+
+        try {
+            // 上傳照片
+            let photoUrl = null;
+            if (photoBlob) {
+                const fileName = `kiosk_${currentEmployee.employee_number}_${Date.now()}.jpg`;
+                const { error: upErr } = await sb.storage.from('selfies').upload(fileName, photoBlob);
+                if (!upErr) {
+                    const { data: urlData } = sb.storage.from('selfies').getPublicUrl(fileName);
+                    photoUrl = urlData?.publicUrl || null;
+                }
+            }
+
+            // GPS（公務機可能有定位）
+            let lat = null, lng = null;
+            try {
+                const pos = await new Promise((resolve, reject) => {
+                    navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 3000 });
+                });
+                lat = pos.coords.latitude;
+                lng = pos.coords.longitude;
+            } catch (e) { }
+
+            const { data, error } = await sb.rpc('kiosk_check_in', {
+                p_employee_id: currentEmployee.employee_id,
+                p_action: action,
+                p_kiosk_token: kioskToken,
+                p_photo_url: photoUrl,
+                p_latitude: lat,
+                p_longitude: lng
+            });
+
+            if (error) throw error;
+            if (!data?.success) {
+                showError(data?.error || '打卡失敗');
+                return;
+            }
+
+            showResult(data);
+        } catch (e) {
+            showError(e.message || '打卡失敗，請重試');
+        }
+    }
+
+    // ===== 結果畫面 =====
+    function showResult(data) {
+        stopCamera();
+        document.getElementById('stepEmployee').classList.add('hidden');
+        document.getElementById('stepResult').classList.remove('hidden');
+
+        const isCheckIn = data.type === 'check_in';
+        document.getElementById('resultIcon').textContent = isCheckIn ? '☀️' : '🌙';
+        document.getElementById('resultName').textContent = data.name;
+        document.getElementById('resultMsg').textContent = isCheckIn ? '上班打卡成功' : '下班打卡成功';
+
+        const nowTime = new Date().toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+        document.getElementById('resultTime').textContent = nowTime;
+
+        let sec = 3;
+        const cdEl = document.getElementById('resultCountdown');
+        cdEl.textContent = sec + ' 秒後返回...';
+        const timer = setInterval(() => {
+            sec--;
+            if (sec <= 0) {
+                clearInterval(timer);
+                resetToInput();
+            } else {
+                cdEl.textContent = sec + ' 秒後返回...';
+            }
+        }, 1000);
+    }
+
+    // ===== 錯誤畫面 =====
+    function showError(msg) {
+        stopCamera();
+        document.getElementById('stepInput').classList.add('hidden');
+        document.getElementById('stepEmployee').classList.add('hidden');
+        document.getElementById('stepResult').classList.add('hidden');
+        document.getElementById('stepError').classList.remove('hidden');
+        document.getElementById('errorMsg').textContent = msg;
+    }
+
+    // ===== 重設 =====
+    function resetToInput() {
+        stopCamera();
+        inputStr = '';
+        currentEmployee = null;
+        photoBlob = null;
+        updateInputDisplay();
+        document.getElementById('stepInput').classList.remove('hidden');
+        document.getElementById('stepEmployee').classList.add('hidden');
+        document.getElementById('stepResult').classList.add('hidden');
+        document.getElementById('stepError').classList.add('hidden');
+    }
+    </script>
+</body>
+</html>
