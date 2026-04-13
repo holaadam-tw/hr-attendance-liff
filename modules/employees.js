@@ -808,8 +808,8 @@ export async function openEditEmployeeModal(empId) {
             const shiftMode = data.shift_mode || 'fixed';
             const radios = document.querySelectorAll('input[name="editShiftMode"]');
             radios.forEach(r => { r.checked = r.value === shiftMode; });
-            document.getElementById('editFixedStart').value = data.fixed_shift_start ? data.fixed_shift_start.substring(0, 5) : '09:00';
-            document.getElementById('editFixedEnd').value = data.fixed_shift_end ? data.fixed_shift_end.substring(0, 5) : '18:00';
+            document.getElementById('editFixedStart').value = data.fixed_shift_start ? data.fixed_shift_start.substring(0, 5) : '08:00';
+            document.getElementById('editFixedEnd').value = data.fixed_shift_end ? data.fixed_shift_end.substring(0, 5) : '17:00';
             if (typeof toggleShiftFields === 'function') toggleShiftFields();
             // 排班權限 + 免打卡
             const canScheduleEl = document.getElementById('editCanSchedule');

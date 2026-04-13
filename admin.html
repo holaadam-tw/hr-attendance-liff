@@ -579,11 +579,11 @@
                         <div id="fixedShiftFields" style="display:flex;gap:10px;">
                             <div style="flex:1;">
                                 <label style="font-size:12px;color:#64748B;">上班時間</label>
-                                <input type="time" id="editFixedStart" value="09:00" style="width:100%;padding:10px;border:2px solid #E2E8F0;border-radius:10px;font-size:14px;">
+                                <input type="time" id="editFixedStart" value="08:00" style="width:100%;padding:10px;border:2px solid #E2E8F0;border-radius:10px;font-size:14px;">
                             </div>
                             <div style="flex:1;">
                                 <label style="font-size:12px;color:#64748B;">下班時間</label>
-                                <input type="time" id="editFixedEnd" value="18:00" style="width:100%;padding:10px;border:2px solid #E2E8F0;border-radius:10px;font-size:14px;">
+                                <input type="time" id="editFixedEnd" value="17:00" style="width:100%;padding:10px;border:2px solid #E2E8F0;border-radius:10px;font-size:14px;">
                             </div>
                         </div>
                         <div id="scheduledShiftHint" style="display:none;padding:10px;background:#DBEAFE;border-radius:8px;font-size:13px;color:#1E40AF;">
@@ -2199,6 +2199,13 @@
         const mode = document.querySelector('input[name="editShiftMode"]:checked')?.value || 'fixed';
         document.getElementById('fixedShiftFields').style.display = mode === 'fixed' ? 'flex' : 'none';
         document.getElementById('scheduledShiftHint').style.display = mode === 'scheduled' ? 'block' : 'none';
+        // 切到固定班時，若時間為空則自動填入預設值
+        if (mode === 'fixed') {
+            const startEl = document.getElementById('editFixedStart');
+            const endEl = document.getElementById('editFixedEnd');
+            if (startEl && !startEl.value) startEl.value = '08:00';
+            if (endEl && !endEl.value) endEl.value = '17:00';
+        }
     };
     </script>
     <script>
