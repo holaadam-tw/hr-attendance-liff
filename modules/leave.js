@@ -33,7 +33,8 @@ export async function loadLeaveApprovals(status) {
     if (!listEl) return;
     try {
         const { data, error } = await sb.from('leave_requests')
-            .select(`*, employees!leave_requests_employee_id_fkey(name, employee_number, department)`)
+            .select(`*, employees!inner(name, employee_number, department, company_id)`)
+            .eq('employees.company_id', window.currentCompanyId)
             .eq('status', status)
             .order('created_at', { ascending: false });
         if (error) throw error;
@@ -401,7 +402,8 @@ export async function loadStaffOverview() {
             return;
         }
         const todayStr = getTaiwanDate();
-        const { data: todayLeaves } = await sb.from('leave_requests').select('id')
+        const { data: todayLeaves } = await sb.from('leave_requests').select('id, employees!inner(company_id)')
+            .eq('employees.company_id', window.currentCompanyId)
             .in('status', ['approved', 'pending'])
             .lte('start_date', todayStr).gte('end_date', todayStr);
         const onLeave = todayLeaves?.length || 0;
@@ -449,7 +451,8 @@ export async function loadLeaveCal() {
     try {
         const { data: emps } = await sb.from('employees').select('id, name, department').eq('company_id', window.currentCompanyId).eq('is_active', true).order('department').order('name');
         employees = emps || [];
-        const { data: lvs } = await sb.from('leave_requests').select('employee_id, start_date, end_date, leave_type, status')
+        const { data: lvs } = await sb.from('leave_requests').select('employee_id, start_date, end_date, leave_type, status, employees!inner(company_id)')
+            .eq('employees.company_id', window.currentCompanyId)
             .in('status', ['approved', 'pending']).or(`and(start_date.lte.${me},end_date.gte.${ms})`);
         leaves = lvs || [];
     } catch (e) { console.error(e); }

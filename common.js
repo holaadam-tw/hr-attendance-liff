@@ -1973,6 +1973,7 @@ async function writeAuditLog(action, targetTable, targetId, targetName, details 
         await sb.from('hr_audit_logs').insert({
             actor_id: currentEmployee?.id || null,
             actor_name: currentEmployee?.name || 'System',
+            company_id: window.currentCompanyId || null,
             action, target_table: targetTable,
             target_id: String(targetId || ''),
             target_name: targetName || '',

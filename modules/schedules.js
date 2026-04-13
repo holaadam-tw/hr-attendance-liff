@@ -398,7 +398,8 @@ export async function loadSwapApprovals() {
     el.innerHTML = '<p style="text-align:center;color:#666;">載入中...</p>';
     try {
         const { data } = await sb.from('shift_swap_requests')
-            .select('*, requester:employees!shift_swap_requests_requester_id_fkey(name, department), target:employees!shift_swap_requests_target_id_fkey(name, department)')
+            .select('*, requester:employees!shift_swap_requests_requester_id_fkey(name, department, company_id), target:employees!shift_swap_requests_target_id_fkey(name, department)')
+            .eq('requester.company_id', window.currentCompanyId)
             .in('status', ['pending_admin', 'approved', 'rejected'])
             .order('created_at', { ascending: false }).limit(20);
         if (!data || data.length === 0) { el.innerHTML = '<p style="text-align:center;color:#999;">無換班申請</p>'; return; }

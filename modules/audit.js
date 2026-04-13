@@ -11,7 +11,7 @@ export async function loadAuditLogs(more = false) {
     if (!el) return;
     if (!more) { auditOffset = 0; el.innerHTML = ''; }
     try {
-        const { data } = await sb.from('hr_audit_logs').select('*').order('created_at', { ascending: false }).range(auditOffset, auditOffset + 29);
+        const { data } = await sb.from('hr_audit_logs').select('*').eq('company_id', window.currentCompanyId).order('created_at', { ascending: false }).range(auditOffset, auditOffset + 29);
         if (!data || data.length === 0) { if (auditOffset === 0) el.innerHTML = '<p style="text-align:center;color:#999;">尚無記錄</p>'; return; }
         const ai = { create: '➕', update: '✏️', delete: '🗑️', approve: '✅', reject: '❌', export: '📊', acknowledge: '✍️' };
         const al = { create: '新增', update: '修改', delete: '刪除', approve: '通過', reject: '拒絕', export: '匯出', acknowledge: '簽署' };
