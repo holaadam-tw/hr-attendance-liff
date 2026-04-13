@@ -579,6 +579,12 @@
 
                 const isLoggedIn = await checkUserStatus();
                 if (isLoggedIn) {
+                    // 公務機帳號 → 直接跳轉 kiosk 模式
+                    if (currentEmployee && currentEmployee.is_kiosk) {
+                        window.location.href = 'kiosk.html';
+                        return;
+                    }
+
                     // URL 參數跳轉（Rich Menu 用）
                     if (handleGotoParam()) return;
 

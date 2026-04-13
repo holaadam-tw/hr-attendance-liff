@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>公務機打卡</title>
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -160,13 +161,10 @@
 
     const SUPABASE_URL = 'https://nssuisyvlrqnqfxupklb.supabase.co';
     const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5zc3Vpc3l2bHJxbnFmeHVwa2xiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkyOTAwMzUsImV4cCI6MjA4NDg2NjAzNX0.q_B6v3gf1TOCuAq7z0xIw10wDueCSJn0p37VzdMfmbc';
+    const LIFF_ID = '2008962829-bnsS1bbB';
     const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    // URL 參數
-    const params = new URLSearchParams(window.location.search);
-    const companyId = params.get('company');
-    const kioskToken = params.get('token');
-
+    let kioskLineUserId = null;
     let inputStr = '';
     let currentEmployee = null;
     let photoBlob = null;
@@ -184,27 +182,36 @@
     setInterval(updateClock, 1000);
     updateClock();
 
-    // ===== 初始化 =====
+    // ===== 初始化（LIFF 認證） =====
     window.addEventListener('load', async () => {
-        if (!companyId || !kioskToken) {
-            document.getElementById('stepInput').innerHTML = '<div class="error-card"><div class="icon">⚠️</div><div class="msg">缺少公司代碼或驗證碼<br><br><span style="font-size:13px;color:#64748B;">請從管理後台取得公務機連結</span></div></div>';
+        try {
+            await liff.init({ liffId: LIFF_ID });
+            if (!liff.isLoggedIn()) {
+                liff.login();
+                return;
+            }
+            const profile = await liff.getProfile();
+            kioskLineUserId = profile.userId;
+        } catch (e) {
+            document.getElementById('stepInput').innerHTML = '<div class="error-card"><div class="icon">⚠️</div><div class="msg">請從 LINE 開啟此頁面</div></div>';
             return;
         }
 
-        // 載入公司名稱（透過 RPC 驗證 token 後回傳）
+        // 驗證公務機帳號
         try {
             const { data } = await sb.rpc('kiosk_get_company', {
-                p_company_id: companyId,
-                p_kiosk_token: kioskToken
+                p_kiosk_line_user_id: kioskLineUserId
             });
             if (data?.success && data.name) {
                 document.getElementById('companyName').textContent = data.name;
                 document.getElementById('kioskTitle').textContent = data.name + ' 公務機打卡';
-            } else if (!data?.success) {
-                document.getElementById('stepInput').innerHTML = '<div class="error-card"><div class="icon">⚠️</div><div class="msg">' + (data?.error || '驗證失敗') + '<br><br><span style="font-size:13px;color:#64748B;">請從管理後台重新取得公務機連結</span></div></div>';
+            } else {
+                document.getElementById('stepInput').innerHTML = '<div class="error-card"><div class="icon">⚠️</div><div class="msg">' + (data?.error || '此帳號非公務機') + '<br><br><span style="font-size:13px;color:#64748B;">請聯繫管理員設定公務機帳號</span></div></div>';
                 return;
             }
-        } catch (e) { }
+        } catch (e) {
+            document.getElementById('stepInput').innerHTML = '<div class="error-card"><div class="icon">⚠️</div><div class="msg">連線失敗，請重試</div></div>';
+        }
     });
 
     // ===== 閒置計時 =====
@@ -253,9 +260,8 @@
 
         try {
             const { data, error } = await sb.rpc('kiosk_lookup_employee', {
-                p_company_id: companyId,
-                p_identifier: inputStr,
-                p_kiosk_token: kioskToken
+                p_kiosk_line_user_id: kioskLineUserId,
+                p_identifier: inputStr
             });
 
             if (error) throw error;
@@ -388,9 +394,9 @@
             } catch (e) { }
 
             const { data, error } = await sb.rpc('kiosk_check_in', {
+                p_kiosk_line_user_id: kioskLineUserId,
                 p_employee_id: currentEmployee.employee_id,
                 p_action: action,
-                p_kiosk_token: kioskToken,
                 p_photo_url: photoUrl,
                 p_latitude: lat,
                 p_longitude: lng
