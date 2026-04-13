@@ -482,7 +482,7 @@ export async function loadPayrollData() {
             sb.from('attendance').select('employee_id, date, is_late, total_work_hours, overtime_hours, check_in_time, check_out_time, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).gte('date', startDate).lte('date', endDate),
             sb.from('leave_requests').select('employee_id, days, leave_type, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).eq('status', 'approved').gte('start_date', startDate).lte('end_date', endDate),
             sb.from('overtime_requests').select('employee_id, hours, ot_date, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).eq('status', 'approved').gte('ot_date', startDate).lte('ot_date', endDate).then(r => r).catch(() => ({ data: [] })),
-            sb.from('payroll').select('*').eq('year', year).eq('month', month),
+            sb.from('payroll').select('*, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).eq('year', year).eq('month', month),
             sb.from('insurance_brackets').select('*').eq('is_active', true).order('salary_min').then(r => r).catch(() => ({ data: [] }))
         ]);
 

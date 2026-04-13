@@ -199,7 +199,7 @@ let adminClients = [];
 
 export async function loadClientList() {
     try {
-        const { data } = await sb.from('clients').select('*').order('company_name');
+        const { data } = await sb.from('clients').select('*').eq('company_id', window.currentCompanyId).order('company_name');
         adminClients = data || [];
         renderClientList(adminClients);
     } catch(e) { console.error('載入客戶失敗', e); }
@@ -386,7 +386,8 @@ export async function loadFieldWorkApprovals() {
 
     try {
         let query = sb.from('field_work_logs')
-            .select('*, employees(name, employee_number), clients(company_name), service_items(name)')
+            .select('*, employees!inner(name, employee_number, company_id), clients(company_name), service_items(name)')
+            .eq('employees.company_id', window.currentCompanyId)
             .gte('work_date', from)
             .lte('work_date', to)
             .order('work_date', { ascending: false })
@@ -722,6 +723,7 @@ async function loadSalesTargetData() {
     try {
         const { data: defaultTarget } = await sb.from('sales_targets')
             .select('*')
+            .eq('company_id', window.currentCompanyId)
             .is('employee_id', null)
             .eq('week_start', monday)
             .maybeSingle();
@@ -736,13 +738,15 @@ async function loadSalesTargetData() {
 
         const { data: targets } = await sb.from('sales_targets')
             .select('*')
+            .eq('company_id', window.currentCompanyId)
             .eq('week_start', monday)
             .not('employee_id', 'is', null);
         const targetMap = {};
         (targets || []).forEach(t => { targetMap[t.employee_id] = t; });
 
         const { data: activities } = await sb.from('sales_activities')
-            .select('employee_id, activity_type')
+            .select('employee_id, activity_type, employees!inner(company_id)')
+            .eq('employees.company_id', window.currentCompanyId)
             .gte('activity_date', monday)
             .lte('activity_date', sunday);
 

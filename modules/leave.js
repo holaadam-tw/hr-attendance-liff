@@ -360,7 +360,7 @@ export async function loadAdminLunchStats() {
     if (!el) return;
     const todayStr = getTaiwanDate(0);
     try {
-        const { data } = await sb.from('lunch_orders').select('id, is_vegetarian, status').eq('order_date', todayStr);
+        const { data } = await sb.from('lunch_orders').select('id, is_vegetarian, status, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).eq('order_date', todayStr);
         const orders = (data || []).filter(o => o.status === 'ordered');
         const veg = orders.filter(o => o.is_vegetarian).length;
         const regular = orders.filter(o => !o.is_vegetarian).length;

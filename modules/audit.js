@@ -52,12 +52,12 @@ export async function exportReport(type) {
             (data || []).forEach(r => rows.push([r.employees?.employee_number, r.employees?.name, r.employees?.department, r.ot_date, r.planned_hours, r.approved_hours || '', r.actual_hours || '', r.final_hours || '', r.compensation_type === 'pay' ? '加班費' : '補休', r.status]));
             fn = `加班報表_${ms}.csv`;
         } else if (type === 'lunch') {
-            const { data } = await sb.from('lunch_orders').select('*, employees(name, employee_number)').gte('order_date', ms + '-01').lte('order_date', ms + '-31').order('order_date');
+            const { data } = await sb.from('lunch_orders').select('*, employees!inner(name, employee_number, company_id)').eq('employees.company_id', window.currentCompanyId).gte('order_date', ms + '-01').lte('order_date', ms + '-31').order('order_date');
             rows.push(['日期', '工號', '姓名', '類型', '狀態', '備註']);
             (data || []).forEach(r => rows.push([r.order_date, r.employees?.employee_number, r.employees?.name, r.is_vegetarian ? '素食' : '葷食', r.status === 'cancelled' ? '取消($50)' : '已訂', r.notes || '']));
             fn = `便當報表_${ms}.csv`;
         } else if (type === 'bonus') {
-            const { data } = await sb.from('annual_bonus').select('*, employees(name, employee_number, department)').eq('year', y);
+            const { data } = await sb.from('annual_bonus').select('*, employees!inner(name, employee_number, department, company_id)').eq('employees.company_id', window.currentCompanyId).eq('year', y);
             rows.push(['工號', '姓名', '部門', '年資(月)', '基本獎金', '調整', '最終', '詳細']);
             (data || []).forEach(r => {
                 let detail = '';
@@ -66,7 +66,7 @@ export async function exportReport(type) {
             });
             fn = `獎金報表_${y}.csv`;
         } else if (type === 'payroll') {
-            const { data } = await sb.from('payroll').select('*, employees(name, employee_number, department)').eq('year', y).eq('month', m).order('employees(employee_number)');
+            const { data } = await sb.from('payroll').select('*, employees!inner(name, employee_number, department, company_id)').eq('employees.company_id', window.currentCompanyId).eq('year', y).eq('month', m);
             rows.push(['工號', '姓名', '部門', '薪資類型', '底薪', '加班費', '全勤獎金', '伙食津貼', '職務加給', '勞保', '健保', '勞退', '所得稅', '遲到扣', '請假扣', '手動調整', '總收入', '總扣款', '實發', '狀態']);
             (data || []).forEach(r => {
                 const typeMap = { monthly: '月薪', daily: '日薪', hourly: '時薪' };
@@ -77,7 +77,7 @@ export async function exportReport(type) {
             const threeMonthsAgo = new Date();
             threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
             const since = fmtDate(threeMonthsAgo);
-            const { data: od } = await sb.from('orders').select('*, store_profiles(store_name)').gte('created_at', since + 'T00:00:00').order('created_at', { ascending: false });
+            const { data: od } = await sb.from('orders').select('*, store_profiles!inner(store_name, company_id)').eq('store_profiles.company_id', window.currentCompanyId).gte('created_at', since + 'T00:00:00').order('created_at', { ascending: false });
             const typeLabel = { dine_in: '內用', takeout: '外帶', delivery: '外送' };
             const stLabel = { pending: '待處理', confirmed: '已確認', preparing: '準備中', ready: '可取餐', completed: '已完成', cancelled: '已取消' };
             rows.push(['訂單號', '商店', '取餐號', '客人', '電話', '類型', '品項明細', '合計', '狀態', '下單時間']);
