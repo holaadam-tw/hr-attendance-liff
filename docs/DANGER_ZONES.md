@@ -74,3 +74,4 @@
 | `SELECT *` 改指定欄位 | 必須 grep 所有消費端確認每個欄位都有列出 |
 | `sessionStorage` 快取 | 需手動清除，跨頁面可能帶殘值 |
 | 勞退自提存 TIMESTAMPTZ | 用 `now()` 不能用 `now() AT TIME ZONE` |
+| **新查詢必須有 company_id** | 每個 `sb.from()` 查詢都必須帶 `.eq('company_id', window.currentCompanyId)` 或透過 `employees!inner(company_id)` 間接隔離。左 join `employees(...)` 無法做隔離，必須用 `employees!inner(...)` |
