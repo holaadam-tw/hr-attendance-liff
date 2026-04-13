@@ -1417,44 +1417,7 @@
                         <div id="maxLeaveSaveStatus" style="margin-top:8px;text-align:center;font-size:13px;display:none;"></div>
                     </div>
 
-                    <div style="background:#fff;border-radius:14px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,0.08);margin-bottom:16px;">
-                        <div style="font-size:14px;font-weight:800;color:#0F172A;margin-bottom:12px;">🏢 排班模式</div>
-                        <p style="font-size:12px;color:#94A3B8;margin-bottom:12px;">選擇公司的班別制度，影響排班表與員工班表頁面</p>
-                        <div style="display:flex;gap:8px;margin-bottom:12px;">
-                            <div id="modeShift" onclick="selectSchedulingMode('shift')" style="flex:1;padding:14px 12px;border:2px solid #4F46E5;border-radius:12px;cursor:pointer;text-align:center;background:#EEF2FF;transition:all 0.2s;">
-                                <div style="font-size:24px;margin-bottom:6px;">🔄</div>
-                                <div id="modeShiftLabel" style="font-size:13px;font-weight:800;color:#4F46E5;">排班制</div>
-                                <div style="font-size:10px;color:#94A3B8;margin-top:4px;">服務業、餐飲、零售<br>早/中/晚輪班</div>
-                            </div>
-                            <div id="modeFixed" onclick="selectSchedulingMode('fixed')" style="flex:1;padding:14px 12px;border:2px solid #E5E7EB;border-radius:12px;cursor:pointer;text-align:center;background:#fff;transition:all 0.2s;">
-                                <div style="font-size:24px;margin-bottom:6px;">☀️</div>
-                                <div id="modeFixedLabel" style="font-size:13px;font-weight:800;color:#94A3B8;">固定班</div>
-                                <div style="font-size:10px;color:#94A3B8;margin-top:4px;">固定時段上班<br>可自訂時間</div>
-                            </div>
-                        </div>
-                        <!-- 固定班設定（選擇固定班時顯示） -->
-                        <div id="fixedShiftConfig" style="display:none;margin-bottom:12px;">
-                            <div style="font-size:12px;font-weight:700;color:#4b5563;margin-bottom:8px;">固定班別設定</div>
-                            <div style="display:flex;gap:6px;margin-bottom:10px;">
-                                <button onclick="setFixedPreset('08:00','17:00')" class="fixedPresetBtn" style="flex:1;padding:8px;border:1px solid #E5E7EB;border-radius:8px;background:#fff;font-size:11px;font-weight:700;cursor:pointer;color:#4F46E5;">☀️ 早班</button>
-                                <button onclick="setFixedPreset('13:00','22:00')" class="fixedPresetBtn" style="flex:1;padding:8px;border:1px solid #E5E7EB;border-radius:8px;background:#fff;font-size:11px;font-weight:700;cursor:pointer;color:#F59E0B;">🌤️ 中班</button>
-                                <button onclick="setFixedPreset('22:00','07:00')" class="fixedPresetBtn" style="flex:1;padding:8px;border:1px solid #E5E7EB;border-radius:8px;background:#fff;font-size:11px;font-weight:700;cursor:pointer;color:#8B5CF6;">🌙 晚班</button>
-                            </div>
-                            <div style="display:flex;gap:8px;align-items:center;">
-                                <div style="flex:1;">
-                                    <label style="font-size:11px;color:#94A3B8;display:block;margin-bottom:4px;">上班時間</label>
-                                    <input type="time" id="fixedStartTime" value="08:00" style="width:100%;padding:10px;border:1px solid #E5E7EB;border-radius:8px;font-size:14px;font-weight:700;">
-                                </div>
-                                <span style="margin-top:16px;font-weight:700;color:#94A3B8;">~</span>
-                                <div style="flex:1;">
-                                    <label style="font-size:11px;color:#94A3B8;display:block;margin-bottom:4px;">下班時間</label>
-                                    <input type="time" id="fixedEndTime" value="17:00" style="width:100%;padding:10px;border:1px solid #E5E7EB;border-radius:8px;font-size:14px;font-weight:700;">
-                                </div>
-                            </div>
-                        </div>
-                        <button onclick="saveSchedulingMode()" style="width:100%;padding:12px;border:none;border-radius:10px;background:linear-gradient(135deg,#4F46E5,#7C3AED);color:#fff;font-weight:700;font-size:14px;cursor:pointer;">💾 儲存排班模式</button>
-                        <div id="schedModeSaveStatus" style="margin-top:8px;text-align:center;font-size:13px;display:none;"></div>
-                    </div>
+                    <!-- 🏢 排班模式已停用（2026-04-14）— 改用員工個別 shift_mode，不需公司全域設定 -->
 
                     <div style="background:#fff;border-radius:14px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,0.08);margin-bottom:16px;">
                         <div style="font-size:14px;font-weight:800;color:#0F172A;margin-bottom:8px;">⏰ 考勤設定</div>

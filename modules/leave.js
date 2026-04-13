@@ -149,104 +149,14 @@ export async function saveMaxLeave() {
     }
 }
 
-// ===== 排班模式設定 =====
-let currentSchedulingMode = 'shift';
-let fixedShiftStart = '08:00';
-let fixedShiftEnd = '17:00';
-
-export async function loadSchedulingMode() {
-    try {
-        const { data } = await sb.from('system_settings').select('value').eq('key', 'scheduling_mode').eq('company_id', window.currentCompanyId).maybeSingle();
-        if (data?.value?.mode) currentSchedulingMode = data.value.mode;
-        if (data?.value?.start) fixedShiftStart = data.value.start;
-        if (data?.value?.end) fixedShiftEnd = data.value.end;
-    } catch (e) { }
-    const startEl = document.getElementById('fixedStartTime');
-    const endEl = document.getElementById('fixedEndTime');
-    if (startEl) startEl.value = fixedShiftStart;
-    if (endEl) endEl.value = fixedShiftEnd;
-    applySchedulingModeUI();
-}
-
-export function selectSchedulingMode(mode) {
-    currentSchedulingMode = mode;
-    applySchedulingModeUI();
-}
-
-export function setFixedPreset(start, end) {
-    document.getElementById('fixedStartTime').value = start;
-    document.getElementById('fixedEndTime').value = end;
-    document.querySelectorAll('.fixedPresetBtn').forEach(b => { b.style.background = '#fff'; b.style.border = '1px solid #E5E7EB'; });
-    event.target.closest('.fixedPresetBtn').style.background = '#EEF2FF';
-    event.target.closest('.fixedPresetBtn').style.border = '2px solid #4F46E5';
-}
-
-export function applySchedulingModeUI() {
-    const shiftEl = document.getElementById('modeShift');
-    const fixedEl = document.getElementById('modeFixed');
-    const shiftLabel = document.getElementById('modeShiftLabel');
-    const fixedLabel = document.getElementById('modeFixedLabel');
-    const fixedConfig = document.getElementById('fixedShiftConfig');
-    if (!shiftEl || !fixedEl) return;
-    if (currentSchedulingMode === 'shift') {
-        shiftEl.style.border = '2px solid #4F46E5'; shiftEl.style.background = '#EEF2FF';
-        if (shiftLabel) shiftLabel.style.color = '#4F46E5';
-        fixedEl.style.border = '2px solid #E5E7EB'; fixedEl.style.background = '#fff';
-        if (fixedLabel) fixedLabel.style.color = '#94A3B8';
-        if (fixedConfig) fixedConfig.style.display = 'none';
-    } else {
-        fixedEl.style.border = '2px solid #4F46E5'; fixedEl.style.background = '#EEF2FF';
-        if (fixedLabel) fixedLabel.style.color = '#4F46E5';
-        shiftEl.style.border = '2px solid #E5E7EB'; shiftEl.style.background = '#fff';
-        if (shiftLabel) shiftLabel.style.color = '#94A3B8';
-        if (fixedConfig) fixedConfig.style.display = 'block';
-    }
-    applyShiftTabMode();
-}
-
-export function applyShiftTabMode() {
-    const shiftContent = document.getElementById('tabShift');
-    if (!shiftContent) return;
-    let notice = document.getElementById('fixedModeNotice');
-    if (currentSchedulingMode === 'fixed') {
-        const st = document.getElementById('fixedStartTime')?.value || fixedShiftStart;
-        const et = document.getElementById('fixedEndTime')?.value || fixedShiftEnd;
-        if (!notice) {
-            notice = document.createElement('div');
-            notice.id = 'fixedModeNotice';
-            notice.style.cssText = 'background:#EEF2FF;border-radius:14px;padding:20px;text-align:center;';
-            shiftContent.insertBefore(notice, shiftContent.firstChild);
-        }
-        notice.innerHTML = '<div style="font-size:32px;margin-bottom:8px;">☀️</div>' +
-            '<div style="font-size:15px;font-weight:800;color:#4F46E5;margin-bottom:8px;">固定班制</div>' +
-            '<div style="font-size:13px;color:#64748B;line-height:1.6;">所有員工統一上班時間<br><b>' + st + ' - ' + et + '</b></div>' +
-            '<div style="font-size:11px;color:#94A3B8;margin-top:12px;">如需排班請至「人力設定」切換為排班制</div>';
-        notice.style.display = 'block';
-        Array.from(shiftContent.children).forEach(el => { if (el.id !== 'fixedModeNotice') el.style.display = 'none'; });
-    } else {
-        if (notice) notice.style.display = 'none';
-        Array.from(shiftContent.children).forEach(el => { if (el.id !== 'fixedModeNotice') el.style.display = ''; });
-    }
-}
-
-export async function saveSchedulingMode() {
-    const statusEl = document.getElementById('schedModeSaveStatus');
-    try {
-        const st = document.getElementById('fixedStartTime')?.value || '08:00';
-        const et = document.getElementById('fixedEndTime')?.value || '17:00';
-        fixedShiftStart = st; fixedShiftEnd = et;
-        const val = { mode: currentSchedulingMode, start: st, end: et };
-        await saveSetting('scheduling_mode', val, '排班模式：shift=排班制, fixed=固定班');
-        const modeLabel = currentSchedulingMode === 'shift' ? '排班制' : `固定班 ${st}-${et}`;
-        statusEl.style.display = 'block'; statusEl.style.color = '#059669';
-        statusEl.textContent = '✅ 已儲存 — ' + modeLabel;
-        setTimeout(() => { statusEl.style.display = 'none'; }, 2000);
-        applyShiftTabMode();
-        if (typeof writeAuditLog === 'function') writeAuditLog('update', 'system_settings', null, '排班模式', { scheduling_mode: val });
-    } catch (e) {
-        statusEl.style.display = 'block'; statusEl.style.color = '#DC2626'; statusEl.textContent = '❌ 儲存失敗';
-    }
-}
+// ===== 排班模式設定（已停用 2026-04-14，改用員工個別 shift_mode）=====
+// 保留 export 避免 import 報錯，函數為空操作
+export async function loadSchedulingMode() { }
+export function selectSchedulingMode() { }
+export function setFixedPreset() { }
+export function applySchedulingModeUI() { }
+export function applyShiftTabMode() { }
+export async function saveSchedulingMode() { }
 
 // ===== 便當管理員設定 =====
 let lunchManagerIds = [];

@@ -859,6 +859,13 @@ function renderScheduleView(data, dates) {
                         '<div style="font-weight:700;color:#15803D;">固定</div>' +
                         '<div style="color:#64748B;font-size:10px;">' + fs + '-' + fe + '</div></div></td>';
                 }
+            } else if (emp.shift_mode === 'scheduled') {
+                const dow = d.getDay();
+                if (dow === 0 || dow === 6) {
+                    bodyHtml += '<td style="text-align:center;"><span style="display:inline-block;padding:4px 8px;border-radius:8px;font-size:11px;font-weight:700;background:#F3F4F6;color:#9CA3AF;">-</span></td>';
+                } else {
+                    bodyHtml += '<td style="text-align:center;"><span style="display:inline-block;padding:4px 8px;border-radius:8px;font-size:10px;font-weight:700;background:#FEE2E2;color:#DC2626;">未排</span></td>';
+                }
             } else {
                 bodyHtml += '<td style="text-align:center;color:#CBD5E1;">-</td>';
             }
