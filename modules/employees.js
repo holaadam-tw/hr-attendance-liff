@@ -811,6 +811,9 @@ export async function openEditEmployeeModal(empId) {
             document.getElementById('editFixedStart').value = data.fixed_shift_start ? data.fixed_shift_start.substring(0, 5) : '09:00';
             document.getElementById('editFixedEnd').value = data.fixed_shift_end ? data.fixed_shift_end.substring(0, 5) : '18:00';
             if (typeof toggleShiftFields === 'function') toggleShiftFields();
+            // 排班權限
+            const canScheduleEl = document.getElementById('editCanSchedule');
+            if (canScheduleEl) canScheduleEl.checked = !!data.can_schedule;
             // LINE 綁定狀態
             const lineStatusEl = document.getElementById('editEmpLineStatus');
             const lineInputEl = document.getElementById('editEmpLineUserId');
@@ -846,7 +849,8 @@ export async function saveEditEmployee() {
         is_bound: !!lineVal,
         shift_mode: shiftMode,
         fixed_shift_start: shiftMode === 'fixed' ? (document.getElementById('editFixedStart').value || null) : null,
-        fixed_shift_end: shiftMode === 'fixed' ? (document.getElementById('editFixedEnd').value || null) : null
+        fixed_shift_end: shiftMode === 'fixed' ? (document.getElementById('editFixedEnd').value || null) : null,
+        can_schedule: !!document.getElementById('editCanSchedule')?.checked
     };
     if (!updates.name) { showToast('⚠️ 姓名不可為空'); return; }
     try {

@@ -178,6 +178,7 @@
                         <tr>
                             <th>員工</th>
                             <th>部門</th>
+                            <th>班別</th>
                             <th>上班</th>
                             <th>下班</th>
                             <th>工時</th>
@@ -185,7 +186,7 @@
                         </tr>
                     </thead>
                     <tbody id="dailyTableBody">
-                        <tr><td colspan="6" style="text-align:center;color:#999;padding:40px;">載入中...</td></tr>
+                        <tr><td colspan="7" style="text-align:center;color:#999;padding:40px;">載入中...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -365,7 +366,7 @@
                 loadLunchStats(dateStr);
             } catch (e) {
                 console.error('Load daily data error:', e);
-                document.getElementById('dailyTableBody').innerHTML = '<tr><td colspan="6" style="text-align:center;color:#ef4444;padding:20px;">載入失敗：' + escapeHTML(e.message || '') + '</td></tr>';
+                document.getElementById('dailyTableBody').innerHTML = '<tr><td colspan="7" style="text-align:center;color:#ef4444;padding:20px;">載入失敗：' + escapeHTML(e.message || '') + '</td></tr>';
             }
         }
 
@@ -425,6 +426,15 @@
             return Math.round(h * 10) / 10 + 'h';
         }
 
+        function shiftBadge(row) {
+            if (row.is_off_day) return '<span class="status-badge s-off-day">休假</span>';
+            if (!row.shift_name || row.shift_name === '未排班') return '<span class="status-badge" style="background:#FEF3C7;color:#92400E;">未排班</span>';
+            const timeStr = row.shift_start && row.shift_end
+                ? ' ' + (row.shift_start||'').substring(0,5) + '-' + (row.shift_end||'').substring(0,5)
+                : '';
+            return '<span class="status-badge" style="background:#DBEAFE;color:#1E40AF;">' + escapeHTML(row.shift_name) + timeStr + '</span>';
+        }
+
         function statusBadge(row) {
             const map = {
                 working: ['上班中', 's-working'],
@@ -456,7 +466,7 @@
             const tbody = document.getElementById('dailyTableBody');
 
             if (rows.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#999;padding:40px;">無資料</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#999;padding:40px;">無資料</td></tr>';
                 return;
             }
 
@@ -467,6 +477,7 @@
                 html += '<tr>' +
                     '<td style="font-weight:700;white-space:nowrap;">' + escapeHTML(r.employee_name) + '</td>' +
                     '<td style="color:#64748B;font-size:11px;">' + escapeHTML(r.department || '-') + '</td>' +
+                    '<td>' + shiftBadge(r) + '</td>' +
                     '<td class="time-cell">' + inTime +
                         (r.is_late ? ' <span class="late-flag">遲到</span>' : '') +
                         (r.check_in_location ? '<span class="loc-hint" title="' + escapeHTML(r.check_in_location) + '">📍' + escapeHTML(r.check_in_location) + '</span>' : '') +

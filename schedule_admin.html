@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <link rel="icon" href="data:,">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>📅 排班管理</title>
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .schedule-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        .schedule-table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 600px; }
+        .schedule-table th { background: #F8FAFC; padding: 10px 6px; text-align: center; font-weight: 700; color: #64748B; border-bottom: 2px solid #E2E8F0; position: sticky; top: 0; z-index: 1; white-space: nowrap; }
+        .schedule-table th:first-child { text-align: left; position: sticky; left: 0; z-index: 2; background: #F8FAFC; }
+        .schedule-table td { padding: 6px 4px; border-bottom: 1px solid #F1F5F9; text-align: center; vertical-align: middle; }
+        .schedule-table td:first-child { text-align: left; font-weight: 700; font-size: 13px; position: sticky; left: 0; background: #fff; z-index: 1; white-space: nowrap; padding-left: 8px; }
+        .schedule-table tr:hover td { background: #F8FAFC; }
+
+        .shift-cell { padding: 6px 4px; border-radius: 8px; cursor: pointer; min-width: 52px; min-height: 36px; font-size: 11px; font-weight: 700; transition: all 0.15s; display: inline-block; }
+        .shift-cell:hover { transform: scale(1.05); box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
+
+        .week-nav { display: flex; align-items: center; justify-content: center; gap: 12px; margin-bottom: 16px; }
+        .week-nav button { background: none; border: 2px solid #E2E8F0; border-radius: 10px; padding: 8px 14px; font-size: 14px; cursor: pointer; font-family: inherit; font-weight: 700; }
+        .week-nav button:hover { background: #F1F5F9; }
+        .week-nav span { font-size: 15px; font-weight: 800; min-width: 200px; text-align: center; }
+
+        .shift-modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 9999; display: none; align-items: center; justify-content: center; padding: 20px; }
+        .shift-modal-content { background: #fff; border-radius: 20px; padding: 24px; max-width: 320px; width: 100%; }
+        .shift-option { padding: 14px; border: 2px solid #E2E8F0; border-radius: 12px; margin-bottom: 8px; cursor: pointer; font-weight: 700; font-size: 14px; text-align: center; transition: all 0.15s; }
+        .shift-option:hover { border-color: #4F46E5; background: #EEF2FF; }
+
+        .legend { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; font-size: 12px; }
+        .legend-item { display: flex; align-items: center; gap: 4px; }
+        .legend-dot { width: 12px; height: 12px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div id="loadingPage" class="loading-screen">
+        <div class="spinner"></div>
+        <p>系統載入中...</p>
+    </div>
+
+    <div class="container">
+        <div class="page active">
+            <div style="display:flex;gap:8px;margin-bottom:12px;">
+                <button class="btn btn-secondary" onclick="window.location.href='admin.html'" style="width:auto;padding:8px 16px;font-size:13px;">← 返回</button>
+            </div>
+
+            <h2 style="text-align:center;font-size:18px;font-weight:800;color:#0F172A;margin-bottom:4px;">📅 排班管理</h2>
+            <div id="schedulerInfo" style="text-align:center;font-size:12px;color:#64748B;margin-bottom:16px;"></div>
+
+            <div id="noPermission" style="display:none;text-align:center;padding:40px;">
+                <div style="font-size:48px;margin-bottom:12px;">🔒</div>
+                <p style="font-size:16px;font-weight:700;color:#64748B;">無排班權限</p>
+                <p style="font-size:13px;color:#94A3B8;margin-top:8px;">請聯繫管理員開啟排班權限</p>
+            </div>
+
+            <div id="scheduleContent" style="display:none;">
+                <div class="week-nav">
+                    <button onclick="changeWeek(-1)">← 上週</button>
+                    <span id="weekLabel"></span>
+                    <button onclick="changeWeek(1)">下週 →</button>
+                </div>
+
+                <div class="legend">
+                    <div class="legend-item"><div class="legend-dot" style="background:#DBEAFE;"></div> 早班</div>
+                    <div class="legend-item"><div class="legend-dot" style="background:#FEF3C7;"></div> 中班</div>
+                    <div class="legend-item"><div class="legend-dot" style="background:#EDE9FE;"></div> 晚班</div>
+                    <div class="legend-item"><div class="legend-dot" style="background:#ECFDF5;"></div> 休假</div>
+                    <div class="legend-item"><div class="legend-dot" style="background:#F1F5F9;"></div> 未排</div>
+                </div>
+
+                <div class="schedule-wrap">
+                    <table class="schedule-table">
+                        <thead id="scheduleHead"></thead>
+                        <tbody id="scheduleBody"></tbody>
+                    </table>
+                </div>
+
+                <div id="lastModified" style="text-align:center;font-size:11px;color:#94A3B8;margin-top:12px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 班別選擇 Modal -->
+    <div id="shiftModal" class="shift-modal">
+        <div class="shift-modal-content">
+            <h3 id="shiftModalTitle" style="margin:0 0 16px;font-size:16px;font-weight:800;text-align:center;"></h3>
+            <div id="shiftOptions"></div>
+            <button onclick="closeShiftModal()" style="width:100%;padding:12px;background:#F1F5F9;border:2px solid #E2E8F0;border-radius:12px;color:#64748B;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:4px;">取消</button>
+        </div>
+    </div>
+
+    <script src="common.js"></script>
+    <script>
+    // === 全域錯誤監控 ===
+    window._errLogCount = 0; window._errLogResetTs = 0;
+    window.onerror = function(msg, src, line, col, err) {
+        try {
+            var _now = Date.now(); if (_now > window._errLogResetTs) { window._errLogCount = 0; window._errLogResetTs = _now + 60000; } if (++window._errLogCount > 5) return;
+            fetch(CONFIG.SUPABASE_URL + '/rest/v1/error_logs', {
+                method: 'POST',
+                headers: { 'apikey': CONFIG.SUPABASE_ANON_KEY, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+                body: JSON.stringify({ message: String(msg).substring(0, 1000), page: 'schedule_admin.html', line: line, user_id: (window.liffProfile && window.liffProfile.userId) || null, user_agent: navigator.userAgent })
+            }).catch(function(){});
+        } catch(e) {}
+    };
+
+    let schedulerEmployee = null;
+    let weekStart = null;
+    let weekData = null;
+    let pendingCell = null;
+
+    // 初始化週起始
+    (function() {
+        const n = new Date();
+        const dow = n.getDay();
+        weekStart = new Date(n);
+        weekStart.setDate(n.getDate() - ((dow + 6) % 7));
+        weekStart.setHours(0, 0, 0, 0);
+    })();
+
+    const SHIFT_COLORS = {
+        morning: { bg: '#DBEAFE', color: '#1E40AF', label: '☀️ 早班' },
+        afternoon: { bg: '#FEF3C7', color: '#92400E', label: '🌤️ 中班' },
+        night: { bg: '#EDE9FE', color: '#6D28D9', label: '🌙 晚班' },
+        off: { bg: '#ECFDF5', color: '#059669', label: '🏖️ 休假' },
+        unknown: { bg: '#DBEAFE', color: '#1E40AF', label: '班' }
+    };
+
+    function fmtDateLocal(d) {
+        return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    }
+
+    function getWeekDates() {
+        const dates = [];
+        for (let i = 0; i < 7; i++) {
+            const d = new Date(weekStart);
+            d.setDate(d.getDate() + i);
+            dates.push(d);
+        }
+        return dates;
+    }
+
+    function changeWeek(delta) {
+        weekStart.setDate(weekStart.getDate() + delta * 7);
+        loadScheduleData();
+    }
+
+    window.addEventListener('load', async () => {
+        if (typeof initializeLiff === 'undefined') return;
+        const initialized = await initializeLiff();
+        if (!initialized) return;
+        const loggedIn = await checkUserStatus();
+        if (!loggedIn) { window.location.href = 'index.html'; return; }
+
+        // 檢查排班權限
+        try {
+            const { data, error } = await sb.rpc('check_schedule_permission', {
+                p_line_user_id: liffProfile.userId
+            });
+            if (error || !data?.success) {
+                document.getElementById('noPermission').style.display = 'block';
+                return;
+            }
+            schedulerEmployee = data;
+            document.getElementById('schedulerInfo').textContent = '排班者：' + data.name;
+            document.getElementById('scheduleContent').style.display = 'block';
+            loadScheduleData();
+        } catch (e) {
+            document.getElementById('noPermission').style.display = 'block';
+        }
+    });
+
+    async function loadScheduleData() {
+        const dates = getWeekDates();
+        const startStr = fmtDateLocal(dates[0]);
+        const endStr = fmtDateLocal(dates[6]);
+        document.getElementById('weekLabel').textContent = startStr + ' ~ ' + endStr;
+        document.getElementById('scheduleBody').innerHTML = '<tr><td colspan="8" style="text-align:center;padding:30px;color:#94A3B8;">載入中...</td></tr>';
+
+        try {
+            const { data, error } = await sb.rpc('get_weekly_schedules', {
+                p_company_id: schedulerEmployee.company_id,
+                p_start_date: startStr
+            });
+            if (error) throw error;
+            weekData = data;
+            renderScheduleTable();
+        } catch (e) {
+            console.error(e);
+            document.getElementById('scheduleBody').innerHTML = '<tr><td colspan="8" style="text-align:center;color:#ef4444;">載入失敗</td></tr>';
+        }
+    }
+
+    function renderScheduleTable() {
+        if (!weekData) return;
+        const dates = getWeekDates();
+        const wd = ['日', '一', '二', '三', '四', '五', '六'];
+
+        // Build shift type lookup
+        const stMap = {};
+        (weekData.shift_types || []).forEach(st => { stMap[st.id] = st; });
+
+        // Build schedule lookup
+        const schMap = {};
+        let latestModified = null;
+        let latestModifier = null;
+        (weekData.schedules || []).forEach(s => {
+            schMap[s.employee_id + '_' + s.date] = s;
+            if (s.scheduled_at && (!latestModified || s.scheduled_at > latestModified)) {
+                latestModified = s.scheduled_at;
+                latestModifier = s.scheduled_by;
+            }
+        });
+
+        // Header
+        let headHtml = '<tr><th style="min-width:70px;">員工</th>';
+        dates.forEach(d => {
+            const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+            headHtml += '<th style="' + (isWeekend ? 'background:#F1F5F9;' : '') + '">' +
+                '<div style="font-size:10px;">' + wd[d.getDay()] + '</div>' +
+                '<div style="font-size:13px;">' + String(d.getDate()).padStart(2, '0') + '</div></th>';
+        });
+        headHtml += '</tr>';
+        document.getElementById('scheduleHead').innerHTML = headHtml;
+
+        // Body
+        let bodyHtml = '';
+        const employees = weekData.employees || [];
+
+        if (employees.length === 0) {
+            bodyHtml = '<tr><td colspan="8" style="text-align:center;padding:30px;color:#94A3B8;">無員工資料</td></tr>';
+        } else {
+            employees.forEach(emp => {
+                bodyHtml += '<tr><td>' + escapeHTML(emp.name) + '<div style="font-size:10px;color:#94A3B8;">' + escapeHTML(emp.department || '') + '</div></td>';
+                dates.forEach(d => {
+                    const dateStr = fmtDateLocal(d);
+                    const sch = schMap[emp.id + '_' + dateStr];
+                    let cellHtml = '';
+
+                    if (sch) {
+                        if (sch.is_off_day) {
+                            cellHtml = '<div class="shift-cell" style="background:#ECFDF5;color:#059669;" onclick="openShiftModal(\'' + emp.id + '\',\'' + dateStr + '\',\'' + escapeHTML(emp.name) + '\')">🏖️ 休</div>';
+                        } else {
+                            const st = stMap[sch.shift_type_id];
+                            const code = st?.code || 'unknown';
+                            const sc = SHIFT_COLORS[code] || SHIFT_COLORS.unknown;
+                            const timeStr = st ? (st.start_time||'').substring(0,5) + '-' + (st.end_time||'').substring(0,5) : '';
+                            cellHtml = '<div class="shift-cell" style="background:' + sc.bg + ';color:' + sc.color + ';" onclick="openShiftModal(\'' + emp.id + '\',\'' + dateStr + '\',\'' + escapeHTML(emp.name) + '\')">' +
+                                (st?.name || '班') + '<div style="font-size:9px;">' + timeStr + '</div></div>';
+                        }
+                    } else if (emp.shift_mode === 'fixed' && emp.fixed_shift_start) {
+                        cellHtml = '<div class="shift-cell" style="background:#F0F9FF;color:#0369A1;" onclick="openShiftModal(\'' + emp.id + '\',\'' + dateStr + '\',\'' + escapeHTML(emp.name) + '\')">固定<div style="font-size:9px;">' +
+                            (emp.fixed_shift_start||'').substring(0,5) + '-' + (emp.fixed_shift_end||'').substring(0,5) + '</div></div>';
+                    } else {
+                        cellHtml = '<div class="shift-cell" style="background:#F8FAFC;color:#94A3B8;" onclick="openShiftModal(\'' + emp.id + '\',\'' + dateStr + '\',\'' + escapeHTML(emp.name) + '\')">⬜</div>';
+                    }
+
+                    bodyHtml += '<td>' + cellHtml + '</td>';
+                });
+                bodyHtml += '</tr>';
+            });
+        }
+        document.getElementById('scheduleBody').innerHTML = bodyHtml;
+
+        // Last modified
+        if (latestModified && latestModifier) {
+            const dt = new Date(latestModified).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
+            document.getElementById('lastModified').textContent = '最後修改：' + latestModifier + ' 於 ' + dt;
+        } else {
+            document.getElementById('lastModified').textContent = '';
+        }
+    }
+
+    // ===== 班別選擇 Modal =====
+    function openShiftModal(empId, dateStr, empName) {
+        pendingCell = { empId, dateStr };
+        document.getElementById('shiftModalTitle').textContent = empName + ' · ' + dateStr;
+
+        const stMap = {};
+        (weekData?.shift_types || []).forEach(st => { stMap[st.id] = st; });
+
+        let optHtml = '';
+        (weekData?.shift_types || []).forEach(st => {
+            const code = st.code || 'unknown';
+            const sc = SHIFT_COLORS[code] || SHIFT_COLORS.unknown;
+            optHtml += '<div class="shift-option" style="background:' + sc.bg + ';color:' + sc.color + ';border-color:' + sc.bg + ';" onclick="selectShift(\'' + st.id + '\', false)">' +
+                st.name + ' ' + (st.start_time||'').substring(0,5) + '-' + (st.end_time||'').substring(0,5) + '</div>';
+        });
+        optHtml += '<div class="shift-option" style="background:#ECFDF5;color:#059669;border-color:#A7F3D0;" onclick="selectShift(null, true)">🏖️ 休假</div>';
+        optHtml += '<div class="shift-option" style="background:#FEE2E2;color:#DC2626;border-color:#FECACA;" onclick="clearSchedule()">🗑️ 清除排班</div>';
+
+        document.getElementById('shiftOptions').innerHTML = optHtml;
+        document.getElementById('shiftModal').style.display = 'flex';
+    }
+
+    function closeShiftModal() {
+        document.getElementById('shiftModal').style.display = 'none';
+        pendingCell = null;
+    }
+
+    async function selectShift(shiftTypeId, isOffDay) {
+        if (!pendingCell || !schedulerEmployee) return;
+        closeShiftModal();
+
+        try {
+            const { data, error } = await sb.rpc('upsert_schedule', {
+                p_scheduler_id: schedulerEmployee.employee_id,
+                p_employee_id: pendingCell.empId,
+                p_date: pendingCell.dateStr,
+                p_shift_type_id: shiftTypeId,
+                p_is_off_day: isOffDay
+            });
+            if (error) throw error;
+            if (!data?.success) throw new Error(data?.error || '排班失敗');
+            showToast('✅ 已更新排班');
+            loadScheduleData();
+        } catch (e) {
+            showToast('❌ ' + (e.message || '排班失敗'));
+        }
+    }
+
+    async function clearSchedule() {
+        if (!pendingCell || !schedulerEmployee) return;
+        closeShiftModal();
+
+        try {
+            const { data, error } = await sb.rpc('delete_schedule', {
+                p_scheduler_id: schedulerEmployee.employee_id,
+                p_employee_id: pendingCell.empId,
+                p_date: pendingCell.dateStr
+            });
+            if (error) throw error;
+            if (!data?.success) throw new Error(data?.error || '清除失敗');
+            showToast('✅ 已清除排班');
+            loadScheduleData();
+        } catch (e) {
+            showToast('❌ ' + (e.message || '清除失敗'));
+        }
+    }
+    </script>
+</body>
+</html>
