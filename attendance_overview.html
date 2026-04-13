@@ -96,6 +96,7 @@
             <div style="display:flex;gap:6px;">
                 <button onclick="showCheckinQRModal()" style="padding:8px 12px;border:2px solid #7C3AED;border-radius:10px;background:#F5F3FF;color:#7C3AED;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;">📲 打卡 QR</button>
                 <button onclick="showOverviewRegisterQR()" style="padding:8px 12px;border:2px solid #10B981;border-radius:10px;background:#F0FDF4;color:#059669;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;">📱 登記 QR</button>
+                <button onclick="showOvKioskModal()" style="padding:8px 12px;border:2px solid #1E293B;border-radius:10px;background:#F8FAFC;color:#1E293B;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;">📱 公務機</button>
                 <button class="export-btn" onclick="exportExcel()">📥 匯出</button>
             </div>
         </div>
@@ -304,6 +305,30 @@
                     </p>
                 </div>
                 <button onclick="downloadOvRegisterQR()" style="margin-top:15px;padding:10px 24px;border:2px solid #10B981;border-radius:10px;background:#F0FDF4;color:#059669;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">📥 下載 QR Code</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 公務機打卡 Modal -->
+    <div id="ovKioskModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:999;align-items:center;justify-content:center;padding:20px;">
+        <div style="background:#fff;border-radius:20px;padding:24px;max-width:480px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.3);">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+                <h3 style="margin:0;font-size:16px;">📱 公務機打卡</h3>
+                <button onclick="document.getElementById('ovKioskModal').style.display='none'" style="background:none;border:none;font-size:20px;cursor:pointer;color:#94A3B8;">&times;</button>
+            </div>
+            <p style="font-size:13px;color:#64748B;margin-bottom:16px;text-align:center;">在公務機開啟此連結，員工輸入驗證碼即可打卡</p>
+            <div id="ovKioskStatus" style="text-align:center;margin-bottom:16px;"></div>
+            <div id="ovKioskQR" style="text-align:center;margin-bottom:16px;"></div>
+            <div id="ovKioskURL" style="background:#F1F5F9;border-radius:10px;padding:12px;font-size:12px;color:#334155;word-break:break-all;margin-bottom:12px;display:none;"></div>
+            <div style="display:flex;gap:10px;">
+                <button id="ovKioskCopyBtn" onclick="copyOvKioskURL()" style="flex:1;padding:10px;background:#4F46E5;border:none;border-radius:10px;color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;display:none;">📋 複製連結</button>
+                <button onclick="generateOvKioskToken()" style="flex:1;padding:10px;background:#F59E0B;border:none;border-radius:10px;color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">🔄 產生新驗證碼</button>
+            </div>
+            <div style="margin-top:16px;padding:12px;background:#DBEAFE;border-radius:8px;border-left:4px solid #3B82F6;font-size:12px;color:#1E40AF;line-height:1.6;">
+                <strong>使用說明：</strong><br>
+                1. 點「產生新驗證碼」取得公務機連結<br>
+                2. 在公務機開啟連結，加到主畫面<br>
+                3. 員工輸入驗證碼（4碼）或手機號碼 → 拍照 → 打卡
             </div>
         </div>
     </div>
@@ -763,6 +788,58 @@
             link.download = 'employee_register_qr.png';
             link.href = canvas.toDataURL('image/png');
             link.click();
+        }
+
+        // ===== 公務機打卡 =====
+        let _ovKioskURL = null;
+
+        async function showOvKioskModal() {
+            document.getElementById('ovKioskModal').style.display = 'flex';
+            const statusEl = document.getElementById('ovKioskStatus');
+            statusEl.innerHTML = '<span style="color:#94A3B8;">載入中...</span>';
+            try {
+                const res = await sb.from('system_settings').select('value').eq('key', 'kiosk_token').eq('company_id', window.currentCompanyId).maybeSingle();
+                if (res.data?.value) {
+                    showOvKioskURL(res.data.value);
+                } else {
+                    statusEl.innerHTML = '<span style="color:#F59E0B;">尚未產生公務機驗證碼</span>';
+                }
+            } catch (e) {
+                statusEl.innerHTML = '<span style="color:#EF4444;">載入失敗</span>';
+            }
+        }
+
+        async function generateOvKioskToken() {
+            const token = Array.from(crypto.getRandomValues(new Uint8Array(16))).map(b => b.toString(16).padStart(2, '0')).join('');
+            try {
+                await saveSetting('kiosk_token', token, '公務機打卡驗證碼');
+                showOvKioskURL(token);
+                showToast('✅ 已產生新的公務機驗證碼');
+            } catch (e) {
+                showToast('❌ 產生失敗');
+            }
+        }
+
+        function showOvKioskURL(token) {
+            const base = window.location.origin + window.location.pathname.replace('attendance_overview.html', '');
+            const url = base + 'kiosk.html?company=' + window.currentCompanyId + '&token=' + token;
+            _ovKioskURL = url;
+            document.getElementById('ovKioskStatus').innerHTML = '<span style="color:#10B981;font-weight:600;">✅ 已啟用</span>';
+            document.getElementById('ovKioskURL').style.display = 'block';
+            document.getElementById('ovKioskURL').textContent = url;
+            document.getElementById('ovKioskCopyBtn').style.display = 'block';
+            const qrEl = document.getElementById('ovKioskQR');
+            qrEl.innerHTML = '';
+            if (typeof QRCode !== 'undefined') {
+                new QRCode(qrEl, { text: url, width: 200, height: 200, colorDark: '#1E293B', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.H });
+            }
+        }
+
+        function copyOvKioskURL() {
+            if (!_ovKioskURL) return;
+            navigator.clipboard.writeText(_ovKioskURL).then(() => showToast('✅ 已複製連結')).catch(() => {
+                const ta = document.createElement('textarea'); ta.value = _ovKioskURL; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); showToast('✅ 已複製連結');
+            });
         }
 
         // ===== 便當訂購統計 =====
