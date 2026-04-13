@@ -139,9 +139,12 @@ body {
 /* Forms */
 .form-group { margin-bottom: 18px; }
 .form-group label { display: block; margin-bottom: 8px; font-weight: 600; color: #4b5563; font-size: 13px; }
-.form-group input, .form-group select, .form-group textarea {
+.form-group input:not([type="checkbox"]):not([type="radio"]), .form-group select, .form-group textarea {
     width: 100%; padding: 13px 14px; border: 2px solid var(--border); border-radius: 12px;
     font-size: 16px; transition: all 0.3s ease; background: #FAFBFC; -webkit-appearance: none; color: var(--text);
+}
+.form-group input[type="checkbox"], .form-group input[type="radio"] {
+    width: auto; -webkit-appearance: checkbox; appearance: checkbox;
 }
 .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
     outline: none; border-color: var(--primary); background: var(--white);

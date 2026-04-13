@@ -189,8 +189,9 @@
             weekData = data;
             renderScheduleTable();
         } catch (e) {
-            console.error(e);
-            document.getElementById('scheduleBody').innerHTML = '<tr><td colspan="8" style="text-align:center;color:#ef4444;">載入失敗</td></tr>';
+            console.error('排班載入失敗:', e);
+            const errMsg = (e && (e.message || e.details || e.hint)) || '未知錯誤';
+            document.getElementById('scheduleBody').innerHTML = '<tr><td colspan="8" style="text-align:center;color:#ef4444;padding:20px;font-size:13px;">載入失敗：' + errMsg + '</td></tr>';
         }
     }
 
