@@ -561,6 +561,30 @@
                         </select>
                     </div>
                     <div class="form-group">
+                        <label>工時模式</label>
+                        <div style="display:flex;gap:12px;margin-bottom:8px;">
+                            <label style="display:flex;align-items:center;gap:6px;font-size:14px;cursor:pointer;">
+                                <input type="radio" name="editShiftMode" value="fixed" onchange="toggleShiftFields()" checked> 固定班
+                            </label>
+                            <label style="display:flex;align-items:center;gap:6px;font-size:14px;cursor:pointer;">
+                                <input type="radio" name="editShiftMode" value="scheduled" onchange="toggleShiftFields()"> 排班制
+                            </label>
+                        </div>
+                        <div id="fixedShiftFields" style="display:flex;gap:10px;">
+                            <div style="flex:1;">
+                                <label style="font-size:12px;color:#64748B;">上班時間</label>
+                                <input type="time" id="editFixedStart" value="09:00" style="width:100%;padding:10px;border:2px solid #E2E8F0;border-radius:10px;font-size:14px;">
+                            </div>
+                            <div style="flex:1;">
+                                <label style="font-size:12px;color:#64748B;">下班時間</label>
+                                <input type="time" id="editFixedEnd" value="18:00" style="width:100%;padding:10px;border:2px solid #E2E8F0;border-radius:10px;font-size:14px;">
+                            </div>
+                        </div>
+                        <div id="scheduledShiftHint" style="display:none;padding:10px;background:#DBEAFE;border-radius:8px;font-size:13px;color:#1E40AF;">
+                            📅 此員工使用排班制，請至「排班管理」設定班表
+                        </div>
+                    </div>
+                    <div class="form-group">
                         <label>LINE 綁定</label>
                         <div id="editEmpLineStatus" style="font-size:13px;color:#64748B;margin-bottom:6px;">載入中...</div>
                         <input type="text" id="editEmpLineUserId" placeholder="貼上員工的 LINE User ID" style="font-family:monospace;font-size:13px;">
@@ -2114,6 +2138,14 @@
     <script src="common.js?v=20260325"></script>
     <script type="module" src="modules/index.js?v=20260325"></script>
     <script type="module" src="admin_fixes.js?v=20260325"></script>
+    <script>
+    // ===== 工時模式切換 =====
+    window.toggleShiftFields = function() {
+        const mode = document.querySelector('input[name="editShiftMode"]:checked')?.value || 'fixed';
+        document.getElementById('fixedShiftFields').style.display = mode === 'fixed' ? 'flex' : 'none';
+        document.getElementById('scheduledShiftHint').style.display = mode === 'scheduled' ? 'block' : 'none';
+    };
+    </script>
     <script>
     // ===== 薪資試算器（admin 內嵌版）=====
     (function() {
