@@ -179,7 +179,7 @@ export async function loadAnnouncementList() {
 
 export async function toggleAnnouncement(id, active) {
     try {
-        await sb.from('announcements').update({ is_active: active, updated_at: new Date().toISOString() }).eq('id', id);
+        await sb.from('announcements').update({ is_active: active, updated_at: new Date().toISOString() }).eq('id', id).eq('company_id', window.currentCompanyId);
         showToast(active ? '✅ 已啟用' : '⏸️ 已停用');
         loadAnnouncementList();
     } catch(e) { showToast('❌ 操作失敗'); }
@@ -188,7 +188,7 @@ export async function toggleAnnouncement(id, active) {
 export async function deleteAnnouncement(id) {
     if (!confirm('確定刪除此公告？')) return;
     try {
-        await sb.from('announcements').delete().eq('id', id);
+        await sb.from('announcements').delete().eq('id', id).eq('company_id', window.currentCompanyId);
         showToast('🗑️ 已刪除');
         loadAnnouncementList();
     } catch(e) { showToast('❌ 刪除失敗'); }
@@ -828,6 +828,7 @@ export async function saveDefaultTarget() {
 
         const { data: existing } = await sb.from('sales_targets')
             .select('id')
+            .eq('company_id', window.currentCompanyId)
             .is('employee_id', null)
             .eq('week_start', weekStart)
             .maybeSingle();

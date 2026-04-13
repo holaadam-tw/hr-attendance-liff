@@ -362,7 +362,7 @@ export async function loadSalarySettingList() {
     try {
         const [empRes, ssRes] = await Promise.all([
             sb.from('employees').select('id, name, employee_number, department').eq('company_id', window.currentCompanyId).eq('is_active', true).order('department'),
-            sb.from('salary_settings').select('employee_id, salary_type, base_salary').eq('is_current', true)
+            sb.from('salary_settings').select('employee_id, salary_type, base_salary, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).eq('is_current', true)
         ]);
         const ssMap = {};
         (ssRes.data || []).forEach(s => { ssMap[s.employee_id] = s; });

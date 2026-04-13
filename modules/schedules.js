@@ -431,8 +431,9 @@ export async function loadSwapApprovals() {
 export async function approveSwap(id) {
     try {
         const { data: req } = await sb.from('shift_swap_requests')
-            .select('*, requester:employees!shift_swap_requests_requester_id_fkey(name, id), target:employees!shift_swap_requests_target_id_fkey(name, id)')
+            .select('*, requester:employees!shift_swap_requests_requester_id_fkey(name, id, company_id), target:employees!shift_swap_requests_target_id_fkey(name, id)')
             .eq('id', id).single();
+        if (!req || req.requester?.company_id !== window.currentCompanyId) { showToast('❌ 無權操作此換班'); return; }
         await sb.from('shift_swap_requests').update({
             status: 'approved', approver_id: window.currentAdminEmployee?.id, approved_at: new Date().toISOString()
         }).eq('id', id);
@@ -457,6 +458,10 @@ export async function rejectSwap(id) {
     const reason = prompt('拒絕原因：');
     if (reason === null) return;
     try {
+        const { data: chk } = await sb.from('shift_swap_requests')
+            .select('requester:employees!shift_swap_requests_requester_id_fkey(company_id)')
+            .eq('id', id).single();
+        if (!chk || chk.requester?.company_id !== window.currentCompanyId) { showToast('❌ 無權操作'); return; }
         await sb.from('shift_swap_requests').update({
             status: 'rejected', rejection_reason: reason || '不符規定',
             approver_id: window.currentAdminEmployee?.id, approved_at: new Date().toISOString()

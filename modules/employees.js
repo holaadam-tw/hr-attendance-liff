@@ -193,7 +193,8 @@ export async function updateEmployeeRoleAdmin(employeeId, newRole, employeeName)
     try {
         const { error } = await sb.from('employees')
             .update({ role: newRole })
-            .eq('id', employeeId);
+            .eq('id', employeeId)
+            .eq('company_id', window.currentCompanyId);
 
         if (error) throw error;
         showToast(`✅ ${employeeName} → ${roleNames[newRole]}`);
