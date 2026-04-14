@@ -1324,15 +1324,53 @@
             <div class="checkin-page">
                 <h2>📋 人力管理</h2>
 
-                <!-- 三頁籤 -->
-                <div style="display:flex;gap:4px;margin-bottom:16px;background:#F1F5F9;border-radius:10px;padding:3px;">
-                    <button class="smTab" onclick="switchStaffTab('shift')" style="flex:1;padding:10px;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;background:#fff;color:#4F46E5;box-shadow:0 1px 4px rgba(0,0,0,0.08);">📋 排班表</button>
-                    <button class="smTab" onclick="switchStaffTab('leave')" style="flex:1;padding:10px;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;background:transparent;color:#94A3B8;">🗓️ 休假月表</button>
-                    <button class="smTab" onclick="switchStaffTab('setting')" style="flex:1;padding:10px;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;background:transparent;color:#94A3B8;">⚙️ 人力設定</button>
+                <!-- 五頁籤 -->
+                <div style="display:flex;gap:3px;margin-bottom:16px;background:#F1F5F9;border-radius:10px;padding:3px;overflow-x:auto;">
+                    <button class="smTab" onclick="switchStaffTab('shiftMode')" style="flex:1;min-width:0;padding:10px 6px;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:11px;background:#fff;color:#4F46E5;box-shadow:0 1px 4px rgba(0,0,0,0.08);white-space:nowrap;">👥 工時</button>
+                    <button class="smTab" onclick="switchStaffTab('shift')" style="flex:1;min-width:0;padding:10px 6px;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:11px;background:transparent;color:#94A3B8;white-space:nowrap;">📋 排班</button>
+                    <button class="smTab" onclick="switchStaffTab('shifts')" style="flex:1;min-width:0;padding:10px 6px;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:11px;background:transparent;color:#94A3B8;white-space:nowrap;">⚙️ 班別</button>
+                    <button class="smTab" onclick="switchStaffTab('leave')" style="flex:1;min-width:0;padding:10px 6px;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:11px;background:transparent;color:#94A3B8;white-space:nowrap;">🗓️ 休假</button>
+                    <button class="smTab" onclick="switchStaffTab('setting')" style="flex:1;min-width:0;padding:10px 6px;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:11px;background:transparent;color:#94A3B8;white-space:nowrap;">⚙️ 設定</button>
+                </div>
+
+                <!-- === 員工工時 TAB === -->
+                <div id="tabShiftMode" class="staffTabContent">
+                    <p style="color:#6b7280;font-size:12px;margin-bottom:12px;">設定每位員工的工時模式，固定班或排班制</p>
+                    <div id="shiftModeList" style="display:flex;flex-direction:column;gap:8px;">
+                        <p style="text-align:center;color:#94A3B8;padding:20px;">載入中...</p>
+                    </div>
+                    <button onclick="saveAllShiftModes()" style="width:100%;margin-top:16px;padding:14px;border:none;border-radius:12px;background:linear-gradient(135deg,#4F46E5,#7C3AED);color:#fff;font-weight:700;font-size:14px;cursor:pointer;">💾 儲存全部</button>
+                    <div id="shiftModeSaveStatus" style="margin-top:8px;text-align:center;font-size:13px;display:none;"></div>
+                </div>
+
+                <!-- === 班別管理 TAB === -->
+                <div id="tabShifts" class="staffTabContent" style="display:none;">
+                    <p style="color:#6b7280;font-size:12px;margin-bottom:12px;">管理公司班別類型，排班表會使用這些班別</p>
+                    <div id="shiftTypeList" style="display:flex;flex-direction:column;gap:8px;">
+                        <p style="text-align:center;color:#94A3B8;padding:20px;">載入中...</p>
+                    </div>
+                    <button onclick="showAddShiftTypeForm()" style="width:100%;margin-top:12px;padding:12px;border:2px dashed #CBD5E1;border-radius:12px;background:#F8FAFC;color:#64748B;font-weight:700;font-size:13px;cursor:pointer;">+ 新增班別</button>
+                    <!-- 新增/編輯表單 -->
+                    <div id="shiftTypeForm" style="display:none;margin-top:12px;background:#fff;border-radius:14px;padding:16px;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+                        <input type="hidden" id="stEditId">
+                        <div style="display:flex;gap:8px;margin-bottom:10px;">
+                            <div style="flex:1;"><label style="font-size:11px;color:#94A3B8;display:block;margin-bottom:4px;">班別名稱</label><input type="text" id="stName" placeholder="例：早班" style="width:100%;padding:10px;border:2px solid #E2E8F0;border-radius:10px;font-size:14px;"></div>
+                            <div style="flex:1;"><label style="font-size:11px;color:#94A3B8;display:block;margin-bottom:4px;">代碼</label><input type="text" id="stCode" placeholder="DAY" style="width:100%;padding:10px;border:2px solid #E2E8F0;border-radius:10px;font-size:14px;"></div>
+                        </div>
+                        <div style="display:flex;gap:8px;margin-bottom:10px;">
+                            <div style="flex:1;"><label style="font-size:11px;color:#94A3B8;display:block;margin-bottom:4px;">開始時間</label><input type="time" id="stStart" value="08:00" style="width:100%;padding:10px;border:2px solid #E2E8F0;border-radius:10px;font-size:14px;"></div>
+                            <div style="flex:1;"><label style="font-size:11px;color:#94A3B8;display:block;margin-bottom:4px;">結束時間</label><input type="time" id="stEnd" value="17:00" style="width:100%;padding:10px;border:2px solid #E2E8F0;border-radius:10px;font-size:14px;"></div>
+                        </div>
+                        <label style="display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:12px;cursor:pointer;"><input type="checkbox" id="stOvernight" style="width:18px;height:18px;"> 跨日班（結束時間在隔天）</label>
+                        <div style="display:flex;gap:8px;">
+                            <button onclick="saveShiftType()" style="flex:1;padding:12px;border:none;border-radius:10px;background:#4F46E5;color:#fff;font-weight:700;font-size:13px;cursor:pointer;">💾 儲存</button>
+                            <button onclick="document.getElementById('shiftTypeForm').style.display='none'" style="padding:12px 20px;border:2px solid #E2E8F0;border-radius:10px;background:#fff;color:#64748B;font-weight:700;font-size:13px;cursor:pointer;">取消</button>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- === 排班表 TAB === -->
-                <div id="tabShift" class="staffTabContent">
+                <div id="tabShift" class="staffTabContent" style="display:none;">
                     <p style="color:#6b7280;font-size:12px;margin-bottom:12px;">點擊格子切換班別，排好後按儲存</p>
                     <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:12px;">
                         <button onclick="changeShiftWeek(-1)" style="background:none;border:none;font-size:20px;cursor:pointer;padding:6px 10px;border-radius:8px;">◀</button>

@@ -111,13 +111,16 @@ export function switchStaffTab(tab) {
     document.querySelectorAll('.smTab').forEach(btn => {
         btn.style.background = 'transparent'; btn.style.color = '#94A3B8'; btn.style.boxShadow = 'none';
     });
-    const tabEl = document.getElementById({ shift: 'tabShift', leave: 'tabLeave', setting: 'tabSetting' }[tab]);
+    const tabMap = { shiftMode: 'tabShiftMode', shift: 'tabShift', shifts: 'tabShifts', leave: 'tabLeave', setting: 'tabSetting' };
+    const tabEl = document.getElementById(tabMap[tab]);
     if (tabEl) tabEl.style.display = 'block';
     const btns = document.querySelectorAll('.smTab');
-    const idx = { shift: 0, leave: 1, setting: 2 }[tab];
+    const idx = { shiftMode: 0, shift: 1, shifts: 2, leave: 3, setting: 4 }[tab];
     if (btns[idx]) { btns[idx].style.background = '#fff'; btns[idx].style.color = '#4F46E5'; btns[idx].style.boxShadow = '0 1px 4px rgba(0,0,0,0.08)'; }
-    if (tab === 'leave') loadLeaveCal();
+    if (tab === 'shiftMode') window.loadEmployeeShiftModes?.();
     if (tab === 'shift') window.loadShiftMgr?.();
+    if (tab === 'shifts') window.loadShiftTypeList?.();
+    if (tab === 'leave') loadLeaveCal();
     if (tab === 'setting') { loadMaxLeaveSetting(); loadStaffOverview(); }
 }
 

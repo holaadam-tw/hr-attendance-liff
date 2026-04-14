@@ -43,7 +43,9 @@ import {
     saveSchedule, copyLastWeek, switchMakeupTab, loadMakeupApprovals,
     approveMakeupPunch, rejectMakeupPunchPrompt, rejectMakeupPunch,
     switchOtTab, loadOtApprovals, approveOt, rejectOtPrompt, rejectOt,
-    loadSwapApprovals, approveSwap, rejectSwap
+    loadSwapApprovals, approveSwap, rejectSwap,
+    loadShiftTypeList, showAddShiftTypeForm, editShiftType, saveShiftType, deleteShiftType,
+    loadEmployeeShiftModes, toggleShiftModeRow, saveAllShiftModes
 } from './schedules.js';
 
 import {
@@ -201,6 +203,14 @@ window.rejectOt = rejectOt;
 window.loadSwapApprovals = loadSwapApprovals;
 window.approveSwap = approveSwap;
 window.rejectSwap = rejectSwap;
+window.loadShiftTypeList = loadShiftTypeList;
+window.showAddShiftTypeForm = showAddShiftTypeForm;
+window.editShiftType = editShiftType;
+window.saveShiftType = saveShiftType;
+window.deleteShiftType = deleteShiftType;
+window.loadEmployeeShiftModes = loadEmployeeShiftModes;
+window.toggleShiftModeRow = toggleShiftModeRow;
+window.saveAllShiftModes = saveAllShiftModes;
 
 // payroll
 window.BONUS_MATRIX = BONUS_MATRIX;
