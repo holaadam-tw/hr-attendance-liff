@@ -848,7 +848,7 @@ export async function saveEditEmployee() {
         name: document.getElementById('editEmpName').value.trim(),
         department: document.getElementById('editEmpDept').value,
         position: document.getElementById('editEmpPosition').value.trim(),
-        hire_date: document.getElementById('editEmpHireDate').value,
+        hire_date: document.getElementById('editEmpHireDate').value || null,
         employment_type: document.getElementById('editEmpType').value,
         line_user_id: lineVal || null,
         is_bound: !!lineVal,
