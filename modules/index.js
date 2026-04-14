@@ -44,7 +44,7 @@ import {
     approveMakeupPunch, rejectMakeupPunchPrompt, rejectMakeupPunch,
     switchOtTab, loadOtApprovals, approveOt, rejectOtPrompt, rejectOt,
     loadSwapApprovals, approveSwap, rejectSwap,
-    loadShiftTypeList, showAddShiftTypeForm, editShiftType, saveShiftType, deleteShiftType,
+    loadShiftTypeList, showAddShiftTypeForm, editShiftTypeById, deleteShiftTypeById, saveShiftType, deleteShiftType,
     loadEmployeeShiftModes, toggleShiftModeRow, saveAllShiftModes, smMarkChanged, smClearChanged, smHasUnsavedChanges
 } from './schedules.js';
 
@@ -205,7 +205,8 @@ window.approveSwap = approveSwap;
 window.rejectSwap = rejectSwap;
 window.loadShiftTypeList = loadShiftTypeList;
 window.showAddShiftTypeForm = showAddShiftTypeForm;
-window.editShiftType = editShiftType;
+window.editShiftTypeById = editShiftTypeById;
+window.deleteShiftTypeById = deleteShiftTypeById;
 window.saveShiftType = saveShiftType;
 window.deleteShiftType = deleteShiftType;
 window.loadEmployeeShiftModes = loadEmployeeShiftModes;

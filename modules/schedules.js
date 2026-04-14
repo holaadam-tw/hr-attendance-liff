@@ -512,14 +512,17 @@ export async function loadShiftTypeList() {
             el.innerHTML = '<p style="text-align:center;color:#94A3B8;padding:20px;">尚無班別，請新增</p>';
             return;
         }
+        // 存班別資料供按鈕使用
+        window._shiftTypeData = {};
+        data.forEach(st => { window._shiftTypeData[st.id] = st; });
         el.innerHTML = data.map(st => `
             <div style="display:flex;align-items:center;gap:10px;padding:12px;background:#fff;border-radius:12px;border:1.5px solid #E2E8F0;">
                 <div style="flex:1;">
                     <div style="font-weight:700;font-size:14px;color:#0F172A;">${escapeHTML(st.name)}</div>
                     <div style="font-size:12px;color:#64748B;margin-top:2px;">${(st.start_time||'').substring(0,5)} - ${(st.end_time||'').substring(0,5)}${st.is_overnight ? ' (跨日)' : ''}</div>
                 </div>
-                <button onclick="editShiftType('${st.id}','${escapeHTML(st.name)}','${st.code}','${(st.start_time||'').substring(0,5)}','${(st.end_time||'').substring(0,5)}',${!!st.is_overnight})" style="padding:6px 12px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;font-size:11px;font-weight:700;cursor:pointer;color:#4F46E5;">✏️</button>
-                <button onclick="deleteShiftType('${st.id}','${escapeHTML(st.name)}')" style="padding:6px 12px;border:1px solid #FEE2E2;border-radius:8px;background:#FEF2F2;font-size:11px;font-weight:700;cursor:pointer;color:#DC2626;">🗑️</button>
+                <button onclick="editShiftTypeById('${st.id}')" style="padding:6px 12px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;font-size:11px;font-weight:700;cursor:pointer;color:#4F46E5;">✏️</button>
+                <button onclick="deleteShiftTypeById('${st.id}')" style="padding:6px 12px;border:1px solid #FEE2E2;border-radius:8px;background:#FEF2F2;font-size:11px;font-weight:700;cursor:pointer;color:#DC2626;">🗑️</button>
             </div>
         `).join('');
     } catch (e) { el.innerHTML = '<p style="text-align:center;color:#ef4444;">載入失敗</p>'; }
@@ -535,14 +538,21 @@ export function showAddShiftTypeForm() {
     document.getElementById('shiftTypeForm').style.display = 'block';
 }
 
-export function editShiftType(id, name, code, start, end, overnight) {
-    document.getElementById('stEditId').value = id;
-    document.getElementById('stName').value = name;
-    document.getElementById('stCode').value = code;
-    document.getElementById('stStart').value = start;
-    document.getElementById('stEnd').value = end;
-    document.getElementById('stOvernight').checked = overnight;
+export function editShiftTypeById(id) {
+    const st = window._shiftTypeData?.[id];
+    if (!st) return;
+    document.getElementById('stEditId').value = st.id;
+    document.getElementById('stName').value = st.name || '';
+    document.getElementById('stCode').value = st.code || '';
+    document.getElementById('stStart').value = (st.start_time || '').substring(0, 5);
+    document.getElementById('stEnd').value = (st.end_time || '').substring(0, 5);
+    document.getElementById('stOvernight').checked = !!st.is_overnight;
     document.getElementById('shiftTypeForm').style.display = 'block';
+}
+
+export function deleteShiftTypeById(id) {
+    const st = window._shiftTypeData?.[id];
+    deleteShiftType(id, st?.name || '');
 }
 
 export async function saveShiftType() {
