@@ -10,8 +10,25 @@
 | # | Bug | 嚴重度 | 狀態 |
 |---|-----|--------|------|
 | 1 | 打卡後首頁狀態不顯示 — LIFF BFCache 問題 | 🔴 嚴重 | 修了 3 次還沒穩定 |
-| 2 | 考勤查詢不顯示 — RPC+RLS+時區三重 bug | 🔴 嚴重 | ✅ 已修復（041 SQL 重建 RPC + UTC 時區字串比較 + debug log）需執行 041 SQL |
-| 3 | RLS 未設定 — anon key 可讀所有公司資料 | 🔴 安全 | ✅ 已修復（c5d3f9d + 8ab8332 + 2ecc410）前端查詢全面加 company_id 隔離 |
+| 2 | 考勤查詢不顯示 — RPC+RLS+時區三重 bug | 🔴 嚴重 | ✅ 已修復（041 SQL）|
+| 3 | RLS 未設定 — anon key 可讀所有公司資料 | 🔴 安全 | ✅ 已修復（24+ 個查詢加 company_id）|
+
+## 🔵 2026-04-14 修復的 Bug
+
+| # | Bug | Commit | 說明 |
+|---|-----|--------|------|
+| B1 | quick_check_in v_schedule 未賦值 | 3324bfe | 用 v_schedule_found BOOLEAN 旗標取代直接存取 RECORD |
+| B2 | checkbox 無法取消勾選 | c3b9094 | CSS -webkit-appearance:none 連 checkbox 也套用 |
+| B3 | 排班頁面載入失敗無錯誤訊息 | c3b9094 | 加顯示 e.message/details/hint |
+| B4 | 固定班顯示 09:00/18:00 不是 08:00/17:00 | c3b9094 | migration 062 統一修正 |
+| B5 | get_weekly_schedules column not exist | ddb1f52 | shift_types 加 company_id + 重建 RPC |
+| B6 | 多租戶隔離 24+ 個漏洞 | c5d3f9d~b0d47d7 | 4 批次全面修復 |
+| B7 | hire_date 空字串 → 400 錯誤 | 1d1577b | 加 \|\| null 防護 |
+| B8 | QR 列印空白 | a1e4aa3 | 改用 window.open 獨立視窗 |
+| B9 | 班別編輯 onclick 引號壞掉 | 0c77d57 | 改用 data lookup |
+| B10 | 工時 tab 時間框截斷 | e417dba | 120px → 160px |
+| B11 | shift_types 401 Unauthorized | 31fe10b | 改用 SECURITY DEFINER RPC |
+| B12 | 公務機帳號繞過打卡防護 | c7c9b52 | 3 層防線（index/checkin/RPC）|
 
 ---
 
