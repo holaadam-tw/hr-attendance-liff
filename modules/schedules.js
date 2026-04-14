@@ -601,9 +601,9 @@ export async function loadEmployeeShiftModes() {
                         <option value="scheduled" ${!isFixed ? 'selected' : ''}>排班制</option>
                     </select>
                     <div class="sm-fixed-fields" style="display:${isFixed ? 'flex' : 'none'};gap:6px;align-items:center;flex-shrink:0;">
-                        <input type="time" class="sm-start" value="${fs}" onchange="markShiftChanged()" style="padding:8px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;font-weight:600;width:120px;">
+                        <input type="time" class="sm-start" value="${fs}" onchange="markShiftChanged()" style="padding:8px 6px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:13px;font-weight:600;width:160px;min-width:160px;">
                         <span style="color:#94A3B8;font-weight:700;">~</span>
-                        <input type="time" class="sm-end" value="${fe}" onchange="markShiftChanged()" style="padding:8px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;font-weight:600;width:120px;">
+                        <input type="time" class="sm-end" value="${fe}" onchange="markShiftChanged()" style="padding:8px 6px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:13px;font-weight:600;width:160px;min-width:160px;">
                     </div>
                     <div class="sm-sched-hint" style="display:${!isFixed ? 'inline' : 'none'};font-size:12px;color:#4F46E5;font-weight:600;">→ 至排班 tab 設定</div>
                 </div>
