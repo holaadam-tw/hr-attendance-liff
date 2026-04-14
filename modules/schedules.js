@@ -527,7 +527,7 @@ export async function saveShiftType() {
     if (!name || !start || !end) { showToast('⚠️ 請填寫名稱和時間'); return; }
     try {
         if (id) {
-            const { error } = await sb.from('shift_types').update({ name, code, start_time: start, end_time: end, is_overnight: overnight }).eq('id', id);
+            const { error } = await sb.from('shift_types').update({ name, code, start_time: start, end_time: end, is_overnight: overnight }).eq('id', id).eq('company_id', window.currentCompanyId);
             if (error) throw error;
             showToast('✅ 班別已更新');
         } else {
@@ -543,7 +543,7 @@ export async function saveShiftType() {
 export async function deleteShiftType(id, name) {
     if (!confirm('確定刪除班別「' + name + '」？')) return;
     try {
-        const { error } = await sb.from('shift_types').update({ is_active: false }).eq('id', id);
+        const { error } = await sb.from('shift_types').update({ is_active: false }).eq('id', id).eq('company_id', window.currentCompanyId);
         if (error) throw error;
         showToast('🗑️ 已刪除');
         loadShiftTypeList();

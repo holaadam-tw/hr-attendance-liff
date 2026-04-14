@@ -75,3 +75,6 @@
 | `sessionStorage` 快取 | 需手動清除，跨頁面可能帶殘值 |
 | 勞退自提存 TIMESTAMPTZ | 用 `now()` 不能用 `now() AT TIME ZONE` |
 | **新查詢必須有 company_id** | 每個 `sb.from()` 查詢都必須帶 `.eq('company_id', window.currentCompanyId)` 或透過 `employees!inner(company_id)` 間接隔離。左 join `employees(...)` 無法做隔離，必須用 `employees!inner(...)` |
+| **空字串 → DATE/TIME 欄位** | `input.value` 為空時回傳 `''`，必須加 `\|\| null`，否則 Supabase PATCH 400 |
+| **工時模式統一管理** | 員工 shift_mode 只在「人力管理 → 👥 工時」tab 設定，員工管理 Modal 不處理 shift_mode |
+| **shift_types 按公司隔離** | 每個公司有自己的班別，查詢必須帶 `company_id` 或 `company_id IS NULL` |
