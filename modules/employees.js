@@ -163,7 +163,7 @@ export async function loadEmployeeList() {
                         <span style="font-size:12px;">驗證碼: ${escapeHTML(emp.id_card_last_4 || '未設定')}</span>
                     </div>
                     <div style="font-size:12px;color:#666;margin-top:5px;">
-                        到職: ${emp.hire_date || '未設定'} · ${emp.employment_type === 'parttime' ? '兼職' : '正職'} · ${emp.is_kiosk ? '📱 公務機' : emp.no_checkin ? '🚫 免打卡' : emp.shift_mode === 'scheduled' ? '📅 排班制' : emp.fixed_shift_start ? '📌 ' + (emp.fixed_shift_start || '').substring(0, 5) + '-' + (emp.fixed_shift_end || '').substring(0, 5) : '📌 固定班'} · ${emp.line_user_id ? '✅ 已綁定' : '⏳ 未綁定'}
+                        到職: ${emp.hire_date || '未設定'} · ${emp.employment_type === 'parttime' ? '兼職' : '正職'} · ${emp.is_kiosk ? '📱 公務機' : emp.no_checkin ? '🚫 免打卡' : ''} · ${emp.line_user_id ? '✅ 已綁定' : '⏳ 未綁定'}
                     </div>
                     <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;">
                         <button onclick="openEditEmployeeModal('${emp.id}')" style="padding:7px 12px;border:1px solid #E5E7EB;border-radius:8px;background:#fff;font-size:11px;font-weight:700;cursor:pointer;color:#4F46E5;">✏️ 編輯</button>
@@ -805,14 +805,7 @@ export async function openEditEmployeeModal(empId) {
             document.getElementById('editEmpPosition').value = data.position || '';
             document.getElementById('editEmpHireDate').value = data.hire_date || '';
             document.getElementById('editEmpType').value = data.employment_type || 'fulltime';
-            // 工時模式
-            const shiftMode = data.shift_mode || 'fixed';
-            const radios = document.querySelectorAll('input[name="editShiftMode"]');
-            radios.forEach(r => { r.checked = r.value === shiftMode; });
-            document.getElementById('editFixedStart').value = data.fixed_shift_start ? data.fixed_shift_start.substring(0, 5) : '08:00';
-            document.getElementById('editFixedEnd').value = data.fixed_shift_end ? data.fixed_shift_end.substring(0, 5) : '17:00';
-            if (typeof toggleShiftFields === 'function') toggleShiftFields();
-            // 排班權限 + 免打卡
+            // 排班權限 + 免打卡（工時模式改在人力管理 tab 設定）
             const canScheduleEl = document.getElementById('editCanSchedule');
             if (canScheduleEl) canScheduleEl.checked = !!data.can_schedule;
             const noCheckinEl = document.getElementById('editNoCheckin');
@@ -843,7 +836,6 @@ export async function saveEditEmployee() {
     const empId = document.getElementById('editEmpId').value;
     if (!empId) return;
     const lineVal = (document.getElementById('editEmpLineUserId')?.value || '').trim();
-    const shiftMode = document.querySelector('input[name="editShiftMode"]:checked')?.value || 'fixed';
     const updates = {
         name: document.getElementById('editEmpName').value.trim(),
         department: document.getElementById('editEmpDept').value,
@@ -852,9 +844,6 @@ export async function saveEditEmployee() {
         employment_type: document.getElementById('editEmpType').value,
         line_user_id: lineVal || null,
         is_bound: !!lineVal,
-        shift_mode: shiftMode,
-        fixed_shift_start: shiftMode === 'fixed' ? (document.getElementById('editFixedStart').value || null) : null,
-        fixed_shift_end: shiftMode === 'fixed' ? (document.getElementById('editFixedEnd').value || null) : null,
         can_schedule: !!document.getElementById('editCanSchedule')?.checked,
         no_checkin: !!document.getElementById('editNoCheckin')?.checked,
         is_kiosk: !!document.getElementById('editIsKiosk')?.checked
