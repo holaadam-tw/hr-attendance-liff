@@ -50,10 +50,8 @@ export async function loadShiftMgr() {
     document.getElementById('smHead').innerHTML = '';
     document.getElementById('shiftDaySummary').innerHTML = '';
     try {
-        // 動態載入公司班別
-        const { data: stData } = await sb.from('shift_types').select('id, code, name, start_time, end_time, is_overnight')
-            .or(`company_id.eq.${window.currentCompanyId},company_id.is.null`)
-            .eq('is_active', true).order('start_time');
+        // 動態載入公司班別（透過 RPC）
+        const { data: stData } = await sb.rpc('get_company_shift_types', { p_company_id: window.currentCompanyId });
         smShiftTypes = stData || [];
         SHIFT_TYPES = [null, ...smShiftTypes.map(s => s.code), 'off'];
         SHIFT_DISPLAY = { null: { label: '⬜', bg: '#F8FAFC', color: '#94A3B8', name: '未排' }, off: { label: '🏖️', bg: '#ECFDF5', color: '#059669', name: '休假' } };
@@ -213,7 +211,7 @@ export async function saveSchedule() {
     const statusEl = document.getElementById('smSaveStatus');
     statusEl.style.display = 'block'; statusEl.style.color = '#F59E0B'; statusEl.textContent = '⏳ 儲存中...';
     try {
-        const { data: shiftTypes } = await sb.from('shift_types').select('id, code, name').or(`company_id.eq.${window.currentCompanyId},company_id.is.null`);
+        const { data: shiftTypes } = await sb.rpc('get_company_shift_types', { p_company_id: window.currentCompanyId });
         const stMap = {};
         (shiftTypes || []).forEach(st => { stMap[st.code || st.name] = st.id; });
         const upserts = [];
@@ -503,29 +501,29 @@ export async function loadShiftTypeList() {
     const el = document.getElementById('shiftTypeList');
     if (!el) return;
     try {
-        const { data, error } = await sb.from('shift_types').select('*')
-            .or(`company_id.eq.${window.currentCompanyId},company_id.is.null`)
-            .eq('is_active', true)
-            .order('start_time');
+        const { data, error } = await sb.rpc('get_company_shift_types', { p_company_id: window.currentCompanyId });
         if (error) throw error;
-        if (!data || data.length === 0) {
+        const list = data || [];
+        if (list.length === 0) {
             el.innerHTML = '<p style="text-align:center;color:#94A3B8;padding:20px;">尚無班別，請新增</p>';
             return;
         }
-        // 存班別資料供按鈕使用
         window._shiftTypeData = {};
-        data.forEach(st => { window._shiftTypeData[st.id] = st; });
-        el.innerHTML = data.map(st => `
+        list.forEach(st => { window._shiftTypeData[st.id] = st; });
+        el.innerHTML = list.map(st => `
             <div style="display:flex;align-items:center;gap:10px;padding:12px;background:#fff;border-radius:12px;border:1.5px solid #E2E8F0;">
                 <div style="flex:1;">
                     <div style="font-weight:700;font-size:14px;color:#0F172A;">${escapeHTML(st.name)}</div>
                     <div style="font-size:12px;color:#64748B;margin-top:2px;">${(st.start_time||'').substring(0,5)} - ${(st.end_time||'').substring(0,5)}${st.is_overnight ? ' (跨日)' : ''}</div>
                 </div>
-                <button onclick="editShiftTypeById('${st.id}')" style="padding:6px 12px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;font-size:11px;font-weight:700;cursor:pointer;color:#4F46E5;">✏️</button>
-                <button onclick="deleteShiftTypeById('${st.id}')" style="padding:6px 12px;border:1px solid #FEE2E2;border-radius:8px;background:#FEF2F2;font-size:11px;font-weight:700;cursor:pointer;color:#DC2626;">🗑️</button>
+                ${st.company_id ? `<button onclick="editShiftTypeById('${st.id}')" style="padding:6px 12px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;font-size:11px;font-weight:700;cursor:pointer;color:#4F46E5;">✏️</button>
+                <button onclick="deleteShiftTypeById('${st.id}')" style="padding:6px 12px;border:1px solid #FEE2E2;border-radius:8px;background:#FEF2F2;font-size:11px;font-weight:700;cursor:pointer;color:#DC2626;">🗑️</button>` : ''}
             </div>
         `).join('');
-    } catch (e) { el.innerHTML = '<p style="text-align:center;color:#ef4444;">載入失敗</p>'; }
+    } catch (e) {
+        console.error('載入班別失敗:', e);
+        el.innerHTML = '<p style="text-align:center;color:#ef4444;">載入失敗：' + escapeHTML(e.message || '') + '</p>';
+    }
 }
 
 export function showAddShiftTypeForm() {
@@ -558,34 +556,46 @@ export function deleteShiftTypeById(id) {
 export async function saveShiftType() {
     const id = document.getElementById('stEditId').value;
     const name = document.getElementById('stName').value.trim();
-    const code = document.getElementById('stCode').value.trim() || name.substring(0, 10).toUpperCase();
+    const code = document.getElementById('stCode').value.trim() || null;
     const start = document.getElementById('stStart').value;
     const end = document.getElementById('stEnd').value;
     const overnight = document.getElementById('stOvernight').checked;
     if (!name || !start || !end) { showToast('⚠️ 請填寫名稱和時間'); return; }
     try {
         if (id) {
-            const { error } = await sb.from('shift_types').update({ name, code, start_time: start, end_time: end, is_overnight: overnight }).eq('id', id).eq('company_id', window.currentCompanyId);
+            const { error } = await sb.rpc('update_shift_type', {
+                p_id: id, p_company_id: window.currentCompanyId,
+                p_name: name, p_code: code, p_start_time: start, p_end_time: end, p_is_overnight: overnight
+            });
             if (error) throw error;
             showToast('✅ 班別已更新');
         } else {
-            const { error } = await sb.from('shift_types').insert({ name, code, start_time: start, end_time: end, is_overnight: overnight, company_id: window.currentCompanyId });
+            const { error } = await sb.rpc('create_shift_type', {
+                p_company_id: window.currentCompanyId,
+                p_name: name, p_code: code, p_start_time: start, p_end_time: end, p_is_overnight: overnight
+            });
             if (error) throw error;
-            showToast('✅ 班別已新增');
+            showToast('✅ 班別已建立');
         }
         document.getElementById('shiftTypeForm').style.display = 'none';
         loadShiftTypeList();
-    } catch (e) { showToast('❌ 儲存失敗: ' + friendlyError(e)); }
+    } catch (e) {
+        console.error('儲存班別失敗:', e);
+        showToast('❌ 儲存失敗：' + friendlyError(e));
+    }
 }
 
 export async function deleteShiftType(id, name) {
     if (!confirm('確定刪除班別「' + name + '」？')) return;
     try {
-        const { error } = await sb.from('shift_types').update({ is_active: false }).eq('id', id).eq('company_id', window.currentCompanyId);
+        const { error } = await sb.rpc('delete_shift_type', { p_id: id, p_company_id: window.currentCompanyId });
         if (error) throw error;
         showToast('🗑️ 已刪除');
         loadShiftTypeList();
-    } catch (e) { showToast('❌ 刪除失敗'); }
+    } catch (e) {
+        console.error('刪除失敗:', e);
+        showToast('❌ 刪除失敗：' + friendlyError(e));
+    }
 }
 
 // ===== 員工工時模式管理 =====
