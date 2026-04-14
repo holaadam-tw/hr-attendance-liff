@@ -49,7 +49,7 @@ export async function loadShiftMgr() {
     document.getElementById('smHead').innerHTML = '';
     document.getElementById('shiftDaySummary').innerHTML = '';
     try {
-        const { data: emps } = await sb.from('employees').select('id, name, department').eq('company_id', window.currentCompanyId).eq('is_active', true).order('name');
+        const { data: emps } = await sb.from('employees').select('id, name, department, shift_mode').eq('company_id', window.currentCompanyId).eq('is_active', true).eq('shift_mode', 'scheduled').order('name');
         smEmployees = emps || [];
         const { data: scheds } = await sb.from('schedules').select('employee_id, date, shift_type_id, shift_types(name, code), employees!inner(company_id)')
             .eq('employees.company_id', window.currentCompanyId)
@@ -87,9 +87,8 @@ function renderShiftTable() {
         document.getElementById('shiftDaySummary').innerHTML = `
             <div style="width:100%;text-align:center;padding:40px 20px;">
                 <div style="font-size:48px;margin-bottom:12px;">👥</div>
-                <div style="font-size:16px;font-weight:800;color:#0F172A;margin-bottom:8px;">尚無員工資料</div>
-                <div style="font-size:13px;color:#94A3B8;margin-bottom:16px;">請先到「員工管理」新增員工，才能排班</div>
-                <button onclick="showPage('employeePage')" style="padding:12px 24px;border:none;border-radius:10px;background:linear-gradient(135deg,#4F46E5,#7C3AED);color:#fff;font-weight:700;font-size:14px;cursor:pointer;">👉 前往員工管理</button>
+                <div style="font-size:16px;font-weight:800;color:#0F172A;margin-bottom:8px;">沒有排班制員工</div>
+                <div style="font-size:13px;color:#94A3B8;margin-bottom:16px;">請先到「👥 工時」tab 將員工設為排班制</div>
             </div>`;
         const w = document.getElementById('shiftStaffWarn');
         if (w) w.style.display = 'none';
