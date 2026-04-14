@@ -552,9 +552,31 @@ export async function deleteShiftType(id, name) {
 
 // ===== 員工工時模式管理 =====
 
+let smHasUnsaved = false;
+
+export function smMarkChanged() {
+    if (smHasUnsaved) return;
+    smHasUnsaved = true;
+    const banner = document.getElementById('smUnsavedBanner');
+    if (banner) banner.style.display = 'block';
+    const btn = document.getElementById('smSaveBtn');
+    if (btn) { btn.style.background = 'linear-gradient(135deg,#F59E0B,#DC2626)'; btn.textContent = '⚠️ 儲存所有變更'; }
+}
+
+export function smClearChanged() {
+    smHasUnsaved = false;
+    const banner = document.getElementById('smUnsavedBanner');
+    if (banner) banner.style.display = 'none';
+    const btn = document.getElementById('smSaveBtn');
+    if (btn) { btn.style.background = 'linear-gradient(135deg,#4F46E5,#7C3AED)'; btn.textContent = '💾 儲存全部'; }
+}
+
+export function smHasUnsavedChanges() { return smHasUnsaved; }
+
 export async function loadEmployeeShiftModes() {
     const el = document.getElementById('shiftModeList');
     if (!el) return;
+    smClearChanged();
     try {
         const { data, error } = await sb.from('employees')
             .select('id, name, department, shift_mode, fixed_shift_start, fixed_shift_end')
@@ -568,21 +590,23 @@ export async function loadEmployeeShiftModes() {
             const fs = (emp.fixed_shift_start || '').substring(0, 5) || '08:00';
             const fe = (emp.fixed_shift_end || '').substring(0, 5) || '17:00';
             return `
-            <div style="display:flex;align-items:center;gap:8px;padding:12px;background:#fff;border-radius:12px;border:1.5px solid #E2E8F0;flex-wrap:wrap;" data-emp-id="${emp.id}">
-                <div style="min-width:80px;">
-                    <div style="font-weight:700;font-size:13px;color:#0F172A;">${escapeHTML(emp.name)}</div>
-                    <div style="font-size:11px;color:#94A3B8;">${escapeHTML(emp.department || '')}</div>
+            <div style="padding:14px;background:#fff;border-radius:12px;border:1.5px solid #E2E8F0;" data-emp-id="${emp.id}">
+                <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                    <div style="min-width:70px;flex-shrink:0;">
+                        <div style="font-weight:700;font-size:14px;color:#0F172A;">${escapeHTML(emp.name)}</div>
+                        <div style="font-size:11px;color:#94A3B8;">${escapeHTML(emp.department || '')}</div>
+                    </div>
+                    <select class="sm-mode" data-emp="${emp.id}" onchange="toggleShiftModeRow(this);markShiftChanged()" style="padding:8px 12px;border:2px solid #E2E8F0;border-radius:8px;font-size:13px;font-weight:700;flex-shrink:0;">
+                        <option value="fixed" ${isFixed ? 'selected' : ''}>固定班</option>
+                        <option value="scheduled" ${!isFixed ? 'selected' : ''}>排班制</option>
+                    </select>
+                    <div class="sm-fixed-fields" style="display:${isFixed ? 'flex' : 'none'};gap:6px;align-items:center;flex-shrink:0;">
+                        <input type="time" class="sm-start" value="${fs}" onchange="markShiftChanged()" style="padding:8px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;font-weight:600;width:120px;">
+                        <span style="color:#94A3B8;font-weight:700;">~</span>
+                        <input type="time" class="sm-end" value="${fe}" onchange="markShiftChanged()" style="padding:8px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:14px;font-weight:600;width:120px;">
+                    </div>
+                    <div class="sm-sched-hint" style="display:${!isFixed ? 'inline' : 'none'};font-size:12px;color:#4F46E5;font-weight:600;">→ 至排班 tab 設定</div>
                 </div>
-                <select class="sm-mode" data-emp="${emp.id}" onchange="toggleShiftModeRow(this)" style="padding:8px;border:2px solid #E2E8F0;border-radius:8px;font-size:13px;font-weight:700;">
-                    <option value="fixed" ${isFixed ? 'selected' : ''}>固定班</option>
-                    <option value="scheduled" ${!isFixed ? 'selected' : ''}>排班制</option>
-                </select>
-                <div class="sm-fixed-fields" style="display:${isFixed ? 'flex' : 'none'};gap:4px;align-items:center;">
-                    <input type="time" class="sm-start" value="${fs}" style="padding:6px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:13px;width:90px;">
-                    <span style="color:#94A3B8;">~</span>
-                    <input type="time" class="sm-end" value="${fe}" style="padding:6px;border:1.5px solid #E2E8F0;border-radius:8px;font-size:13px;width:90px;">
-                </div>
-                <div class="sm-sched-hint" style="display:${!isFixed ? 'inline' : 'none'};font-size:11px;color:#4F46E5;font-weight:600;">→ 排班表設定</div>
             </div>`;
         }).join('');
     } catch (e) { el.innerHTML = '<p style="text-align:center;color:#ef4444;">載入失敗</p>'; }
@@ -614,6 +638,7 @@ export async function saveAllShiftModes() {
             if (error) throw error;
             count++;
         }
+        smClearChanged();
         statusEl.style.display = 'block'; statusEl.style.color = '#059669';
         statusEl.textContent = '✅ 已儲存 ' + count + ' 位員工';
         setTimeout(() => { statusEl.style.display = 'none'; }, 2500);

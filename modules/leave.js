@@ -107,6 +107,9 @@ export async function approveLeave(requestId, newStatus) {
 
 // ===== 人力管理 — 頁籤切換 =====
 export function switchStaffTab(tab) {
+    if (window.smHasUnsavedChanges?.()) {
+        if (!confirm('您有未儲存的工時變更，確定離開？')) return;
+    }
     document.querySelectorAll('.staffTabContent').forEach(el => el.style.display = 'none');
     document.querySelectorAll('.smTab').forEach(btn => {
         btn.style.background = 'transparent'; btn.style.color = '#94A3B8'; btn.style.boxShadow = 'none';

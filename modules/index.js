@@ -45,7 +45,7 @@ import {
     switchOtTab, loadOtApprovals, approveOt, rejectOtPrompt, rejectOt,
     loadSwapApprovals, approveSwap, rejectSwap,
     loadShiftTypeList, showAddShiftTypeForm, editShiftType, saveShiftType, deleteShiftType,
-    loadEmployeeShiftModes, toggleShiftModeRow, saveAllShiftModes
+    loadEmployeeShiftModes, toggleShiftModeRow, saveAllShiftModes, smMarkChanged, smClearChanged, smHasUnsavedChanges
 } from './schedules.js';
 
 import {
@@ -211,6 +211,8 @@ window.deleteShiftType = deleteShiftType;
 window.loadEmployeeShiftModes = loadEmployeeShiftModes;
 window.toggleShiftModeRow = toggleShiftModeRow;
 window.saveAllShiftModes = saveAllShiftModes;
+window.markShiftChanged = smMarkChanged;
+window.smHasUnsavedChanges = smHasUnsavedChanges;
 
 // payroll
 window.BONUS_MATRIX = BONUS_MATRIX;

@@ -1313,10 +1313,13 @@
                 <!-- === 員工工時 TAB === -->
                 <div id="tabShiftMode" class="staffTabContent">
                     <p style="color:#6b7280;font-size:12px;margin-bottom:12px;">設定每位員工的工時模式，固定班或排班制</p>
-                    <div id="shiftModeList" style="display:flex;flex-direction:column;gap:8px;">
+                    <div id="shiftModeList" style="display:flex;flex-direction:column;gap:10px;">
                         <p style="text-align:center;color:#94A3B8;padding:20px;">載入中...</p>
                     </div>
-                    <button onclick="saveAllShiftModes()" style="width:100%;margin-top:16px;padding:14px;border:none;border-radius:12px;background:linear-gradient(135deg,#4F46E5,#7C3AED);color:#fff;font-weight:700;font-size:14px;cursor:pointer;">💾 儲存全部</button>
+                    <div id="smUnsavedBanner" style="display:none;position:sticky;bottom:0;background:#FEF3C7;border-top:2px solid #F59E0B;padding:12px 16px;text-align:center;font-weight:700;color:#92400E;z-index:100;border-radius:0 0 12px 12px;margin-top:12px;">
+                        ⚠️ 有未儲存的變更
+                    </div>
+                    <button id="smSaveBtn" onclick="saveAllShiftModes()" style="width:100%;margin-top:16px;padding:14px;border:none;border-radius:12px;background:linear-gradient(135deg,#4F46E5,#7C3AED);color:#fff;font-weight:700;font-size:14px;cursor:pointer;">💾 儲存全部</button>
                     <div id="shiftModeSaveStatus" style="margin-top:8px;text-align:center;font-size:13px;display:none;"></div>
                 </div>
 
