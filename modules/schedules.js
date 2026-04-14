@@ -16,14 +16,15 @@ let smWeekStart;
 let smEmployees = [];
 let smScheduleData = {};
 let smLeaveData = {};
-const SHIFT_TYPES = [null, 'morning', 'afternoon', 'night', 'off'];
-const SHIFT_DISPLAY = {
+let smShiftTypes = []; // 動態班別列表
+let SHIFT_TYPES = [null, 'off']; // 預設只有 null 和 off，loadShiftMgr 會填入
+let SHIFT_DISPLAY = {
     null: { label: '⬜', bg: '#F8FAFC', color: '#94A3B8', name: '未排' },
-    morning: { label: '☀️', bg: '#DBEAFE', color: '#1E40AF', name: '早班' },
-    afternoon: { label: '🌤️', bg: '#FEF3C7', color: '#92400E', name: '中班' },
-    night: { label: '🌙', bg: '#EDE9FE', color: '#6D28D9', name: '晚班' },
     off: { label: '🏖️', bg: '#ECFDF5', color: '#059669', name: '休假' }
 };
+const SHIFT_ICONS = ['☀️', '🌤️', '🌙', '⏰', '🌅', '🌆', '🔔', '🏢'];
+const SHIFT_COLORS = ['#DBEAFE', '#FEF3C7', '#EDE9FE', '#FCE7F3', '#D1FAE5', '#FFF7ED', '#F1F5F9', '#E0E7FF'];
+const SHIFT_TEXT_COLORS = ['#1E40AF', '#92400E', '#6D28D9', '#BE185D', '#065F46', '#9A3412', '#475569', '#3730A3'];
 
 export function changeShiftWeek(d) { smWeekStart.setDate(smWeekStart.getDate() + d * 7); loadShiftMgr(); }
 export function resetShiftWeek() {
@@ -49,6 +50,18 @@ export async function loadShiftMgr() {
     document.getElementById('smHead').innerHTML = '';
     document.getElementById('shiftDaySummary').innerHTML = '';
     try {
+        // 動態載入公司班別
+        const { data: stData } = await sb.from('shift_types').select('id, code, name, start_time, end_time, is_overnight')
+            .or(`company_id.eq.${window.currentCompanyId},company_id.is.null`)
+            .eq('is_active', true).order('start_time');
+        smShiftTypes = stData || [];
+        SHIFT_TYPES = [null, ...smShiftTypes.map(s => s.code), 'off'];
+        SHIFT_DISPLAY = { null: { label: '⬜', bg: '#F8FAFC', color: '#94A3B8', name: '未排' }, off: { label: '🏖️', bg: '#ECFDF5', color: '#059669', name: '休假' } };
+        smShiftTypes.forEach((s, i) => {
+            SHIFT_DISPLAY[s.code] = { label: SHIFT_ICONS[i] || '⏰', bg: SHIFT_COLORS[i] || '#F3F4F6', color: SHIFT_TEXT_COLORS[i] || '#475569', name: s.name };
+        });
+        updateShiftLegend();
+
         const { data: emps } = await sb.from('employees').select('id, name, department, shift_mode').eq('company_id', window.currentCompanyId).eq('is_active', true).eq('shift_mode', 'scheduled').order('name');
         smEmployees = emps || [];
         const { data: scheds } = await sb.from('schedules').select('employee_id, date, shift_type_id, shift_types(name, code), employees!inner(company_id)')
@@ -146,7 +159,8 @@ function renderShiftTable() {
     dates.forEach(d => {
         const ds = fmtDate(d);
         const isW = d.getDay() === 0 || d.getDay() === 6;
-        const counts = { morning: 0, afternoon: 0, night: 0, off: 0, leave: 0, unset: 0 };
+        const counts = { off: 0, leave: 0, unset: 0 };
+        smShiftTypes.forEach(s => { counts[s.code] = 0; });
         smEmployees.forEach(emp => {
             const key = `${emp.id}_${ds}`;
             if (smLeaveData[key]) { counts.leave++; return; }
@@ -154,12 +168,14 @@ function renderShiftTable() {
             if (s && counts.hasOwnProperty(s)) counts[s]++;
             else counts.unset++;
         });
-        const total = counts.morning + counts.afternoon + counts.night;
+        let total = 0;
+        smShiftTypes.forEach(s => { total += counts[s.code] || 0; });
         const low = total > 0 && total <= 2 && !isW;
+        let shiftSumStr = smShiftTypes.map((s, i) => `${SHIFT_ICONS[i] || ''}${counts[s.code] || 0}`).join(' ');
         sumHtml += `<div style="min-width:60px;padding:6px 8px;background:${low ? '#FEF2F2' : '#F8FAFC'};border-radius:8px;text-align:center;flex-shrink:0;${low ? 'border:2px solid #FCA5A5;' : ''}">
             <div style="font-size:10px;font-weight:700;color:#64748B;">${d.getDate()}日</div>
             <div style="font-size:14px;font-weight:900;color:${low ? '#DC2626' : '#0F172A'};">${total}人</div>
-            <div style="font-size:9px;color:#94A3B8;">☀${counts.morning} 🌤${counts.afternoon} 🌙${counts.night}</div>
+            <div style="font-size:9px;color:#94A3B8;">${shiftSumStr}</div>
             ${counts.leave > 0 ? `<div style="font-size:9px;color:#EA580C;">假${counts.leave}</div>` : ''}
         </div>`;
     });
@@ -172,6 +188,18 @@ function renderShiftTable() {
     } else {
         warnEl.style.display = 'none';
     }
+}
+
+function updateShiftLegend() {
+    const el = document.getElementById('shiftLegend');
+    if (!el) return;
+    let html = '';
+    smShiftTypes.forEach((s, i) => {
+        html += `<span style="font-size:10px;padding:3px 8px;background:${SHIFT_COLORS[i] || '#F3F4F6'};color:${SHIFT_TEXT_COLORS[i] || '#475569'};border-radius:6px;font-weight:700;">${SHIFT_ICONS[i] || '⏰'}${escapeHTML(s.name)}</span>`;
+    });
+    html += '<span style="font-size:10px;padding:3px 8px;background:#ECFDF5;color:#059669;border-radius:6px;font-weight:700;">🏖️休</span>';
+    html += '<span style="font-size:10px;padding:3px 8px;background:#F1F5F9;color:#64748B;border-radius:6px;font-weight:700;">⬜未排</span>';
+    el.innerHTML = html;
 }
 
 export function cycleShift(key) {

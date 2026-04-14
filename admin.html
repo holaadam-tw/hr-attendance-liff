@@ -1362,13 +1362,7 @@
                         <button onclick="changeShiftWeek(1)" style="background:none;border:none;font-size:20px;cursor:pointer;padding:6px 10px;border-radius:8px;">▶</button>
                         <button onclick="resetShiftWeek()" style="padding:4px 10px;border:1px solid #E5E7EB;border-radius:6px;background:#fff;font-size:11px;font-weight:700;color:#4F46E5;cursor:pointer;">本週</button>
                     </div>
-                    <div style="display:flex;gap:5px;margin-bottom:12px;flex-wrap:wrap;justify-content:center;">
-                        <span style="font-size:10px;padding:3px 8px;background:#DBEAFE;color:#1E40AF;border-radius:6px;font-weight:700;">☀️早</span>
-                        <span style="font-size:10px;padding:3px 8px;background:#FEF3C7;color:#92400E;border-radius:6px;font-weight:700;">🌤️中</span>
-                        <span style="font-size:10px;padding:3px 8px;background:#EDE9FE;color:#6D28D9;border-radius:6px;font-weight:700;">🌙晚</span>
-                        <span style="font-size:10px;padding:3px 8px;background:#ECFDF5;color:#059669;border-radius:6px;font-weight:700;">🏖️休</span>
-                        <span style="font-size:10px;padding:3px 8px;background:#F1F5F9;color:#64748B;border-radius:6px;font-weight:700;">⬜未排</span>
-                    </div>
+                    <div id="shiftLegend" style="display:flex;gap:5px;margin-bottom:12px;flex-wrap:wrap;justify-content:center;"></div>
                     <!-- 人力不足警告 -->
                     <div id="shiftStaffWarn" style="display:none;padding:10px 14px;background:#FEF2F2;border-radius:10px;margin-bottom:12px;font-size:12px;color:#DC2626;font-weight:700;"></div>
                     <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
