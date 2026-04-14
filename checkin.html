@@ -480,6 +480,11 @@
             if (initialized) {
                 const isLoggedIn = await checkUserStatus();
                 if (isLoggedIn) {
+                    // 公務機帳號不能自己打卡 → 跳轉 kiosk 模式
+                    if (currentEmployee && currentEmployee.is_kiosk) {
+                        window.location.href = 'kiosk.html';
+                        return;
+                    }
                     checkGPSPermission();
                     // 預先請求相機權限（延遲 500ms 避免跟 LIFF init 搶資源）
                     setTimeout(preRequestCameraPermission, 500);
