@@ -78,13 +78,6 @@ body{font-family:'Noto Sans TC',-apple-system,sans-serif;background:var(--bg);co
 .qr-modal-content{background:#fff;border-radius:20px;padding:24px;width:100%;margin:20px auto;box-shadow:0 20px 60px rgba(0,0,0,0.3);}
 .qr-modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;}
 
-@media print {
-    body > * { display:none !important; }
-    .qr-modal-bg.printing { display:block !important; position:static !important; background:white !important; overflow:visible !important; padding:0 !important; }
-    .qr-modal-bg.printing .qr-modal-content { box-shadow:none !important; margin:0 auto !important; padding:16px !important; max-width:100% !important; border-radius:0 !important; }
-    .no-print { display:none !important; }
-    .print-poster { page-break-inside:avoid; }
-}
     </style>
 </head>
 <body>
@@ -280,7 +273,7 @@ body{font-family:'Noto Sans TC',-apple-system,sans-serif;background:var(--bg);co
                 <div class="no-print" style="display:flex;gap:8px;">
                     <button onclick="downloadPubCkQR('in')" style="flex:1;padding:12px;border:2px solid #059669;border-radius:10px;background:#F0FDF4;color:#059669;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">📥 上班 PNG</button>
                     <button onclick="downloadPubCkQR('out')" style="flex:1;padding:12px;border:2px solid #7C3AED;border-radius:10px;background:#F5F3FF;color:#7C3AED;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">📥 下班 PNG</button>
-                    <button onclick="printQRModal('pubCheckinQRModal')" style="flex:1;padding:12px;border:2px solid #4F46E5;border-radius:10px;background:#EEF2FF;color:#4F46E5;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">🖨️ 列印</button>
+                    <button onclick="printQRModal('checkin')" style="flex:1;padding:12px;border:2px solid #4F46E5;border-radius:10px;background:#EEF2FF;color:#4F46E5;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">🖨️ 列印</button>
                 </div>
             </div>
         </div>
@@ -310,7 +303,7 @@ body{font-family:'Noto Sans TC',-apple-system,sans-serif;background:var(--bg);co
                 </div>
                 <div class="no-print" style="display:flex;gap:8px;margin-top:16px;">
                     <button onclick="downloadPubRegisterQR()" style="flex:1;padding:12px;border:2px solid #10B981;border-radius:10px;background:#F0FDF4;color:#059669;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">📥 下載 PNG</button>
-                    <button onclick="printQRModal('pubRegisterQrModal')" style="flex:1;padding:12px;border:2px solid #4F46E5;border-radius:10px;background:#EEF2FF;color:#4F46E5;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">🖨️ 列印</button>
+                    <button onclick="printQRModal('register')" style="flex:1;padding:12px;border:2px solid #4F46E5;border-radius:10px;background:#EEF2FF;color:#4F46E5;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">🖨️ 列印</button>
                 </div>
             </div>
         </div>
@@ -676,11 +669,59 @@ function downloadPubCkQR(type) {
     link.click();
 }
 
-function printQRModal(modalId) {
-    // 標記要列印的 modal
-    document.querySelectorAll('.qr-modal-bg').forEach(function(m) { m.classList.remove('printing'); });
-    document.getElementById(modalId).classList.add('printing');
-    setTimeout(function() { window.print(); }, 200);
+function printQRModal(type) {
+    var name = esc(companyName || '員工服務中心');
+    var urlIn = 'https://liff.line.me/' + LIFF_ID + '?goto=checkin&action=check_in';
+    var urlOut = 'https://liff.line.me/' + LIFF_ID + '?goto=checkin&action=check_out';
+    var regUrl = 'https://liff.line.me/' + LIFF_ID + '?goto=register&company=' + companyId;
+
+    var css = 'body{font-family:-apple-system,"PingFang TC","Microsoft JhengHei","Noto Sans TC",sans-serif;margin:0;padding:20px;color:#1E293B;}' +
+        '.poster{page-break-after:always;border:3px solid #000;border-radius:16px;padding:40px 30px;margin-bottom:20px;text-align:center;}' +
+        '.poster:last-child{page-break-after:auto;}' +
+        '.company{font-size:14px;font-weight:700;color:#94A3B8;margin-bottom:4px;}' +
+        '.title{font-size:32px;font-weight:900;margin-bottom:4px;}' +
+        '.subtitle{font-size:14px;margin-bottom:24px;}' +
+        '.qr-wrap{display:inline-block;padding:12px;border-radius:16px;border:2px solid #E2E8F0;}' +
+        '.steps{text-align:left;max-width:420px;margin:24px auto 0;padding:16px;background:#F8FAFC;border-radius:12px;font-size:14px;line-height:2;}' +
+        '@media print{body{padding:0;}.poster{border:3px solid #000;page-break-inside:avoid;}}';
+
+    var body = '';
+    if (type === 'checkin') {
+        body += '<div class="poster" style="border-color:#059669;">' +
+            '<div class="company">' + name + '</div>' +
+            '<div class="title" style="color:#059669;">☀️ 上班打卡</div>' +
+            '<div class="subtitle" style="color:#065F46;">早上來公司掃這個</div>' +
+            '<div class="qr-wrap" id="qr1"></div>' +
+            '<div class="steps" style="background:#F0FDF4;color:#065F46;"><b>使用方式：</b><br>1. 打開 LINE → 掃描上方 QR Code<br>2. 允許相機拍照 → 完成上班打卡</div></div>';
+        body += '<div class="poster" style="border-color:#7C3AED;">' +
+            '<div class="company">' + name + '</div>' +
+            '<div class="title" style="color:#7C3AED;">🌙 下班打卡</div>' +
+            '<div class="subtitle" style="color:#4C1D95;">下班離開掃這個</div>' +
+            '<div class="qr-wrap" id="qr2"></div>' +
+            '<div class="steps" style="background:#F5F3FF;color:#4C1D95;"><b>使用方式：</b><br>1. 打開 LINE → 掃描上方 QR Code<br>2. 允許相機拍照 → 完成下班打卡</div></div>';
+        body += '<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>' +
+            '<script>new QRCode(document.getElementById("qr1"),{text:"' + urlIn + '",width:300,height:300,colorDark:"#059669",correctLevel:QRCode.CorrectLevel.H});' +
+            'new QRCode(document.getElementById("qr2"),{text:"' + urlOut + '",width:300,height:300,colorDark:"#7C3AED",correctLevel:QRCode.CorrectLevel.H});' +
+            'setTimeout(function(){window.print();},800);<\/script>';
+    } else {
+        body += '<div class="poster" style="border-color:#10B981;">' +
+            '<div style="font-size:40px;margin-bottom:8px;">🎉</div>' +
+            '<div style="font-size:14px;font-weight:700;color:#94A3B8;">加入</div>' +
+            '<div style="font-size:28px;font-weight:900;color:#059669;margin-bottom:4px;">' + name + '</div>' +
+            '<div style="font-size:18px;font-weight:700;color:#064E3B;margin-bottom:24px;">員工服務中心</div>' +
+            '<div class="qr-wrap" id="qr1"></div>' +
+            '<div class="steps" style="background:#F0FDF4;color:#065F46;"><b>📋 註冊步驟：</b><br>' +
+            '1. 用 LINE 掃描上方 QR Code<br>2. 填寫姓名、手機、部門<br>3. 等待管理員審核<br>' +
+            '4. 通過後即可使用：<br>&nbsp;&nbsp;&nbsp;✓ 打卡&nbsp;&nbsp;✓ 請假&nbsp;&nbsp;✓ 查薪資</div>' +
+            '<div style="margin-top:16px;font-size:12px;color:#94A3B8;">有問題請聯繫管理員</div></div>';
+        body += '<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"><\/script>' +
+            '<script>new QRCode(document.getElementById("qr1"),{text:"' + regUrl + '",width:400,height:400,colorDark:"#059669",correctLevel:QRCode.CorrectLevel.H});' +
+            'setTimeout(function(){window.print();},800);<\/script>';
+    }
+
+    var w = window.open('', '_blank', 'width=800,height=1000');
+    w.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + name + ' - QR Code</title><style>' + css + '</style></head><body>' + body + '</body></html>');
+    w.document.close();
 }
 
 // === 員工登記 QR Code ===
