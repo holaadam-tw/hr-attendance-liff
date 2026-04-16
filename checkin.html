@@ -486,8 +486,9 @@
                         return;
                     }
                     checkGPSPermission();
-                    // 預先請求相機權限（延遲 500ms 避免跟 LIFF init 搶資源）
-                    setTimeout(preRequestCameraPermission, 500);
+                    // 不再 preRequestCameraPermission()：在 LINE WebView 會造成權限被問 2 次
+                    // 原因：preRequest 用 {video:true}，openCamera 用 {facingMode:'user',...}
+                    // constraints 不同 + 第一次 stream 已 stop → 視為兩次獨立請求
                     openCamera();
                 } else {
                     window.location.href = 'index.html';
