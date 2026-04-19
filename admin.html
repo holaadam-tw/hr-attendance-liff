@@ -592,6 +592,16 @@
                         <input type="text" id="editEmpLineUserId" placeholder="貼上員工的 LINE User ID" style="font-family:monospace;font-size:13px;">
                         <div style="font-size:11px;color:#64748B;margin-top:4px;">員工從 LINE 開啟系統 → 複製 LINE ID → 貼在此處</div>
                     </div>
+                    <!-- 角色欄位：僅 platform_admin 可見（由 openEditEmployeeModal 控制） -->
+                    <div class="form-group" id="editEmpRoleGroup" style="display:none;">
+                        <label>角色</label>
+                        <select id="editEmpRole">
+                            <option value="user">一般員工</option>
+                            <option value="manager">主管</option>
+                            <option value="admin">管理員</option>
+                        </select>
+                        <div style="font-size:11px;color:#64748B;margin-top:4px;">平台管理員專用：調整此員工的角色權限（不含 platform_admin，避免誤操作）</div>
+                    </div>
                     <div style="display:flex;gap:10px;margin-top:20px;">
                         <button onclick="saveEditEmployee()" class="btn btn-success" style="flex:1;">💾 儲存</button>
                         <button onclick="closeEditEmployeeModal()" class="btn btn-secondary" style="flex:1;">取消</button>

@@ -824,6 +824,24 @@ export async function openEditEmployeeModal(empId) {
                     lineStatusEl.innerHTML = '<span style="color:#F59E0B;font-weight:600;">⚠️ 未綁定 LINE</span>';
                 }
             }
+            // 角色欄位：僅 platform_admin 可見，且不能改自己
+            const roleGroup = document.getElementById('editEmpRoleGroup');
+            const roleSel = document.getElementById('editEmpRole');
+            if (roleGroup && roleSel) {
+                const isPlatformAdmin = window.currentEmployee && window.currentEmployee.role === 'platform_admin';
+                const isSelf = window.currentEmployee && window.currentEmployee.id === data.id;
+                // platform_admin 目標員工：不給一般 admin/platform_admin 降級，直接隱藏欄位避免誤操作
+                const targetIsPlatformAdmin = data.role === 'platform_admin';
+                if (isPlatformAdmin && !isSelf && !targetIsPlatformAdmin) {
+                    // 只保留三個選項，不含 platform_admin
+                    // DB CHECK: role IN ('admin','user','manager')
+                    const currentRole = data.role && ['user','manager','admin'].includes(data.role) ? data.role : 'user';
+                    roleSel.value = currentRole;
+                    roleGroup.style.display = '';
+                } else {
+                    roleGroup.style.display = 'none';
+                }
+            }
         }
     } catch (e) { }
     document.getElementById('editEmployeeModal').style.display = 'flex';
@@ -850,6 +868,16 @@ export async function saveEditEmployee() {
         no_checkin: !!document.getElementById('editNoCheckin')?.checked,
         is_kiosk: !!document.getElementById('editIsKiosk')?.checked
     };
+    // 角色欄位：只有 platform_admin 看得到這組 UI 時才寫入 role
+    const roleGroup = document.getElementById('editEmpRoleGroup');
+    const roleSel = document.getElementById('editEmpRole');
+    if (roleGroup && roleSel && roleGroup.style.display !== 'none') {
+        const v = roleSel.value;
+        // 白名單：避免前端被改注入 platform_admin（DB CHECK 也只接受 admin/user/manager）
+        if (['user','manager','admin'].includes(v)) {
+            updates.role = v;
+        }
+    }
     if (!updates.name) { showToast('⚠️ 姓名不可為空'); return; }
     try {
         const { error } = await sb.from('employees').update(updates).eq('id', empId);

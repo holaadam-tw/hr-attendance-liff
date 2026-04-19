@@ -15,6 +15,61 @@
         <p>系統載入中...</p>
     </div>
 
+    <!-- 多公司選擇 overlay（員工綁定 2+ 家公司時顯示） -->
+    <style>
+        #company-selector-overlay {
+            position: fixed; inset: 0; z-index: 9999;
+            background: #F8FAFC;
+            display: none; flex-direction: column;
+            align-items: center; justify-content: center;
+            padding: 24px;
+        }
+        #company-selector-overlay .cs-card {
+            background: #fff; border-radius: 20px;
+            padding: 28px 20px; width: 100%; max-width: 420px;
+            box-shadow: 0 8px 32px rgba(15,23,42,0.08);
+        }
+        #company-selector-overlay h2 {
+            font-size: 20px; font-weight: 800; color: #0F172A;
+            margin: 0 0 8px; text-align: center;
+        }
+        #company-selector-overlay .cs-sub {
+            font-size: 13px; color: #64748B; text-align: center;
+            margin: 0 0 20px;
+        }
+        #company-selector-list {
+            display: flex; flex-direction: column; gap: 12px;
+        }
+        #company-selector-list .cs-item {
+            background: #F8FAFC; border: 2px solid #E2E8F0;
+            border-radius: 14px; padding: 16px 18px;
+            min-height: 60px; cursor: pointer;
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 12px; transition: all .15s ease;
+            font-family: inherit; text-align: left; width: 100%;
+        }
+        #company-selector-list .cs-item:active { transform: scale(0.98); }
+        #company-selector-list .cs-item:hover {
+            border-color: #6366F1; background: #EEF2FF;
+        }
+        #company-selector-list .cs-name {
+            font-size: 16px; font-weight: 700; color: #0F172A;
+        }
+        #company-selector-list .cs-role {
+            font-size: 12px; color: #64748B; margin-top: 2px;
+        }
+        #company-selector-list .cs-arrow {
+            color: #94A3B8; font-size: 20px; flex-shrink: 0;
+        }
+    </style>
+    <div id="company-selector-overlay" role="dialog" aria-labelledby="cs-title">
+        <div class="cs-card">
+            <h2 id="cs-title">請選擇公司</h2>
+            <p class="cs-sub">您在多家公司有員工身份，請選擇要登入的公司</p>
+            <div id="company-selector-list"></div>
+        </div>
+    </div>
+
     <style>
         @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.5; } }
         .skeleton-block { background:#E5E7EB; border-radius:16px; animation:pulse 1.5s infinite; }
@@ -554,6 +609,61 @@
             if (pages[goto]) { window.location.href = pages[goto]; return true; }
             return false;
         }
+
+        // ===== 多公司選擇 overlay =====
+        // 由 common.js checkUserStatus 在員工綁定多家公司且 sessionStorage 無選擇時呼叫
+        // 回傳 Promise，使用者點擊卡片後 resolve 該員工記錄
+        window.showCompanySelector = function(employeeRecords) {
+            return new Promise((resolve) => {
+                // 顯示前先把 loading/skeleton 藏起來
+                var _loading = document.getElementById('loadingPage');
+                if (_loading) _loading.style.display = 'none';
+                var _skel = document.getElementById('skeletonScreen');
+                if (_skel) _skel.style.display = 'none';
+
+                var overlay = document.getElementById('company-selector-overlay');
+                var list = document.getElementById('company-selector-list');
+                if (!overlay || !list) {
+                    // 防禦：DOM 不存在就回傳第一筆避免卡住
+                    console.error('company-selector-overlay DOM 不存在');
+                    resolve(employeeRecords[0]);
+                    return;
+                }
+
+                list.innerHTML = '';
+                var roleLabel = function(r) {
+                    if (r === 'admin') return '管理員';
+                    if (r === 'manager') return '主管';
+                    if (r === 'platform_admin') return '平台管理員';
+                    return '一般員工';
+                };
+
+                employeeRecords.forEach(function(emp) {
+                    var btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'cs-item';
+                    var cname = (emp.companies && emp.companies.name) ? emp.companies.name : '未命名公司';
+                    btn.innerHTML =
+                        '<div>' +
+                            '<div class="cs-name"></div>' +
+                            '<div class="cs-role"></div>' +
+                        '</div>' +
+                        '<div class="cs-arrow">›</div>';
+                    btn.querySelector('.cs-name').textContent = cname;
+                    btn.querySelector('.cs-role').textContent = roleLabel(emp.role);
+                    btn.addEventListener('click', function() {
+                        overlay.style.display = 'none';
+                        // 隱藏後重顯骨架屏，避免 loadSettings/checkTodayAttendance 期間空白
+                        var _skel2 = document.getElementById('skeletonScreen');
+                        if (_skel2) _skel2.style.display = '';
+                        resolve(emp);
+                    });
+                    list.appendChild(btn);
+                });
+
+                overlay.style.display = 'flex';
+            });
+        };
 
         window.addEventListener('load', async () => {
             if (typeof initializeLiff === 'undefined') {

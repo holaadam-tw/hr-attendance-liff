@@ -293,48 +293,82 @@ async function checkUserStatus() {
             return true;
         }
 
-        // === 一般員工流程 ===
-        const { data, error } = await sb.from('employees')
-            .select('id, name, role, department, position, employee_number, line_user_id, company_id, is_active, status, hire_date')
-            .eq('line_user_id', liffProfile.userId)
-            .maybeSingle();
+        // === 一般員工流程（支援多公司） ===
+        // 一次查出該 LINE user 所有員工記錄 + 對應公司資料
+        const { data: allRows, error } = await sb.from('employees')
+            .select('id, name, role, department, position, employee_number, line_user_id, company_id, is_active, status, hire_date, companies(name, features, status, industry)')
+            .eq('line_user_id', liffProfile.userId);
 
-        if (loadingEl) loadingEl.style.display = 'none';
-
-        if (data) {
-            // 待審核員工 → 設 flag 讓 index.html 顯示等待訊息
-            if (data.status === 'pending' || !data.is_active) {
-                window._pendingEmployeeStatus = data.status || 'pending';
-                return false;
-            }
-
-            currentEmployee = data;
-            currentCompanyId = data.company_id || null;
-            window.currentCompanyId = currentCompanyId;
-            window.currentEmployee = currentEmployee;
-            // 並行載入公司資料、system_settings、今日考勤
-            if (currentCompanyId) {
-                const [companyResult] = await Promise.all([
-                    sb.from('companies')
-                        .select('name, features, status, industry')
-                        .eq('id', currentCompanyId)
-                        .maybeSingle()
-                        .then(r => r.data)
-                        .catch(() => null),
-                    loadSettings(),
-                    checkTodayAttendance()
-                ]);
-                if (companyResult) {
-                    currentCompanyFeatures = companyResult.features || null;
-                    currentCompanyName = companyResult.name || null;
-                    currentCompanyIndustry = companyResult.industry || 'general';
-                }
-            }
-            updateUserInfo(data);
-            return true;
-        } else {
+        if (error) {
+            console.error('查詢員工記錄失敗:', error);
+            if (loadingEl) loadingEl.style.display = 'none';
             return false;
         }
+
+        const rows = allRows || [];
+        if (rows.length === 0) {
+            if (loadingEl) loadingEl.style.display = 'none';
+            return false; // 未綁定
+        }
+
+        // 僅保留已啟用的員工記錄
+        const activeRows = rows.filter(r => r.is_active && r.status !== 'pending');
+        if (activeRows.length === 0) {
+            // 有記錄但都是 pending / inactive → 顯示等待審核畫面
+            window._pendingEmployeeStatus = rows[0].status || 'pending';
+            if (loadingEl) loadingEl.style.display = 'none';
+            return false;
+        }
+
+        let selected = null;
+        if (activeRows.length === 1) {
+            selected = activeRows[0];
+        } else {
+            // 2+ 家公司：先看 sessionStorage 有沒有上次選擇
+            const saved = sessionStorage.getItem('selectedCompanyId');
+            if (saved) selected = activeRows.find(r => r.company_id === saved) || null;
+
+            if (!selected) {
+                if (typeof window.showCompanySelector === 'function') {
+                    // 顯示公司選擇 overlay（index.html 有這支函數），等使用者點擊
+                    selected = await window.showCompanySelector(activeRows);
+                } else {
+                    // 子頁面沒有 selector UI → 導回 index.html 重新選擇
+                    if (loadingEl) loadingEl.style.display = 'none';
+                    window.location.href = 'index.html';
+                    return false;
+                }
+            }
+            if (selected) sessionStorage.setItem('selectedCompanyId', selected.company_id);
+        }
+
+        if (!selected) {
+            if (loadingEl) loadingEl.style.display = 'none';
+            return false;
+        }
+
+        currentEmployee = selected;
+        currentCompanyId = selected.company_id || null;
+        window.currentCompanyId = currentCompanyId;
+        window.currentEmployee = currentEmployee;
+
+        // 用 JOIN 帶回的公司資料，省掉額外一次查詢
+        if (selected.companies) {
+            currentCompanyFeatures = selected.companies.features || null;
+            currentCompanyName = selected.companies.name || null;
+            currentCompanyIndustry = selected.companies.industry || 'general';
+        }
+
+        if (currentCompanyId) {
+            await Promise.all([
+                loadSettings(),
+                checkTodayAttendance()
+            ]);
+        }
+
+        if (loadingEl) loadingEl.style.display = 'none';
+        updateUserInfo(selected);
+        return true;
     } catch (err) {
         console.error('檢查用戶狀態失敗:', err);
         if (loadingEl) loadingEl.style.display = 'none';
