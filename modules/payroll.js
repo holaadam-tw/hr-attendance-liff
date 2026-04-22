@@ -476,14 +476,15 @@ export async function loadPayrollData() {
     btn.disabled = true; btn.textContent = '⏳ 計算中...';
 
     try {
-        const [empRes, salaryRes, attRes, leaveRes, otRes, existRes, bracketRes] = await Promise.all([
+        const [empRes, salaryRes, attRes, leaveRes, otRes, existRes, bracketRes, schedRes] = await Promise.all([
             sb.from('employees').select('id, name, employee_number, department, is_active, status, resigned_date').eq('company_id', window.currentCompanyId).eq('no_checkin', false).in('status', ['approved', 'resigned']),
             sb.from('salary_settings').select('*, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).eq('is_current', true),
             sb.from('attendance').select('employee_id, date, is_late, total_work_hours, overtime_hours, check_in_time, check_out_time, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).gte('date', startDate).lte('date', endDate),
             sb.from('leave_requests').select('employee_id, days, leave_type, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).eq('status', 'approved').gte('start_date', startDate).lte('end_date', endDate),
             sb.from('overtime_requests').select('employee_id, hours, ot_date, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).eq('status', 'approved').gte('ot_date', startDate).lte('ot_date', endDate).then(r => r).catch(() => ({ data: [] })),
             sb.from('payroll').select('*, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).eq('year', year).eq('month', month),
-            sb.from('insurance_brackets').select('*').eq('is_active', true).order('salary_min').then(r => r).catch(() => ({ data: [] }))
+            sb.from('insurance_brackets').select('*').eq('is_active', true).order('salary_min').then(r => r).catch(() => ({ data: [] })),
+            sb.from('schedules').select('employee_id, date, is_off_day, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).gte('date', startDate).lte('date', endDate).then(r => r).catch(() => ({ data: [] }))
         ]);
 
         payrollBrackets = bracketRes.data || [];
@@ -533,6 +534,13 @@ export async function loadPayrollData() {
             }
         });
 
+        // schedMap: 按員工+日期分組，供 expected_days 計算（對齊 get_company_monthly_attendance RPC）
+        const schedMap = {};
+        (schedRes.data || []).forEach(s => {
+            if (!schedMap[s.employee_id]) schedMap[s.employee_id] = {};
+            schedMap[s.employee_id][s.date] = s;
+        });
+
         payrollIsPublished = (existRes.data || []).some(p => p.is_published);
         if (payrollIsPublished) warnEl.style.display = 'block';
 
@@ -547,7 +555,8 @@ export async function loadPayrollData() {
             const atts = attMap[emp.id] || [];
             const leaves = leaveMap[emp.id] || { total: 0, personal: 0 };
             const otHours = otMap[emp.id] || 0;
-            return calcEmployeePayroll(emp, ss, atts, leaves, otHours, year, month, payrollSettings);
+            const expectedDays = computeEmployeeExpectedDays(emp.id, startDate, endDate, schedMap);
+            return calcEmployeePayroll(emp, ss, atts, leaves, otHours, year, month, payrollSettings, expectedDays);
         }).filter(Boolean);
 
         populatePayrollDropdown();
@@ -572,7 +581,30 @@ function prLookupBracket(salary) {
     return b || payrollBrackets[payrollBrackets.length - 1];
 }
 
-function calcEmployeePayroll(emp, ss, atts, leaves, otHours, year, month, payrollSettings) {
+// 複製 get_company_monthly_attendance RPC 的 expected_days 邏輯 (migrations/059:156-172)
+// 差異: 不截到今天 → 月中 preview 可看到整月 expected_days
+// 對齊邏輯: 有排班且非休假日 → 應到; 無排班且非週末 → 應到
+function computeEmployeeExpectedDays(empId, startStr, endStr, schedMap) {
+    const start = new Date(startStr + 'T00:00:00+08:00');
+    const end = new Date(endStr + 'T00:00:00+08:00');
+    const empSched = schedMap[empId] || {};
+    let count = 0;
+    const d = new Date(start);
+    while (d <= end) {
+        const ds = d.toLocaleDateString('sv-SE', { timeZone: 'Asia/Taipei' });
+        const sch = empSched[ds];
+        if (sch) {
+            if (!sch.is_off_day) count++;
+        } else {
+            const dow = d.getDay();
+            if (dow !== 0 && dow !== 6) count++;
+        }
+        d.setDate(d.getDate() + 1);
+    }
+    return count;
+}
+
+function calcEmployeePayroll(emp, ss, atts, leaves, otHours, year, month, payrollSettings, expectedDaysOverride) {
     const _ps = payrollSettings || {};
     const salaryType = ss.salary_type || 'monthly';
     const baseSalary = ss.base_salary || 0;
@@ -587,7 +619,7 @@ function calcEmployeePayroll(emp, ss, atts, leaves, otHours, year, month, payrol
     const totalWorkHours = atts.reduce((s, a) => s + (a.total_work_hours || 0), 0);
     const leaveDays = leaves.total;
     const personalLeaveDays = leaves.personal;
-    const expectedDays = _ps.work_days_per_month || 22;
+    const expectedDays = (expectedDaysOverride !== undefined && expectedDaysOverride !== null) ? expectedDaysOverride : (_ps.work_days_per_month || 22);
 
     let monthSalary, dailyRate, hourlyRate;
     if (salaryType === 'monthly') {
