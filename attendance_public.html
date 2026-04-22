@@ -65,7 +65,20 @@ body{font-family:'Noto Sans TC',-apple-system,sans-serif;background:var(--bg);co
 .expand-row.show{display:table-row;}
 .expand-cell{padding:8px 16px !important;background:#FAFBFC;}
 .detail-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:4px;font-size:11px;}
-.detail-day{padding:4px 6px;border-radius:6px;text-align:center;}
+.detail-calendar{display:grid;grid-template-columns:repeat(7,minmax(56px,1fr));gap:4px;font-size:11px;}
+.detail-calendar-header{font-weight:700;text-align:center;font-size:11px;color:#64748B;padding:4px 0;}
+.detail-day{padding:4px 6px;border-radius:6px;text-align:center;min-height:42px;}
+.detail-day-empty{background:transparent;min-height:42px;}
+.detail-day-holiday-label{font-size:9px;line-height:1.1;margin-top:1px;color:#BE123C;}
+
+@media (max-width: 640px){
+  .expand-cell{padding:4px 8px !important;}
+  .detail-calendar{grid-template-columns:repeat(7,minmax(36px,1fr));gap:2px;font-size:10px;}
+  .detail-calendar-header{font-size:10px;padding:2px 0;}
+  .detail-day{padding:2px 3px;font-size:10px;min-height:34px;border-radius:4px;}
+  .detail-day-empty{min-height:34px;}
+  .detail-day-holiday-label{font-size:8px;}
+}
 
 .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:12px;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,0.05);}
 
@@ -345,6 +358,8 @@ let mYear = new Date().getFullYear();
 let mMonth = new Date().getMonth();
 let refreshTimer = null;
 let currentTab = 'daily';
+let currentWeekendPolicy = 'fixed';
+let monthHolidayMap = {};
 
 // === 工具函數 ===
 function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = String(s); return d.innerHTML; }
@@ -533,8 +548,39 @@ function changeMonth(delta) {
     loadMonthlyData();
 }
 
+// 載入 weekend_policy + holidays（非核心，允許失敗 fallback）
+async function loadCompanyPolicyAndHolidays() {
+    const startDate = mYear + '-' + String(mMonth + 1).padStart(2, '0') + '-01';
+    const lastDay = new Date(mYear, mMonth + 1, 0).getDate();
+    const endDate = mYear + '-' + String(mMonth + 1).padStart(2, '0') + '-' + String(lastDay).padStart(2, '0');
+
+    const [policyRes, holidayRes] = await Promise.allSettled([
+        sb.from('companies').select('weekend_policy').eq('id', companyId).maybeSingle(),
+        sb.from('holidays')
+            .select('holiday_date, holiday_name')
+            .eq('company_id', companyId)
+            .gte('holiday_date', startDate)
+            .lte('holiday_date', endDate)
+    ]);
+
+    if (policyRes.status === 'fulfilled' && !policyRes.value.error && policyRes.value.data && policyRes.value.data.weekend_policy) {
+        currentWeekendPolicy = policyRes.value.data.weekend_policy;
+    } else {
+        currentWeekendPolicy = 'fixed';
+    }
+
+    monthHolidayMap = {};
+    if (holidayRes.status === 'fulfilled' && !holidayRes.value.error && Array.isArray(holidayRes.value.data)) {
+        holidayRes.value.data.forEach(h => {
+            if (h && h.holiday_date) monthHolidayMap[h.holiday_date] = h.holiday_name || '假日';
+        });
+    }
+}
+
 async function loadMonthlyData() {
     document.getElementById('monthLabel').textContent = mYear + '年' + (mMonth + 1) + '月';
+    // 非核心查詢：失敗不擋主表
+    await loadCompanyPolicyAndHolidays();
     try {
         const { data, error } = await sb.rpc('get_company_monthly_attendance', { p_company_id: companyId, p_year: mYear, p_month: mMonth + 1 });
         if (error) throw error;
@@ -590,20 +636,50 @@ async function toggleMonthDetail(empId) {
             .eq('employee_id', empId).gte('date', startDate).lte('date', endStr).order('date');
         if (error) throw error;
         const attMap = {}; (data || []).forEach(a => { attMap[a.date] = a; });
-        let html = '<div class="detail-grid">';
-        for (let day = 1; day <= endDate.getDate(); day++) {
+
+        // 週一起始月曆 grid
+        const daysInMonth = endDate.getDate();
+        const firstDow = new Date(mYear, mMonth, 1).getDay(); // 週日=0, 週一=1...
+        const leadingEmpty = (firstDow + 6) % 7;              // 週一起始補位
+        const weekendFn = (dow) => (dow === 0 || dow === 6);  // 目前只支援 'fixed' policy
+
+        let html = '<div class="detail-calendar">';
+        ['一','二','三','四','五','六','日'].forEach(n => {
+            html += '<div class="detail-calendar-header">' + n + '</div>';
+        });
+        for (let i = 0; i < leadingEmpty; i++) {
+            html += '<div class="detail-day-empty"></div>';
+        }
+        for (let day = 1; day <= daysInMonth; day++) {
             const ds = mYear + '-' + String(mMonth + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
             const d = new Date(ds + 'T00:00:00+08:00');
-            const dow = d.getDay(); const a = attMap[ds];
-            let bg = '#F3F4F6', text = '--', color = '#9CA3AF';
-            if (dow === 0 || dow === 6) { bg = '#F9FAFB'; text = '休'; color = '#CBD5E1'; }
+            const dow = d.getDay();
+            const a = attMap[ds];
+            const holidayName = monthHolidayMap[ds];
+            const isWeekend = weekendFn(dow);
+
+            let bg = '#F3F4F6', text = '--', color = '#9CA3AF', extraLabel = '';
+
+            if (holidayName) {
+                bg = '#FEE2E2'; color = '#BE123C'; text = '休';
+                extraLabel = '<div class="detail-day-holiday-label">' + esc(holidayName) + '</div>';
+            } else if (isWeekend) {
+                bg = '#F9FAFB'; text = '休'; color = '#CBD5E1';
+            }
+
+            // 打卡資料仍以出勤顏色覆蓋（既有行為）
             if (a) {
                 if (a.is_late) { bg = '#FEF3C7'; color = '#92400E'; text = fmtTime(a.check_in_time) + ' ⚠️'; }
                 else { bg = '#ECFDF5'; color = '#059669'; text = fmtTime(a.check_in_time); }
                 if (a.check_out_time) text += '~' + fmtTime(a.check_out_time);
                 if (a.total_work_hours > 0) text += ' (' + fmtHours(a.total_work_hours) + ')';
             }
-            html += '<div class="detail-day" style="background:' + bg + ';color:' + color + ';"><div style="font-weight:700;font-size:12px;">' + day + '日</div><div style="font-size:10px;">' + text + '</div></div>';
+
+            html += '<div class="detail-day" style="background:' + bg + ';color:' + color + ';">' +
+                '<div style="font-weight:700;font-size:12px;">' + day + '日</div>' +
+                '<div style="font-size:10px;">' + text + '</div>' +
+                extraLabel +
+            '</div>';
         }
         html += '</div>';
         contentEl.innerHTML = html;
