@@ -477,7 +477,7 @@ export async function loadPayrollData() {
 
     try {
         const [empRes, salaryRes, attRes, leaveRes, otRes, existRes, bracketRes] = await Promise.all([
-            sb.from('employees').select('id, name, employee_number, department, is_active, status, resigned_date').eq('company_id', window.currentCompanyId).in('status', ['approved', 'resigned']),
+            sb.from('employees').select('id, name, employee_number, department, is_active, status, resigned_date').eq('company_id', window.currentCompanyId).eq('no_checkin', false).in('status', ['approved', 'resigned']),
             sb.from('salary_settings').select('*, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).eq('is_current', true),
             sb.from('attendance').select('employee_id, date, is_late, total_work_hours, overtime_hours, check_in_time, check_out_time, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).gte('date', startDate).lte('date', endDate),
             sb.from('leave_requests').select('employee_id, days, leave_type, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).eq('status', 'approved').gte('start_date', startDate).lte('end_date', endDate),
