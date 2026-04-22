@@ -1,6 +1,6 @@
 # RunPiston Bug 追蹤 & 測試清單
 
-> 更新日期：2026-04-14
+> 更新日期：2026-04-22
 > 每次修改後更新此檔案
 
 ---
@@ -29,6 +29,17 @@
 | B10 | 工時 tab 時間框截斷 | e417dba | 120px → 160px |
 | B11 | shift_types 401 Unauthorized | 31fe10b | 改用 SECURITY DEFINER RPC |
 | B12 | 公務機帳號繞過打卡防護 | c7c9b52 | 3 層防線（index/checkin/RPC）|
+
+## 🔵 2026-04-22 修復的 Bug（薪資連動審查）
+
+| # | Bug | Commit | 說明 |
+|---|-----|--------|------|
+| B13 | 薪資計算未過濾公務機/免打卡員工 → 出現在薪資單且缺勤扣光 | 471f284 | `modules/payroll.js:480` 加 `.eq('no_checkin', false)`，對齊 `get_company_monthly_attendance` RPC（`migrations/059:103,223`）|
+| B14 | 月度總覽 vs 薪資單 `expected_days` / `absent_days` 不一致（例：排班 20 天的人薪資按 22 天扣，多扣 2 天） | be7c42f | `modules/payroll.js` 加 `computeEmployeeExpectedDays()` helper，複製 `migrations/059:156-172` 逐日排班判斷邏輯；**月中 preview 不截到今天**（B 方案核心優勢）|
+
+### 📝 本次審查但**非 bug** 的項目
+
+- **加班雙計疑慮**（`payroll.js:515-526`）：經確認 `attendance.overtime_hours` 欄位整個 production 無寫入路徑（`quick_check_in` RPC `migrations/069` 下班 UPDATE 不寫 `overtime_hours`；全 repo grep 無 INSERT/UPDATE 寫入），`if-else` 中 else 分支為 **dead code**，實際不會雙計。但若未來有 migration 啟用 `attendance.overtime_hours` 寫入，`if-else` 二選一陷阱會浮現（漏算非 OT 申請天數），屆時需改為合併邏輯。
 
 ---
 
