@@ -85,7 +85,44 @@ PoC-1/2/3 可執行（純 recon），PoC-4 會寫 DB 需 **L2 授權**。
 
 ---
 
-## 🎯 等 User 決策（Batch 3 產出的 3 項）
+## ✅ User 決策（2026-04-23 收集）
+
+| # | 原問題 | User 回答 | 後續動作 |
+|---|---|---|---|
+| **D1** | `attendance_public.html` URL 可改是 feature 還是 bug？ | **Bug — 要修 (i) LIFF 登入**（看者是管理者，不是外部會計；管理者本來就是員工升等而來，有 LINE 綁定） | 下個 sprint 改 `attendance_public.html` init() 加 LIFF 登入 + company_id 匹配驗證（L2，需明確授權動手） |
+| **D2** | `employees.line_user_id` 要改複合鍵嗎？ | **維持現況**（員工不會兼差多家；管理者靠 `platform_admins` 架構處理，和員工表無關） | 不做 migration，文件已記錄「單人單公司」限制 |
+| **D3** | PoC-4 並行打卡要不要實測？ | **走折衷**（管理者才會測打卡，穩定後不打卡；實務 race 觸發機率極低） | 已完成 `tests/poc/poc5_rpc069_race_review.md` code review，**P6 從 🔴 推論降級 🟡 理論存在** |
+
+### D1 後續修復方向（待使用者授權才動）
+```js
+// attendance_public.html init() 修改建議
+async function init() {
+    // 1. LIFF 登入
+    const initialized = await liff.init({ liffId: LIFF_ID });
+    if (!liff.isLoggedIn()) { liff.login(); return; }
+    const profile = await liff.getProfile();
+
+    // 2. 從 URL 拿 company_id
+    const companyId = new URLSearchParams(location.search).get('company');
+
+    // 3. 驗證呼叫者屬於該公司（admin/manager only）
+    const { data: emp } = await sb.from('employees')
+        .select('company_id, role, is_admin')
+        .eq('line_user_id', profile.userId)
+        .eq('company_id', companyId)
+        .maybeSingle();
+
+    if (!emp || (!emp.is_admin && emp.role !== 'manager')) {
+        showError('權限不足', '只有該公司的管理者可查看');
+        return;
+    }
+    // ... 其餘 init 邏輯不變
+}
+```
+
+---
+
+## 🎯 原等 User 決策清單（歷史紀錄）
 
 ### D1 — `attendance_public.html` URL 可竄改（B1-H4）
 **現況**：`?company=<uuid>` 只驗公司存在，任何人知道 UUID 就能看
