@@ -178,3 +178,74 @@ async function init() {
 ---
 
 **彙總完成。下一步 Batch 4 PoC 視你 D3 回答。**
+
+---
+
+## 📝 後續 Sprint 規劃（2026-04-23 User 新增）
+
+### Sprint X — `platform.html` 新增平台管理員 UI
+
+**背景**：目前新增 platform_admin 必須手動跑 SQL（例 `setup-adam-multicompany.sql`），無自助 UI。使用者要求開 sprint 補。
+
+**URL 參考**：`https://holaadam-tw.github.io/hr-attendance-liff/platform.html`
+
+**範圍**：
+
+| 檔案 | 動作 | 估行數 |
+|---|---|---|
+| `migrations/0XX_create_platform_admin_rpc.sql` | 新增 `create_platform_admin(p_line_user_id, p_name, p_company_ids[])` SECURITY DEFINER RPC | ~50 |
+| `platform.html` | 新增「新增平台管理員」modal + 表單（LINE ID + 姓名 + 勾選可管理公司） | ~80 |
+| `modules/auth.js` 或新 `modules/platform.js` | 前端呼叫 RPC + 表單驗證 | ~40 |
+
+總計預估 3 檔 · 170 行 · 4-6 commits（L2 級別，<8 檔 / <300 行邊界內）。
+
+**RPC 設計要點**（避免重演 P1/H2 裸 GRANT anon）：
+```sql
+CREATE FUNCTION create_platform_admin(
+    p_line_user_id TEXT,
+    p_name TEXT,
+    p_company_ids UUID[]
+) RETURNS UUID
+LANGUAGE plpgsql SECURITY DEFINER AS $$
+DECLARE
+    v_new_id UUID;
+    v_caller_line TEXT;
+BEGIN
+    -- 🔴 關鍵：驗證呼叫者本身是平台管理員
+    v_caller_line := auth.jwt() ->> 'line_user_id';  -- 或其他取身份機制
+    IF NOT EXISTS (
+        SELECT 1 FROM platform_admins
+        WHERE line_user_id = v_caller_line AND is_active = true
+    ) THEN
+        RAISE EXCEPTION '只有平台管理員可新增平台管理員';
+    END IF;
+
+    -- INSERT platform_admins
+    INSERT INTO platform_admins (line_user_id, name, is_active)
+    VALUES (p_line_user_id, p_name, true)
+    RETURNING id INTO v_new_id;
+
+    -- INSERT platform_admin_companies（每家一筆）
+    INSERT INTO platform_admin_companies (platform_admin_id, company_id, role)
+    SELECT v_new_id, unnest(p_company_ids), 'owner';
+
+    RETURN v_new_id;
+END;
+$$;
+```
+
+**風險**：
+- **Bootstrap 情境**：第一個 platform_admin 仍需 SQL 手動建（因為沒有呼叫者能通過上面的驗證）— **保留 `setup-adam-multicompany.sql` 作為 bootstrap**
+- **RLS**：`platform_admins.RLS` 是 allow-all（`migrations/006:51-57`）— RPC SECURITY DEFINER 不受影響，但若未來想加「平台管理員只能看自己」要先改 RLS
+
+**優先級**：**低** — 目前 2 家公司手動 SQL 可接受，但未來公司數變多會累
+
+**依賴**：無（schema 已存在 `platform_admins` + `platform_admin_companies`）
+
+**建議切分成 4 commit**：
+1. migration：新增 `create_platform_admin` RPC
+2. platform.html：UI 表單
+3. 前端呼叫邏輯
+4. 測試 + 文件更新
+
+**狀態**：🕓 待 user 授權執行（L2，新 migration + 跨檔改動）
