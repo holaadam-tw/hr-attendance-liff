@@ -1,17 +1,41 @@
 # RunPiston Bug 追蹤 & 測試清單
 
-> 更新日期：2026-04-22
+> 更新日期：2026-04-23
 > 每次修改後更新此檔案
 
 ---
 
 ## 🔴 未修復 Bug（優先修）
 
+### 舊項目
 | # | Bug | 嚴重度 | 狀態 |
 |---|-----|--------|------|
 | 1 | 打卡後首頁狀態不顯示 — LIFF BFCache 問題 | 🔴 嚴重 | 修了 3 次還沒穩定 |
 | 2 | 考勤查詢不顯示 — RPC+RLS+時區三重 bug | 🔴 嚴重 | ✅ 已修復（041 SQL）|
 | 3 | RLS 未設定 — anon key 可讀所有公司資料 | 🔴 安全 | ✅ 已修復（24+ 個查詢加 company_id）|
+
+### 2026-04-23 Audit 新發現（完整報告: `reports/audit_summary_2026-04-22.md`）
+
+**🔴 最優先（安全風險）**
+| # | Bug | 位置 | PoC |
+|---|-----|------|-----|
+| P1 | 敏感 RPC 無後端身份驗證（`shift_types` 4 支 + 其他 SECURITY DEFINER + GRANT anon）→ anon 可讀/改/刪他家班別 | `migrations/068:10-88` + 其他 | `tests/poc/poc1_shift_types_anon.mjs`（可執行） |
+| P2 | `updateAdjustment` 無負數/上限/NULL 檢查 → 可誤發負薪或天價 | `modules/payroll.js:224-230` | `tests/poc/poc2_bonus_negative.md` |
+| P3 | `Promise.all` silent error → 獎金數字錯但 UI 看不出 | `modules/payroll.js:76-82` | `tests/poc/poc3_promise_all_silent.md` |
+| D1 | `attendance_public.html` URL 可改 → 知道 UUID 就能偷看別家打卡 | `attendance_public.html:377-414` | User 確認為 bug，修法 (i) LIFF 登入 |
+
+**🟠 次優先**
+| # | Bug | 位置 | 說明 |
+|---|-----|------|------|
+| P4 | `baseSalary NULL` 被當 0 → 新員工漏發薪資無警告 | `modules/payroll.js:95` | 應顯式檢查 |
+| P5 | `switchCompanyAdmin` 切公司未清 7 個 payroll/bonus 全域變數 → UI 殘影、調整值跨公司殘留 | `modules/auth.js:303-353` + `modules/payroll.js:20-27` | 需 clearState 機制 |
+| P7 | `onclick` 字串拼接 XSS pattern（UUID 實務安全，但 pattern 危險） | `modules/employees.js:171`、`common.js:1286/1709` | 改 `data-*` + addEventListener |
+| P8 | `toISOString()` 時區邊界 → 跨時區公告到期誤判 | `common.js:978` | 改 `toLocaleString('sv-SE', { timeZone: 'Asia/Taipei' })` |
+
+**🟡 降級觀察**
+| # | Bug | 結論 |
+|---|-----|------|
+| P6 | 並行打卡 race（原為 🔴 推論） | ✅ **code review 降級** — `checkin.html:191/330` 前端明確傳 `p_action='check_in'/'check_out'` → 069 race 不觸發；詳見 `tests/poc/poc5_rpc069_race_review.md` |
 
 ## 🔵 2026-04-14 修復的 Bug
 
@@ -40,6 +64,27 @@
 ### 📝 本次審查但**非 bug** 的項目
 
 - **加班雙計疑慮**（`payroll.js:515-526`）：經確認 `attendance.overtime_hours` 欄位整個 production 無寫入路徑（`quick_check_in` RPC `migrations/069` 下班 UPDATE 不寫 `overtime_hours`；全 repo grep 無 INSERT/UPDATE 寫入），`if-else` 中 else 分支為 **dead code**，實際不會雙計。但若未來有 migration 啟用 `attendance.overtime_hours` 寫入，`if-else` 二選一陷阱會浮現（漏算非 OT 申請天數），屆時需改為合併邏輯。
+
+## 📋 2026-04-23 User 決策（完整記錄於 `reports/audit_summary_2026-04-22.md`）
+
+- **D1**：`attendance_public.html` URL 可改 → **是 bug，採 (i) LIFF 登入**（看者是管理者升等而來的員工）
+- **D2**：`employees.line_user_id` 複合鍵 → **維持現況**（員工不兼差多家，跨公司用 `platform_admins` 處理）
+- **D3**：PoC-4 並行打卡實測 → **走折衷**（已由 `poc5_rpc069_race_review.md` 完成 code review）
+- **Sprint X**：`platform.html` 新增平台管理員自助 UI → **規劃中**（~3 檔 170 行，等 L2 授權）
+
+## 🎯 2026-04-23 Audit 待 User L2 授權的修復清單
+
+| # | 項目 | 預估 commits |
+|---|---|---|
+| 1 | P2 `updateAdjustment` 輸入驗證 | 1（最快） |
+| 2 | P3 `Promise.all → allSettled` | 1 |
+| 3 | P4 `baseSalary NULL` 警告 | 1 |
+| 4 | P1 `shift_types` 4 RPC 加身份驗證 | 3-5 |
+| 5 | D1 `attendance_public.html` LIFF 登入 | 2-3 |
+| 6 | P5 `switchCompanyAdmin` clearState | 2-3 |
+| 7 | Sprint X 平台管理員自助 UI | 4 |
+
+**建議修復順序**：1 → 2 → 3 → 4 → 5 → 6 → 7（由小到大，風險由低到高）
 
 ---
 
