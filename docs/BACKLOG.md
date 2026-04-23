@@ -19,6 +19,18 @@
 | 8 | **P7** onclick 字串拼接重構 → `data-*` + addEventListener | 2-3 | 🟠 pattern | `logic_security_audit_2026-04-22.md` §S5 |
 | 9 | **P8** 時區統一 `toLocaleString('sv-SE', { timeZone: 'Asia/Taipei' })` | 1 | 🟠 推論 | `logic_security_audit_2026-04-22.md` §S6 |
 
+### 2026-04-23 Feature Gap Audit 新增（B / F 系列）
+| 順序 | 項目 | 預估 commits | 嚴重度 | 完整細節 |
+|---|---|---|---|---|
+| 10 | **B1 / F1-S1** 請假 date input 加 min/max 限制 | 1 | 🟠 | `reports/feature_gap_employee_2026-04-23.md` + summary |
+| 11 | **B2 / F2-SR1** 跨月請假查詢 + calc 修正（薪資誤算） | 2-3 | 🔴 財務 | `reports/feature_gap_admin_2026-04-23.md` + summary |
+| 12 | **F2-P2** 排班 upsert 加 confirm dialog（覆蓋既有排班提示） | 1 | 🟡 | `feature_gap_admin_2026-04-23.md` 親驗 |
+| 13 | **F2-P3** 公告 `expire_at` 設過去日期時警告 | 1 | 🟡 | `feature_gap_admin_2026-04-23.md` |
+
+### 🕓 Agent 推論待親驗（修前必驗 — 不可直接動手）
+- **F1-S2** 補卡日期 min / **F1-S3** 加班時數 JS 驗 / **F1-I3** GPS fail fallback / **F1-I4** 便當截止 popup 重檢
+- **F2-I1** AI 菜單按鈕卡 disabled（疑似同 F2-S1 誤判）/ **F2-I2** 離職員工薪資邊界 / **F2-I3** 批次計算原子性 / **F2-I4** 審核人離職鏈斷
+
 **執行前請告訴我要做哪一項**（GUARDRAILS §3 L2 規範：DB 寫入/破壞性/跨 >8 檔 需明確授權）
 
 ---
