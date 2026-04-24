@@ -1,5 +1,15 @@
 # RunPiston 開發規則（每次 session 自動載入）
 
+## AI Agent 主規範（優先順序由高到低）
+
+1. `docs/AI_AGENT_MASTER_RULES.md` — 最高優先級政策、規則階層、停損條件
+2. `docs/AUTONOMOUS_24H_GUARDRAILS.md` — Runtime 安全：Hard Block / L1/L2 / 心跳 / 證據 / stale wakeup
+3. `docs/EXECUTION_RULES_AGENT_SKILLS.md` — 工作流程：Spec → Plan → Build → Verify → Review → Ship
+4. 本文件 `CLAUDE.md` — 專案強制規則、QA / RLS / Hook、核心檔案職責、回歸測試清單
+5. `openspec/` — 規格驅動開發（SDD）
+
+規則衝突時，上位者勝。標準召喚語：`請依照 docs/AI_AGENT_MASTER_RULES.md 執行`。
+
 請在每次對話開始時，主動讀取以下記憶檔案：
 - .claude/memory/MEMORY.md
 - .claude/memory/architecture.md
