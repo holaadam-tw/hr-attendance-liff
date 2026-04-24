@@ -53,13 +53,14 @@
 4. **Hook 自動檢查**：
    - 每次 Edit/Write 後 `.claude/hooks/check-rls-bypass.sh` 和 `.claude/hooks/check-multitenant.sh` 會自動跑
    - **看到 ⚠️ 警告必須立刻檢查**
-   - 如果是新出現的警告，必須修正
+   - **新出現的警告 = 視同 FAIL，必須修正才能 commit**（對齊 Guardrails §6）
    - 已知低風險警告（員工自查）可以忽略：
      - common.js:524, 614, 646, 1097
      - modules/employees.js:233, 801
      - modules/leave.js:280
+   - ⚠️ **Allowlist 失效條件**：若上述行號對應的程式碼結構改變（例如查詢邏輯改動、不再是員工自查），例外立即失效，必須重新驗證
 
-### 改程式後（自我驗證 5 步）
+### 改程式後（自我驗證 5 步 — 快速 checklist）
 
 每次修改必須：
 1. `git diff` 列出所有改動
@@ -69,6 +70,8 @@
 5. 跑 `npm test`（必須 53 通過）
 
 **如果任一情境走不通 → 不可 commit**
+
+> 📖 **完整 Verify 規格見 `docs/EXECUTION_RULES_AGENT_SKILLS.md` §6**（含行為驗證、多租戶驗證、副作用驗證、證據化要求）。本 5 步是每次必跑的子集，不是上限。
 
 ### 任務完成前
 
@@ -82,8 +85,9 @@
 
 3. **Git 流程**：
    - 永遠在 `dev` 分支改
-   - `git push origin dev` 後由使用者手動合併 main
-   - **絕對禁止直接改 main**
+   - **測試通過後**（qa_check + npm test 綠）才 `git add` → `commit` → `git push origin dev`
+   - 由使用者手動合併 main
+   - **絕對禁止直接改 main**（觸發 GitHub Pages 部署，對齊 Guardrails §1 Hard Block）
 
 ---
 
@@ -135,16 +139,16 @@
 
 ## 自動執行
 
-修完後直接 `git add`, `commit`, `push origin dev`，不動 main branch。
-合併到 main 必須 user 明確確認。
+**測試通過後**（`qa_check.sh` 0 FAIL + `npm test` 53 通過 + Hook 無新警告），再執行 `git add`, `commit`, `push origin dev`。不動 main branch。
+合併到 main **必須 user 明確、結構化授權**（僅一句「可以」不算授權，對齊 Guardrails §1/§3）；觸發 GitHub Pages 自動部署。
 
 ---
 
 ## Git 規則
 - **所有變更先在 dev 分支進行**，測試沒問題才合併到 main
-- 合併流程：`git checkout main && git merge dev && git push origin main`
+- 合併流程：`git checkout main && git merge dev && git push origin main` — **僅在 user 明確授權後執行**
 - 不要直接在 main 上開發
-- GitHub Pages 部署來源是 main 分支
+- GitHub Pages 部署來源是 main 分支（合併 = 自動部署，屬 Guardrails §1 Hard Block 範圍）
 - `node_modules/` 已加入 `.gitignore`，**絕對不可上傳到 git**
 - 需要時用 `npm install` 還原即可
 
@@ -176,7 +180,10 @@ bash scripts/qa_check.sh
 6. 子頁面返回按鍵
 7. 消費者頁面不應有 LIFF
 
-**FAIL 必須修正才能 commit，WARN 需確認是否為預期行為。**
+**FAIL 必須修正才能 commit；WARN 不 block commit，但必須在證據中列出並確認。**
+**Hook 新出現的警告視同 FAIL，必須修正。**
+
+> 📖 完整測試門檻見 `docs/AUTONOMOUS_24H_GUARDRAILS.md` §6。
 
 ### RLS 檢查機制
 
