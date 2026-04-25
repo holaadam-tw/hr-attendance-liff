@@ -612,7 +612,12 @@ export async function loadPayrollData() {
             const atts = attMap[emp.id] || [];
             const leaves = leaveMap[emp.id] || { total: 0, personal: 0 };
             const otHours = otMap[emp.id] || 0;
-            const expectedDays = computeEmployeeExpectedDays(emp.id, startDate, endDate, schedMap);
+            // 月中離職：expected_days 只算到離職日
+            let effectiveEndDate = endDate;
+            if (emp.status === 'resigned' && emp.resigned_date && emp.resigned_date < endDate) {
+                effectiveEndDate = emp.resigned_date;
+            }
+            const expectedDays = computeEmployeeExpectedDays(emp.id, startDate, effectiveEndDate, schedMap);
             return calcEmployeePayroll(emp, ss, atts, leaves, otHours, year, month, payrollSettings, expectedDays);
         }).filter(Boolean);
         if (noSalaryPayroll.length > 0) {

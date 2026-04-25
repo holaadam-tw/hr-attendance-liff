@@ -362,6 +362,8 @@
             if (mpDate && !mpDate.value) {
                 const y = new Date(); y.setDate(y.getDate() - 1);
                 mpDate.value = fmtDate(y);
+                const min = new Date(); min.setDate(min.getDate() - 30);
+                mpDate.min = fmtDate(min);
                 mpDate.max = fmtDate(new Date());
             }
         }
@@ -616,23 +618,19 @@
 
                 if (existingOrder && existingOrder.status !== 'cancelled') return; // 已訂過
 
-                // 讀取截止時間
-                let deadlineHour = 9;
-                const deadlineSetting = getCachedSetting('lunch_deadline');
-                if (deadlineSetting) {
-                    const parsed = parseInt(deadlineSetting, 10);
-                    if (!isNaN(parsed)) deadlineHour = parsed;
-                }
+                // 讀取截止時間（格式 HH:MM 或純數字）
+                const dlVal = getCachedSetting('lunch_deadline') || '9:00';
+                const [dlHour, dlMin] = dlVal.includes(':') ? dlVal.split(':').map(Number) : [parseInt(dlVal, 10) || 9, 0];
 
-                // 檢查是否已超過截止時間
-                const nowHour = parseInt(new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour: 'numeric', hour12: false }), 10);
-                if (nowHour >= deadlineHour) return; // 已超過截止
+                // 檢查是否已超過截止時間（分鐘級別）
+                const nowTw = new Date(new Date().toLocaleString('en-US', {timeZone:'Asia/Taipei'}));
+                if (nowTw.getHours() > dlHour || (nowTw.getHours() === dlHour && nowTw.getMinutes() >= dlMin)) return;
 
                 // 顯示便當提示
                 const banner = document.getElementById('lunchPromptBanner');
                 const deadlineText = document.getElementById('lunchDeadlineText');
                 if (banner) banner.style.display = 'block';
-                if (deadlineText) deadlineText.textContent = `截止 ${deadlineHour}:00`;
+                if (deadlineText) deadlineText.textContent = `截止 ${dlHour}:${String(dlMin).padStart(2,'0')}`;
             } catch (e) {
                 console.error('Check lunch prompt error:', e);
             }

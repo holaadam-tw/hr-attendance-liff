@@ -545,14 +545,10 @@
             if (currentCompanyFeatures && !currentCompanyFeatures.lunch) return false;
 
             // 2. 檢查截止時間
-            let deadlineHour = 9;
-            const dlSetting = getCachedSetting('lunch_deadline');
-            if (dlSetting) {
-                const parsed = parseInt(dlSetting, 10);
-                if (!isNaN(parsed)) deadlineHour = parsed;
-            }
-            const nowHour = parseInt(new Date().toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour: 'numeric', hour12: false }), 10);
-            if (nowHour >= deadlineHour) return false;
+            const dlVal = getCachedSetting('lunch_deadline') || '9:00';
+            const [dlHour, dlMin] = dlVal.includes(':') ? dlVal.split(':').map(Number) : [parseInt(dlVal, 10) || 9, 0];
+            const nowTw = new Date(new Date().toLocaleString('en-US', {timeZone:'Asia/Taipei'}));
+            if (nowTw.getHours() > dlHour || (nowTw.getHours() === dlHour && nowTw.getMinutes() >= dlMin)) return false;
 
             // 3. 檢查今天是否已訂過
             if (currentEmployee) {
