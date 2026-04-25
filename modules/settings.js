@@ -107,6 +107,9 @@ export async function publishAnnouncement() {
     const isPopup = document.getElementById('annIsPopup')?.checked || false;
 
     if (!title) return showToast('❌ 請輸入標題');
+    if (expire && new Date(expire + 'T23:59:59') < new Date()) {
+        if (!confirm('到期日已過，公告發布後將不會顯示。確定繼續？')) return;
+    }
 
     try {
         const row = {

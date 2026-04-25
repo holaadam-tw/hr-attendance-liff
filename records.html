@@ -320,15 +320,33 @@
                 if (idx !== undefined && tabs[idx]) tabs[idx].classList.add('active');
             }
             if (id === 'attendancePage') { attYear = new Date().getFullYear(); attMonth = new Date().getMonth(); loadAttCal(); }
-            if (id === 'leavePage') loadLeaveHistory();
+            if (id === 'leavePage') { loadLeaveHistory(); initLeaveDates(); }
             if (id === 'makeupPunchPage') { loadMakeupHistory(); initMpDate(); }
             if (id === 'overtimePage') { loadOvertimeHistory(); initOtDate(); }
             if (id === 'salaryPage') { document.getElementById('salaryYear').value = new Date().getFullYear(); loadAnnualSummary(); }
         }
 
+        function initLeaveDates() {
+            const startEl = document.getElementById('leaveStartDate');
+            const endEl = document.getElementById('leaveEndDate');
+            if (!startEl || !endEl) return;
+            const today = new Date();
+            const min = new Date(today); min.setDate(min.getDate() - 30);
+            const max = new Date(today); max.setDate(max.getDate() + 90);
+            startEl.min = fmtDate(min); startEl.max = fmtDate(max);
+            endEl.min = fmtDate(min); endEl.max = fmtDate(max);
+            if (!startEl.value) startEl.value = fmtDate(today);
+            if (!endEl.value) endEl.value = fmtDate(today);
+        }
+
         function initOtDate() {
             const el = document.getElementById('otDate');
             if (el && !el.value) el.value = fmtDate(new Date());
+            if (el) {
+                const min = new Date(); min.setDate(min.getDate() - 30);
+                el.min = fmtDate(min);
+                el.max = fmtDate(new Date());
+            }
         }
 
         // 補打卡類型選擇

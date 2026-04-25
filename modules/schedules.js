@@ -225,6 +225,16 @@ export async function saveSchedule() {
             upserts.push({ employee_id: empId, date, shift_type_id: stId });
         }
         if (upserts.length > 0) {
+            const empIds = [...new Set(upserts.map(u => u.employee_id))];
+            const dates = [...new Set(upserts.map(u => u.date))];
+            const { count } = await sb.from('schedules')
+                .select('id', { count: 'exact', head: true })
+                .in('employee_id', empIds)
+                .in('date', dates);
+            if (count > 0 && !confirm(`將覆蓋 ${count} 筆既有排班，確定儲存？`)) {
+                statusEl.style.display = 'none';
+                return;
+            }
             const { error } = await sb.from('schedules').upsert(upserts, { onConflict: 'employee_id,date' });
             if (error) throw error;
         }
