@@ -87,7 +87,7 @@ export async function loadHybridBonusData() {
             sb.from('employees').select('id, name, employee_number, department, hire_date').eq('company_id', window.currentCompanyId).eq('is_active', true).order('department').order('name'),
             sb.from('salary_settings').select('employee_id, base_salary, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).eq('is_current', true),
             sb.from('attendance').select('employee_id, is_late, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).gte('date', `${year}-01-01`).lte('date', `${year}-12-31`),
-            sb.from('leave_requests').select('employee_id, days, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).eq('status', 'approved').gte('start_date', `${year}-01-01`).lte('start_date', `${year}-12-31`)
+            sb.from('leave_requests').select('employee_id, days, start_date, end_date, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).eq('status', 'approved').lte('start_date', `${year}-12-31`).gte('end_date', `${year}-01-01`)
         ]);
         if (empRes.error) throw empRes.error;
         const queryErrors = [];
@@ -103,7 +103,16 @@ export async function loadHybridBonusData() {
         const lateMap = {};
         (attRes.data || []).forEach(a => { if (!lateMap[a.employee_id]) lateMap[a.employee_id] = 0; if (a.is_late) lateMap[a.employee_id]++; });
         const leaveMap = {};
-        (leaveRes.data || []).forEach(l => { if (!leaveMap[l.employee_id]) leaveMap[l.employee_id] = 0; leaveMap[l.employee_id] += (parseFloat(l.days) || 0); });
+        const bYearStart = new Date(year, 0, 1);
+        const bYearEnd = new Date(year, 11, 31);
+        (leaveRes.data || []).forEach(l => {
+            if (!leaveMap[l.employee_id]) leaveMap[l.employee_id] = 0;
+            const ls = new Date((l.start_date || `${year}-01-01`) + 'T00:00:00+08:00');
+            const le = new Date((l.end_date || `${year}-12-31`) + 'T00:00:00+08:00');
+            const os = ls > bYearStart ? ls : bYearStart;
+            const oe = le < bYearEnd ? le : bYearEnd;
+            leaveMap[l.employee_id] += Math.max(0, (oe - os) / 86400000 + 1);
+        });
 
         const yearEnd = new Date(year, 11, 31);
         const today = new Date();
@@ -510,7 +519,7 @@ export async function loadPayrollData() {
             sb.from('employees').select('id, name, employee_number, department, is_active, status, resigned_date').eq('company_id', window.currentCompanyId).eq('no_checkin', false).in('status', ['approved', 'resigned']),
             sb.from('salary_settings').select('*, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).eq('is_current', true),
             sb.from('attendance').select('employee_id, date, is_late, total_work_hours, overtime_hours, check_in_time, check_out_time, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).gte('date', startDate).lte('date', endDate),
-            sb.from('leave_requests').select('employee_id, days, leave_type, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).eq('status', 'approved').gte('start_date', startDate).lte('end_date', endDate),
+            sb.from('leave_requests').select('employee_id, days, leave_type, start_date, end_date, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).eq('status', 'approved').lte('start_date', endDate).gte('end_date', startDate),
             sb.from('overtime_requests').select('employee_id, hours, ot_date, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).eq('status', 'approved').gte('ot_date', startDate).lte('ot_date', endDate).then(r => r).catch(() => ({ data: [] })),
             sb.from('payroll').select('*, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).eq('year', year).eq('month', month),
             sb.from('insurance_brackets').select('*').eq('is_active', true).order('salary_min').then(r => r).catch(() => ({ data: [] })),
@@ -547,10 +556,17 @@ export async function loadPayrollData() {
         });
 
         const leaveMap = {};
+        const pStart = new Date(startDate + 'T00:00:00+08:00');
+        const pEnd = new Date(endDate + 'T00:00:00+08:00');
         (leaveRes.data || []).forEach(l => {
             if (!leaveMap[l.employee_id]) leaveMap[l.employee_id] = { total: 0, personal: 0 };
-            leaveMap[l.employee_id].total += (l.days || 0);
-            if (l.leave_type === 'personal') leaveMap[l.employee_id].personal += (l.days || 0);
+            const ls = new Date((l.start_date || startDate) + 'T00:00:00+08:00');
+            const le = new Date((l.end_date || endDate) + 'T00:00:00+08:00');
+            const overlapStart = ls > pStart ? ls : pStart;
+            const overlapEnd = le < pEnd ? le : pEnd;
+            const overlapDays = Math.max(0, (overlapEnd - overlapStart) / 86400000 + 1);
+            leaveMap[l.employee_id].total += overlapDays;
+            if (l.leave_type === 'personal') leaveMap[l.employee_id].personal += overlapDays;
         });
 
         const otMap = {};
