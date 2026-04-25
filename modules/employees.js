@@ -544,43 +544,48 @@ export async function loadPendingEmployees() {
 export async function approveEmployee(empId, empName) {
     if (!confirm(`確定通過「${empName}」的登記申請？`)) return;
 
-    try {
-        // 產生工號（全域遞增，UNIQUE 約束為全域）
-        const { data: maxEmp } = await sb.from('employees')
-            .select('employee_number')
-            .not('employee_number', 'is', null)
-            .order('employee_number', { ascending: false })
-            .limit(20);
+    for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+            const { data: allEmp } = await sb.from('employees')
+                .select('employee_number')
+                .not('employee_number', 'is', null);
 
-        let nextNum = 'E001';
-        if (maxEmp && maxEmp.length > 0) {
+            const usedNumbers = new Set((allEmp || []).map(e => e.employee_number));
             let maxN = 0;
-            maxEmp.forEach(e => {
-                const m = (e.employee_number || '').match(/\d+/);
-                if (m) {
-                    const n = parseInt(m[0], 10);
-                    if (n > maxN) maxN = n;
-                }
+            usedNumbers.forEach(num => {
+                const m = (num || '').match(/\d+/);
+                if (m) { const n = parseInt(m[0], 10); if (n > maxN) maxN = n; }
             });
-            nextNum = 'E' + String(maxN + 1).padStart(3, '0');
+
+            let nextNum = 'E' + String(maxN + 1 + attempt).padStart(3, '0');
+            while (usedNumbers.has(nextNum)) {
+                maxN++;
+                nextNum = 'E' + String(maxN + 1 + attempt).padStart(3, '0');
+            }
+
+            const { error } = await sb.from('employees').update({
+                is_active: true,
+                is_bound: true,
+                status: 'approved',
+                employee_number: nextNum,
+                updated_at: new Date().toISOString()
+            }).eq('id', empId);
+
+            if (error) {
+                if (error.code === '23505' && attempt < 2) continue;
+                throw error;
+            }
+
+            showToast(`✅ ${empName} 已通過審核（工號：${nextNum}）`);
+            loadPendingEmployees();
+            return;
+
+        } catch (err) {
+            if (err.code === '23505' && attempt < 2) continue;
+            console.error('Approve error:', err);
+            showToast('❌ 審核失敗: ' + friendlyError(err));
+            return;
         }
-
-        const { error } = await sb.from('employees').update({
-            is_active: true,
-            is_bound: true,
-            status: 'approved',
-            employee_number: nextNum,
-            updated_at: new Date().toISOString()
-        }).eq('id', empId);
-
-        if (error) throw error;
-
-        showToast(`✅ ${empName} 已通過審核（工號：${nextNum}）`);
-        loadPendingEmployees();
-
-    } catch (err) {
-        console.error('Approve error:', err);
-        showToast('❌ 審核失敗: ' + friendlyError(err));
     }
 }
 
