@@ -80,6 +80,13 @@ export async function loadHybridBonusData() {
             sb.from('leave_requests').select('employee_id, days, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).eq('status', 'approved').gte('start_date', `${year}-01-01`).lte('start_date', `${year}-12-31`)
         ]);
         if (empRes.error) throw empRes.error;
+        const queryErrors = [];
+        if (salaryRes.error) queryErrors.push('薪資設定');
+        if (attRes.error) queryErrors.push('出勤紀錄');
+        if (leaveRes.error) queryErrors.push('請假紀錄');
+        if (queryErrors.length > 0) {
+            showToast(`⚠️ ${queryErrors.join('、')}載入失敗，獎金計算可能不準確`, 'error');
+        }
 
         const salaryMap = {};
         (salaryRes.data || []).forEach(s => { salaryMap[s.employee_id] = s.base_salary; });
@@ -223,6 +230,14 @@ export function updatePerformance(empId, rating) {
 
 export function updateAdjustment(empId, value) {
     const val = parseMoney(value);
+    if (val < -500000) {
+        showToast('調整金額不可低於 -$500,000', 'error');
+        return;
+    }
+    if (val > 5000000) {
+        showToast('調整金額不可超過 $5,000,000', 'error');
+        return;
+    }
     bonusAdjustments[empId] = val;
     populateBonusEmpDropdown();
     renderSelectedBonusCard();
@@ -486,6 +501,16 @@ export async function loadPayrollData() {
             sb.from('insurance_brackets').select('*').eq('is_active', true).order('salary_min').then(r => r).catch(() => ({ data: [] })),
             sb.from('schedules').select('employee_id, date, is_off_day, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).gte('date', startDate).lte('date', endDate).then(r => r).catch(() => ({ data: [] }))
         ]);
+
+        if (empRes.error) throw empRes.error;
+        const payrollQueryErrors = [];
+        if (salaryRes.error) payrollQueryErrors.push('薪資設定');
+        if (attRes.error) payrollQueryErrors.push('出勤紀錄');
+        if (leaveRes.error) payrollQueryErrors.push('請假紀錄');
+        if (existRes.error) payrollQueryErrors.push('已發薪資');
+        if (payrollQueryErrors.length > 0) {
+            showToast(`⚠️ ${payrollQueryErrors.join('、')}載入失敗，薪資計算可能不準確`, 'error');
+        }
 
         payrollBrackets = bracketRes.data || [];
 

@@ -51,7 +51,7 @@ export async function loadShiftMgr() {
     document.getElementById('shiftDaySummary').innerHTML = '';
     try {
         // 動態載入公司班別（透過 RPC）
-        const { data: stData } = await sb.rpc('get_company_shift_types', { p_company_id: window.currentCompanyId });
+        const { data: stData } = await sb.rpc('get_company_shift_types', { p_company_id: window.currentCompanyId, p_line_user_id: window.currentAdminEmployee?.line_user_id });
         smShiftTypes = stData || [];
         SHIFT_TYPES = [null, ...smShiftTypes.map(s => s.code), 'off'];
         SHIFT_DISPLAY = { null: { label: '⬜', bg: '#F8FAFC', color: '#94A3B8', name: '未排' }, off: { label: '🏖️', bg: '#ECFDF5', color: '#059669', name: '休假' } };
@@ -211,7 +211,7 @@ export async function saveSchedule() {
     const statusEl = document.getElementById('smSaveStatus');
     statusEl.style.display = 'block'; statusEl.style.color = '#F59E0B'; statusEl.textContent = '⏳ 儲存中...';
     try {
-        const { data: shiftTypes } = await sb.rpc('get_company_shift_types', { p_company_id: window.currentCompanyId });
+        const { data: shiftTypes } = await sb.rpc('get_company_shift_types', { p_company_id: window.currentCompanyId, p_line_user_id: window.currentAdminEmployee?.line_user_id });
         const stMap = {};
         (shiftTypes || []).forEach(st => { stMap[st.code || st.name] = st.id; });
         const upserts = [];
@@ -501,7 +501,7 @@ export async function loadShiftTypeList() {
     const el = document.getElementById('shiftTypeList');
     if (!el) return;
     try {
-        const { data, error } = await sb.rpc('get_company_shift_types', { p_company_id: window.currentCompanyId });
+        const { data, error } = await sb.rpc('get_company_shift_types', { p_company_id: window.currentCompanyId, p_line_user_id: window.currentAdminEmployee?.line_user_id });
         if (error) throw error;
         const list = data || [];
         if (list.length === 0) {
@@ -564,14 +564,14 @@ export async function saveShiftType() {
     try {
         if (id) {
             const { error } = await sb.rpc('update_shift_type', {
-                p_id: id, p_company_id: window.currentCompanyId,
+                p_id: id, p_company_id: window.currentCompanyId, p_line_user_id: window.currentAdminEmployee?.line_user_id,
                 p_name: name, p_code: code, p_start_time: start, p_end_time: end, p_is_overnight: overnight
             });
             if (error) throw error;
             showToast('✅ 班別已更新');
         } else {
             const { error } = await sb.rpc('create_shift_type', {
-                p_company_id: window.currentCompanyId,
+                p_company_id: window.currentCompanyId, p_line_user_id: window.currentAdminEmployee?.line_user_id,
                 p_name: name, p_code: code, p_start_time: start, p_end_time: end, p_is_overnight: overnight
             });
             if (error) throw error;
@@ -588,7 +588,7 @@ export async function saveShiftType() {
 export async function deleteShiftType(id, name) {
     if (!confirm('確定刪除班別「' + name + '」？')) return;
     try {
-        const { error } = await sb.rpc('delete_shift_type', { p_id: id, p_company_id: window.currentCompanyId });
+        const { error } = await sb.rpc('delete_shift_type', { p_id: id, p_company_id: window.currentCompanyId, p_line_user_id: window.currentAdminEmployee?.line_user_id });
         if (error) throw error;
         showToast('🗑️ 已刪除');
         loadShiftTypeList();
