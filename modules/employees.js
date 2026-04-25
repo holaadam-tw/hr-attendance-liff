@@ -545,17 +545,15 @@ export async function approveEmployee(empId, empName) {
     if (!confirm(`確定通過「${empName}」的登記申請？`)) return;
 
     try {
-        // 產生工號（自動遞增）
+        // 產生工號（全域遞增，UNIQUE 約束為全域）
         const { data: maxEmp } = await sb.from('employees')
             .select('employee_number')
-            .eq('company_id', window.currentCompanyId)
             .not('employee_number', 'is', null)
             .order('employee_number', { ascending: false })
-            .limit(10);
+            .limit(20);
 
         let nextNum = 'E001';
         if (maxEmp && maxEmp.length > 0) {
-            // 找最大數字工號
             let maxN = 0;
             maxEmp.forEach(e => {
                 const m = (e.employee_number || '').match(/\d+/);
