@@ -27,11 +27,18 @@
 | 12 | **F2-P2** 排班 upsert 加 confirm dialog（覆蓋既有排班提示） | 1 | 🟡 | `feature_gap_admin_2026-04-23.md` 親驗 |
 | 13 | **F2-P3** 公告 `expire_at` 設過去日期時警告 | 1 | 🟡 | `feature_gap_admin_2026-04-23.md` |
 
-### 🕓 Agent 推論待親驗（修前必驗 — 不可直接動手）
-- **F1-S2** 補卡日期 min / **F1-S3** 加班時數 JS 驗 / **F1-I3** GPS fail fallback / **F1-I4** 便當截止 popup 重檢
-- **F2-I1** AI 菜單按鈕卡 disabled（疑似同 F2-S1 誤判）/ **F2-I2** 離職員工薪資邊界 / **F2-I3** 批次計算原子性 / **F2-I4** 審核人離職鏈斷
+### 🕓 Agent 推論 — 2026-04-25 親驗結果
 
-**執行前請告訴我要做哪一項**（GUARDRAILS §3 L2 規範：DB 寫入/破壞性/跨 >8 檔 需明確授權）
+| 項目 | 結論 | 處置 |
+|------|------|------|
+| **F1-S2** 補卡日期 min | ✅ 真 bug | 已修 `0e6ab3e` |
+| **F1-S3** 加班時數 JS 驗 | ✗ 非 bug | HTML min/max + JS 雙重驗證已到位 |
+| **F1-I3** GPS fail fallback | ⚠️ 設計決策 | 顯示 modal 讓用戶開啟定位是合理行為；允許無位置打卡需業務決策 |
+| **F1-I4** 便當截止 popup | ✅ 真 bug | 已修 `0e6ab3e`（統一分鐘級別判斷） |
+| **F2-I1** AI 菜單按鈕 | ✗ 非 bug | finally 塊正確恢復 disabled |
+| **F2-I2** 離職薪資邊界 | ✅ 真 bug | 已修 `0e6ab3e`（expectedDays 到離職日） |
+| **F2-I3** 批次原子性 | ✗ 非 bug | Supabase upsert 陣列 = 單一原子操作 |
+| **F2-I4** 審核人離職 | ✗ 非 bug | pending requests 不綁 approver，任何 admin 可審 |
 
 ---
 
