@@ -331,6 +331,9 @@ export async function switchCompanyAdmin(companyId) {
     window.currentAdminEmployee = currentAdminEmployee;
     updateAdminInfo(currentAdminEmployee);
 
+    // 清除跨公司殘留狀態
+    if (typeof window.clearPayrollState === 'function') window.clearPayrollState();
+
     // 重新載入設定
     sessionStorage.removeItem('system_settings_cache');
     await loadSettings();

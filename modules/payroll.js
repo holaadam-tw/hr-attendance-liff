@@ -27,6 +27,16 @@ let payrollAdjustments = {};   // { empId: { amount: 0, note: '' } }
 let payrollBrackets = [];
 let payrollIsPublished = false;
 
+export function clearPayrollState() {
+    bonusEmployees = [];
+    bonusPerformance = {};
+    bonusAdjustments = {};
+    payrollEmployees = [];
+    payrollAdjustments = {};
+    payrollBrackets = [];
+    payrollIsPublished = false;
+}
+
 // ===== Tab 切換 =====
 export function switchPayTab(tab, btn) {
     // 隱藏所有 tab 內容
@@ -98,8 +108,10 @@ export async function loadHybridBonusData() {
         const yearEnd = new Date(year, 11, 31);
         const today = new Date();
         const cutoffDate = yearEnd < today ? yearEnd : today;
+        const noSalaryNames = [];
         bonusEmployees = (empRes.data || []).map(emp => {
             const baseSalary = salaryMap[emp.id] || 0;
+            if (!salaryMap[emp.id]) noSalaryNames.push(emp.name);
             const lateCount = lateMap[emp.id] || 0;
             const leaveDays = leaveMap[emp.id] || 0;
             let tenureRatio = 1.0;
@@ -114,6 +126,9 @@ export async function loadHybridBonusData() {
 
             return { id: emp.id, name: emp.name, employeeNumber: emp.employee_number, department: emp.department, hireDate: emp.hire_date, baseSalary, lateCount, leaveDays, tenureRatio, attendanceGrade, perfRating: bonusPerformance[emp.id] || 'A' };
         });
+        if (noSalaryNames.length > 0) {
+            showToast(`⚠️ ${noSalaryNames.join('、')}尚未設定底薪，獎金以 $0 計算`, 'error');
+        }
 
         populateBonusEmpDropdown();
         renderSelectedBonusCard();
@@ -569,9 +584,10 @@ export async function loadPayrollData() {
         payrollIsPublished = (existRes.data || []).some(p => p.is_published);
         if (payrollIsPublished) warnEl.style.display = 'block';
 
+        const noSalaryPayroll = [];
         payrollEmployees = (empRes.data || []).map(emp => {
             const ss = salaryMap[emp.id];
-            if (!ss) return null;
+            if (!ss) { noSalaryPayroll.push(emp.name); return null; }
             // 已離職且離職日在該月份之前 → 跳過
             if (emp.status === 'resigned' && emp.resigned_date) {
                 const resignMonth = new Date(emp.resigned_date + 'T00:00:00+08:00');
@@ -583,6 +599,9 @@ export async function loadPayrollData() {
             const expectedDays = computeEmployeeExpectedDays(emp.id, startDate, endDate, schedMap);
             return calcEmployeePayroll(emp, ss, atts, leaves, otHours, year, month, payrollSettings, expectedDays);
         }).filter(Boolean);
+        if (noSalaryPayroll.length > 0) {
+            showToast(`⚠️ ${noSalaryPayroll.join('、')}尚未設定底薪，已從薪資計算中排除`, 'error');
+        }
 
         populatePayrollDropdown();
         renderPayrollSummary();

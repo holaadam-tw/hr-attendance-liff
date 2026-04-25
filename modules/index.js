@@ -52,6 +52,7 @@ import {
     BONUS_MATRIX, loadHybridBonusData, renderSelectedBonusCard,
     updatePerformance, updateAdjustment, toggleMatrixRef,
     saveAllBonuses, exportBonusCSV,
+    clearPayrollState,
     loadPayrollConfig, savePayrollConfig,
     initPayrollPage, toggleSalarySettingPanel, loadSalarySettingList,
     onBatchSalaryTypeChange, onBatchSalaryBaseChange, saveAllSalarySettings,
@@ -247,6 +248,7 @@ window.saveInsBracket = saveInsBracket;
 window.deleteInsBracket = deleteInsBracket;
 window.updateAllInsRates = updateAllInsRates;
 window.switchPayTab = switchPayTab;
+window.clearPayrollState = clearPayrollState;
 
 // store
 window.loadRestaurantList = loadRestaurantList;
