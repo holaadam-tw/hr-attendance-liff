@@ -16,19 +16,19 @@
 
 ### 2026-04-23 Audit 新發現（完整報告: `reports/audit_summary_2026-04-22.md`）
 
-**🔴 最優先（安全風險）**
-| # | Bug | 位置 | PoC |
-|---|-----|------|-----|
-| P1 | 敏感 RPC 無後端身份驗證（`shift_types` 4 支 + 其他 SECURITY DEFINER + GRANT anon）→ anon 可讀/改/刪他家班別 | `migrations/068:10-88` + 其他 | `tests/poc/poc1_shift_types_anon.mjs`（可執行） |
-| P2 | `updateAdjustment` 無負數/上限/NULL 檢查 → 可誤發負薪或天價 | `modules/payroll.js:224-230` | `tests/poc/poc2_bonus_negative.md` |
-| P3 | `Promise.all` silent error → 獎金數字錯但 UI 看不出 | `modules/payroll.js:76-82` | `tests/poc/poc3_promise_all_silent.md` |
-| D1 | `attendance_public.html` URL 可改 → 知道 UUID 就能偷看別家打卡 | `attendance_public.html:377-414` | User 確認為 bug，修法 (i) LIFF 登入 |
+**🔴 最優先（安全風險）— 全部已修復 ✅**
+| # | Bug | Commit | 修復方式 |
+|---|-----|--------|---------|
+| P1 | 敏感 RPC 無後端身份驗證 → anon 可讀/改/刪他家班別 | 44ac302 | `migrations/071` 重建 4 RPC 加 `p_line_user_id` 驗證 |
+| P2 | `updateAdjustment` 無負數/上限檢查 → 可誤發負薪或天價 | 44ac302 | 加 -500K~5M 範圍檢查 + toast 擋住 |
+| P3 | `Promise.all` silent error → 獎金數字錯但 UI 看不出 | 44ac302 | 獎金+薪資計算加完整 error 檢查 + toast 警告 |
+| D1 | `attendance_public.html` URL 可偷看別家打卡 | 0bb126c | 加 LIFF 登入 + admin/manager 角色驗證 |
 
-**🟠 次優先**
+**🟠 次優先 — P4/P5 已修復 ✅**
 | # | Bug | 位置 | 說明 |
 |---|-----|------|------|
-| P4 | `baseSalary NULL` 被當 0 → 新員工漏發薪資無警告 | `modules/payroll.js:95` | 應顯式檢查 |
-| P5 | `switchCompanyAdmin` 切公司未清 7 個 payroll/bonus 全域變數 → UI 殘影、調整值跨公司殘留 | `modules/auth.js:303-353` + `modules/payroll.js:20-27` | 需 clearState 機制 |
+| P4 | ~~`baseSalary NULL` 被當 0~~ | ✅ d50968c | 獎金+薪資計算偵測未設底薪 → toast 警告 |
+| P5 | ~~`switchCompanyAdmin` 切公司未清全域變數~~ | ✅ d50968c | `clearPayrollState()` 清除 7 個變數 |
 | P7 | `onclick` 字串拼接 XSS pattern（UUID 實務安全，但 pattern 危險） | `modules/employees.js:171`、`common.js:1286/1709` | 改 `data-*` + addEventListener |
 | P8 | `toISOString()` 時區邊界 → 跨時區公告到期誤判 | `common.js:978` | 改 `toLocaleString('sv-SE', { timeZone: 'Asia/Taipei' })` |
 
