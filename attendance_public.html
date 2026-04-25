@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>📊 打卡總覽 - 會計查看</title>
+    <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -384,10 +385,33 @@ async function init() {
             return;
         }
 
+        // LIFF 身份驗證
+        await liff.init({ liffId: LIFF_ID });
+        if (!liff.isLoggedIn()) {
+            const thisPage = window.location.pathname.split('/').pop() + window.location.search;
+            sessionStorage.setItem('liff_redirect_page', thisPage);
+            liff.login();
+            return;
+        }
+        const profile = await liff.getProfile();
+
         // 查公司名稱
         const { data: company, error } = await sb.from('companies').select('id, name').eq('id', companyId).maybeSingle();
         if (error || !company) {
             showError('公司不存在', '此連結無效，請確認公司代碼是否正確。');
+            return;
+        }
+
+        // 驗證呼叫者是該公司的 admin/manager
+        const { data: emp } = await sb.from('employees')
+            .select('id, role')
+            .eq('line_user_id', profile.userId)
+            .eq('company_id', companyId)
+            .eq('is_active', true)
+            .in('role', ['admin', 'manager'])
+            .maybeSingle();
+        if (!emp) {
+            showError('無存取權限', '您的帳號不是此公司的管理員，無法查看打卡總覽。');
             return;
         }
 
