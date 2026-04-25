@@ -29,8 +29,8 @@
 |---|-----|------|------|
 | P4 | ~~`baseSalary NULL` 被當 0~~ | ✅ d50968c | 獎金+薪資計算偵測未設底薪 → toast 警告 |
 | P5 | ~~`switchCompanyAdmin` 切公司未清全域變數~~ | ✅ d50968c | `clearPayrollState()` 清除 7 個變數 |
-| P7 | `onclick` 字串拼接 XSS pattern（UUID 實務安全，但 pattern 危險） | `modules/employees.js:171`、`common.js:1286/1709` | 改 `data-*` + addEventListener |
-| P8 | `toISOString()` 時區邊界 → 跨時區公告到期誤判 | `common.js:978` | 改 `toLocaleString('sv-SE', { timeZone: 'Asia/Taipei' })` |
+| P7 | ~~`onclick` 字串拼接 XSS pattern~~ | ✅ d894248 | 改 `data-*` + `this.dataset`，消除 JS 字串拼接 |
+| P8 | ~~`toISOString()` 時區邊界~~ | ✅ d894248 | 改 `toLocaleString('sv-SE', { timeZone: 'Asia/Taipei' })` |
 
 **🟡 降級觀察**
 | # | Bug | 結論 |
@@ -53,6 +53,15 @@
 | B10 | 工時 tab 時間框截斷 | e417dba | 120px → 160px |
 | B11 | shift_types 401 Unauthorized | 31fe10b | 改用 SECURITY DEFINER RPC |
 | B12 | 公務機帳號繞過打卡防護 | c7c9b52 | 3 層防線（index/checkin/RPC）|
+
+## 🔵 2026-04-25 修復的 Bug（BACKLOG 全面清掃）
+
+| # | Bug | Commit | 說明 |
+|---|-----|--------|------|
+| B15 | 跨月請假查詢漏算（薪資少扣）| 56d8cfa | 查詢改區間交集 + 計算月內 overlap 天數 |
+| B16 | 請假/加班日期無限制 | d9abb3b | 請假 min=-30d/max=+90d、加班 min=-30d/max=今天 |
+| B17 | 排班覆蓋無提示 | d9abb3b | 儲存前查既有排班 → confirm 提示 |
+| B18 | 公告 expire_at 可設過去日期 | d9abb3b | 過去日期顯示 confirm 警告 |
 
 ## 🔵 2026-04-22 修復的 Bug（薪資連動審查）
 
