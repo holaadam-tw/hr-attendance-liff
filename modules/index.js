@@ -35,7 +35,8 @@ import {
     loadLunchManagers, addLunchManager, removeLunchManager, saveLunchDeadline, loadLunchDeadline,
     saveAttendanceSettings, loadAttendanceSettings,
     loadAdminLunchStats, loadStaffOverview, changeLeaveCal,
-    resetLeaveCal, loadLeaveCal
+    resetLeaveCal, loadLeaveCal,
+    clearLeaveState
 } from './leave.js';
 
 import {
@@ -45,7 +46,8 @@ import {
     switchOtTab, loadOtApprovals, approveOt, rejectOtPrompt, rejectOt,
     loadSwapApprovals, approveSwap, rejectSwap,
     loadShiftTypeList, showAddShiftTypeForm, editShiftTypeById, deleteShiftTypeById, saveShiftType, deleteShiftType,
-    loadEmployeeShiftModes, toggleShiftModeRow, saveAllShiftModes, smMarkChanged, smClearChanged, smHasUnsavedChanges
+    loadEmployeeShiftModes, toggleShiftModeRow, saveAllShiftModes, smMarkChanged, smClearChanged, smHasUnsavedChanges,
+    clearSchedulesState
 } from './schedules.js';
 
 import {
@@ -249,6 +251,8 @@ window.deleteInsBracket = deleteInsBracket;
 window.updateAllInsRates = updateAllInsRates;
 window.switchPayTab = switchPayTab;
 window.clearPayrollState = clearPayrollState;
+window.clearSchedulesState = clearSchedulesState;
+window.clearLeaveState = clearLeaveState;
 
 // store
 window.loadRestaurantList = loadRestaurantList;

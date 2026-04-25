@@ -127,6 +127,12 @@ export function switchStaffTab(tab) {
     if (tab === 'setting') { loadMaxLeaveSetting(); loadStaffOverview(); }
 }
 
+export function clearLeaveState() {
+    maxLeaveValue = 2;
+    lunchManagerIds = [];
+    const n = new Date(); lcYear = n.getFullYear(); lcMonth = n.getMonth();
+}
+
 // ===== 人力設定 =====
 let maxLeaveValue = 2;
 

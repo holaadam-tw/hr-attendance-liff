@@ -333,6 +333,8 @@ export async function switchCompanyAdmin(companyId) {
 
     // 清除跨公司殘留狀態
     if (typeof window.clearPayrollState === 'function') window.clearPayrollState();
+    if (typeof window.clearSchedulesState === 'function') window.clearSchedulesState();
+    if (typeof window.clearLeaveState === 'function') window.clearLeaveState();
 
     // 重新載入設定
     sessionStorage.removeItem('system_settings_cache');

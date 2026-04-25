@@ -23,6 +23,18 @@ let SHIFT_DISPLAY = {
     off: { label: '🏖️', bg: '#ECFDF5', color: '#059669', name: '休假' }
 };
 const SHIFT_ICONS = ['☀️', '🌤️', '🌙', '⏰', '🌅', '🌆', '🔔', '🏢'];
+
+export function clearSchedulesState() {
+    smEmployees = [];
+    smScheduleData = {};
+    smLeaveData = {};
+    smShiftTypes = [];
+    SHIFT_TYPES = [null, 'off'];
+    SHIFT_DISPLAY = {
+        null: { label: '⬜', bg: '#F8FAFC', color: '#94A3B8', name: '未排' },
+        off: { label: '🏖️', bg: '#ECFDF5', color: '#059669', name: '休假' }
+    };
+}
 const SHIFT_COLORS = ['#DBEAFE', '#FEF3C7', '#EDE9FE', '#FCE7F3', '#D1FAE5', '#FFF7ED', '#F1F5F9', '#E0E7FF'];
 const SHIFT_TEXT_COLORS = ['#1E40AF', '#92400E', '#6D28D9', '#BE185D', '#065F46', '#9A3412', '#475569', '#3730A3'];
 
