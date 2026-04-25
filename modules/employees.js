@@ -166,13 +166,13 @@ export async function loadEmployeeList() {
                         ${emp.phone ? '📱 ' + escapeHTML(emp.phone) + ' · ' : ''}到職: ${emp.hire_date || '未設定'} · ${emp.employment_type === 'parttime' ? '兼職' : '正職'} · ${emp.is_kiosk ? '📱 公務機' : emp.no_checkin ? '🚫 免打卡' : ''} · ${emp.line_user_id ? '✅ 已綁定' : '⏳ 未綁定'}
                     </div>
                     <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;">
-                        <button onclick="openEditEmployeeModal('${emp.id}')" style="padding:7px 12px;border:1px solid #E5E7EB;border-radius:8px;background:#fff;font-size:11px;font-weight:700;cursor:pointer;color:#4F46E5;">✏️ 編輯</button>
+                        <button data-id="${emp.id}" onclick="openEditEmployeeModal(this.dataset.id)" style="padding:7px 12px;border:1px solid #E5E7EB;border-radius:8px;background:#fff;font-size:11px;font-weight:700;cursor:pointer;color:#4F46E5;">✏️ 編輯</button>
                         ${emp.line_user_id ? `
-                            <button onclick="updateEmployeeRoleAdmin('${emp.id}', '${emp.role === 'admin' ? 'user' : 'admin'}', '${escapeHTML(emp.name)}')" style="padding:7px 12px;border:1px solid #E5E7EB;border-radius:8px;background:#fff;font-size:11px;font-weight:700;cursor:pointer;color:#EA580C;">
+                            <button data-id="${emp.id}" data-role="${emp.role === 'admin' ? 'user' : 'admin'}" data-name="${escapeHTML(emp.name)}" onclick="updateEmployeeRoleAdmin(this.dataset.id, this.dataset.role, this.dataset.name)" style="padding:7px 12px;border:1px solid #E5E7EB;border-radius:8px;background:#fff;font-size:11px;font-weight:700;cursor:pointer;color:#EA580C;">
                                 ${emp.role === 'admin' ? '取消管理員' : '設為管理員'}
                             </button>
                         ` : ''}
-                        <button onclick="showResignModal('${emp.id}', '${escapeHTML(emp.name)}')" style="padding:7px 12px;border:1px solid #FCA5A5;border-radius:8px;background:#FEF2F2;font-size:11px;font-weight:700;cursor:pointer;color:#DC2626;">📤 離職</button>
+                        <button data-id="${emp.id}" data-name="${escapeHTML(emp.name)}" onclick="showResignModal(this.dataset.id, this.dataset.name)" style="padding:7px 12px;border:1px solid #FCA5A5;border-radius:8px;background:#FEF2F2;font-size:11px;font-weight:700;cursor:pointer;color:#DC2626;">📤 離職</button>
                     </div>
                 </div>
             `;
@@ -416,7 +416,7 @@ export async function loadUnbindEmployees() {
                     </div>
                     <div style="display:flex;gap:6px;align-items:center;">
                         <input type="text" id="bindLineInput_${emp.id}" placeholder="LINE User ID" style="width:140px;padding:8px;border:1px solid #E2E8F0;border-radius:8px;font-size:12px;font-family:monospace;">
-                        <button onclick="quickBindLine('${emp.id}', '${escapeHTML(emp.name)}')" style="padding:8px 14px;border:none;border-radius:8px;background:#4F46E5;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;">
+                        <button data-id="${emp.id}" data-name="${escapeHTML(emp.name)}" onclick="quickBindLine(this.dataset.id, this.dataset.name)" style="padding:8px 14px;border:none;border-radius:8px;background:#4F46E5;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;">
                             綁定
                         </button>
                     </div>
@@ -521,10 +521,10 @@ export async function loadPendingEmployees() {
                     </div>
                     ${emp.emergency_contact ? `<div style="font-size:12px;color:#666;margin-top:3px;">🆘 緊急聯絡: ${escapeHTML(emp.emergency_contact)} ${escapeHTML(emp.emergency_phone || '')}</div>` : ''}
                     <div style="margin-top:10px;display:flex;gap:8px;">
-                        <button onclick="approveEmployee('${emp.id}', '${escapeHTML(emp.name)}')" style="flex:1;padding:10px;border:none;border-radius:8px;background:#10B981;color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">
+                        <button data-id="${emp.id}" data-name="${escapeHTML(emp.name)}" onclick="approveEmployee(this.dataset.id, this.dataset.name)" style="flex:1;padding:10px;border:none;border-radius:8px;background:#10B981;color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">
                             ✅ 通過
                         </button>
-                        <button onclick="rejectEmployee('${emp.id}', '${escapeHTML(emp.name)}')" style="flex:1;padding:10px;border:none;border-radius:8px;background:#EF4444;color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">
+                        <button data-id="${emp.id}" data-name="${escapeHTML(emp.name)}" onclick="rejectEmployee(this.dataset.id, this.dataset.name)" style="flex:1;padding:10px;border:none;border-radius:8px;background:#EF4444;color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">
                             ❌ 拒絕
                         </button>
                     </div>
@@ -733,7 +733,7 @@ export async function loadResignedEmployees() {
                     </div>
                     ${emp.resign_note ? `<div style="font-size:12px;color:#94A3B8;margin-top:3px;">備註：${escapeHTML(emp.resign_note)}</div>` : ''}
                     <div style="margin-top:8px;">
-                        <button onclick="restoreEmployee('${emp.id}', '${escapeHTML(emp.name)}')" style="padding:7px 14px;border:1px solid #BBF7D0;border-radius:8px;background:#F0FDF4;font-size:11px;font-weight:700;cursor:pointer;color:#059669;">🔄 恢復在職</button>
+                        <button data-id="${emp.id}" data-name="${escapeHTML(emp.name)}" onclick="restoreEmployee(this.dataset.id, this.dataset.name)" style="padding:7px 14px;border:1px solid #BBF7D0;border-radius:8px;background:#F0FDF4;font-size:11px;font-weight:700;cursor:pointer;color:#059669;">🔄 恢復在職</button>
                     </div>
                 </div>
             `;

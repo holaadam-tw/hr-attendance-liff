@@ -975,7 +975,7 @@ async function sendUserNotify(employeeId, message) {
 // ===== 公告系統（使用 announcements 資料表） =====
 async function loadAnnouncements() {
     try {
-        const now = new Date().toISOString();
+        const now = new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Taipei' });
         let query = sb.from('announcements')
             .select('id, title, content, type, created_at, publish_at, expire_at, company_id')
             .eq('is_active', true)
@@ -1039,7 +1039,7 @@ window.showAnnouncementList = function() {
         const dateStr = (date.getMonth() + 1) + '/' + date.getDate();
         return '<div style="padding:14px;background:#fff;border-radius:12px;margin-bottom:8px;cursor:pointer;' +
             (isUnread ? 'border-left:4px solid #6366F1;' : 'border-left:4px solid #E2E8F0;opacity:.7;') +
-            '" onclick="event.stopPropagation();viewAnnouncement(\'' + esc(a.id) + '\')">' +
+            '" data-id="' + esc(a.id) + '" onclick="event.stopPropagation();viewAnnouncement(this.dataset.id)">' +
             '<div style="display:flex;justify-content:space-between;align-items:center;">' +
             '<div style="font-size:14px;font-weight:700;">' + (icons[a.type] || '📋') + ' ' + escapeHTML(a.title) + '</div>' +
             '<span style="font-size:11px;color:#94A3B8;">' + dateStr + '</span></div>' +
@@ -1283,8 +1283,8 @@ function renderLocationList() {
             <div style="font-size:12px;color:#94A3B8;margin-bottom:4px;">座標：${loc.lat}, ${loc.lng}</div>
             <div style="font-size:12px;color:#94A3B8;margin-bottom:8px;">打卡半徑：${loc.radius}m</div>
             <div style="display:flex;gap:8px;">
-                <button onclick="editLocation(${index})" style="font-size:12px;padding:6px 14px;border:1px solid #6366F1;border-radius:8px;background:#EEF2FF;color:#6366F1;cursor:pointer;">✏️ 編輯</button>
-                <button onclick="deleteLocation(${index})" style="font-size:12px;padding:6px 14px;border:1px solid #EF4444;border-radius:8px;background:#FEF2F2;color:#EF4444;cursor:pointer;">🗑️ 刪除</button>
+                <button data-index="${index}" onclick="editLocation(+this.dataset.index)" style="font-size:12px;padding:6px 14px;border:1px solid #6366F1;border-radius:8px;background:#EEF2FF;color:#6366F1;cursor:pointer;">✏️ 編輯</button>
+                <button data-index="${index}" onclick="deleteLocation(+this.dataset.index)" style="font-size:12px;padding:6px 14px;border:1px solid #EF4444;border-radius:8px;background:#FEF2F2;color:#EF4444;cursor:pointer;">🗑️ 刪除</button>
             </div>
         </div>
     `).join('');
@@ -1706,13 +1706,13 @@ function renderAdminRequestCard(r) {
     // 操作按鈕
     if (r.status === 'pending') {
         html += '<div style="display:flex;gap:6px;">';
-        html += '<button onclick="approveRequest(\'' + r.id + '\')" style="flex:1;padding:8px;border:none;border-radius:8px;background:#D1FAE5;color:#065F46;font-weight:700;font-size:12px;cursor:pointer;">✓ 核准</button>';
-        html += '<button onclick="rejectRequest(\'' + r.id + '\')" style="flex:1;padding:8px;border:none;border-radius:8px;background:#FEE2E2;color:#991B1B;font-weight:700;font-size:12px;cursor:pointer;">✕ 退回</button>';
+        html += '<button data-id="' + esc(r.id) + '" onclick="approveRequest(this.dataset.id)" style="flex:1;padding:8px;border:none;border-radius:8px;background:#D1FAE5;color:#065F46;font-weight:700;font-size:12px;cursor:pointer;">✓ 核准</button>';
+        html += '<button data-id="' + esc(r.id) + '" onclick="rejectRequest(this.dataset.id)" style="flex:1;padding:8px;border:none;border-radius:8px;background:#FEE2E2;color:#991B1B;font-weight:700;font-size:12px;cursor:pointer;">✕ 退回</button>';
         html += '</div>';
     } else if (r.status === 'approved') {
-        html += '<button onclick="updateRequestStatus(\'' + r.id + '\',\'in_progress\')" style="width:100%;padding:8px;border:none;border-radius:8px;background:#DBEAFE;color:#1E40AF;font-weight:700;font-size:12px;cursor:pointer;">🔄 標記進行中</button>';
+        html += '<button data-id="' + esc(r.id) + '" onclick="updateRequestStatus(this.dataset.id,\'in_progress\')" style="width:100%;padding:8px;border:none;border-radius:8px;background:#DBEAFE;color:#1E40AF;font-weight:700;font-size:12px;cursor:pointer;">🔄 標記進行中</button>';
     } else if (r.status === 'in_progress') {
-        html += '<button onclick="updateRequestStatus(\'' + r.id + '\',\'completed\')" style="width:100%;padding:8px;border:none;border-radius:8px;background:#EDE9FE;color:#5B21B6;font-weight:700;font-size:12px;cursor:pointer;">✔ 標記完成</button>';
+        html += '<button data-id="' + esc(r.id) + '" onclick="updateRequestStatus(this.dataset.id,\'completed\')" style="width:100%;padding:8px;border:none;border-radius:8px;background:#EDE9FE;color:#5B21B6;font-weight:700;font-size:12px;cursor:pointer;">✔ 標記完成</button>';
     }
     if (r.status === 'rejected' && r.rejection_reason) {
         html += '<div style="margin-top:6px;padding:6px 10px;background:#FEE2E2;border-radius:8px;font-size:12px;color:#991B1B;">退回原因：' + escapeHTML(r.rejection_reason) + '</div>';
@@ -2066,7 +2066,7 @@ function showPopupAnnouncement(a) {
         '<div style="text-align:center;font-size:12px;color:#EF4444;font-weight:700;margin-bottom:4px;">緊急公告</div>' +
         '<h3 style="text-align:center;font-size:18px;font-weight:800;color:' + typeColor + ';margin-bottom:12px;">' + escapeHTML(a.title) + '</h3>' +
         (a.content ? '<div style="font-size:14px;color:#374151;line-height:1.8;padding:14px;background:#F8FAFC;border-radius:12px;margin-bottom:16px;max-height:300px;overflow-y:auto;white-space:pre-wrap;">' + escapeHTML(a.content) + '</div>' : '') +
-        '<button id="forcedAckBtn" onclick="acknowledgeForcedAnnouncement(\'' + esc(a.id) + '\')" style="width:100%;padding:14px;border:none;border-radius:12px;background:' + typeColor + ';color:#fff;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit;">✅ 我已閱讀並確認</button>' +
+        '<button id="forcedAckBtn" data-id="' + esc(a.id) + '" onclick="acknowledgeForcedAnnouncement(this.dataset.id)" style="width:100%;padding:14px;border:none;border-radius:12px;background:' + typeColor + ';color:#fff;font-size:15px;font-weight:800;cursor:pointer;font-family:inherit;">✅ 我已閱讀並確認</button>' +
         '<p style="font-size:10px;color:#94A3B8;text-align:center;margin-top:8px;">確認後才能繼續使用系統</p>' +
     '</div>';
     document.body.appendChild(modal);
