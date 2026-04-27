@@ -103,6 +103,7 @@ body{font-family:'Noto Sans TC',-apple-system,sans-serif;background:var(--bg);co
 .role-hint{display:inline-flex;align-items:center;gap:6px;padding:7px 10px;border-radius:999px;font-size:11px;font-weight:700;background:#E2E8F0;color:#334155;}
 .role-hint.role-manager{background:#EDE9FE;color:#5B21B6;}
 .role-hint.role-employee{background:#DBEAFE;color:#1D4ED8;}
+.role-hint.clickable{cursor:pointer;}
 
 .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1E293B;color:#fff;padding:10px 24px;border-radius:10px;font-size:14px;font-weight:600;z-index:9999;opacity:0;transition:opacity 0.3s;pointer-events:none;}
 .toast.show{opacity:1;}
@@ -409,6 +410,7 @@ let currentTab = 'daily';
 let currentWeekendPolicy = 'fixed';
 let monthHolidayMap = {};
 let currentUserRole = null;
+let viewingAsEmployee = false;
 const LINE_ADD_FRIEND_URL = 'https://line.me/R/ti/p/@130oqrak';
 
 // === 工具函數 ===
@@ -421,30 +423,60 @@ function buildRegisterUrl() { return 'https://liff.line.me/' + LIFF_ID + '?goto=
 function openCheckinEntry(action) { window.location.href = buildCheckinUrl(action); }
 function openRegisterEntry() { window.location.href = buildRegisterUrl(); }
 function openLineFriend() { window.open(LINE_ADD_FRIEND_URL, '_blank'); }
+function toggleViewMode() {
+    if (!isManagerRole(currentUserRole)) return;
+    viewingAsEmployee = !viewingAsEmployee;
+    applyRoleAccess();
+}
 
 function applyRoleAccess() {
     const manager = isManagerRole(currentUserRole);
+    const employeeView = !manager || viewingAsEmployee;
     const roleHint = document.getElementById('roleHint');
     const managerTools = document.getElementById('managerTools');
     const pageTitle = document.getElementById('pageTitle');
     const tabDaily = document.getElementById('tabDaily');
     const tabMonthly = document.getElementById('tabMonthly');
+    const subtitle = document.querySelector('.entry-subtitle');
 
-    roleHint.textContent = manager ? '管理員模式' : '員工模式';
-    roleHint.classList.toggle('role-manager', manager);
-    roleHint.classList.toggle('role-employee', !manager);
-    managerTools.style.display = manager ? 'flex' : 'none';
+    roleHint.onclick = manager ? toggleViewMode : null;
+    roleHint.classList.toggle('clickable', manager);
+    roleHint.classList.toggle('role-manager', manager && !employeeView);
+    roleHint.classList.toggle('role-employee', employeeView);
 
-    if (!manager) {
-        pageTitle.textContent = '📋 週班表';
-        tabDaily.style.display = 'none';
+    if (manager && !employeeView) {
+        roleHint.textContent = '管理員模式｜點我看員工模式';
+        roleHint.title = '切換成員工視角預覽';
+    } else if (manager && employeeView) {
+        roleHint.textContent = '員工視角｜點我回管理員模式';
+        roleHint.title = '切回管理員完整模式';
+    } else {
+        roleHint.textContent = '員工模式';
+        roleHint.title = '';
+    }
+
+    managerTools.style.display = manager && !employeeView ? 'flex' : 'none';
+
+    if (employeeView) {
+        pageTitle.textContent = '📅 今日與週班表';
+        tabDaily.style.display = '';
         tabMonthly.style.display = 'none';
-        switchTab('schedule');
+        if (currentTab === 'monthly') {
+            switchTab('daily');
+        } else {
+            switchTab(currentTab === 'schedule' ? 'schedule' : 'daily');
+        }
+        if (subtitle) {
+            subtitle.textContent = '同一個入口自動區分權限。一般員工可查看今日與週班表；管理員可切回完整模式查看月度統計、匯出與 QR 工具。';
+        }
     } else {
         pageTitle.textContent = '📊 打卡總覽';
         tabDaily.style.display = '';
         tabMonthly.style.display = '';
-        switchTab('daily');
+        switchTab(currentTab === 'schedule' ? 'schedule' : currentTab);
+        if (subtitle) {
+            subtitle.textContent = '同一個入口自動區分權限。一般員工可查看今日與週班表；管理員可查看完整打卡總覽與工具。';
+        }
     }
 }
 
