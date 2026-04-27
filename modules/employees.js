@@ -144,8 +144,19 @@ export async function loadEmployeeList() {
 
         const roleNames = { 'admin': '管理員', 'manager': '主管', 'user': '一般員工' };
 
+        const rolePriority = { admin: 0, manager: 1, user: 2 };
+        const sortedEmployees = [...(data || [])].sort((a, b) => {
+            const roleDiff = (rolePriority[a.role] ?? 99) - (rolePriority[b.role] ?? 99);
+            if (roleDiff !== 0) return roleDiff;
+
+            const deptDiff = String(a.department || '').localeCompare(String(b.department || ''), 'zh-Hant');
+            if (deptDiff !== 0) return deptDiff;
+
+            return String(a.employee_number || '').localeCompare(String(b.employee_number || ''), 'en');
+        });
+
         let html = '';
-        data.forEach(emp => {
+        sortedEmployees.forEach(emp => {
             html += `
                 <div class="attendance-item">
                     <div class="date">
