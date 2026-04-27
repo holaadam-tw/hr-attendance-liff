@@ -102,6 +102,13 @@
         };
         let currentCheckInType = 'in';
 
+        function getPhotoProcessError() {
+            return {
+                title: '照片處理失敗',
+                message: '這次拍照沒有成功存成照片，請重新拍一次；若持續發生，請改用系統相機模式重試。'
+            };
+        }
+
         // 更新時鐘
         function updateClock() {
             const now = new Date();
@@ -149,6 +156,10 @@
                 ctx.translate(cw, 0); ctx.scale(-1, 1);
                 ctx.drawImage(video, 0, 0, cw, ch);
                 const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.6));
+                if (!blob) {
+                    const photoErr = getPhotoProcessError();
+                    throw new Error(photoErr.message);
+                }
                 console.log(`📸 壓縮: ${vw}x${vh} → ${cw}x${ch}, ${(blob.size/1024).toFixed(0)}KB`);
 
                 showStatus(statusBox, 'info', '☁️ 上傳中...');
@@ -217,8 +228,14 @@
                 clearTimeout(safetyTimer);
                 stopCamera();
                 console.error(err);
+                const photoErr = getPhotoProcessError();
+                const isPhotoError = (err.message || '').includes(photoErr.message) || (err.message || '').includes('blob.size');
                 const mapped = mapCheckinError(null, null);
-                showCheckinError('系統錯誤', err.message || mapped.message, true);
+                showCheckinError(
+                    isPhotoError ? photoErr.title : '系統錯誤',
+                    isPhotoError ? photoErr.message : (err.message || mapped.message),
+                    true
+                );
             }
         }
 
@@ -295,6 +312,10 @@
                     canvas.width = cw; canvas.height = ch;
                     canvas.getContext('2d').drawImage(img, 0, 0, cw, ch);
                     const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.6));
+                    if (!blob) {
+                        const photoErr = getPhotoProcessError();
+                        throw new Error(photoErr.message);
+                    }
                     console.log(`📸 capture 壓縮: ${img.width}x${img.height} → ${cw}x${ch}, ${(blob.size/1024).toFixed(0)}KB`);
 
                     showStatus(statusBox, 'info', '☁️ 上傳中...');
@@ -349,8 +370,20 @@
                     showCheckInSuccess(actualType + overnightHint, locText, nowTime);
                 } catch(err) {
                     console.error(err);
-                    showCheckinError('系統錯誤', err.message || '打卡失敗，請重試', true);
+                    const photoErr = getPhotoProcessError();
+                    const isPhotoError = (err.message || '').includes(photoErr.message) || (err.message || '').includes('blob.size');
+                    showCheckinError(
+                        isPhotoError ? photoErr.title : '系統錯誤',
+                        isPhotoError ? photoErr.message : (err.message || '打卡失敗，請重試'),
+                        true
+                    );
                 }
+            };
+            img.onerror = () => {
+                const photoErr = getPhotoProcessError();
+                showCheckinError(photoErr.title, photoErr.message, true);
+                btn.disabled = false;
+                btn.textContent = '📸 開啟相機拍照';
             };
             img.src = URL.createObjectURL(file);
         }
