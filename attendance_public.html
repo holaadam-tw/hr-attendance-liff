@@ -94,6 +94,8 @@ body{font-family:'Noto Sans TC',-apple-system,sans-serif;background:var(--bg);co
 .entry-block{border:1px solid #E2E8F0;border-radius:14px;padding:14px;background:#fff;}
 .entry-label{font-size:12px;font-weight:800;color:#475569;margin-bottom:10px;}
 .entry-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}
+.entry-help{margin-top:12px;padding:12px 14px;border-radius:12px;background:#F8FAFC;border:1px solid #E2E8F0;font-size:12px;color:#475569;line-height:1.8;}
+.entry-help strong{color:#0F172A;}
 .entry-link{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 14px;border-radius:12px;text-decoration:none;font-size:13px;font-weight:700;border:1px solid transparent;cursor:pointer;font-family:inherit;}
 .entry-link span:last-child{font-size:16px;line-height:1;}
 .entry-link-checkin{background:#EEF2FF;color:#4338CA;border-color:#C7D2FE;}
@@ -169,8 +171,13 @@ body{font-family:'Noto Sans TC',-apple-system,sans-serif;background:var(--bg);co
                             <a class="entry-link entry-link-register" href="#" onclick="openRegisterEntry(); return false;"><span>員工註冊</span><span>↗</span></a>
                             <a class="entry-link entry-link-friend" href="#" onclick="openLineFriend(); return false;"><span>加入 LINE 好友</span><span>↗</span></a>
                         </div>
+                        <div class="entry-help">
+                            <strong>員工怎麼使用</strong><br>
+                            第一次使用：先加好友，再點員工註冊。<br>
+                            平常打卡：直接從 LINE 點上班 / 下班打卡。
+                        </div>
                     </div>
-                    <div class="entry-block">
+                    <div class="entry-block" id="adminEntryBlock">
                         <div class="entry-label">管理員入口</div>
                         <div class="entry-grid">
                             <a class="entry-link entry-link-admin" href="admin.html"><span>管理後台</span><span>↗</span></a>
@@ -438,6 +445,7 @@ function applyRoleAccess() {
     const tabDaily = document.getElementById('tabDaily');
     const tabMonthly = document.getElementById('tabMonthly');
     const subtitle = document.querySelector('.entry-subtitle');
+    const adminEntryBlock = document.getElementById('adminEntryBlock');
 
     roleHint.onclick = manager ? toggleViewMode : null;
     roleHint.classList.toggle('clickable', manager);
@@ -456,6 +464,7 @@ function applyRoleAccess() {
     }
 
     managerTools.style.display = manager && !employeeView ? 'flex' : 'none';
+    adminEntryBlock.style.display = manager && !employeeView ? 'block' : 'none';
 
     if (employeeView) {
         pageTitle.textContent = '📅 今日與週班表';
