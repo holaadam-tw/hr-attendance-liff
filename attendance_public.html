@@ -79,11 +79,30 @@ body{font-family:'Noto Sans TC',-apple-system,sans-serif;background:var(--bg);co
   .detail-day{padding:2px 3px;font-size:10px;min-height:34px;border-radius:4px;}
   .detail-day-empty{min-height:34px;}
   .detail-day-holiday-label{font-size:8px;}
+  .entry-sections{grid-template-columns:1fr;}
+  .entry-grid{grid-template-columns:1fr;}
 }
 
 .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:12px;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,0.05);}
 
 .export-btn{padding:8px 16px;border:2px solid #10B981;border-radius:10px;background:#F0FDF4;color:#059669;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;}
+.entry-card{padding:18px;border:1px solid #E2E8F0;border-radius:16px;background:linear-gradient(180deg,#FFFFFF 0%,#F8FAFC 100%);margin-bottom:16px;}
+.entry-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px;}
+.entry-title{font-size:16px;font-weight:800;color:#0F172A;}
+.entry-subtitle{font-size:12px;color:#64748B;line-height:1.6;margin-top:4px;}
+.entry-sections{display:grid;grid-template-columns:2fr 1fr;gap:12px;}
+.entry-block{border:1px solid #E2E8F0;border-radius:14px;padding:14px;background:#fff;}
+.entry-label{font-size:12px;font-weight:800;color:#475569;margin-bottom:10px;}
+.entry-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}
+.entry-link{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 14px;border-radius:12px;text-decoration:none;font-size:13px;font-weight:700;border:1px solid transparent;cursor:pointer;font-family:inherit;}
+.entry-link span:last-child{font-size:16px;line-height:1;}
+.entry-link-checkin{background:#EEF2FF;color:#4338CA;border-color:#C7D2FE;}
+.entry-link-register{background:#ECFDF5;color:#047857;border-color:#A7F3D0;}
+.entry-link-admin{background:#F5F3FF;color:#6D28D9;border-color:#DDD6FE;}
+.entry-link-friend{background:#F0FDF4;color:#15803D;border-color:#BBF7D0;}
+.role-hint{display:inline-flex;align-items:center;gap:6px;padding:7px 10px;border-radius:999px;font-size:11px;font-weight:700;background:#E2E8F0;color:#334155;}
+.role-hint.role-manager{background:#EDE9FE;color:#5B21B6;}
+.role-hint.role-employee{background:#DBEAFE;color:#1D4ED8;}
 
 .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1E293B;color:#fff;padding:10px 24px;border-radius:10px;font-size:14px;font-weight:600;z-index:9999;opacity:0;transition:opacity 0.3s;pointer-events:none;}
 .toast.show{opacity:1;}
@@ -121,10 +140,10 @@ body{font-family:'Noto Sans TC',-apple-system,sans-serif;background:var(--bg);co
             <!-- 頁頭 -->
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px;">
                 <div>
-                    <h2 style="margin:0;font-size:18px;font-weight:800;">📊 打卡總覽</h2>
+                    <h2 id="pageTitle" style="margin:0;font-size:18px;font-weight:800;">📊 打卡總覽</h2>
                     <div style="font-size:12px;color:var(--text-muted);margin-top:2px;" id="companyLabel"></div>
                 </div>
-                <div style="display:flex;gap:6px;">
+                <div id="managerTools" style="display:flex;gap:6px;">
                     <button onclick="showPubCheckinQR()" style="padding:8px 12px;border:2px solid #7C3AED;border-radius:10px;background:#F5F3FF;color:#7C3AED;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;">📲 打卡 QR</button>
                     <button onclick="showPublicRegisterQR()" style="padding:8px 12px;border:2px solid #10B981;border-radius:10px;background:#F0FDF4;color:#059669;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;">📱 登記 QR</button>
                     <button class="export-btn" onclick="exportExcel()">📥 匯出</button>
@@ -132,6 +151,34 @@ body{font-family:'Noto Sans TC',-apple-system,sans-serif;background:var(--bg);co
             </div>
 
             <!-- Tab 切換 -->
+            <div class="entry-card">
+                <div class="entry-head">
+                    <div>
+                        <div class="entry-title">常用入口</div>
+                        <div class="entry-subtitle">同一個入口自動區分權限。一般員工可查看週班表；管理員可查看完整打卡總覽與工具。</div>
+                    </div>
+                    <div id="roleHint" class="role-hint">辨識中</div>
+                </div>
+                <div class="entry-sections">
+                    <div class="entry-block">
+                        <div class="entry-label">一般員工入口</div>
+                        <div class="entry-grid">
+                            <a class="entry-link entry-link-checkin" href="#" onclick="openCheckinEntry('check_in'); return false;"><span>上班打卡</span><span>↗</span></a>
+                            <a class="entry-link entry-link-checkin" href="#" onclick="openCheckinEntry('check_out'); return false;"><span>下班打卡</span><span>↗</span></a>
+                            <a class="entry-link entry-link-register" href="#" onclick="openRegisterEntry(); return false;"><span>員工註冊</span><span>↗</span></a>
+                            <a class="entry-link entry-link-friend" href="#" onclick="openLineFriend(); return false;"><span>加入 LINE 好友</span><span>↗</span></a>
+                        </div>
+                    </div>
+                    <div class="entry-block">
+                        <div class="entry-label">管理員入口</div>
+                        <div class="entry-grid">
+                            <a class="entry-link entry-link-admin" href="admin.html"><span>管理後台</span><span>↗</span></a>
+                        </div>
+                        <div style="margin-top:10px;font-size:11px;color:#64748B;line-height:1.6;">官方帳號：<strong>@130oqrak</strong></div>
+                    </div>
+                </div>
+            </div>
+
             <div class="ov-tabs">
                 <button class="ov-tab active" id="tabDaily" onclick="switchTab('daily')">📅 今日</button>
                 <button class="ov-tab" id="tabMonthly" onclick="switchTab('monthly')">📊 月度</button>
@@ -361,11 +408,45 @@ let refreshTimer = null;
 let currentTab = 'daily';
 let currentWeekendPolicy = 'fixed';
 let monthHolidayMap = {};
+let currentUserRole = null;
+const LINE_ADD_FRIEND_URL = 'https://line.me/R/ti/p/@130oqrak';
 
 // === 工具函數 ===
 function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = String(s); return d.innerHTML; }
 function showToast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2500); }
 function getTaiwanDate() { return new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Taipei' }); }
+function isManagerRole(role) { return role === 'admin' || role === 'manager'; }
+function buildCheckinUrl(action) { return 'https://liff.line.me/' + LIFF_ID + '?goto=checkin&action=' + action; }
+function buildRegisterUrl() { return 'https://liff.line.me/' + LIFF_ID + '?goto=register&company=' + companyId; }
+function openCheckinEntry(action) { window.location.href = buildCheckinUrl(action); }
+function openRegisterEntry() { window.location.href = buildRegisterUrl(); }
+function openLineFriend() { window.open(LINE_ADD_FRIEND_URL, '_blank'); }
+
+function applyRoleAccess() {
+    const manager = isManagerRole(currentUserRole);
+    const roleHint = document.getElementById('roleHint');
+    const managerTools = document.getElementById('managerTools');
+    const pageTitle = document.getElementById('pageTitle');
+    const tabDaily = document.getElementById('tabDaily');
+    const tabMonthly = document.getElementById('tabMonthly');
+
+    roleHint.textContent = manager ? '管理員模式' : '員工模式';
+    roleHint.classList.toggle('role-manager', manager);
+    roleHint.classList.toggle('role-employee', !manager);
+    managerTools.style.display = manager ? 'flex' : 'none';
+
+    if (!manager) {
+        pageTitle.textContent = '📋 週班表';
+        tabDaily.style.display = 'none';
+        tabMonthly.style.display = 'none';
+        switchTab('schedule');
+    } else {
+        pageTitle.textContent = '📊 打卡總覽';
+        tabDaily.style.display = '';
+        tabMonthly.style.display = '';
+        switchTab('daily');
+    }
+}
 
 function showError(title, msg) {
     document.getElementById('errorTitle').textContent = title;
@@ -408,12 +489,12 @@ async function init() {
             .eq('line_user_id', profile.userId)
             .eq('company_id', companyId)
             .eq('is_active', true)
-            .in('role', ['admin', 'manager'])
             .maybeSingle();
         if (!emp) {
-            showError('無存取權限', '您的帳號不是此公司的管理員，無法查看打卡總覽。');
+            showError('無存取權限', '您的帳號不是此公司的在職員工，無法查看這個入口。');
             return;
         }
+        currentUserRole = emp.role || 'user';
 
         companyName = company.name;
         document.getElementById('companyLabel').textContent = companyName;
@@ -428,8 +509,7 @@ async function init() {
         document.getElementById('mainView').style.display = 'block';
 
         await checkLunchFeature();
-        loadDailyData();
-        startAutoRefresh();
+        applyRoleAccess();
 
     } catch (e) {
         console.error('Init error:', e);
