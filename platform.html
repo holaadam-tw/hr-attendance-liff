@@ -187,6 +187,13 @@
                         <p style="text-align:center;color:#94A3B8;font-size:13px;padding:8px 0;">頛銝?..</p>
                     </div>
                 </div>
+                <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:12px;padding:14px;margin-bottom:14px;">
+                    <div style="font-size:14px;font-weight:800;color:#0F172A;margin-bottom:8px;">各公司管理員 / 主管</div>
+                    <div style="font-size:12px;color:#64748B;margin-bottom:10px;">列出每間公司目前的 admin 與 manager 名單。</div>
+                    <div id="companyManagerList">
+                        <p style="text-align:center;color:#94A3B8;font-size:13px;padding:8px 0;">載入中...</p>
+                    </div>
+                </div>
                 <div id="platformAdminList">
                     <p style="text-align:center;color:#94A3B8;font-size:13px;padding:16px;">載入中...</p>
                 </div>
@@ -604,7 +611,124 @@
         async function loadPlatformAdmins() {
             const el = document.getElementById('platformAdminList');
             const bindEl = document.getElementById('platformAdminBindings');
+            const mgrEl = document.getElementById('companyManagerList');
             if (!el) return;
+            if (mgrEl) {
+                try {
+                    const [platformRes, managerRes] = await Promise.all([
+                        sb.from('platform_admins')
+                            .select('*, platform_admin_companies(company_id, role, companies(name))')
+                            .order('created_at', { ascending: false }),
+                        sb.from('employees')
+                            .select('id, name, role, line_user_id, company_id, companies(name)')
+                            .in('role', ['admin', 'manager'])
+                            .eq('is_active', true)
+                            .order('company_id', { ascending: true })
+                            .order('role', { ascending: true })
+                            .order('name', { ascending: true })
+                    ]);
+
+                    if (platformRes.error) throw platformRes.error;
+                    if (managerRes.error) throw managerRes.error;
+
+                    const admins = platformRes.data || [];
+                    const managers = managerRes.data || [];
+
+                    if (bindEl) {
+                        if (admins.length === 0) {
+                            bindEl.innerHTML = '<p style="text-align:center;color:#94A3B8;padding:8px 0;">暫無平台管理員</p>';
+                        } else {
+                            bindEl.innerHTML = admins.map(a => {
+                                const bindings = a.platform_admin_companies || [];
+                                const roleSet = [...new Set(bindings.map(c => (c.role || 'owner').toLowerCase()))];
+                                const roleBadges = roleSet.map(role => {
+                                    const isOwner = role === 'owner';
+                                    const label = isOwner ? 'owner' : role;
+                                    return `<span style="display:inline-flex;align-items:center;padding:4px 8px;border-radius:999px;font-size:11px;font-weight:700;background:${isOwner ? '#EDE9FE' : '#DBEAFE'};color:${isOwner ? '#6D28D9' : '#1D4ED8'};">${escapeHTML(label)}</span>`;
+                                }).join(' ');
+                                const companyBadges = bindings.map(c => `<span style="display:inline-flex;align-items:center;padding:5px 9px;border-radius:999px;font-size:11px;font-weight:700;background:#EEF2FF;color:#4338CA;">${escapeHTML(c.companies?.name || '?')}</span>`).join(' ');
+                                const companyCount = bindings.length;
+                                return `<div style="padding:12px 0;border-bottom:1px solid #E5E7EB;">
+                                    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
+                                        <div style="min-width:0;">
+                                            <div style="font-weight:800;font-size:16px;color:#111827;">${escapeHTML(a.name)}</div>
+                                            <div style="font-family:monospace;font-size:11px;color:#94A3B8;word-break:break-all;margin-top:4px;">${escapeHTML(a.line_user_id || '-')}</div>
+                                        </div>
+                                        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0;">
+                                            <span style="display:inline-flex;align-items:center;padding:4px 8px;border-radius:999px;font-size:11px;font-weight:800;background:#F3F4F6;color:#374151;">可切換 ${companyCount} 間</span>
+                                            <div style="display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px;">${roleBadges || '<span style="font-size:11px;color:#94A3B8;">無角色</span>'}</div>
+                                        </div>
+                                    </div>
+                                    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;">${companyBadges || '<span style="font-size:12px;color:#94A3B8;">未綁定公司</span>'}</div>
+                                </div>`;
+                            }).join('');
+                        }
+                    }
+
+                    if (managers.length === 0) {
+                        mgrEl.innerHTML = '<p style="text-align:center;color:#94A3B8;padding:8px 0;">目前沒有可顯示的公司管理員</p>';
+                    } else {
+                        const grouped = managers.reduce((acc, row) => {
+                            const key = row.company_id || 'unknown';
+                            if (!acc[key]) {
+                                acc[key] = {
+                                    companyName: row.companies?.name || '未命名公司',
+                                    members: []
+                                };
+                            }
+                            acc[key].members.push(row);
+                            return acc;
+                        }, {});
+
+                        mgrEl.innerHTML = Object.values(grouped).map(group => {
+                            const memberCards = group.members.map(member => {
+                                const role = (member.role || 'manager').toLowerCase();
+                                const isAdmin = role === 'admin';
+                                return `<div style="padding:10px 12px;border:1px solid #E2E8F0;border-radius:10px;background:#fff;">
+                                    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
+                                        <div style="min-width:0;">
+                                            <div style="font-size:14px;font-weight:800;color:#111827;">${escapeHTML(member.name || '未命名')}</div>
+                                            <div style="font-family:monospace;font-size:11px;color:#94A3B8;word-break:break-all;margin-top:4px;">${escapeHTML(member.line_user_id || '-')}</div>
+                                        </div>
+                                        <span style="display:inline-flex;align-items:center;padding:4px 8px;border-radius:999px;font-size:11px;font-weight:700;background:${isAdmin ? '#DBEAFE' : '#DCFCE7'};color:${isAdmin ? '#1D4ED8' : '#166534'};">${escapeHTML(role)}</span>
+                                    </div>
+                                </div>`;
+                            }).join('');
+
+                            return `<div style="padding:12px 0;border-bottom:1px solid #E5E7EB;">
+                                <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px;">
+                                    <div style="font-size:15px;font-weight:800;color:#111827;">${escapeHTML(group.companyName)}</div>
+                                    <span style="display:inline-flex;align-items:center;padding:4px 8px;border-radius:999px;font-size:11px;font-weight:800;background:#F3F4F6;color:#374151;">${group.members.length} 位管理者</span>
+                                </div>
+                                <div style="display:grid;gap:8px;">${memberCards}</div>
+                            </div>`;
+                        }).join('');
+                    }
+
+                    if (admins.length === 0) {
+                        el.innerHTML = '<p style="text-align:center;color:#94A3B8;padding:30px;">尚無平台管理員</p>';
+                    } else {
+                        el.innerHTML = admins.map(a => {
+                            const companies = (a.platform_admin_companies || []).map(c => escapeHTML(c.companies?.name || '?')).join('、') || '無';
+                            const isSelf = window.currentPlatformAdmin?.id === a.id;
+                            return `<div style="background:#fff;border-radius:12px;padding:14px;margin-bottom:10px;box-shadow:0 1px 4px rgba(0,0,0,0.06);${a.is_active ? '' : 'opacity:0.5;'}">
+                                <div style="display:flex;justify-content:space-between;align-items:center;">
+                                    <div style="font-weight:700;font-size:15px;">${a.is_active ? '🟢' : '🔴'} ${escapeHTML(a.name)}${isSelf ? ' (自己)' : ''}</div>
+                                    <button data-id="${a.id}" onclick="openAdminModal(this.dataset.id)" style="padding:6px 12px;border:1px solid #E5E7EB;border-radius:8px;background:#fff;font-size:11px;font-weight:700;cursor:pointer;color:#4F46E5;">✏️ 編輯</button>
+                                </div>
+                                <div style="font-size:12px;color:#64748B;margin-top:4px;font-family:monospace;">${escapeHTML(a.line_user_id || '-')}</div>
+                                <div style="font-size:12px;color:#64748B;margin-top:4px;">管理：${companies}</div>
+                            </div>`;
+                        }).join('');
+                    }
+
+                    return;
+                } catch (e) {
+                    showToast('❌ 載入失敗');
+                    console.error(e);
+                    return;
+                }
+            }
             try {
                 const { data, error } = await sb.from('platform_admins').select('*, platform_admin_companies(company_id, role, companies(name))').order('created_at', { ascending: false });
                 if (error) throw error;
