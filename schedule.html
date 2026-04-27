@@ -431,12 +431,20 @@
                     .select('shift_types(name)').eq('employee_id', targetId).eq('date', date).maybeSingle();
                 const targetShift = targetSched?.shift_types?.name || '未排';
                 
+                const { data: mySched } = await sb.from('schedules')
+                    .select('shift_types(name)').eq('employee_id', currentEmployee.id).eq('date', date).maybeSingle();
+                const requesterShiftName = mySched?.shift_types?.name || myShift;
+                const targetShiftName = targetSched?.shift_types?.name || targetShift;
+                if (!requesterShiftName || requesterShiftName === '未排' || !targetShiftName || targetShiftName === '未排') {
+                    return showToast('❌ 雙方當天都必須已有排班才能申請換班');
+                }
+
                 const { error } = await sb.from('shift_swap_requests').insert({
                     requester_id: currentEmployee.id,
                     target_id: targetId,
                     swap_date: date,
-                    requester_original_shift: myShift,
-                    target_original_shift: targetShift,
+                    requester_original_shift: requesterShiftName,
+                    target_original_shift: targetShiftName,
                     reason: reason || '',
                     status: 'pending_target'
                 });

@@ -481,16 +481,25 @@ export async function approveSwap(id) {
             .select('*, requester:employees!shift_swap_requests_requester_id_fkey(name, id, company_id), target:employees!shift_swap_requests_target_id_fkey(name, id)')
             .eq('id', id).single();
         if (!req || req.requester?.company_id !== window.currentCompanyId) { showToast('❌ 無權操作此換班'); return; }
-        await sb.from('shift_swap_requests').update({
-            status: 'approved', approver_id: window.currentAdminEmployee?.id, approved_at: new Date().toISOString()
-        }).eq('id', id);
         if (req) {
             const date = req.swap_date;
             const { data: s1 } = await sb.from('schedules').select('id, shift_type_id').eq('employee_id', req.requester_id).eq('date', date).maybeSingle();
             const { data: s2 } = await sb.from('schedules').select('id, shift_type_id').eq('employee_id', req.target_id).eq('date', date).maybeSingle();
-            if (s1 && s2) {
-                await sb.from('schedules').update({ shift_type_id: s2.shift_type_id }).eq('id', s1.id);
-                await sb.from('schedules').update({ shift_type_id: s1.shift_type_id }).eq('id', s2.id);
+            if (!s1 || !s2) throw new Error('雙方當天都必須已有排班，才能核准換班');
+            const { error: updateReqError } = await sb.from('schedules').update({ shift_type_id: s2.shift_type_id }).eq('id', s1.id);
+            if (updateReqError) throw updateReqError;
+            const { error: updateTargetError } = await sb.from('schedules').update({ shift_type_id: s1.shift_type_id }).eq('id', s2.id);
+            if (updateTargetError) {
+                await sb.from('schedules').update({ shift_type_id: s1.shift_type_id }).eq('id', s1.id);
+                throw updateTargetError;
+            }
+            const { error: approveError } = await sb.from('shift_swap_requests').update({
+                status: 'approved', approver_id: window.currentAdminEmployee?.id, approved_at: new Date().toISOString()
+            }).eq('id', id);
+            if (approveError) {
+                await sb.from('schedules').update({ shift_type_id: s1.shift_type_id }).eq('id', s1.id);
+                await sb.from('schedules').update({ shift_type_id: s2.shift_type_id }).eq('id', s2.id);
+                throw approveError;
             }
             writeAuditLog('approve', 'shift_swap_requests', id, `${req.requester?.name} ↔ ${req.target?.name}`, { date });
             if (req.requester?.id) sendUserNotify(req.requester.id, `✅ 換班已核准\n📅 ${date} 班表已自動更新`);
