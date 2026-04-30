@@ -520,7 +520,7 @@ export async function loadPayrollData() {
             sb.from('salary_settings').select('*, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).eq('is_current', true),
             sb.from('attendance').select('employee_id, date, is_late, total_work_hours, overtime_hours, check_in_time, check_out_time, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).gte('date', startDate).lte('date', endDate),
             sb.from('leave_requests').select('employee_id, days, leave_type, start_date, end_date, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).eq('status', 'approved').lte('start_date', endDate).gte('end_date', startDate),
-            sb.from('overtime_requests').select('employee_id, hours, ot_date, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).eq('status', 'approved').gte('ot_date', startDate).lte('ot_date', endDate).then(r => r).catch(() => ({ data: [] })),
+            sb.from('overtime_requests').select('employee_id, hours, planned_hours, actual_hours, approved_hours, final_hours, source_type, ot_date, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).eq('status', 'approved').gte('ot_date', startDate).lte('ot_date', endDate).then(r => r).catch(() => ({ data: [] })),
             sb.from('payroll').select('*, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).eq('year', year).eq('month', month),
             sb.from('insurance_brackets').select('*').eq('is_active', true).order('salary_min').then(r => r).catch(() => ({ data: [] })),
             sb.from('schedules').select('employee_id, date, is_off_day, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).gte('date', startDate).lte('date', endDate).then(r => r).catch(() => ({ data: [] }))
@@ -572,7 +572,8 @@ export async function loadPayrollData() {
         const otMap = {};
         if ((otRes.data || []).length > 0) {
             (otRes.data).forEach(o => {
-                otMap[o.employee_id] = (otMap[o.employee_id] || 0) + (o.hours || 0);
+                const approvedOtHours = o.final_hours ?? o.approved_hours ?? o.actual_hours ?? o.planned_hours ?? o.hours ?? 0;
+                otMap[o.employee_id] = (otMap[o.employee_id] || 0) + approvedOtHours;
             });
         } else {
             (attRes.data || []).forEach(a => {
