@@ -102,23 +102,6 @@
         };
         let currentCheckInType = 'in';
 
-        async function syncLateCloseOvertimeIfNeeded(attendanceDate) {
-            if (!liffProfile?.userId || currentCheckInType !== 'out') return;
-            try {
-                const twDate = attendanceDate || new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Taipei' });
-                const { data: result, error } = await sb.rpc('sync_late_close_overtime_request', {
-                    p_line_user_id: liffProfile.userId,
-                    p_attendance_date: twDate
-                });
-                if (error) throw error;
-                if (result && result.success === false) {
-                    console.warn('sync_late_close_overtime_request failed:', result.error);
-                }
-            } catch (syncErr) {
-                console.warn('sync late close overtime failed:', syncErr);
-            }
-        }
-
         function getPhotoProcessError() {
             return {
                 title: '照片處理失敗',
@@ -233,10 +216,6 @@
                 }
 
                 if (rpcData.location_name) localStorage.setItem('last_location', rpcData.location_name);
-                const attendanceDate = rpcData.overnight
-                    ? new Date(Date.now() - 86400000).toLocaleDateString('sv-SE', { timeZone: 'Asia/Taipei' })
-                    : new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Taipei' });
-                await syncLateCloseOvertimeIfNeeded(attendanceDate);
 
                 const typeText = rpcData.type === 'check_out' ? '下班' : '上班';
                 const locText = rpcData.location_name || '公司';
@@ -383,10 +362,6 @@
                     }
 
                     if (rpcData.location_name) localStorage.setItem('last_location', rpcData.location_name);
-                    const attendanceDate = rpcData.overnight
-                        ? new Date(Date.now() - 86400000).toLocaleDateString('sv-SE', { timeZone: 'Asia/Taipei' })
-                        : new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Taipei' });
-                    await syncLateCloseOvertimeIfNeeded(attendanceDate);
                     const actualType = rpcData.type === 'check_out' ? '下班' : '上班';
                     const locText = rpcData.location_name || '公司';
                     const nowTime = new Date().toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', hour12: false });

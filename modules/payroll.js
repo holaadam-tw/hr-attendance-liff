@@ -570,18 +570,11 @@ export async function loadPayrollData() {
         });
 
         const otMap = {};
-        if ((otRes.data || []).length > 0) {
-            (otRes.data).forEach(o => {
-                const approvedOtHours = o.final_hours ?? o.approved_hours ?? o.actual_hours ?? o.planned_hours ?? o.hours ?? 0;
-                otMap[o.employee_id] = (otMap[o.employee_id] || 0) + approvedOtHours;
-            });
-        } else {
-            (attRes.data || []).forEach(a => {
-                if (a.overtime_hours > 0) {
-                    otMap[a.employee_id] = (otMap[a.employee_id] || 0) + a.overtime_hours;
-                }
-            });
-        }
+        (otRes.data || []).forEach(o => {
+            if ((o.source_type || 'manual') === 'late_close_auto') return;
+            const approvedOtHours = o.final_hours ?? o.approved_hours ?? o.actual_hours ?? o.planned_hours ?? o.hours ?? 0;
+            otMap[o.employee_id] = (otMap[o.employee_id] || 0) + approvedOtHours;
+        });
 
         const existMap = {};
         (existRes.data || []).forEach(p => {
@@ -670,6 +663,29 @@ function computeEmployeeExpectedDays(empId, startStr, endStr, schedMap) {
     return count;
 }
 
+function toTaipeiDate(value) {
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function calcCappedWorkHours(attendance) {
+    const rawHours = Number(attendance?.total_work_hours || 0);
+    if (!attendance?.check_in_time || !attendance?.check_out_time) return rawHours;
+
+    const checkIn = toTaipeiDate(attendance.check_in_time);
+    const checkOut = toTaipeiDate(attendance.check_out_time);
+    if (!checkIn || !checkOut) return rawHours;
+
+    const workDate = attendance.date || checkIn.toLocaleDateString('sv-SE', { timeZone: 'Asia/Taipei' });
+    const cutoff = new Date(`${workDate}T21:30:00+08:00`);
+    if (Number.isNaN(cutoff.getTime())) return rawHours;
+    if (checkOut <= cutoff) return rawHours;
+    if (checkIn >= cutoff) return 0;
+
+    const cappedHours = (cutoff.getTime() - checkIn.getTime()) / 3600000;
+    return Math.max(0, Math.round(cappedHours * 100) / 100);
+}
+
 function calcEmployeePayroll(emp, ss, atts, leaves, otHours, year, month, payrollSettings, expectedDaysOverride) {
     const _ps = payrollSettings || {};
     const salaryType = ss.salary_type || 'monthly';
@@ -682,7 +698,7 @@ function calcEmployeePayroll(emp, ss, atts, leaves, otHours, year, month, payrol
 
     const actualDays = atts.filter(a => a.check_in_time).length;
     const lateCount = atts.filter(a => a.is_late).length;
-    const totalWorkHours = atts.reduce((s, a) => s + (a.total_work_hours || 0), 0);
+    const totalWorkHours = atts.reduce((s, a) => s + calcCappedWorkHours(a), 0);
     const leaveDays = leaves.total;
     const personalLeaveDays = leaves.personal;
     const expectedDays = (expectedDaysOverride !== undefined && expectedDaysOverride !== null) ? expectedDaysOverride : (_ps.work_days_per_month || 22);
