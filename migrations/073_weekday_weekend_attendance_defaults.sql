@@ -73,7 +73,7 @@ BEGIN
         RETURN jsonb_build_object('success', false, 'error', 'employee_no_checkin');
     END IF;
 
-    SELECT value INTO v_setting_val
+    SELECT value #>> '{}' INTO v_setting_val
     FROM system_settings
     WHERE key = 'checkout_time_limit_hours'
       AND company_id = v_employee.company_id;
@@ -169,7 +169,7 @@ BEGIN
             v_target_work_date := v_existing.date;
             v_is_weekend := EXTRACT(DOW FROM v_target_work_date) IN (0, 6);
 
-            SELECT value INTO v_setting_val
+            SELECT value #>> '{}' INTO v_setting_val
             FROM system_settings
             WHERE key = CASE
                     WHEN v_is_weekend THEN 'default_weekend_work_end'
@@ -178,7 +178,7 @@ BEGIN
               AND company_id = v_employee.company_id;
 
             IF COALESCE(v_setting_val, '') = '' THEN
-                SELECT value INTO v_setting_val
+                SELECT value #>> '{}' INTO v_setting_val
                 FROM system_settings
                 WHERE key = 'default_work_end'
                   AND company_id = v_employee.company_id;
@@ -198,7 +198,7 @@ BEGIN
             END IF;
         END IF;
 
-        SELECT value INTO v_setting_val
+        SELECT value #>> '{}' INTO v_setting_val
         FROM system_settings
         WHERE key = 'early_leave_threshold_minutes'
           AND company_id = v_employee.company_id;
@@ -273,7 +273,7 @@ BEGIN
 
     v_location_name := COALESCE(v_matched_location, 'unspecified_location');
 
-    SELECT value INTO v_setting_val
+    SELECT value #>> '{}' INTO v_setting_val
     FROM system_settings
     WHERE key = 'late_threshold_minutes'
       AND company_id = v_employee.company_id;
@@ -304,7 +304,7 @@ BEGIN
         v_target_work_date := v_today;
         v_is_weekend := EXTRACT(DOW FROM v_target_work_date) IN (0, 6);
 
-        SELECT value INTO v_setting_val
+        SELECT value #>> '{}' INTO v_setting_val
         FROM system_settings
         WHERE key = CASE
                 WHEN v_is_weekend THEN 'default_weekend_work_start'
@@ -313,7 +313,7 @@ BEGIN
           AND company_id = v_employee.company_id;
 
         IF COALESCE(v_setting_val, '') = '' THEN
-            SELECT value INTO v_setting_val
+            SELECT value #>> '{}' INTO v_setting_val
             FROM system_settings
             WHERE key = 'default_work_start'
               AND company_id = v_employee.company_id;
@@ -385,74 +385,74 @@ DECLARE
     v_company_id CONSTANT UUID := 'fb1f6b5f-dcd5-4262-a7de-e7c357662639';
 BEGIN
     UPDATE system_settings
-    SET value = '10:30', description = 'Benmi weekday default check-in', updated_at = now()
+    SET value = to_jsonb('10:30'::text), description = 'Benmi weekday default check-in', updated_at = now()
     WHERE company_id = v_company_id AND key = 'default_work_start';
     IF NOT FOUND THEN
         INSERT INTO system_settings (company_id, key, value, description)
-        VALUES (v_company_id, 'default_work_start', '10:30', 'Benmi weekday default check-in');
+        VALUES (v_company_id, 'default_work_start', to_jsonb('10:30'::text), 'Benmi weekday default check-in');
     END IF;
 
     UPDATE system_settings
-    SET value = '21:30', description = 'Benmi weekday default check-out', updated_at = now()
+    SET value = to_jsonb('21:30'::text), description = 'Benmi weekday default check-out', updated_at = now()
     WHERE company_id = v_company_id AND key = 'default_work_end';
     IF NOT FOUND THEN
         INSERT INTO system_settings (company_id, key, value, description)
-        VALUES (v_company_id, 'default_work_end', '21:30', 'Benmi weekday default check-out');
+        VALUES (v_company_id, 'default_work_end', to_jsonb('21:30'::text), 'Benmi weekday default check-out');
     END IF;
 
     UPDATE system_settings
-    SET value = '10:30', description = 'Benmi weekday default check-in', updated_at = now()
+    SET value = to_jsonb('10:30'::text), description = 'Benmi weekday default check-in', updated_at = now()
     WHERE company_id = v_company_id AND key = 'default_weekday_work_start';
     IF NOT FOUND THEN
         INSERT INTO system_settings (company_id, key, value, description)
-        VALUES (v_company_id, 'default_weekday_work_start', '10:30', 'Benmi weekday default check-in');
+        VALUES (v_company_id, 'default_weekday_work_start', to_jsonb('10:30'::text), 'Benmi weekday default check-in');
     END IF;
 
     UPDATE system_settings
-    SET value = '21:30', description = 'Benmi weekday default check-out', updated_at = now()
+    SET value = to_jsonb('21:30'::text), description = 'Benmi weekday default check-out', updated_at = now()
     WHERE company_id = v_company_id AND key = 'default_weekday_work_end';
     IF NOT FOUND THEN
         INSERT INTO system_settings (company_id, key, value, description)
-        VALUES (v_company_id, 'default_weekday_work_end', '21:30', 'Benmi weekday default check-out');
+        VALUES (v_company_id, 'default_weekday_work_end', to_jsonb('21:30'::text), 'Benmi weekday default check-out');
     END IF;
 
     UPDATE system_settings
-    SET value = '07:00', description = 'Benmi weekend default check-in', updated_at = now()
+    SET value = to_jsonb('07:00'::text), description = 'Benmi weekend default check-in', updated_at = now()
     WHERE company_id = v_company_id AND key = 'default_weekend_work_start';
     IF NOT FOUND THEN
         INSERT INTO system_settings (company_id, key, value, description)
-        VALUES (v_company_id, 'default_weekend_work_start', '07:00', 'Benmi weekend default check-in');
+        VALUES (v_company_id, 'default_weekend_work_start', to_jsonb('07:00'::text), 'Benmi weekend default check-in');
     END IF;
 
     UPDATE system_settings
-    SET value = '21:30', description = 'Benmi weekend default check-out', updated_at = now()
+    SET value = to_jsonb('21:30'::text), description = 'Benmi weekend default check-out', updated_at = now()
     WHERE company_id = v_company_id AND key = 'default_weekend_work_end';
     IF NOT FOUND THEN
         INSERT INTO system_settings (company_id, key, value, description)
-        VALUES (v_company_id, 'default_weekend_work_end', '21:30', 'Benmi weekend default check-out');
+        VALUES (v_company_id, 'default_weekend_work_end', to_jsonb('21:30'::text), 'Benmi weekend default check-out');
     END IF;
 
     UPDATE system_settings
-    SET value = '9999', description = 'Late check disabled before scheduling starts', updated_at = now()
+    SET value = to_jsonb(9999), description = 'Late check disabled before scheduling starts', updated_at = now()
     WHERE company_id = v_company_id AND key = 'late_threshold_minutes';
     IF NOT FOUND THEN
         INSERT INTO system_settings (company_id, key, value, description)
-        VALUES (v_company_id, 'late_threshold_minutes', '9999', 'Late check disabled before scheduling starts');
+        VALUES (v_company_id, 'late_threshold_minutes', to_jsonb(9999), 'Late check disabled before scheduling starts');
     END IF;
 
     UPDATE system_settings
-    SET value = '0', description = 'Benmi early leave threshold minutes', updated_at = now()
+    SET value = to_jsonb(0), description = 'Benmi early leave threshold minutes', updated_at = now()
     WHERE company_id = v_company_id AND key = 'early_leave_threshold_minutes';
     IF NOT FOUND THEN
         INSERT INTO system_settings (company_id, key, value, description)
-        VALUES (v_company_id, 'early_leave_threshold_minutes', '0', 'Benmi early leave threshold minutes');
+        VALUES (v_company_id, 'early_leave_threshold_minutes', to_jsonb(0), 'Benmi early leave threshold minutes');
     END IF;
 
     UPDATE system_settings
-    SET value = '4', description = 'Benmi checkout limit hours', updated_at = now()
+    SET value = to_jsonb(4), description = 'Benmi checkout limit hours', updated_at = now()
     WHERE company_id = v_company_id AND key = 'checkout_time_limit_hours';
     IF NOT FOUND THEN
         INSERT INTO system_settings (company_id, key, value, description)
-        VALUES (v_company_id, 'checkout_time_limit_hours', '4', 'Benmi checkout limit hours');
+        VALUES (v_company_id, 'checkout_time_limit_hours', to_jsonb(4), 'Benmi checkout limit hours');
     END IF;
 END $$;
