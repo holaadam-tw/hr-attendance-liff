@@ -1287,13 +1287,33 @@ function changeHumanWeek(delta) { humanWeekStart.setDate(humanWeekStart.getDate(
 function resetHumanWeek() { humanWeekStart = getHumanWeekMonday(new Date()); loadHumanManagement(); }
 function canSaveHumanSchedule() { return currentUserRole === 'admin' || currentUserRole === 'platform_admin' || currentUserCanSchedule; }
 function shiftCodeFromName(name) { return String(name || '').trim().replace(/\s+/g, '_').toUpperCase().substring(0, 20); }
+function dedupeHumanShiftTypes(list) {
+    const map = new Map();
+    (list || []).forEach(st => {
+        const key = (st.code || st.name || '') + '|' + String(st.start_time || '').slice(0, 5) + '|' + String(st.end_time || '').slice(0, 5);
+        const old = map.get(key);
+        if (!old || (!old.company_id && st.company_id)) map.set(key, st);
+    });
+    return Array.from(map.values()).sort((a, b) => {
+        const timeCompare = String(a.start_time || '').localeCompare(String(b.start_time || ''));
+        if (timeCompare) return timeCompare;
+        return String(a.name || '').localeCompare(String(b.name || ''), 'zh-Hant');
+    });
+}
 async function loadHumanManagement() {
     if (!companyId) return;
     const dates = getHumanDates(); const startStr = fmtDate(dates[0]); const endStr = fmtDate(dates[6]);
     document.getElementById('humanWeekLabel').textContent = startStr + ' ~ ' + endStr;
     document.getElementById('humanBody').innerHTML = '<tr><td style="padding:36px;text-align:center;color:#94A3B8;">\u8f09\u5165\u4e2d...</td></tr>'; document.getElementById('humanStatus').textContent = '';
-    try { const { data, error } = await sb.rpc('get_weekly_schedules', { p_company_id: companyId, p_start_date: startStr }); if (error) throw error;
-        humanEmployees = data?.employees || []; humanShiftTypes = data?.shift_types || []; humanDraft = {}; humanOriginal = {};
+    try {
+        const [weekRes, shiftRes] = await Promise.all([
+            sb.rpc('get_weekly_schedules', { p_company_id: companyId, p_start_date: startStr }),
+            sb.rpc('get_company_shift_types', { p_company_id: companyId, p_line_user_id: currentLineUserId })
+        ]);
+        if (weekRes.error) throw weekRes.error;
+        if (shiftRes.error) throw shiftRes.error;
+        const data = weekRes.data || {};
+        humanEmployees = data?.employees || []; humanShiftTypes = dedupeHumanShiftTypes(shiftRes.data || data?.shift_types || []); humanDraft = {}; humanOriginal = {};
         (data?.schedules || []).forEach(row => { const key = row.employee_id + '_' + row.date; humanOriginal[key] = row.is_off_day ? 'off' : (row.shift_type_id || null); humanDraft[key] = humanOriginal[key]; }); renderHumanManagement(dates);
     } catch (e) { console.error('Load human management error:', e); document.getElementById('humanBody').innerHTML = '<tr><td style="padding:24px;text-align:center;color:#DC2626;">' + esc(e.message || '\u8f09\u5165\u5931\u6557') + '</td></tr>'; }
 }
@@ -1305,10 +1325,11 @@ function renderHumanShiftList() {
         const start = String(st.start_time || '').slice(0, 5);
         const end = String(st.end_time || '').slice(0, 5);
         const editable = !!st.company_id && canSaveHumanSchedule();
+        const readonlyLabel = canSaveHumanSchedule() ? '\u5171\u7528\u73ed\u5225' : '\u7121\u6b0a\u9650';
         return '<div class="shift-card">' +
             '<div><div class="shift-card-name">' + esc(st.name) + '</div><div class="shift-card-time">' + esc(start + '-' + end) + (st.is_overnight ? ' · 跨日' : '') + '</div></div>' +
             '<div class="shift-card-actions">' +
-            (editable ? '<button class="shift-action-btn" onclick="editHumanShiftType(\'' + st.id + '\')">編輯</button><button class="shift-action-btn danger" onclick="deleteHumanShiftType(\'' + st.id + '\')">刪除</button>' : '<span style="font-size:12px;color:#94A3B8;">唯讀</span>') +
+            (editable ? '<button class="shift-action-btn" onclick="editHumanShiftType(\'' + st.id + '\')">編輯</button><button class="shift-action-btn danger" onclick="deleteHumanShiftType(\'' + st.id + '\')">刪除</button>' : '<span style="font-size:12px;color:#94A3B8;">' + readonlyLabel + '</span>') +
             '</div></div>';
     }).join('');
 }
@@ -1391,7 +1412,7 @@ async function seedBenmiShiftTypes() {
     ];
     try {
         for (const [name, code, start, end] of defaults) {
-            const existed = humanShiftTypes.find(st => st.name === name || st.code === code);
+            const existed = humanShiftTypes.find(st => st.company_id && (st.name === name || st.code === code));
             const args = { p_company_id: companyId, p_line_user_id: currentLineUserId, p_name: name, p_code: code, p_start_time: start, p_end_time: end, p_is_overnight: false };
             const res = existed ? await sb.rpc('update_shift_type', Object.assign({ p_id: existed.id }, args)) : await sb.rpc('create_shift_type', args);
             if (res.error) throw res.error;
