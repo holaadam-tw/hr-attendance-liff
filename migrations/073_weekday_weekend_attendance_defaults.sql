@@ -1,8 +1,15 @@
--- 073: 平日 / 六日考勤預設時間
--- 目的：
--- 1. 無排班時，平日可用一組預設上下班
--- 2. 六日可用另一組預設上下班
--- 3. 保留既有 default_work_start / default_work_end 當 fallback
+-- ============================================================
+-- 073: weekday/weekend attendance defaults before scheduling starts
+--
+-- Rules:
+-- 1. If an employee has a schedule, use the scheduled shift.
+-- 2. If an employee has a fixed shift, use the fixed shift.
+-- 3. Otherwise use company fallback settings:
+--    - Weekday: 10:30-21:30
+--    - Weekend: 07:00-21:30
+-- 4. Late marking is disabled for now by setting threshold to 9999.
+-- 5. Check-out is allowed until shift end + checkout_time_limit_hours.
+-- ============================================================
 
 CREATE OR REPLACE FUNCTION quick_check_in(
     p_line_user_id TEXT,
@@ -55,15 +62,15 @@ BEGIN
     LIMIT 1;
 
     IF v_employee.id IS NULL THEN
-        RETURN jsonb_build_object('success', false, 'error', '找不到員工資料，請先完成綁定');
+        RETURN jsonb_build_object('success', false, 'error', 'employee_not_found');
     END IF;
 
     IF COALESCE(v_employee.is_kiosk, false) THEN
-        RETURN jsonb_build_object('success', false, 'error', '公務機員工請使用公務機打卡，不可使用個人 LINE 打卡');
+        RETURN jsonb_build_object('success', false, 'error', 'kiosk_employee_must_use_kiosk');
     END IF;
 
     IF COALESCE(v_employee.no_checkin, false) THEN
-        RETURN jsonb_build_object('success', false, 'error', '此員工免打卡');
+        RETURN jsonb_build_object('success', false, 'error', 'employee_no_checkin');
     END IF;
 
     SELECT value INTO v_setting_val
@@ -79,9 +86,9 @@ BEGIN
 
     IF v_existing.id IS NOT NULL AND v_existing.check_out_time IS NOT NULL THEN
         IF p_action = 'check_in' THEN
-            RETURN jsonb_build_object('success', false, 'error', '今天已完成上班打卡');
+            RETURN jsonb_build_object('success', false, 'error', 'already_checked_in_today');
         ELSE
-            RETURN jsonb_build_object('success', false, 'error', '今天已完成上下班打卡');
+            RETURN jsonb_build_object('success', false, 'error', 'already_checked_out_today');
         END IF;
     END IF;
 
@@ -114,16 +121,16 @@ BEGIN
     IF p_action = 'check_in' THEN
         IF v_existing.id IS NOT NULL AND v_existing.check_out_time IS NULL THEN
             IF v_existing.date = v_today THEN
-                RETURN jsonb_build_object('success', false, 'error', '今天已完成上班打卡');
+                RETURN jsonb_build_object('success', false, 'error', 'already_checked_in_today');
             ELSIF v_yesterday_is_overnight THEN
-                RETURN jsonb_build_object('success', false, 'error', '昨晚跨夜班尚未完成下班打卡');
+                RETURN jsonb_build_object('success', false, 'error', 'overnight_shift_needs_check_out');
             END IF;
             v_existing := NULL;
         END IF;
         v_do_check_in := true;
     ELSIF p_action = 'check_out' THEN
         IF v_existing.id IS NULL OR v_existing.check_out_time IS NOT NULL THEN
-            RETURN jsonb_build_object('success', false, 'error', '尚未找到今日上班打卡紀錄');
+            RETURN jsonb_build_object('success', false, 'error', 'no_open_check_in_record');
         END IF;
         v_do_check_out := true;
     ELSE
@@ -185,7 +192,7 @@ BEGIN
             IF v_tw_time > (v_shift_end + (v_checkout_limit || ' hours')::interval) THEN
                 RETURN jsonb_build_object(
                     'success', false,
-                    'error', '已超過下班打卡時間（截止 ' || (v_shift_end + (v_checkout_limit || ' hours')::interval)::text || '），請申請補卡',
+                    'error', 'checkout_time_expired',
                     'checkout_deadline', (v_shift_end + (v_checkout_limit || ' hours')::interval)::text
                 );
             END IF;
@@ -258,13 +265,13 @@ BEGIN
         IF v_matched_location IS NULL THEN
             RETURN jsonb_build_object(
                 'success', false,
-                'error', '您不在允許打卡範圍內，請移動到指定地點後再打卡',
+                'error', 'outside_allowed_location',
                 'min_distance', round(v_min_dist::numeric, 0)
             );
         END IF;
     END IF;
 
-    v_location_name := COALESCE(v_matched_location, '未設定地點');
+    v_location_name := COALESCE(v_matched_location, 'unspecified_location');
 
     SELECT value INTO v_setting_val
     FROM system_settings
@@ -355,9 +362,9 @@ BEGIN
         END IF;
 
         IF p_action = 'check_in' THEN
-            RETURN jsonb_build_object('success', false, 'error', '今天已完成上班打卡');
+            RETURN jsonb_build_object('success', false, 'error', 'already_checked_in_today');
         END IF;
-        RETURN jsonb_build_object('success', false, 'error', '今天已完成上下班打卡');
+        RETURN jsonb_build_object('success', false, 'error', 'already_checked_out_today');
     END;
 
     RETURN jsonb_build_object(
