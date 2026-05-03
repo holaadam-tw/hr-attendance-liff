@@ -157,18 +157,23 @@ export async function checkAdminPermission() {
         }
 
         // === 一般管理員/主管流程（原邏輯）===
-        const { data, error } = await sb.from('employees')
+        const { data: adminRows, error } = await sb.from('employees')
             .select('*')
             .eq('line_user_id', liffProfile.userId)
             .in('role', ['admin', 'manager'])
-            .eq('is_active', true)
-            .maybeSingle();
+            .eq('is_active', true);
 
         if (error) {
             console.error('❌ 資料庫查詢錯誤:', error);
             showStatus(statusEl, 'error', '❌ 資料庫查詢失敗: ' + error.message);
             return;
         }
+
+        const activeAdminRows = (adminRows || []).filter(row => row.is_active && row.status !== 'pending');
+        const savedAdminCompanyId = sessionStorage.getItem('selectedCompanyId');
+        const data = savedAdminCompanyId
+            ? (activeAdminRows.find(row => row.company_id === savedAdminCompanyId) || activeAdminRows[0] || null)
+            : (activeAdminRows[0] || null);
 
         if (!data) {
             // 檢查是否為員工允許存取的頁面（如 #booking）

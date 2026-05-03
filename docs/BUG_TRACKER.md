@@ -182,3 +182,13 @@
 7. 手機實測驗證
 8. 更新本檔案狀態
 ```
+---
+
+## 2026-05-03 制度調整
+
+| # | 項目 | Commit | 說明 |
+|---|------|--------|------|
+| B19 | 晚班實際下班照打卡，但薪資計算固定封頂 21:30 | 5dbd742 | 停用下班後自動建立 `late_close_auto`，薪資改以實際打卡紀錄回推有效工時，超過當日 `21:30` 的部分僅保留紀錄、不列入計薪；人工核准的其他加班申請仍可照常計薪。 |
+## 2026-05-03 新增
+
+- **B20**：`modules/auth.js` 管理後台權限檢查對 `line_user_id` 使用 `.maybeSingle()`，當同一個 LINE 帳號同時綁定多筆啟用中的 `admin/manager`（例如本米 + 大正）時，會在進入 `admin.html` 顯示 `JSON object requested, multiple (or no) rows returned`。已改為先查全部符合列，再依 `sessionStorage.selectedCompanyId` 或第一筆啟用資料選定目前公司。
