@@ -249,32 +249,47 @@ export async function loadLunchDeadline() {
 
 // ===== 考勤設定 =====
 export async function saveAttendanceSettings() {
-    const start = document.getElementById('defaultWorkStart').value;
-    const end = document.getElementById('defaultWorkEnd').value;
-    const lateThreshold = document.getElementById('lateThresholdMinutes').value;
+    const weekdayStart = document.getElementById('defaultWeekdayWorkStart').value;
+    const weekdayEnd = document.getElementById('defaultWeekdayWorkEnd').value;
+    const weekendStart = document.getElementById('defaultWeekendWorkStart').value;
+    const weekendEnd = document.getElementById('defaultWeekendWorkEnd').value;
     const earlyThreshold = document.getElementById('earlyLeaveThreshold').value;
-    if (!start) return showToast('請選擇上班時間');
-    if (!end) return showToast('請選擇下班時間');
-    await saveSetting('default_work_start', start, '預設上班時間');
-    await saveSetting('default_work_end', end, '預設下班時間');
-    await saveSetting('late_threshold_minutes', parseInt(lateThreshold) || 5, '遲到容忍分鐘');
-    await saveSetting('early_leave_threshold_minutes', parseInt(earlyThreshold) || 0, '早退容忍分鐘');
-    showToast('✅ 考勤設定已儲存');
+    const checkoutLimit = document.getElementById('checkoutTimeLimitHours').value;
+    if (!weekdayStart) return showToast('\u8acb\u8a2d\u5b9a\u5e73\u65e5\u9810\u8a2d\u4e0a\u73ed\u6642\u9593');
+    if (!weekdayEnd) return showToast('\u8acb\u8a2d\u5b9a\u5e73\u65e5\u9810\u8a2d\u4e0b\u73ed\u6642\u9593');
+    if (!weekendStart) return showToast('\u8acb\u8a2d\u5b9a\u516d\u65e5\u9810\u8a2d\u4e0a\u73ed\u6642\u9593');
+    if (!weekendEnd) return showToast('\u8acb\u8a2d\u5b9a\u516d\u65e5\u9810\u8a2d\u4e0b\u73ed\u6642\u9593');
+    await saveSetting('default_work_start', weekdayStart, '\u9810\u8a2d\u4e0a\u73ed\u6642\u9593\uff08\u5e73\u65e5 fallback\uff09');
+    await saveSetting('default_work_end', weekdayEnd, '\u9810\u8a2d\u4e0b\u73ed\u6642\u9593\uff08\u5e73\u65e5 fallback\uff09');
+    await saveSetting('default_weekday_work_start', weekdayStart, '\u5e73\u65e5\u9810\u8a2d\u4e0a\u73ed\u6642\u9593');
+    await saveSetting('default_weekday_work_end', weekdayEnd, '\u5e73\u65e5\u9810\u8a2d\u4e0b\u73ed\u6642\u9593');
+    await saveSetting('default_weekend_work_start', weekendStart, '\u516d\u65e5\u9810\u8a2d\u4e0a\u73ed\u6642\u9593');
+    await saveSetting('default_weekend_work_end', weekendEnd, '\u516d\u65e5\u9810\u8a2d\u4e0b\u73ed\u6642\u9593');
+    await saveSetting('late_threshold_minutes', 9999, '\u66ab\u4e0d\u6a19\u8a18\u9072\u5230');
+    await saveSetting('early_leave_threshold_minutes', parseInt(earlyThreshold) || 0, '\u65e9\u9000\u5bb9\u5fcd\u5206\u9418');
+    await saveSetting('checkout_time_limit_hours', parseInt(checkoutLimit) || 4, '\u4e0b\u73ed\u6253\u5361\u5ef6\u5f8c\u4e0a\u9650\uff08\u5c0f\u6642\uff09');
+    showToast('\u8003\u52e4\u8a2d\u5b9a\u5df2\u5132\u5b58');
 }
 
 export async function loadAttendanceSettings() {
-    const start = getCachedSetting('default_work_start');
-    const end = getCachedSetting('default_work_end');
-    const lateThreshold = getCachedSetting('late_threshold_minutes');
+    const weekdayStart = getCachedSetting('default_weekday_work_start') || getCachedSetting('default_work_start');
+    const weekdayEnd = getCachedSetting('default_weekday_work_end') || getCachedSetting('default_work_end');
+    const weekendStart = getCachedSetting('default_weekend_work_start') || weekdayStart;
+    const weekendEnd = getCachedSetting('default_weekend_work_end') || weekdayEnd;
     const earlyThreshold = getCachedSetting('early_leave_threshold_minutes');
-    const el1 = document.getElementById('defaultWorkStart');
-    const el2 = document.getElementById('lateThresholdMinutes');
-    const el3 = document.getElementById('defaultWorkEnd');
+    const checkoutLimit = getCachedSetting('checkout_time_limit_hours');
+    const el1 = document.getElementById('defaultWeekdayWorkStart');
+    const el3 = document.getElementById('defaultWeekdayWorkEnd');
     const el4 = document.getElementById('earlyLeaveThreshold');
-    if (start && el1) el1.value = start;
-    if (end && el3) el3.value = end;
-    if (lateThreshold !== null && lateThreshold !== undefined && el2) el2.value = lateThreshold;
+    const el5 = document.getElementById('defaultWeekendWorkStart');
+    const el6 = document.getElementById('defaultWeekendWorkEnd');
+    const el7 = document.getElementById('checkoutTimeLimitHours');
+    if (weekdayStart && el1) el1.value = weekdayStart;
+    if (weekdayEnd && el3) el3.value = weekdayEnd;
     if (earlyThreshold !== null && earlyThreshold !== undefined && el4) el4.value = earlyThreshold;
+    if (weekendStart && el5) el5.value = weekendStart;
+    if (weekendEnd && el6) el6.value = weekendEnd;
+    if (checkoutLimit !== null && checkoutLimit !== undefined && el7) el7.value = checkoutLimit;
 }
 
 export async function loadAdminLunchStats() {

@@ -1365,24 +1365,27 @@
 
                 <!-- === 排班表 TAB === -->
                 <div id="tabShift" class="staffTabContent" style="display:none;">
-                    <p style="color:#6b7280;font-size:12px;margin-bottom:12px;">點擊格子切換班別，排好後按儲存</p>
-                    <div style="display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:12px;">
-                        <button onclick="changeShiftWeek(-1)" style="background:none;border:none;font-size:20px;cursor:pointer;padding:6px 10px;border-radius:8px;">◀</button>
-                        <span id="smWeekLabel" style="font-size:14px;font-weight:700;min-width:180px;text-align:center;">-</span>
-                        <button onclick="changeShiftWeek(1)" style="background:none;border:none;font-size:20px;cursor:pointer;padding:6px 10px;border-radius:8px;">▶</button>
-                        <button onclick="resetShiftWeek()" style="padding:4px 10px;border:1px solid #E5E7EB;border-radius:6px;background:#fff;font-size:11px;font-weight:700;color:#4F46E5;cursor:pointer;">本週</button>
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
+                        <div>
+                            <div style="font-size:16px;font-weight:900;color:#0F172A;">&#25490;&#29677;&#34920;</div>
+                            <p style="color:#6b7280;font-size:12px;margin:4px 0 0;">&#40670;&#25802;&#26684;&#23376;&#20999;&#25563;&#29677;&#21029;&#65292;&#25490;&#22909;&#24460;&#25353;&#20786;&#23384;&#12290;</p>
+                        </div>
+                        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                            <button onclick="changeShiftWeek(-1)" style="border:1px solid #E5E7EB;background:#fff;border-radius:8px;font-size:16px;cursor:pointer;padding:8px 12px;">&#9664;</button>
+                            <span id="smWeekLabel" style="font-size:14px;font-weight:800;min-width:190px;text-align:center;color:#0F172A;">-</span>
+                            <button onclick="changeShiftWeek(1)" style="border:1px solid #E5E7EB;background:#fff;border-radius:8px;font-size:16px;cursor:pointer;padding:8px 12px;">&#9654;</button>
+                            <button onclick="resetShiftWeek()" style="padding:8px 12px;border:1px solid #E5E7EB;border-radius:8px;background:#fff;font-size:12px;font-weight:800;color:#4F46E5;cursor:pointer;">&#26412;&#36913;</button>
+                        </div>
                     </div>
-                    <div id="shiftLegend" style="display:flex;gap:5px;margin-bottom:12px;flex-wrap:wrap;justify-content:center;"></div>
-                    <!-- 人力不足警告 -->
+                    <div id="shiftLegend" style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;"></div>
                     <div id="shiftStaffWarn" style="display:none;padding:10px 14px;background:#FEF2F2;border-radius:10px;margin-bottom:12px;font-size:12px;color:#DC2626;font-weight:700;"></div>
-                    <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
-                        <table id="smTable" style="width:100%;border-collapse:collapse;font-size:12px;min-width:500px;"><thead id="smHead"></thead><tbody id="smBody"></tbody></table>
+                    <div style="overflow:auto;-webkit-overflow-scrolling:touch;max-height:68vh;border:1px solid #E5E7EB;border-radius:10px;background:#fff;">
+                        <table id="smTable" style="width:100%;border-collapse:collapse;font-size:14px;min-width:760px;"><thead id="smHead"></thead><tbody id="smBody"></tbody></table>
                     </div>
-                    <!-- 每日人力統計 -->
-                    <div id="shiftDaySummary" style="display:flex;gap:4px;margin-top:10px;overflow-x:auto;padding-bottom:4px;"></div>
+                    <div id="shiftDaySummary" style="display:flex;gap:6px;margin-top:10px;overflow-x:auto;padding-bottom:4px;"></div>
                     <div style="margin-top:14px;display:flex;gap:8px;">
-                        <button onclick="saveSchedule()" style="flex:1;padding:14px;border:none;border-radius:12px;background:linear-gradient(135deg,#4F46E5,#7C3AED);color:#fff;font-weight:700;font-size:14px;cursor:pointer;">💾 儲存排班</button>
-                        <button onclick="copyLastWeek()" style="padding:14px 20px;border:2px solid #E5E7EB;border-radius:12px;background:#fff;font-weight:700;font-size:14px;cursor:pointer;">📋 複製上週</button>
+                        <button onclick="saveSchedule()" style="flex:1;padding:14px;border:none;border-radius:10px;background:linear-gradient(135deg,#4F46E5,#7C3AED);color:#fff;font-weight:800;font-size:14px;cursor:pointer;">&#128190; &#20786;&#23384;&#25490;&#29677;</button>
+                        <button onclick="copyLastWeek()" style="padding:14px 20px;border:2px solid #E5E7EB;border-radius:10px;background:#fff;font-weight:800;font-size:14px;cursor:pointer;">&#128203; &#35079;&#35069;&#19978;&#36913;</button>
                     </div>
                     <div id="smSaveStatus" style="margin-top:10px;text-align:center;font-size:13px;display:none;"></div>
                 </div>
@@ -1447,35 +1450,42 @@
 
                     <div style="background:#fff;border-radius:14px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,0.08);margin-bottom:16px;">
                         <div style="font-size:14px;font-weight:800;color:#0F172A;margin-bottom:8px;">⏰ 考勤設定</div>
-                        <p style="font-size:12px;color:#94A3B8;margin-bottom:14px;">影響打卡遲到判定，未排班員工以預設上班時間為準</p>
-                        <div style="margin-bottom:14px;">
-                            <label style="font-size:12px;font-weight:700;color:#4b5563;display:block;margin-bottom:6px;">預設上班時間</label>
-                            <input type="time" id="defaultWorkStart" value="08:00" style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;font-weight:700;">
-                            <p style="font-size:11px;color:#94A3B8;margin:4px 0 0;">員工未排班時，以此時間判定是否遲到</p>
-                        </div>
-                        <div style="margin-bottom:14px;">
-                            <label style="font-size:12px;font-weight:700;color:#4b5563;display:block;margin-bottom:6px;">遲到容忍分鐘</label>
-                            <div style="display:flex;align-items:center;gap:8px;">
-                                <input type="number" id="lateThresholdMinutes" value="5" min="0" max="60" style="flex:1;padding:10px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;font-weight:700;">
-                                <span style="font-size:13px;color:#64748B;white-space:nowrap;">分鐘</span>
+                        <p style="font-size:12px;color:#94A3B8;margin-bottom:14px;">&#26410;&#38283;&#22987;&#25490;&#29677;&#21069;&#65292;&#20381;&#24179;&#26085;&#25110;&#20845;&#26085;&#38928;&#35373;&#26178;&#38291;&#21028;&#26039;&#19978;&#19979;&#29677;&#65307;&#30446;&#21069;&#26283;&#19981;&#27161;&#35352;&#36978;&#21040;&#12290;</p>
+                        <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:14px;">
+                            <div>
+                                <label style="font-size:12px;font-weight:700;color:#4b5563;display:block;margin-bottom:6px;">&#24179;&#26085;&#38928;&#35373;&#19978;&#29677;</label>
+                                <input type="time" id="defaultWeekdayWorkStart" value="10:30" style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;font-weight:700;">
                             </div>
-                            <p style="font-size:11px;color:#94A3B8;margin:4px 0 0;">0 = 準時到就算遲到，5 = 超過5分鐘才算</p>
-                        </div>
-                        <hr style="border:none;border-top:1px solid #E2E8F0;margin:14px 0;">
-                        <div style="margin-bottom:14px;">
-                            <label style="font-size:12px;font-weight:700;color:#4b5563;display:block;margin-bottom:6px;">預設下班時間</label>
-                            <input type="time" id="defaultWorkEnd" value="17:00" style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;font-weight:700;">
-                            <p style="font-size:11px;color:#94A3B8;margin:4px 0 0;">員工未排班時，以此時間判定是否早退</p>
-                        </div>
-                        <div style="margin-bottom:14px;">
-                            <label style="font-size:12px;font-weight:700;color:#4b5563;display:block;margin-bottom:6px;">早退容忍分鐘</label>
-                            <div style="display:flex;align-items:center;gap:8px;">
-                                <input type="number" id="earlyLeaveThreshold" value="0" min="0" max="60" style="flex:1;padding:10px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;font-weight:700;">
-                                <span style="font-size:13px;color:#64748B;white-space:nowrap;">分鐘</span>
+                            <div>
+                                <label style="font-size:12px;font-weight:700;color:#4b5563;display:block;margin-bottom:6px;">&#24179;&#26085;&#38928;&#35373;&#19979;&#29677;</label>
+                                <input type="time" id="defaultWeekdayWorkEnd" value="21:30" style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;font-weight:700;">
                             </div>
-                            <p style="font-size:11px;color:#94A3B8;margin:4px 0 0;">0 = 提早一分鐘即算早退</p>
+                            <div>
+                                <label style="font-size:12px;font-weight:700;color:#4b5563;display:block;margin-bottom:6px;">&#20845;&#26085;&#38928;&#35373;&#19978;&#29677;</label>
+                                <input type="time" id="defaultWeekendWorkStart" value="07:00" style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;font-weight:700;">
+                            </div>
+                            <div>
+                                <label style="font-size:12px;font-weight:700;color:#4b5563;display:block;margin-bottom:6px;">&#20845;&#26085;&#38928;&#35373;&#19979;&#29677;</label>
+                                <input type="time" id="defaultWeekendWorkEnd" value="21:30" style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;font-weight:700;">
+                            </div>
                         </div>
-                        <button onclick="saveAttendanceSettings()" style="width:100%;padding:12px;border:none;border-radius:10px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;font-weight:700;font-size:14px;cursor:pointer;">💾 儲存考勤設定</button>
+                        <div style="margin-bottom:14px;">
+                            <label style="font-size:12px;font-weight:700;color:#4b5563;display:block;margin-bottom:6px;">&#26089;&#36864;&#23481;&#24525;&#20998;&#37912;</label>
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <input type="number" id="earlyLeaveThreshold" value="0" min="0" max="120" style="flex:1;padding:10px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;font-weight:700;">
+                                <span style="font-size:13px;color:#64748B;white-space:nowrap;">&#20998;&#37912;</span>
+                            </div>
+                            <p style="font-size:11px;color:#94A3B8;margin:4px 0 0;">0 &#34920;&#31034;&#25552;&#26089;&#38626;&#38283;&#23601;&#26371;&#34987;&#27161;&#25104;&#26089;&#36864;&#12290;</p>
+                        </div>
+                        <div style="margin-bottom:14px;">
+                            <label style="font-size:12px;font-weight:700;color:#4b5563;display:block;margin-bottom:6px;">&#19979;&#29677;&#25171;&#21345;&#24310;&#24460;&#19978;&#38480;</label>
+                            <div style="display:flex;align-items:center;gap:8px;">
+                                <input type="number" id="checkoutTimeLimitHours" value="4" min="1" max="12" style="flex:1;padding:10px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;font-weight:700;">
+                                <span style="font-size:13px;color:#64748B;white-space:nowrap;">&#23567;&#26178;</span>
+                            </div>
+                            <p style="font-size:11px;color:#94A3B8;margin:4px 0 0;">&#20363;&#22914;&#19979;&#29677; 21:30&#12289;&#19978;&#38480; 4 &#23567;&#26178;&#65292;&#26368;&#26202;&#21487;&#25171;&#21040; 01:30&#12290;</p>
+                        </div>
+                        <button onclick="saveAttendanceSettings()" style="width:100%;padding:12px;border:none;border-radius:10px;background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;font-weight:700;font-size:14px;cursor:pointer;">💾 &#20786;&#23384;&#32771;&#21220;&#35373;&#23450;</button>
                     </div>
 
                     <div style="background:#fff;border-radius:14px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,0.08);margin-top:16px;">

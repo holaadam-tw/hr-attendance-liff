@@ -118,11 +118,11 @@ function renderShiftTable() {
         return;
     }
 
-    let headHtml = '<tr><th style="position:sticky;left:0;background:#fff;z-index:2;padding:8px;min-width:60px;text-align:left;border-bottom:2px solid #E5E7EB;font-size:11px;">姓名</th>';
+    let headHtml = '<tr><th style="position:sticky;left:0;background:#fff;z-index:2;padding:12px;min-width:96px;text-align:left;border-bottom:2px solid #E5E7EB;font-size:13px;">姓名</th>';
     dates.forEach(d => {
         const isW = d.getDay() === 0 || d.getDay() === 6;
-        headHtml += `<th style="padding:6px 4px;min-width:46px;text-align:center;border-bottom:2px solid #E5E7EB;background:${isW ? '#F1F5F9' : '#fff'};">
-            <div style="font-size:12px;">${d.getDate()}</div><div style="font-size:10px;color:#94A3B8;">週${wd[d.getDay()]}</div>
+        headHtml += `<th style="padding:10px 6px;min-width:72px;text-align:center;border-bottom:2px solid #E5E7EB;background:${isW ? '#F1F5F9' : '#fff'};">
+            <div style="font-size:14px;font-weight:900;">${d.getDate()}</div><div style="font-size:11px;color:#94A3B8;">週${wd[d.getDay()]}</div>
         </th>`;
     });
     headHtml += '</tr>';
@@ -130,7 +130,7 @@ function renderShiftTable() {
 
     let bodyHtml = '';
     smEmployees.forEach(emp => {
-        bodyHtml += `<tr><td style="position:sticky;left:0;background:#fff;z-index:1;padding:8px;font-weight:700;font-size:11px;white-space:nowrap;border-bottom:1px solid #F1F5F9;">${emp.name}</td>`;
+        bodyHtml += `<tr><td style="position:sticky;left:0;background:#fff;z-index:1;padding:12px;font-weight:800;font-size:13px;white-space:nowrap;border-bottom:1px solid #F1F5F9;">${emp.name}</td>`;
         dates.forEach(d => {
             const ds = fmtDate(d);
             const key = `${emp.id}_${ds}`;
@@ -138,15 +138,15 @@ function renderShiftTable() {
             const shift = smScheduleData[key] || null;
             const disp = SHIFT_DISPLAY[shift] || SHIFT_DISPLAY[null];
             if (onLeave) {
-                bodyHtml += `<td style="text-align:center;padding:8px 4px;border-bottom:1px solid #F1F5F9;background:#FEE2E2;font-size:14px;cursor:not-allowed;opacity:0.7;" title="${emp.name} 已請假">🏖️</td>`;
+                bodyHtml += `<td style="text-align:center;padding:12px 6px;min-width:72px;border-bottom:1px solid #F1F5F9;background:#FEE2E2;font-size:18px;cursor:not-allowed;opacity:0.7;" title="${emp.name} 已請假">🏖️</td>`;
             } else {
-                bodyHtml += `<td onclick="cycleShift('${key}')" style="text-align:center;padding:8px 4px;cursor:pointer;border-bottom:1px solid #F1F5F9;background:${disp.bg};font-size:14px;transition:all 0.15s;user-select:none;" title="${emp.name} ${ds} ${disp.name}">${disp.label}</td>`;
+                bodyHtml += `<td onclick="cycleShift('${key}')" style="text-align:center;padding:12px 6px;min-width:72px;cursor:pointer;border-bottom:1px solid #F1F5F9;background:${disp.bg};font-size:18px;transition:all 0.15s;user-select:none;" title="${emp.name} ${ds} ${disp.name}">${disp.label}</td>`;
             }
         });
         bodyHtml += '</tr>';
     });
 
-    bodyHtml += '<tr style="background:#F8FAFC;font-weight:700;"><td style="position:sticky;left:0;background:#F8FAFC;z-index:1;padding:6px 8px;font-size:10px;color:#64748B;">上班人數</td>';
+    bodyHtml += '<tr style="background:#F8FAFC;font-weight:700;"><td style="position:sticky;left:0;background:#F8FAFC;z-index:1;padding:10px 12px;font-size:12px;color:#64748B;">上班人數</td>';
     let warnDays = [];
     dates.forEach(d => {
         const ds = fmtDate(d);
@@ -160,7 +160,7 @@ function renderShiftTable() {
         });
         const low = working > 0 && working <= 2 && !isW;
         if (low) warnDays.push(`${d.getMonth() + 1}/${d.getDate()}(${working}人)`);
-        bodyHtml += `<td style="text-align:center;font-size:11px;color:${low ? '#DC2626' : working > 0 ? '#059669' : '#94A3B8'};background:${low ? '#FEF2F2' : '#F8FAFC'};border-bottom:1px solid #F1F5F9;">${working || '-'}</td>`;
+        bodyHtml += `<td style="text-align:center;font-size:13px;padding:8px 6px;color:${low ? '#DC2626' : working > 0 ? '#059669' : '#94A3B8'};background:${low ? '#FEF2F2' : '#F8FAFC'};border-bottom:1px solid #F1F5F9;">${working || '-'}</td>`;
     });
     bodyHtml += '</tr>';
     document.getElementById('smBody').innerHTML = bodyHtml;
@@ -182,10 +182,10 @@ function renderShiftTable() {
         smShiftTypes.forEach(s => { total += counts[s.code] || 0; });
         const low = total > 0 && total <= 2 && !isW;
         let shiftSumStr = smShiftTypes.map((s, i) => `${SHIFT_ICONS[i] || ''}${counts[s.code] || 0}`).join(' ');
-        sumHtml += `<div style="min-width:60px;padding:6px 8px;background:${low ? '#FEF2F2' : '#F8FAFC'};border-radius:8px;text-align:center;flex-shrink:0;${low ? 'border:2px solid #FCA5A5;' : ''}">
-            <div style="font-size:10px;font-weight:700;color:#64748B;">${d.getDate()}日</div>
-            <div style="font-size:14px;font-weight:900;color:${low ? '#DC2626' : '#0F172A'};">${total}人</div>
-            <div style="font-size:9px;color:#94A3B8;">${shiftSumStr}</div>
+        sumHtml += `<div style="min-width:78px;padding:8px 10px;background:${low ? '#FEF2F2' : '#F8FAFC'};border-radius:8px;text-align:center;flex-shrink:0;${low ? 'border:2px solid #FCA5A5;' : ''}">
+            <div style="font-size:11px;font-weight:700;color:#64748B;">${d.getDate()}日</div>
+            <div style="font-size:16px;font-weight:900;color:${low ? '#DC2626' : '#0F172A'};">${total}人</div>
+            <div style="font-size:10px;color:#94A3B8;">${shiftSumStr}</div>
             ${counts.leave > 0 ? `<div style="font-size:9px;color:#EA580C;">假${counts.leave}</div>` : ''}
         </div>`;
     });
@@ -205,10 +205,10 @@ function updateShiftLegend() {
     if (!el) return;
     let html = '';
     smShiftTypes.forEach((s, i) => {
-        html += `<span style="font-size:10px;padding:3px 8px;background:${SHIFT_COLORS[i] || '#F3F4F6'};color:${SHIFT_TEXT_COLORS[i] || '#475569'};border-radius:6px;font-weight:700;">${SHIFT_ICONS[i] || '⏰'}${escapeHTML(s.name)}</span>`;
+        html += `<span style="font-size:12px;padding:6px 10px;background:${SHIFT_COLORS[i] || '#F3F4F6'};color:${SHIFT_TEXT_COLORS[i] || '#475569'};border-radius:8px;font-weight:800;">${SHIFT_ICONS[i] || '⏰'}${escapeHTML(s.name)}</span>`;
     });
-    html += '<span style="font-size:10px;padding:3px 8px;background:#ECFDF5;color:#059669;border-radius:6px;font-weight:700;">🏖️休</span>';
-    html += '<span style="font-size:10px;padding:3px 8px;background:#F1F5F9;color:#64748B;border-radius:6px;font-weight:700;">⬜未排</span>';
+    html += '<span style="font-size:12px;padding:6px 10px;background:#ECFDF5;color:#059669;border-radius:8px;font-weight:800;">🏖️休</span>';
+    html += '<span style="font-size:12px;padding:6px 10px;background:#F1F5F9;color:#64748B;border-radius:8px;font-weight:800;">⬜未排</span>';
     el.innerHTML = html;
 }
 
