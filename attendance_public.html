@@ -478,6 +478,13 @@ function getTaiwanDate() { return new Date().toLocaleDateString('sv-SE', { timeZ
 function isManagerRole(role) { return role === 'admin' || role === 'manager'; }
 function buildCheckinUrl(action) { return 'https://liff.line.me/' + LIFF_ID + '?goto=checkin&action=' + action; }
 function buildRegisterUrl() { return 'https://liff.line.me/' + LIFF_ID + '?goto=register&company=' + companyId; }
+function buildAttendancePublicLiffUrl() { return 'https://liff.line.me/' + LIFF_ID + '?goto=attendance_public&company=' + encodeURIComponent(companyId || ''); }
+function getCachedAttendanceProfile() {
+    if (!companyId) return null;
+    const userId = sessionStorage.getItem('attendance_public_line_user_id_' + companyId);
+    if (!userId) return null;
+    return { userId, displayName: sessionStorage.getItem('attendance_public_line_name_' + companyId) || '' };
+}
 function openCheckinEntry(action) { window.location.href = buildCheckinUrl(action); }
 function openRegisterEntry() { window.location.href = buildRegisterUrl(); }
 function openLineFriend() { window.open(LINE_ADD_FRIEND_URL, '_blank'); }
@@ -562,15 +569,12 @@ async function init() {
             return;
         }
 
-        // LIFF 身份驗證
-        await liff.init({ liffId: LIFF_ID });
-        if (!liff.isLoggedIn()) {
-            const thisPage = window.location.pathname.split('/').pop() + window.location.search;
-            sessionStorage.setItem('liff_redirect_page', thisPage);
-            liff.login();
+        // 身份驗證：本頁不是 LIFF endpoint，需先經 index.html endpoint 取得 LINE profile 後再回來。
+        const profile = getCachedAttendanceProfile();
+        if (!profile) {
+            window.location.replace(buildAttendancePublicLiffUrl());
             return;
         }
-        const profile = await liff.getProfile();
 
         // 查公司名稱
         const { data: company, error } = await sb.from('companies').select('id, name').eq('id', companyId).maybeSingle();

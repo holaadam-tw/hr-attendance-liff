@@ -686,6 +686,15 @@
                     window.location.href = 'employee_register.html?company=' + _regCompany;
                     return;
                 }
+                if (_gotoParams.get('goto') === 'attendance_public') {
+                    const _pubCompany = _gotoParams.get('company') || '';
+                    if (liffProfile && liffProfile.userId && _pubCompany) {
+                        sessionStorage.setItem('attendance_public_line_user_id_' + _pubCompany, liffProfile.userId);
+                        sessionStorage.setItem('attendance_public_line_name_' + _pubCompany, liffProfile.displayName || '');
+                    }
+                    window.location.href = 'attendance_public.html?company=' + encodeURIComponent(_pubCompany);
+                    return;
+                }
 
                 // LIFF 初始化完成後立即顯示骨架屏（比 checkUserStatus 快）
                 const skeleton = document.getElementById('skeletonScreen');
