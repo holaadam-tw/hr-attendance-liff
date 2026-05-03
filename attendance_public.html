@@ -106,6 +106,24 @@ body{font-family:'Noto Sans TC',-apple-system,sans-serif;background:var(--bg);co
 .role-hint.role-manager{background:#EDE9FE;color:#5B21B6;}
 .role-hint.role-employee{background:#DBEAFE;color:#1D4ED8;}
 .role-hint.clickable{cursor:pointer;}
+.hr-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:12px;}
+.hr-week-nav{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.hr-week-nav button,.hr-save-btn{padding:9px 12px;border:1px solid #E2E8F0;border-radius:10px;background:#fff;font-size:12px;font-weight:800;cursor:pointer;font-family:inherit;color:#334155;}
+.hr-save-btn{background:#4F46E5;color:#fff;border-color:#4F46E5;}
+.hr-table{width:100%;border-collapse:collapse;font-size:13px;min-width:980px;}
+.hr-table th{background:#F8FAFC;padding:12px 10px;text-align:left;font-size:12px;color:#64748B;border-bottom:2px solid #E2E8F0;position:sticky;top:0;z-index:2;white-space:nowrap;}
+.hr-table td{padding:10px;border-bottom:1px solid #F1F5F9;vertical-align:middle;}
+.hr-sticky{position:sticky;left:0;background:#fff;z-index:1;box-shadow:1px 0 0 #F1F5F9;}
+.hr-control{width:100%;padding:8px 10px;border:1px solid #CBD5E1;border-radius:9px;background:#fff;font-size:12px;font-weight:700;font-family:inherit;}
+.hr-time-row{display:flex;gap:6px;align-items:center;min-width:170px;}
+.hr-time-row input{width:78px;}
+.hr-cell-btn{width:100%;min-height:48px;border:1px solid #E2E8F0;border-radius:10px;background:#F8FAFC;cursor:pointer;font-family:inherit;font-size:12px;font-weight:800;color:#475569;}
+.hr-cell-btn.shift{background:#DBEAFE;color:#1D4ED8;border-color:#BFDBFE;}
+.hr-cell-btn.off{background:#ECFDF5;color:#047857;border-color:#A7F3D0;}
+.hr-cell-btn.unset{background:#FFF7ED;color:#C2410C;border-color:#FED7AA;}
+.hr-cell-btn:disabled{cursor:not-allowed;opacity:.65;background:#F3F4F6;color:#94A3B8;}
+.hr-meta{font-size:11px;color:#94A3B8;margin-top:4px;line-height:1.4;}
+.hr-status{font-size:12px;color:#64748B;margin-top:8px;text-align:center;}
 
 .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1E293B;color:#fff;padding:10px 24px;border-radius:10px;font-size:14px;font-weight:600;z-index:9999;opacity:0;transition:opacity 0.3s;pointer-events:none;}
 .toast.show{opacity:1;}
@@ -191,6 +209,7 @@ body{font-family:'Noto Sans TC',-apple-system,sans-serif;background:var(--bg);co
                 <button class="ov-tab active" id="tabDaily" onclick="switchTab('daily')">📅 今日</button>
                 <button class="ov-tab" id="tabMonthly" onclick="switchTab('monthly')">📊 月度</button>
                 <button class="ov-tab" id="tabSchedule" onclick="switchTab('schedule')">📋 週班表</button>
+                <button class="ov-tab" id="tabHuman" onclick="switchTab('human')">&#128101; &#20154;&#21147;&#31649;&#29702;</button>
             </div>
 
             <!-- ====== 今日總覽 ====== -->
@@ -306,6 +325,36 @@ body{font-family:'Noto Sans TC',-apple-system,sans-serif;background:var(--bg);co
                     </table>
                 </div>
             </div>
+
+            <!-- ====== Human management ====== -->
+            <div id="humanView" style="display:none;">
+                <div class="card">
+                    <div class="hr-toolbar">
+                        <div>
+                            <div style="font-size:18px;font-weight:900;color:#0F172A;">&#128101; &#20154;&#21147;&#31649;&#29702;</div>
+                            <div style="font-size:12px;color:#64748B;margin-top:4px;">&#38651;&#33126;&#29256;&#25490;&#29677;&#24037;&#20316;&#21488;&#12290;&#21729;&#24037;&#27169;&#24335;&#21487;&#30452;&#25509;&#20786;&#23384;&#65307;&#25490;&#29677;&#26684;&#23376;&#40670;&#25802;&#24460;&#20877;&#25353;&#20786;&#23384;&#25490;&#29677;&#12290;</div>
+                        </div>
+                        <div class="hr-week-nav">
+                            <button onclick="changeHumanWeek(-1)">&#9664;</button>
+                            <span id="humanWeekLabel" style="font-size:14px;font-weight:900;color:#0F172A;min-width:190px;text-align:center;">-</span>
+                            <button onclick="changeHumanWeek(1)">&#9654;</button>
+                            <button onclick="resetHumanWeek()">&#26412;&#36913;</button>
+                            <button class="hr-save-btn" id="humanSaveBtn" onclick="saveHumanSchedule()">&#128190; &#20786;&#23384;&#25490;&#29677;</button>
+                        </div>
+                    </div>
+                    <div id="humanLegend" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;"></div>
+                    <div class="table-wrap" style="max-height:72vh;overflow:auto;">
+                        <table class="hr-table">
+                            <thead><tr id="humanHead"></tr></thead>
+                            <tbody id="humanBody"><tr><td style="padding:36px;text-align:center;color:#94A3B8;">\u8f09\u5165\u4e2d...</td></tr></tbody>
+                        </table>
+                    </div>
+                    <div id="humanStatus" class="hr-status"></div>
+                </div>
+            </div>
+
+
+
         </div>
 
         <!-- 打卡 QR Code Modal -->
@@ -417,6 +466,8 @@ let currentTab = 'daily';
 let currentWeekendPolicy = 'fixed';
 let monthHolidayMap = {};
 let currentUserRole = null;
+let currentEmployeeId = null;
+let currentUserCanSchedule = false;
 let viewingAsEmployee = false;
 const LINE_ADD_FRIEND_URL = 'https://line.me/R/ti/p/@130oqrak';
 
@@ -444,6 +495,7 @@ function applyRoleAccess() {
     const pageTitle = document.getElementById('pageTitle');
     const tabDaily = document.getElementById('tabDaily');
     const tabMonthly = document.getElementById('tabMonthly');
+    const tabHuman = document.getElementById('tabHuman');
     const subtitle = document.querySelector('.entry-subtitle');
     const adminEntryBlock = document.getElementById('adminEntryBlock');
 
@@ -465,12 +517,14 @@ function applyRoleAccess() {
 
     managerTools.style.display = manager && !employeeView ? 'flex' : 'none';
     adminEntryBlock.style.display = manager && !employeeView ? 'block' : 'none';
+    if (tabHuman) tabHuman.style.display = manager && !employeeView ? '' : 'none';
 
     if (employeeView) {
         pageTitle.textContent = '📅 今日與週班表';
         tabDaily.style.display = '';
         tabMonthly.style.display = 'none';
-        if (currentTab === 'monthly') {
+        if (tabHuman) tabHuman.style.display = 'none';
+        if (currentTab === 'monthly' || currentTab === 'human') {
             switchTab('daily');
         } else {
             switchTab(currentTab === 'schedule' ? 'schedule' : 'daily');
@@ -482,7 +536,8 @@ function applyRoleAccess() {
         pageTitle.textContent = '📊 打卡總覽';
         tabDaily.style.display = '';
         tabMonthly.style.display = '';
-        switchTab(currentTab === 'schedule' ? 'schedule' : currentTab);
+        if (tabHuman) tabHuman.style.display = '';
+        switchTab(currentTab === 'schedule' || currentTab === 'human' ? currentTab : currentTab);
         if (subtitle) {
             subtitle.textContent = '同一個入口自動區分權限。一般員工可查看今日與週班表；管理員可查看完整打卡總覽與工具。';
         }
@@ -526,7 +581,7 @@ async function init() {
 
         // 驗證呼叫者是該公司的 admin/manager
         const { data: emp } = await sb.from('employees')
-            .select('id, role')
+            .select('id, role, can_schedule')
             .eq('line_user_id', profile.userId)
             .eq('company_id', companyId)
             .eq('is_active', true)
@@ -536,6 +591,8 @@ async function init() {
             return;
         }
         currentUserRole = emp.role || 'user';
+        currentEmployeeId = emp.id;
+        currentUserCanSchedule = !!emp.can_schedule;
 
         companyName = company.name;
         document.getElementById('companyLabel').textContent = companyName;
@@ -560,16 +617,23 @@ async function init() {
 
 // === Tab 切換 ===
 function switchTab(tab) {
+    const manager = isManagerRole(currentUserRole) && !viewingAsEmployee;
+    if (tab === 'human' && !manager) tab = 'daily';
     currentTab = tab;
     document.getElementById('tabDaily').classList.toggle('active', tab === 'daily');
     document.getElementById('tabMonthly').classList.toggle('active', tab === 'monthly');
     document.getElementById('tabSchedule').classList.toggle('active', tab === 'schedule');
+    const tabHuman = document.getElementById('tabHuman');
+    if (tabHuman) tabHuman.classList.toggle('active', tab === 'human');
     document.getElementById('dailyView').style.display = tab === 'daily' ? 'block' : 'none';
     document.getElementById('monthlyView').style.display = tab === 'monthly' ? 'block' : 'none';
     document.getElementById('scheduleView').style.display = tab === 'schedule' ? 'block' : 'none';
+    const humanView = document.getElementById('humanView');
+    if (humanView) humanView.style.display = tab === 'human' ? 'block' : 'none';
     if (tab === 'daily') { loadDailyData(); startAutoRefresh(); }
     else if (tab === 'monthly') { stopAutoRefresh(); loadMonthlyData(); }
-    else { stopAutoRefresh(); loadScheduleData(); }
+    else if (tab === 'schedule') { stopAutoRefresh(); loadScheduleData(); }
+    else { stopAutoRefresh(); loadHumanManagement(); }
 }
 
 // === 今日總覽 ===
@@ -1151,7 +1215,45 @@ function renderScheduleView(data, dates) {
     document.getElementById('schedBody').innerHTML = bodyHtml;
 }
 
-// === 啟動 ===
+
+// === Human management workspace ===
+let humanWeekStart = getMonday(new Date());
+let humanEmployees = [];
+let humanShiftTypes = [];
+let humanDraft = {};
+let humanOriginal = {};
+function getHumanDates() { const dates = []; for (let i = 0; i < 7; i++) { const d = new Date(humanWeekStart); d.setDate(d.getDate() + i); dates.push(d); } return dates; }
+function changeHumanWeek(delta) { humanWeekStart.setDate(humanWeekStart.getDate() + delta * 7); loadHumanManagement(); }
+function resetHumanWeek() { humanWeekStart = getMonday(new Date()); loadHumanManagement(); }
+function canSaveHumanSchedule() { return currentUserRole === 'admin' || currentUserRole === 'platform_admin' || currentUserCanSchedule; }
+async function loadHumanManagement() {
+    if (!companyId) return;
+    const dates = getHumanDates(); const startStr = fmtDate(dates[0]); const endStr = fmtDate(dates[6]);
+    document.getElementById('humanWeekLabel').textContent = startStr + ' ~ ' + endStr;
+    document.getElementById('humanBody').innerHTML = '<tr><td style="padding:36px;text-align:center;color:#94A3B8;">\u8f09\u5165\u4e2d...</td></tr>'; document.getElementById('humanStatus').textContent = '';
+    try { const { data, error } = await sb.rpc('get_weekly_schedules', { p_company_id: companyId, p_start_date: startStr }); if (error) throw error;
+        humanEmployees = data?.employees || []; humanShiftTypes = data?.shift_types || []; humanDraft = {}; humanOriginal = {};
+        (data?.schedules || []).forEach(row => { const key = row.employee_id + '_' + row.date; humanOriginal[key] = row.is_off_day ? 'off' : (row.shift_type_id || null); humanDraft[key] = humanOriginal[key]; }); renderHumanManagement(dates);
+    } catch (e) { console.error('Load human management error:', e); document.getElementById('humanBody').innerHTML = '<tr><td style="padding:24px;text-align:center;color:#DC2626;">' + esc(e.message || '\u8f09\u5165\u5931\u6557') + '</td></tr>'; }
+}
+function renderHumanLegend() { let html = humanShiftTypes.map(st => '<span style="display:inline-flex;align-items:center;padding:6px 10px;border-radius:999px;background:#DBEAFE;color:#1D4ED8;font-size:12px;font-weight:800;">' + esc(st.name) + ' ' + String(st.start_time || '').slice(0,5) + '-' + String(st.end_time || '').slice(0,5) + '</span>').join(''); html += '<span style="display:inline-flex;align-items:center;padding:6px 10px;border-radius:999px;background:#ECFDF5;color:#047857;font-size:12px;font-weight:800;">\u4f11</span>'; html += '<span style="display:inline-flex;align-items:center;padding:6px 10px;border-radius:999px;background:#FFF7ED;color:#C2410C;font-size:12px;font-weight:800;">\u672a\u6392</span>'; document.getElementById('humanLegend').innerHTML = html; }
+function renderHumanManagement(dates) {
+    renderHumanLegend(); const wd = ['\u65e5','\u4e00','\u4e8c','\u4e09','\u56db','\u4e94','\u516d'];
+    let head = '<th class="hr-sticky" style="min-width:150px;">\u54e1\u5de5</th><th style="min-width:120px;">\u5de5\u6642\u6a21\u5f0f</th><th style="min-width:190px;">\u56fa\u5b9a\u73ed\u6642\u9593</th>';
+    dates.forEach(d => { const weekend = d.getDay() === 0 || d.getDay() === 6; head += '<th style="text-align:center;min-width:96px;' + (weekend ? 'color:#DC2626;' : '') + '">\u9031' + wd[d.getDay()] + '<br><span style="font-size:11px;font-weight:500;">' + (d.getMonth()+1) + '/' + d.getDate() + '</span></th>'; }); document.getElementById('humanHead').innerHTML = head;
+    if (humanEmployees.length === 0) { document.getElementById('humanBody').innerHTML = '<tr><td colspan="10" style="padding:36px;text-align:center;color:#94A3B8;">\u5c1a\u7121\u54e1\u5de5\u8cc7\u6599</td></tr>'; return; }
+    const saveEnabled = canSaveHumanSchedule(); document.getElementById('humanSaveBtn').style.display = saveEnabled ? '' : 'none'; let html = '';
+    const disabledAttr = saveEnabled ? '' : ' disabled';
+    humanEmployees.forEach(emp => { const mode = emp.shift_mode || 'fixed'; const fs = String(emp.fixed_shift_start || '10:30').slice(0,5); const fe = String(emp.fixed_shift_end || '21:30').slice(0,5); html += '<tr data-human-emp="' + esc(emp.id) + '">'; html += '<td class="hr-sticky"><div style="font-weight:900;color:#0F172A;">' + esc(emp.name) + '</div><div class="hr-meta">' + esc(emp.department || '-') + '</div></td>'; html += '<td><select class="hr-control"' + disabledAttr + ' onchange="saveHumanMode(\'' + emp.id + '\')"><option value="fixed"' + (mode !== 'scheduled' ? ' selected' : '') + '>\u56fa\u5b9a\u73ed</option><option value="scheduled"' + (mode === 'scheduled' ? ' selected' : '') + '>\u6392\u73ed\u5236</option></select></td>'; html += '<td><div class="hr-time-row"><input class="hr-control hr-start" type="time" value="' + esc(fs) + '"' + disabledAttr + ' onchange="saveHumanMode(\'' + emp.id + '\')"><span>~</span><input class="hr-control hr-end" type="time" value="' + esc(fe) + '"' + disabledAttr + ' onchange="saveHumanMode(\'' + emp.id + '\')"></div></td>'; dates.forEach(d => { const ds = fmtDate(d); const key = emp.id + '_' + ds; const val = Object.prototype.hasOwnProperty.call(humanDraft, key) ? humanDraft[key] : null; html += '<td>' + humanCellButton(emp, ds, val, mode, saveEnabled) + '</td>'; }); html += '</tr>'; });
+    document.getElementById('humanBody').innerHTML = html; updateHumanStatus();
+}
+function humanCellButton(emp, dateStr, val, mode, saveEnabled) { if (mode !== 'scheduled') { const fs = String(emp.fixed_shift_start || '10:30').slice(0,5); const fe = String(emp.fixed_shift_end || '21:30').slice(0,5); return '<button class="hr-cell-btn" disabled>\u56fa\u5b9a<br><span style="font-size:10px;">' + esc(fs + '-' + fe) + '</span></button>'; } const key = emp.id + '_' + dateStr; let cls = 'unset', label = '\u672a\u6392', sub = ''; if (val === 'off') { cls = 'off'; label = '\u4f11'; } else if (val) { const st = humanShiftTypes.find(x => x.id === val); cls = 'shift'; label = st ? st.name : '\u73ed'; sub = st ? String(st.start_time || '').slice(0,5) + '-' + String(st.end_time || '').slice(0,5) : ''; } return '<button class="hr-cell-btn ' + cls + '" ' + (saveEnabled ? '' : 'disabled') + ' onclick="cycleHumanSchedule(\'' + key + '\')">' + esc(label) + (sub ? '<br><span style="font-size:10px;">' + esc(sub) + '</span>' : '') + '</button>'; }
+function cycleHumanSchedule(key) { const states = [null].concat(humanShiftTypes.map(st => st.id)).concat(['off']); const current = Object.prototype.hasOwnProperty.call(humanDraft, key) ? humanDraft[key] : null; const idx = states.findIndex(x => x === current); humanDraft[key] = states[(idx + 1 + states.length) % states.length]; renderHumanManagement(getHumanDates()); }
+function updateHumanStatus() { const changed = Object.keys(humanDraft).filter(key => (humanDraft[key] || null) !== (humanOriginal[key] || null)).length; const el = document.getElementById('humanStatus'); el.textContent = changed ? '\u5c1a\u672a\u5132\u5b58\uff1a' + changed + ' \u683c\u6392\u73ed\u5df2\u8b8a\u66f4' : '\u6392\u73ed\u5df2\u540c\u6b65'; el.style.color = changed ? '#C2410C' : '#64748B'; }
+async function saveHumanMode(empId) { if (!canSaveHumanSchedule()) return showToast('\u6c92\u6709\u6392\u73ed\u6b0a\u9650'); const row = document.querySelector('[data-human-emp="' + empId + '"]'); if (!row) return; const mode = row.querySelector('select').value; const start = row.querySelector('.hr-start').value || null; const end = row.querySelector('.hr-end').value || null; try { const updates = { shift_mode: mode, fixed_shift_start: mode === 'fixed' ? (start || '10:30') : null, fixed_shift_end: mode === 'fixed' ? (end || '21:30') : null }; const { error } = await sb.from('employees').update(updates).eq('id', empId).eq('company_id', companyId); if (error) throw error; showToast('\u5de5\u6642\u6a21\u5f0f\u5df2\u5132\u5b58'); await loadHumanManagement(); } catch (e) { console.error('Save human mode error:', e); showToast('\u5132\u5b58\u5931\u6557\uff1a' + (e.message || '')); } }
+async function saveHumanSchedule() { if (!canSaveHumanSchedule()) return showToast('\u6c92\u6709\u6392\u73ed\u6b0a\u9650'); if (!currentEmployeeId) return showToast('\u7f3a\u5c11\u7ba1\u7406\u8005\u8eab\u4efd'); const changes = Object.keys(humanDraft).filter(key => (humanDraft[key] || null) !== (humanOriginal[key] || null)); if (changes.length === 0) return showToast('\u6c92\u6709\u6392\u73ed\u8b8a\u66f4'); const btn = document.getElementById('humanSaveBtn'); btn.disabled = true; btn.textContent = '\u8f09\u5165\u4e2d...'; try { for (const key of changes) { const [empId, dateStr] = key.split('_'); const val = humanDraft[key] || null; let res; if (!val) res = await sb.rpc('delete_schedule', { p_scheduler_id: currentEmployeeId, p_employee_id: empId, p_date: dateStr }); else res = await sb.rpc('upsert_schedule', { p_scheduler_id: currentEmployeeId, p_employee_id: empId, p_date: dateStr, p_shift_type_id: val === 'off' ? null : val, p_is_off_day: val === 'off', p_notes: null }); if (res.error) throw res.error; if (res.data && res.data.success === false) throw new Error(res.data.error || 'save failed'); } showToast('\u6392\u73ed\u5df2\u5132\u5b58'); await loadHumanManagement(); } catch (e) { console.error('Save human schedule error:', e); showToast('\u6392\u73ed\u5132\u5b58\u5931\u6557\uff1a' + (e.message || '')); } finally { btn.disabled = false; btn.textContent = '\ud83d\udcbe \u5132\u5b58\u6392\u73ed'; } }
+
+// === end ===
 window.addEventListener('beforeunload', stopAutoRefresh);
 init();
 </script>
