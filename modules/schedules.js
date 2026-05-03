@@ -118,11 +118,11 @@ function renderShiftTable() {
         return;
     }
 
-    let headHtml = '<tr><th style="position:sticky;left:0;background:#fff;z-index:2;padding:8px;min-width:60px;text-align:left;border-bottom:2px solid #E5E7EB;font-size:11px;">姓名</th>';
+    let headHtml = '<tr><th style="position:sticky;left:0;background:#fff;z-index:2;padding:12px;min-width:96px;text-align:left;border-bottom:2px solid #E5E7EB;font-size:13px;">姓名</th>';
     dates.forEach(d => {
         const isW = d.getDay() === 0 || d.getDay() === 6;
-        headHtml += `<th style="padding:6px 4px;min-width:46px;text-align:center;border-bottom:2px solid #E5E7EB;background:${isW ? '#F1F5F9' : '#fff'};">
-            <div style="font-size:12px;">${d.getDate()}</div><div style="font-size:10px;color:#94A3B8;">週${wd[d.getDay()]}</div>
+        headHtml += `<th style="padding:10px 6px;min-width:72px;text-align:center;border-bottom:2px solid #E5E7EB;background:${isW ? '#F1F5F9' : '#fff'};">
+            <div style="font-size:14px;font-weight:900;">${d.getDate()}</div><div style="font-size:11px;color:#94A3B8;">週${wd[d.getDay()]}</div>
         </th>`;
     });
     headHtml += '</tr>';
@@ -130,7 +130,7 @@ function renderShiftTable() {
 
     let bodyHtml = '';
     smEmployees.forEach(emp => {
-        bodyHtml += `<tr><td style="position:sticky;left:0;background:#fff;z-index:1;padding:8px;font-weight:700;font-size:11px;white-space:nowrap;border-bottom:1px solid #F1F5F9;">${emp.name}</td>`;
+        bodyHtml += `<tr><td style="position:sticky;left:0;background:#fff;z-index:1;padding:12px;font-weight:800;font-size:13px;white-space:nowrap;border-bottom:1px solid #F1F5F9;">${emp.name}</td>`;
         dates.forEach(d => {
             const ds = fmtDate(d);
             const key = `${emp.id}_${ds}`;
@@ -138,15 +138,15 @@ function renderShiftTable() {
             const shift = smScheduleData[key] || null;
             const disp = SHIFT_DISPLAY[shift] || SHIFT_DISPLAY[null];
             if (onLeave) {
-                bodyHtml += `<td style="text-align:center;padding:8px 4px;border-bottom:1px solid #F1F5F9;background:#FEE2E2;font-size:14px;cursor:not-allowed;opacity:0.7;" title="${emp.name} 已請假">🏖️</td>`;
+                bodyHtml += `<td style="text-align:center;padding:12px 6px;min-width:72px;border-bottom:1px solid #F1F5F9;background:#FEE2E2;font-size:18px;cursor:not-allowed;opacity:0.7;" title="${emp.name} 已請假">🏖️</td>`;
             } else {
-                bodyHtml += `<td onclick="cycleShift('${key}')" style="text-align:center;padding:8px 4px;cursor:pointer;border-bottom:1px solid #F1F5F9;background:${disp.bg};font-size:14px;transition:all 0.15s;user-select:none;" title="${emp.name} ${ds} ${disp.name}">${disp.label}</td>`;
+                bodyHtml += `<td onclick="cycleShift('${key}')" style="text-align:center;padding:12px 6px;min-width:72px;cursor:pointer;border-bottom:1px solid #F1F5F9;background:${disp.bg};font-size:18px;transition:all 0.15s;user-select:none;" title="${emp.name} ${ds} ${disp.name}">${disp.label}</td>`;
             }
         });
         bodyHtml += '</tr>';
     });
 
-    bodyHtml += '<tr style="background:#F8FAFC;font-weight:700;"><td style="position:sticky;left:0;background:#F8FAFC;z-index:1;padding:6px 8px;font-size:10px;color:#64748B;">上班人數</td>';
+    bodyHtml += '<tr style="background:#F8FAFC;font-weight:700;"><td style="position:sticky;left:0;background:#F8FAFC;z-index:1;padding:10px 12px;font-size:12px;color:#64748B;">上班人數</td>';
     let warnDays = [];
     dates.forEach(d => {
         const ds = fmtDate(d);
@@ -160,7 +160,7 @@ function renderShiftTable() {
         });
         const low = working > 0 && working <= 2 && !isW;
         if (low) warnDays.push(`${d.getMonth() + 1}/${d.getDate()}(${working}人)`);
-        bodyHtml += `<td style="text-align:center;font-size:11px;color:${low ? '#DC2626' : working > 0 ? '#059669' : '#94A3B8'};background:${low ? '#FEF2F2' : '#F8FAFC'};border-bottom:1px solid #F1F5F9;">${working || '-'}</td>`;
+        bodyHtml += `<td style="text-align:center;font-size:13px;padding:8px 6px;color:${low ? '#DC2626' : working > 0 ? '#059669' : '#94A3B8'};background:${low ? '#FEF2F2' : '#F8FAFC'};border-bottom:1px solid #F1F5F9;">${working || '-'}</td>`;
     });
     bodyHtml += '</tr>';
     document.getElementById('smBody').innerHTML = bodyHtml;
@@ -182,10 +182,10 @@ function renderShiftTable() {
         smShiftTypes.forEach(s => { total += counts[s.code] || 0; });
         const low = total > 0 && total <= 2 && !isW;
         let shiftSumStr = smShiftTypes.map((s, i) => `${SHIFT_ICONS[i] || ''}${counts[s.code] || 0}`).join(' ');
-        sumHtml += `<div style="min-width:60px;padding:6px 8px;background:${low ? '#FEF2F2' : '#F8FAFC'};border-radius:8px;text-align:center;flex-shrink:0;${low ? 'border:2px solid #FCA5A5;' : ''}">
-            <div style="font-size:10px;font-weight:700;color:#64748B;">${d.getDate()}日</div>
-            <div style="font-size:14px;font-weight:900;color:${low ? '#DC2626' : '#0F172A'};">${total}人</div>
-            <div style="font-size:9px;color:#94A3B8;">${shiftSumStr}</div>
+        sumHtml += `<div style="min-width:78px;padding:8px 10px;background:${low ? '#FEF2F2' : '#F8FAFC'};border-radius:8px;text-align:center;flex-shrink:0;${low ? 'border:2px solid #FCA5A5;' : ''}">
+            <div style="font-size:11px;font-weight:700;color:#64748B;">${d.getDate()}日</div>
+            <div style="font-size:16px;font-weight:900;color:${low ? '#DC2626' : '#0F172A'};">${total}人</div>
+            <div style="font-size:10px;color:#94A3B8;">${shiftSumStr}</div>
             ${counts.leave > 0 ? `<div style="font-size:9px;color:#EA580C;">假${counts.leave}</div>` : ''}
         </div>`;
     });
@@ -205,10 +205,10 @@ function updateShiftLegend() {
     if (!el) return;
     let html = '';
     smShiftTypes.forEach((s, i) => {
-        html += `<span style="font-size:10px;padding:3px 8px;background:${SHIFT_COLORS[i] || '#F3F4F6'};color:${SHIFT_TEXT_COLORS[i] || '#475569'};border-radius:6px;font-weight:700;">${SHIFT_ICONS[i] || '⏰'}${escapeHTML(s.name)}</span>`;
+        html += `<span style="font-size:12px;padding:6px 10px;background:${SHIFT_COLORS[i] || '#F3F4F6'};color:${SHIFT_TEXT_COLORS[i] || '#475569'};border-radius:8px;font-weight:800;">${SHIFT_ICONS[i] || '⏰'}${escapeHTML(s.name)}</span>`;
     });
-    html += '<span style="font-size:10px;padding:3px 8px;background:#ECFDF5;color:#059669;border-radius:6px;font-weight:700;">🏖️休</span>';
-    html += '<span style="font-size:10px;padding:3px 8px;background:#F1F5F9;color:#64748B;border-radius:6px;font-weight:700;">⬜未排</span>';
+    html += '<span style="font-size:12px;padding:6px 10px;background:#ECFDF5;color:#059669;border-radius:8px;font-weight:800;">🏖️休</span>';
+    html += '<span style="font-size:12px;padding:6px 10px;background:#F1F5F9;color:#64748B;border-radius:8px;font-weight:800;">⬜未排</span>';
     el.innerHTML = html;
 }
 
@@ -353,7 +353,7 @@ export async function rejectMakeupPunch(id, reason) {
         const { data: result, error } = await sb.rpc('reject_makeup_request', {
             p_request_id: id,
             p_approver_id: approverId,
-            p_reason: reason || '不符合規定'
+            p_reason: reason || '不符合規定',
         });
         if (error) throw error;
         if (result && !result.success) throw new Error(result.error);
@@ -377,12 +377,22 @@ export async function loadOtApprovals(status) {
     try {
         // 使用 SECURITY DEFINER RPC 繞過 RLS（050 SQL）
         const { data, error } = await sb.rpc('get_pending_overtime_requests', {
-            p_company_id: window.currentCompanyId
+            p_company_id: window.currentCompanyId,
+            p_status: status || 'pending'
         });
         if (error) throw error;
 
         if (!data || data.length === 0) { el.innerHTML = '<p style="text-align:center;color:#999;">無待審核的加班申請</p>'; return; }
         const compMap = { pay: '💰 加班費', comp_leave: '🏖️ 換補休' };
+        const reasonMap = {
+            customer: '客人未離場',
+            cleaning: '清潔未完成',
+            cashier: '結帳未完成',
+            closing: '收攤未完成',
+            urgent_task: '臨時交辦',
+            personal_delay: '個人拖延',
+            other: '其他'
+        };
         el.innerHTML = data.map(r => `
             <div style="background:#fff;border-radius:14px;padding:14px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,0.06);">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
@@ -391,17 +401,36 @@ export async function loadOtApprovals(status) {
                 </div>
                 <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;font-size:12px;">
                     <span style="padding:3px 8px;background:#EFF6FF;border-radius:6px;color:#2563EB;font-weight:700;">📅 ${r.ot_date}</span>
-                    <span style="padding:3px 8px;background:#F5F3FF;border-radius:6px;color:#7C3AED;font-weight:700;">⏰ ${r.planned_hours || 0}h</span>
+                    <span style="padding:3px 8px;background:#F5F3FF;border-radius:6px;color:#7C3AED;font-weight:700;">實際 ${r.actual_hours ?? r.planned_hours ?? 0}h</span>
                     <span style="padding:3px 8px;background:#ECFDF5;border-radius:6px;color:#059669;font-weight:700;">${compMap[r.compensation_type] || ''}</span>
+                    ${r.source_type === 'late_close_auto' ? '<span style="padding:3px 8px;background:#EEF2FF;border-radius:6px;color:#4F46E5;font-weight:700;">系統自動</span>' : ''}
                 </div>
                 <div style="font-size:12px;color:#64748B;margin-bottom:6px;">${escapeHTML(r.reason || '')}</div>
+                ${r.scheduled_end_time && r.actual_check_out_time ? `<div style="font-size:12px;color:#475569;margin-bottom:8px;">班表下班 ${escapeHTML(String(r.scheduled_end_time).slice(0, 5))} · 實際下班 ${escapeHTML(new Date(r.actual_check_out_time).toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', hour12: false }))}${r.late_close_minutes ? ` · 超時 ${r.late_close_minutes} 分鐘` : ''}</div>` : ''}
                 <div style="margin-bottom:8px;">
                     <label style="font-size:12px;font-weight:700;">核准時數：</label>
-                    <input type="number" id="otAH_${r.id}" value="${r.planned_hours || 0}" min="0" max="12" step="0.5" style="width:70px;padding:4px;border:1px solid #E5E7EB;border-radius:6px;">h
+                    <input type="number" id="otAH_${r.id}" value="${r.final_hours ?? r.approved_hours ?? r.actual_hours ?? r.planned_hours ?? 0}" min="0" max="12" step="0.5" ${r.status !== 'pending' ? 'disabled' : ''} style="width:70px;padding:4px;border:1px solid #E5E7EB;border-radius:6px;">h
+                </div>
+                <div style="margin-bottom:8px;">
+                    <label style="font-size:12px;font-weight:700;">核認原因</label>
+                    <select id="otRC_${r.id}" ${r.status !== 'pending' ? 'disabled' : ''} style="width:100%;padding:8px;border:1px solid #E5E7EB;border-radius:8px;">
+                        <option value="">請選擇</option>
+                        <option value="customer">客人未離場</option>
+                        <option value="cleaning">清潔未完成</option>
+                        <option value="cashier">結帳未完成</option>
+                        <option value="closing">收攤未完成</option>
+                        <option value="urgent_task">臨時交辦</option>
+                        <option value="personal_delay">個人拖延</option>
+                        <option value="other">其他</option>
+                    </select>
+                </div>
+                <div style="margin-bottom:8px;">
+                    <label style="font-size:12px;font-weight:700;">備註</label>
+                    <input type="text" id="otRN_${r.id}" value="${escapeHTML(r.approval_note || '')}" ${r.status !== 'pending' ? 'disabled' : ''} placeholder="例如：客人 21:55 離場 / 個人拖延原因" style="width:100%;padding:8px;border:1px solid #E5E7EB;border-radius:8px;">
                 </div>
                 <div style="display:flex;gap:8px;">
-                    <button onclick="approveOt('${r.id}')" style="flex:1;padding:10px;border:none;border-radius:10px;background:#ECFDF5;color:#059669;font-weight:700;cursor:pointer;">✅ 通過</button>
-                    <button onclick="rejectOtPrompt('${r.id}')" style="flex:1;padding:10px;border:none;border-radius:10px;background:#FEF2F2;color:#DC2626;font-weight:700;cursor:pointer;">❌ 拒絕</button>
+                    <button onclick="approveOt('${r.id}')" ${r.status !== 'pending' ? 'disabled' : ''} style="flex:1;padding:10px;border:none;border-radius:10px;background:#ECFDF5;color:#059669;font-weight:700;cursor:pointer;">認列</button>
+                    <button onclick="rejectOtPrompt('${r.id}')" ${r.status !== 'pending' ? 'disabled' : ''} style="flex:1;padding:10px;border:none;border-radius:10px;background:#FEF2F2;color:#DC2626;font-weight:700;cursor:pointer;">不認列</button>
                 </div>
             </div>
         `).join('');
@@ -410,35 +439,50 @@ export async function loadOtApprovals(status) {
 
 export async function approveOt(id) {
     const h = parseFloat(document.getElementById(`otAH_${id}`)?.value) || 0;
-    if (h <= 0) return showToast('❌ 核准時數需大於 0');
+    const reasonCategory = document.getElementById(`otRC_${id}`)?.value || '';
+    const note = document.getElementById(`otRN_${id}`)?.value?.trim() || '';
+    if (!reasonCategory) return showToast('請先選擇核認原因');
+    if (h < 0) return showToast('核認時數不可小於 0');
+    if ((reasonCategory === 'personal_delay' || reasonCategory === 'other') && !note) return showToast('個人拖延 / 其他請補備註');
     try {
         const approverId = window.currentAdminEmployee?.id || null;
         const { data: result, error } = await sb.rpc('approve_overtime_request', {
             p_request_id: id,
             p_approver_id: approverId,
-            p_approved_hours: h
+            p_approved_hours: h,
+            p_reason_category: reasonCategory,
+            p_note: note
         });
         if (error) throw error;
         if (result && !result.success) throw new Error(result.error);
 
-        writeAuditLog('approve', 'overtime_requests', id, '', { approved_hours: h });
-        showToast('✅ 已通過'); loadOtApprovals('pending');
-    } catch (e) { console.error(e); showToast('❌ 審核失敗: ' + friendlyError(e)); }
+        writeAuditLog('approve', 'overtime_requests', id, '', { approved_hours: h, approval_reason_category: reasonCategory, approval_note: note });
+        showToast('✅ 已完成核認'); loadOtApprovals('pending');
+    } catch (e) { console.error(e); showToast('❌ 加班核認失敗: ' + friendlyError(e)); }
 }
-export function rejectOtPrompt(id) { const r = prompt('拒絕原因：'); if (r === null) return; rejectOt(id, r); }
-export async function rejectOt(id, reason) {
+export function rejectOtPrompt(id) {
+    const reasonCategory = document.getElementById(`otRC_${id}`)?.value || '';
+    const note = document.getElementById(`otRN_${id}`)?.value?.trim() || '';
+    if (!reasonCategory) { showToast('請先選擇核認原因'); return; }
+    const reason = prompt('請輸入不認列原因', note || '');
+    if (reason === null) return;
+    rejectOt(id, reason, reasonCategory, note);
+}
+export async function rejectOt(id, reason, reasonCategory, note = '') {
     try {
         const approverId = window.currentAdminEmployee?.id || null;
         const { data: result, error } = await sb.rpc('reject_overtime_request', {
             p_request_id: id,
             p_approver_id: approverId,
-            p_reason: reason || '不符合規定'
+            p_reason: reason || '未核准',
+            p_reason_category: reasonCategory || null,
+            p_note: note || ''
         });
         if (error) throw error;
         if (result && !result.success) throw new Error(result.error);
 
-        showToast('❌ 已拒絕'); loadOtApprovals('pending');
-    } catch (e) { showToast('❌ 操作失敗: ' + friendlyError(e)); }
+        showToast('✅ 已標記不認列'); loadOtApprovals('pending');
+    } catch (e) { showToast('❌ 不認列失敗: ' + friendlyError(e)); }
 }
 
 // ===== 換班審核 =====
@@ -481,16 +525,25 @@ export async function approveSwap(id) {
             .select('*, requester:employees!shift_swap_requests_requester_id_fkey(name, id, company_id), target:employees!shift_swap_requests_target_id_fkey(name, id)')
             .eq('id', id).single();
         if (!req || req.requester?.company_id !== window.currentCompanyId) { showToast('❌ 無權操作此換班'); return; }
-        await sb.from('shift_swap_requests').update({
-            status: 'approved', approver_id: window.currentAdminEmployee?.id, approved_at: new Date().toISOString()
-        }).eq('id', id);
         if (req) {
             const date = req.swap_date;
             const { data: s1 } = await sb.from('schedules').select('id, shift_type_id').eq('employee_id', req.requester_id).eq('date', date).maybeSingle();
             const { data: s2 } = await sb.from('schedules').select('id, shift_type_id').eq('employee_id', req.target_id).eq('date', date).maybeSingle();
-            if (s1 && s2) {
-                await sb.from('schedules').update({ shift_type_id: s2.shift_type_id }).eq('id', s1.id);
-                await sb.from('schedules').update({ shift_type_id: s1.shift_type_id }).eq('id', s2.id);
+            if (!s1 || !s2) throw new Error('雙方當天都必須已有排班，才能核准換班');
+            const { error: updateReqError } = await sb.from('schedules').update({ shift_type_id: s2.shift_type_id }).eq('id', s1.id);
+            if (updateReqError) throw updateReqError;
+            const { error: updateTargetError } = await sb.from('schedules').update({ shift_type_id: s1.shift_type_id }).eq('id', s2.id);
+            if (updateTargetError) {
+                await sb.from('schedules').update({ shift_type_id: s1.shift_type_id }).eq('id', s1.id);
+                throw updateTargetError;
+            }
+            const { error: approveError } = await sb.from('shift_swap_requests').update({
+                status: 'approved', approver_id: window.currentAdminEmployee?.id, approved_at: new Date().toISOString()
+            }).eq('id', id);
+            if (approveError) {
+                await sb.from('schedules').update({ shift_type_id: s1.shift_type_id }).eq('id', s1.id);
+                await sb.from('schedules').update({ shift_type_id: s2.shift_type_id }).eq('id', s2.id);
+                throw approveError;
             }
             writeAuditLog('approve', 'shift_swap_requests', id, `${req.requester?.name} ↔ ${req.target?.name}`, { date });
             if (req.requester?.id) sendUserNotify(req.requester.id, `✅ 換班已核准\n📅 ${date} 班表已自動更新`);

@@ -182,7 +182,11 @@ export async function loadAnnouncementList() {
 
 export async function toggleAnnouncement(id, active) {
     try {
-        await sb.from('announcements').update({ is_active: active, updated_at: new Date().toISOString() }).eq('id', id).eq('company_id', window.currentCompanyId);
+        let query = sb.from('announcements')
+            .update({ is_active: active, updated_at: new Date().toISOString() })
+            .eq('id', id);
+        query = window.currentCompanyId ? query.eq('company_id', window.currentCompanyId) : query.is('company_id', null);
+        await query;
         showToast(active ? '✅ 已啟用' : '⏸️ 已停用');
         loadAnnouncementList();
     } catch(e) { showToast('❌ 操作失敗'); }
@@ -191,7 +195,11 @@ export async function toggleAnnouncement(id, active) {
 export async function deleteAnnouncement(id) {
     if (!confirm('確定刪除此公告？')) return;
     try {
-        await sb.from('announcements').delete().eq('id', id).eq('company_id', window.currentCompanyId);
+        let query = sb.from('announcements')
+            .delete()
+            .eq('id', id);
+        query = window.currentCompanyId ? query.eq('company_id', window.currentCompanyId) : query.is('company_id', null);
+        await query;
         showToast('🗑️ 已刪除');
         loadAnnouncementList();
     } catch(e) { showToast('❌ 刪除失敗'); }

@@ -1129,13 +1129,24 @@ async function loadMonthlyAttendance() {
             const monthStart = `${year}-${String(month).padStart(2,'0')}-01`;
             const monthEnd = fmtDate(new Date(year, month, 0));
             const { data: leaveData } = await sb.from('leave_requests')
-                .select('days, leave_type')
+                .select('start_date, end_date')
                 .eq('employee_id', currentEmployee.id)
                 .eq('status', 'approved')
-                .gte('start_date', monthStart)
                 .lte('start_date', monthEnd)
+                .gte('end_date', monthStart)
                 .limit(50);
-            if (leaveData) leaveDays = leaveData.reduce((s, r) => s + (parseFloat(r.days) || 0), 0);
+            if (leaveData) {
+                const monthStartDate = new Date(monthStart + 'T00:00:00+08:00');
+                const monthEndDate = new Date(monthEnd + 'T00:00:00+08:00');
+                leaveDays = leaveData.reduce((sum, r) => {
+                    const reqStart = new Date((r.start_date || monthStart) + 'T00:00:00+08:00');
+                    const reqEnd = new Date((r.end_date || r.start_date || monthEnd) + 'T00:00:00+08:00');
+                    const overlapStart = reqStart > monthStartDate ? reqStart : monthStartDate;
+                    const overlapEnd = reqEnd < monthEndDate ? reqEnd : monthEndDate;
+                    if (overlapEnd < overlapStart) return sum;
+                    return sum + ((overlapEnd - overlapStart) / 86400000 + 1);
+                }, 0);
+            }
         } catch(e) { console.warn('查詢當月請假天數失敗', e); }
         
         let html = `
