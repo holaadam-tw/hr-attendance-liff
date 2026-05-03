@@ -1217,14 +1217,15 @@ function renderScheduleView(data, dates) {
 
 
 // === Human management workspace ===
-let humanWeekStart = getMonday(new Date());
+function getHumanWeekMonday(date) { const d = new Date(date); const dow = d.getDay(); d.setDate(d.getDate() - ((dow + 6) % 7)); d.setHours(0, 0, 0, 0); return d; }
+let humanWeekStart = getHumanWeekMonday(new Date());
 let humanEmployees = [];
 let humanShiftTypes = [];
 let humanDraft = {};
 let humanOriginal = {};
 function getHumanDates() { const dates = []; for (let i = 0; i < 7; i++) { const d = new Date(humanWeekStart); d.setDate(d.getDate() + i); dates.push(d); } return dates; }
 function changeHumanWeek(delta) { humanWeekStart.setDate(humanWeekStart.getDate() + delta * 7); loadHumanManagement(); }
-function resetHumanWeek() { humanWeekStart = getMonday(new Date()); loadHumanManagement(); }
+function resetHumanWeek() { humanWeekStart = getHumanWeekMonday(new Date()); loadHumanManagement(); }
 function canSaveHumanSchedule() { return currentUserRole === 'admin' || currentUserRole === 'platform_admin' || currentUserCanSchedule; }
 async function loadHumanManagement() {
     if (!companyId) return;
