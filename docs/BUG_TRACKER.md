@@ -144,6 +144,7 @@
 
 ### 🌅 開機（10 分鐘）
 ```
+
 1. git pull
 2. 看 diff（昨晚 AI 改了什麼）
 3. npm test（確認沒壞）
@@ -194,3 +195,6 @@
 - **B20**：`modules/auth.js` 管理後台權限檢查對 `line_user_id` 使用 `.maybeSingle()`，當同一個 LINE 帳號同時綁定多筆啟用中的 `admin/manager`（例如本米 + 大正）時，會在進入 `admin.html` 顯示 `JSON object requested, multiple (or no) rows returned`。已改為先查全部符合列，再依 `sessionStorage.selectedCompanyId` 或第一筆啟用資料選定目前公司。
 
 - **B21**：本米尚未開始排班前，打卡 fallback 改為平日 `10:30-21:30`、六日 `07:00-21:30`，並加入 `checkout_time_limit_hours` 讓晚離開仍可下班打卡；目前遲到判定先關閉，不標記遲到。
+## 2026-05-04 修復紀錄
+
+- **B22**：本米餐飲業六日上班，但週班表與月度統計仍把「未排班的六日」當休假。修正方向：新增 `074_weekend_workdays_for_food_service.sql`，公司只要設定 `default_weekend_work_start/end`，六日就列入今日狀態與月度應出勤；前端週班表/明細也不再硬把六日畫成休。

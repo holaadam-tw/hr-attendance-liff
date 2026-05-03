@@ -816,14 +816,17 @@ function changeMonth(delta) {
     loadMonthlyData();
 }
 
-// 載入 weekend_policy + holidays（非核心，允許失敗 fallback）
+// 載入週末工時設定 + holidays（非核心，允許失敗 fallback）
 async function loadCompanyPolicyAndHolidays() {
     const startDate = mYear + '-' + String(mMonth + 1).padStart(2, '0') + '-01';
     const lastDay = new Date(mYear, mMonth + 1, 0).getDate();
     const endDate = mYear + '-' + String(mMonth + 1).padStart(2, '0') + '-' + String(lastDay).padStart(2, '0');
 
     const [policyRes, holidayRes] = await Promise.allSettled([
-        sb.from('companies').select('weekend_policy').eq('id', companyId).maybeSingle(),
+        sb.from('system_settings')
+            .select('key, value')
+            .eq('company_id', companyId)
+            .in('key', ['default_weekend_work_start', 'default_weekend_work_end']),
         sb.from('holidays')
             .select('holiday_date, holiday_name')
             .eq('company_id', companyId)
@@ -831,8 +834,9 @@ async function loadCompanyPolicyAndHolidays() {
             .lte('holiday_date', endDate)
     ]);
 
-    if (policyRes.status === 'fulfilled' && !policyRes.value.error && policyRes.value.data && policyRes.value.data.weekend_policy) {
-        currentWeekendPolicy = policyRes.value.data.weekend_policy;
+    if (policyRes.status === 'fulfilled' && !policyRes.value.error && Array.isArray(policyRes.value.data)) {
+        const hasWeekendWork = policyRes.value.data.some(row => row && row.value !== null && row.value !== '' && row.value !== '""');
+        currentWeekendPolicy = hasWeekendWork ? 'working' : 'fixed';
     } else {
         currentWeekendPolicy = 'fixed';
     }
@@ -909,7 +913,7 @@ async function toggleMonthDetail(empId) {
         const daysInMonth = endDate.getDate();
         const firstDow = new Date(mYear, mMonth, 1).getDay(); // 週日=0, 週一=1...
         const leadingEmpty = (firstDow + 6) % 7;              // 週一起始補位
-        const weekendFn = (dow) => (dow === 0 || dow === 6);  // 目前只支援 'fixed' policy
+        const weekendFn = (dow) => currentWeekendPolicy !== 'working' && (dow === 0 || dow === 6);
 
         let html = '<div class="detail-calendar">';
         ['一','二','三','四','五','六','日'].forEach(n => {
@@ -1251,7 +1255,7 @@ function renderScheduleView(data, dates) {
                 const fs = (emp.fixed_shift_start || '').substring(0, 5) || '08:00';
                 const fe = (emp.fixed_shift_end || '').substring(0, 5) || '17:00';
                 const dow = d.getDay();
-                if (dow === 0 || dow === 6) {
+                if (false && (dow === 0 || dow === 6)) {
                     bodyHtml += '<td style="text-align:center;"><span style="display:inline-block;padding:4px 8px;border-radius:8px;font-size:11px;font-weight:700;background:#F3F4F6;color:#9CA3AF;">-</span></td>';
                 } else {
                     bodyHtml += '<td style="text-align:center;"><div style="padding:4px 6px;border-radius:8px;background:#F0FDF4;font-size:11px;">' +
@@ -1260,7 +1264,7 @@ function renderScheduleView(data, dates) {
                 }
             } else if (emp.shift_mode === 'scheduled') {
                 const dow = d.getDay();
-                if (dow === 0 || dow === 6) {
+                if (false && (dow === 0 || dow === 6)) {
                     bodyHtml += '<td style="text-align:center;"><span style="display:inline-block;padding:4px 8px;border-radius:8px;font-size:11px;font-weight:700;background:#F3F4F6;color:#9CA3AF;">-</span></td>';
                 } else {
                     bodyHtml += '<td style="text-align:center;"><span style="display:inline-block;padding:4px 8px;border-radius:8px;font-size:10px;font-weight:700;background:#FEE2E2;color:#DC2626;">未排</span></td>';
