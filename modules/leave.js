@@ -267,7 +267,7 @@ export async function saveAttendanceSettings() {
     await saveSetting('default_weekend_work_end', weekendEnd, '\u516d\u65e5\u9810\u8a2d\u4e0b\u73ed\u6642\u9593');
     await saveSetting('late_threshold_minutes', 9999, '\u66ab\u4e0d\u6a19\u8a18\u9072\u5230');
     await saveSetting('early_leave_threshold_minutes', parseInt(earlyThreshold) || 0, '\u65e9\u9000\u5bb9\u5fcd\u5206\u9418');
-    await saveSetting('checkout_time_limit_hours', parseInt(checkoutLimit) || 4, '\u4e0b\u73ed\u6253\u5361\u5ef6\u5f8c\u4e0a\u9650\uff08\u5c0f\u6642\uff09');
+    await saveSetting('checkout_time_limit_hours', parseFloat(checkoutLimit) || 4, '\u4e0b\u73ed\u6253\u5361\u5ef6\u5f8c\u4e0a\u9650\uff08\u5c0f\u6642\uff09');
     showToast('\u8003\u52e4\u8a2d\u5b9a\u5df2\u5132\u5b58');
 }
 
