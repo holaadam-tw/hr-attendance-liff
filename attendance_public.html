@@ -88,6 +88,8 @@ body{font-family:'Noto Sans TC',-apple-system,sans-serif;background:var(--bg);co
 #dailyView .table-wrap,#monthlyView .table-wrap,#scheduleView .table-wrap{max-height:calc(100vh - 360px);}
 
 .export-btn{padding:8px 16px;border:2px solid #10B981;border-radius:10px;background:#F0FDF4;color:#059669;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;}
+.lang-switch{display:flex;align-items:center;gap:6px;padding:6px 8px;border:1px solid #E2E8F0;border-radius:10px;background:#fff;color:#475569;font-size:12px;font-weight:800;}
+.lang-switch select{border:none;background:transparent;font-family:inherit;font-size:12px;font-weight:900;color:#334155;outline:none;cursor:pointer;}
 .entry-card{padding:18px;border:1px solid #E2E8F0;border-radius:8px;background:#fff;margin-bottom:16px;box-shadow:0 10px 28px rgba(15,23,42,.05);}
 .entry-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px;}
 .entry-title{font-size:16px;font-weight:800;color:#0F172A;}
@@ -524,8 +526,120 @@ let currentUserCanSchedule = false;
 let currentLineUserId = null;
 let viewingAsEmployee = false;
 const LINE_ADD_FRIEND_URL = 'https://line.me/R/ti/p/@130oqrak';
+let currentLang = localStorage.getItem('attendance_public_lang') || 'zh';
+const I18N = {
+    zh: {
+        langLabel:'語言', loading:'載入中...', loadFailed:'載入失敗', noData:'無資料', employee:'員工', department:'部門', shift:'班別', checkIn:'上班', checkOut:'下班', hours:'工時', status:'狀態',
+        pageTitleManager:'📊 打卡總覽', pageTitleEmployee:'📅 今日與週班表', commonEntry:'常用入口', entrySubtitleManager:'同一個入口自動區分權限。一般員工可查看今日與週班表；管理員可查看完整打卡總覽與工具。', entrySubtitleEmployee:'同一個入口自動區分權限。一般員工可查看今日與週班表；管理員可切回完整模式查看月度統計、匯出與 QR 工具。',
+        employeeEntry:'一般員工入口', adminEntry:'管理員入口', checkInEntry:'上班打卡', checkOutEntry:'下班打卡', registerEntry:'員工註冊', addLineFriend:'加入 LINE 好友', adminBackend:'管理後台', officialAccount:'官方帳號：@130oqrak',
+        employeeHelpTitle:'員工怎麼使用', employeeHelp:'第一次使用：先加好友，再點員工註冊。平常打卡：直接從 LINE 點上班 / 下班打卡。',
+        roleLoading:'確認身份中', roleManager:'管理員模式｜點我看員工模式', roleEmployeeSwitch:'員工視角｜點我回管理員模式', roleEmployee:'員工模式',
+        tabDaily:'📅 今日', tabMonthly:'📊 月度', tabSchedule:'📋 週班表', tabHuman:'👥 人力管理',
+        qrCheckin:'📲 打卡 QR', qrRegister:'📱 註冊 QR', export:'📥 匯出',
+        expected:'應出勤', checked:'已打卡', notChecked:'未打卡', late:'遲到', early:'早退', leave:'請假', absent:'缺勤', working:'上班中', completed:'✅ 完成', offDay:'休', unknown:'未知',
+        allDept:'全部部門', allStatus:'全部狀態', lastUpdated:'更新：', autoRefresh:'每 30 秒自動更新', todayPrefix:'今日 ',
+        monthSuffix:'月', total:'總計', actualDays:'實到', expectedDays:'應出勤', leaveDays:'請假', absentDays:'缺勤', totalHours:'總工時',
+        weekSun:'日', weekMon:'一', weekTue:'二', weekWed:'三', weekThu:'四', weekFri:'五', weekSat:'六', weekdays:['週日','週一','週二','週三','週四','週五','週六'], calendarHeaders:['一','二','三','四','五','六','日'],
+        fixedShift:'固定班', scheduledShift:'排班制', unset:'未排', defaultShift:'預設班', sharedShift:'共用班別', noPermission:'無權限', edit:'編輯', delete:'刪除', save:'儲存', clear:'清空', seedDefaults:'建立預設',
+        humanTitle:'👥 人力管理', humanSubtitle:'電腦版排班工作台。員工模式可直接儲存；排班格子點擊後再按儲存排班。', saveSchedule:'💾 儲存排班', thisWeek:'本週', shiftMaintain:'班別新增 / 編輯', shiftName:'班別名稱', startTime:'開始', endTime:'結束', shiftCode:'代碼（可選）', overnight:'跨日班', currentShifts:'目前班別', noShifts:'尚無班別，請先新增或按「建立預設」。',
+        noEmployees:'尚無員工資料', scheduleSynced:'排班已同步', unsavedSchedule:'尚未儲存：{n} 格排班已變更', saveModeOk:'工時模式已儲存', saveFail:'儲存失敗：', scheduleSaved:'排班已儲存', noScheduleChanges:'沒有排班變更', missingManager:'缺少管理者身份',
+        lunchTitle:'便當統計', orders:'份', open:'↗', prev:'◀', next:'▶'
+    },
+    vi: {
+        langLabel:'Ngôn ngữ', loading:'Đang tải...', loadFailed:'Tải thất bại', noData:'Không có dữ liệu', employee:'Nhân viên', department:'Bộ phận', shift:'Ca làm', checkIn:'Giờ vào', checkOut:'Giờ ra', hours:'Giờ công', status:'Trạng thái',
+        pageTitleManager:'📊 Tổng quan chấm công', pageTitleEmployee:'📅 Hôm nay và lịch tuần', commonEntry:'Lối vào thường dùng', entrySubtitleManager:'Cùng một lối vào sẽ tự phân quyền. Nhân viên xem hôm nay và lịch tuần; quản lý xem đầy đủ thống kê, xuất file và công cụ.', entrySubtitleEmployee:'Cùng một lối vào sẽ tự phân quyền. Nhân viên xem hôm nay và lịch tuần; quản lý có thể quay lại chế độ đầy đủ để xem thống kê, xuất file và QR.',
+        employeeEntry:'Lối vào nhân viên', adminEntry:'Lối vào quản lý', checkInEntry:'Chấm công vào', checkOutEntry:'Chấm công ra', registerEntry:'Đăng ký nhân viên', addLineFriend:'Thêm bạn LINE', adminBackend:'Trang quản lý', officialAccount:'Tài khoản chính thức: @130oqrak',
+        employeeHelpTitle:'Cách nhân viên sử dụng', employeeHelp:'Lần đầu: thêm bạn LINE, rồi bấm đăng ký nhân viên. Hằng ngày: vào LINE bấm chấm công vào / chấm công ra.',
+        roleLoading:'Đang kiểm tra quyền', roleManager:'Chế độ quản lý | bấm để xem như nhân viên', roleEmployeeSwitch:'Góc nhìn nhân viên | bấm về quản lý', roleEmployee:'Chế độ nhân viên',
+        tabDaily:'📅 Hôm nay', tabMonthly:'📊 Tháng', tabSchedule:'📋 Lịch tuần', tabHuman:'👥 Nhân sự',
+        qrCheckin:'📲 QR chấm công', qrRegister:'📱 QR đăng ký', export:'📥 Xuất file',
+        expected:'Phải đi làm', checked:'Đã chấm', notChecked:'Chưa chấm', late:'Đi trễ', early:'Về sớm', leave:'Nghỉ phép', absent:'Vắng', working:'Đang làm', completed:'✅ Hoàn tất', offDay:'Nghỉ', unknown:'Không rõ',
+        allDept:'Tất cả bộ phận', allStatus:'Tất cả trạng thái', lastUpdated:'Cập nhật: ', autoRefresh:'Tự động cập nhật mỗi 30 giây', todayPrefix:'Hôm nay ',
+        monthSuffix:'', total:'Tổng', actualDays:'Ngày thực tế', expectedDays:'Ngày phải làm', leaveDays:'Nghỉ phép', absentDays:'Vắng', totalHours:'Tổng giờ',
+        weekSun:'CN', weekMon:'T2', weekTue:'T3', weekWed:'T4', weekThu:'T5', weekFri:'T6', weekSat:'T7', weekdays:['Chủ nhật','Thứ hai','Thứ ba','Thứ tư','Thứ năm','Thứ sáu','Thứ bảy'], calendarHeaders:['T2','T3','T4','T5','T6','T7','CN'],
+        fixedShift:'Ca cố định', scheduledShift:'Theo lịch', unset:'Chưa xếp', defaultShift:'Ca mặc định', sharedShift:'Ca dùng chung', noPermission:'Không có quyền', edit:'Sửa', delete:'Xóa', save:'Lưu', clear:'Xóa form', seedDefaults:'Tạo ca mặc định',
+        humanTitle:'👥 Quản lý nhân sự', humanSubtitle:'Bảng xếp ca bản máy tính. Có thể lưu chế độ giờ làm; bấm ô lịch rồi bấm lưu lịch.', saveSchedule:'💾 Lưu lịch', thisWeek:'Tuần này', shiftMaintain:'Thêm / sửa ca', shiftName:'Tên ca', startTime:'Bắt đầu', endTime:'Kết thúc', shiftCode:'Mã ca (tùy chọn)', overnight:'Ca qua ngày', currentShifts:'Ca hiện có', noShifts:'Chưa có ca. Hãy thêm ca hoặc bấm tạo ca mặc định.',
+        noEmployees:'Chưa có dữ liệu nhân viên', scheduleSynced:'Lịch đã đồng bộ', unsavedSchedule:'Chưa lưu: đã đổi {n} ô lịch', saveModeOk:'Đã lưu chế độ giờ làm', saveFail:'Lưu thất bại: ', scheduleSaved:'Đã lưu lịch', noScheduleChanges:'Không có thay đổi lịch', missingManager:'Thiếu thân phận quản lý',
+        lunchTitle:'Thống kê cơm', orders:'phần', open:'↗', prev:'◀', next:'▶'
+    }
+};
 
 // === 工具函數 ===
+function t(key, vars) {
+    const dict = I18N[currentLang] || I18N.zh;
+    let text = dict[key] || I18N.zh[key] || key;
+    if (vars) Object.keys(vars).forEach(k => { text = text.replace('{' + k + '}', vars[k]); });
+    return text;
+}
+function setText(selector, text) { const el = document.querySelector(selector); if (el) el.textContent = text; }
+function setTexts(selector, values) { document.querySelectorAll(selector).forEach((el, i) => { if (values[i] !== undefined) el.textContent = values[i]; }); }
+function setupLanguageSwitcher() {
+    const header = document.querySelector('#mainView .container > div:first-child');
+    if (!header || document.getElementById('langSelect')) return;
+    const box = document.createElement('label');
+    box.className = 'lang-switch';
+    box.innerHTML = '<span id="langLabel"></span><select id="langSelect" onchange="setLanguage(this.value)"><option value="zh">中文</option><option value="vi">Tiếng Việt</option></select>';
+    header.appendChild(box);
+    document.getElementById('langSelect').value = currentLang;
+}
+function setLanguage(lang) {
+    currentLang = lang === 'vi' ? 'vi' : 'zh';
+    localStorage.setItem('attendance_public_lang', currentLang);
+    applyTranslations();
+    if (currentTab === 'daily') { updateDeptFilter(); renderDailyTable(); updateDailyStats(); }
+    if (currentTab === 'monthly') renderMonthlyTable();
+    if (currentTab === 'schedule') loadScheduleData();
+    if (currentTab === 'human') renderHumanManagement(getHumanDates());
+}
+function applyTranslations() {
+    document.documentElement.lang = currentLang === 'vi' ? 'vi' : 'zh-TW';
+    document.title = t(viewingAsEmployee ? 'pageTitleEmployee' : 'pageTitleManager') + (companyName ? ' - ' + companyName : '');
+    setText('#langLabel', t('langLabel'));
+    setText('.entry-title', t('commonEntry'));
+    setText('.entry-block .entry-label', t('employeeEntry'));
+    setText('#adminEntryBlock .entry-label', t('adminEntry'));
+    setTexts('.entry-link span:first-child', [t('checkInEntry'), t('checkOutEntry'), t('registerEntry'), t('addLineFriend'), t('adminBackend')]);
+    setTexts('.entry-link span:last-child', [t('open'), t('open'), t('open'), t('open'), t('open')]);
+    const help = document.querySelector('.entry-help');
+    if (help) help.innerHTML = '<strong>' + t('employeeHelpTitle') + '</strong><br>' + t('employeeHelp');
+    const official = document.querySelector('#adminEntryBlock div[style*="margin-top"]');
+    if (official) official.innerHTML = t('officialAccount').replace('@130oqrak', '<strong>@130oqrak</strong>');
+    setText('#tabDaily', t('tabDaily'));
+    setText('#tabMonthly', t('tabMonthly'));
+    setText('#tabSchedule', t('tabSchedule'));
+    setText('#tabHuman', t('tabHuman'));
+    const mt = document.querySelectorAll('#managerTools button');
+    if (mt[0]) mt[0].textContent = t('qrCheckin');
+    if (mt[1]) mt[1].textContent = t('qrRegister');
+    if (mt[2]) mt[2].textContent = t('export');
+    setText('#filterDept option[value=""]', t('allDept'));
+    setText('#filterStatus option[value=""]', t('allStatus'));
+    const statusOpts = document.querySelectorAll('#filterStatus option');
+    const statusLabels = ['', t('working'), t('notChecked'), t('completed'), t('late'), t('leave'), t('absent')];
+    statusOpts.forEach((opt, i) => { if (statusLabels[i]) opt.textContent = statusLabels[i]; });
+    const dailyHeads = document.querySelectorAll('#dailyView .emp-table thead th');
+    [t('employee'), t('department'), t('shift'), t('checkIn'), t('checkOut'), t('hours'), t('status')].forEach((v, i) => { if (dailyHeads[i]) dailyHeads[i].textContent = v; });
+    const monthlyHeads = document.querySelectorAll('#monthlyView .emp-table thead th');
+    [t('employee'), t('department'), t('expectedDays'), t('actualDays'), t('late'), t('early'), t('leaveDays'), t('absentDays'), t('totalHours')].forEach((v, i) => { if (monthlyHeads[i]) monthlyHeads[i].textContent = v; });
+    setText('#humanView .hr-toolbar div div:first-child', t('humanTitle'));
+    const humanSubtitle = document.querySelector('#humanView .hr-toolbar div div:nth-child(2)');
+    if (humanSubtitle) humanSubtitle.textContent = t('humanSubtitle');
+    setText('#humanSaveBtn', t('saveSchedule'));
+    setText('.shift-form h4', t('shiftMaintain'));
+    setText('.shift-list h4', t('currentShifts'));
+    const shiftLabels = document.querySelectorAll('.shift-field label');
+    [t('shiftName'), t('startTime'), t('endTime'), t('shiftCode')].forEach((v, i) => { if (shiftLabels[i]) shiftLabels[i].textContent = v; });
+    const overnightLabel = document.querySelector('.shift-form label[style*="display:flex"]');
+    if (overnightLabel) overnightLabel.lastChild.textContent = ' ' + t('overnight');
+    setTexts('.shift-form-actions button', [t('save'), t('clear'), t('seedDefaults')]);
+    const manager = isManagerRole(currentUserRole);
+    const employeeView = !manager || viewingAsEmployee;
+    setText('#pageTitle', employeeView ? t('pageTitleEmployee') : t('pageTitleManager'));
+    const roleHint = document.getElementById('roleHint');
+    if (roleHint) roleHint.textContent = manager ? (employeeView ? t('roleEmployeeSwitch') : t('roleManager')) : t('roleEmployee');
+    const subtitle = document.querySelector('.entry-subtitle');
+    if (subtitle) subtitle.textContent = employeeView && manager ? t('entrySubtitleEmployee') : t('entrySubtitleManager');
+}
 function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = String(s); return d.innerHTML; }
 function showToast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2500); }
 function getTaiwanDate() { return new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Taipei' }); }
@@ -546,6 +660,7 @@ function toggleViewMode() {
     if (!isManagerRole(currentUserRole)) return;
     viewingAsEmployee = !viewingAsEmployee;
     applyRoleAccess();
+    applyTranslations();
 }
 
 function applyRoleAccess() {
@@ -664,9 +779,11 @@ async function init() {
         // 顯示主頁面
         document.getElementById('loadingView').style.display = 'none';
         document.getElementById('mainView').style.display = 'block';
+        setupLanguageSwitcher();
 
         await checkLunchFeature();
         applyRoleAccess();
+        applyTranslations();
 
     } catch (e) {
         console.error('Init error:', e);
@@ -701,9 +818,9 @@ function onDailyDateChange() { loadDailyData(); }
 
 async function loadDailyData() {
     const dateStr = getDailyDate();
-    const dayNames = ['週日','週一','週二','週三','週四','週五','週六'];
+    const dayNames = t('weekdays');
     const d = new Date(dateStr + 'T00:00:00+08:00');
-    document.getElementById('dailyDateLabel').textContent = '📅 ' + dateStr;
+    document.getElementById('dailyDateLabel').textContent = t('todayPrefix') + dateStr;
     document.getElementById('dailyDayLabel').textContent = dayNames[d.getDay()];
 
     try {
@@ -713,7 +830,7 @@ async function loadDailyData() {
         updateDailyStats();
         updateDeptFilter();
         renderDailyTable();
-        document.getElementById('lastRefresh').textContent = '更新：' + new Date().toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+        document.getElementById('lastRefresh').textContent = t('lastUpdated') + new Date().toLocaleTimeString(currentLang === 'vi' ? 'vi-VN' : 'zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
         loadLunchStats(dateStr);
     } catch (e) {
         console.error('Load daily error:', e);
@@ -735,7 +852,7 @@ function updateDeptFilter() {
     const select = document.getElementById('filterDept');
     const current = select.value;
     const depts = [...new Set(dailyData.map(r => r.department).filter(Boolean))].sort();
-    let html = '<option value="">全部部門</option>';
+    let html = '<option value="">' + t('allDept') + '</option>';
     depts.forEach(d => { html += '<option value="' + esc(d) + '"' + (d === current ? ' selected' : '') + '>' + esc(d) + '</option>'; });
     select.innerHTML = html;
 }
@@ -762,8 +879,8 @@ function fmtHours(h) {
 }
 
 function shiftBadge(row) {
-    if (row.is_off_day) return '<span class="status-badge s-off-day">休假</span>';
-    if (!row.shift_name || row.shift_name === '未排班') return '<span class="status-badge" style="background:#FEF3C7;color:#92400E;">未排班</span>';
+    if (row.is_off_day) return '<span class="status-badge s-off-day">' + t('offDay') + '</span>';
+    if (!row.shift_name || row.shift_name === '??') return '<span class="status-badge" style="background:#FEF3C7;color:#92400E;">' + t('unset') + '</span>';
     const timeStr = row.shift_start && row.shift_end
         ? ' ' + (row.shift_start||'').substring(0,5) + '-' + (row.shift_end||'').substring(0,5)
         : '';
@@ -771,15 +888,15 @@ function shiftBadge(row) {
 }
 
 function statusBadge(row) {
-    const map = { working:['上班中','s-working'], completed:['✅ 完成','s-completed'], not_checked:['❌ 未打卡','s-not-checked'], on_leave:['🌴 請假','s-on-leave'], absent:['❌ 缺勤','s-absent'], off_day:['休','s-off-day'] };
+    const map = { working:[t('working'),'s-working'], completed:[t('completed'),'s-completed'], not_checked:[t('notChecked'),'s-not-checked'], on_leave:[t('leave'),'s-on-leave'], absent:[t('absent'),'s-absent'], off_day:[t('offDay'),'s-off-day'] };
     let label, cls;
     if (row.is_late && (row.status === 'working' || row.status === 'completed')) {
-        label = '⚠️ 遲到·' + (row.status === 'working' ? '上班中' : '完成'); cls = 's-late';
-    } else { const m = map[row.status] || ['未知','']; label = m[0]; cls = m[1]; }
-    if (row.is_early_leave) label += ' 早退';
+        label = '?? ' + t('late') + '?' + (row.status === 'working' ? t('working') : t('completed')); cls = 's-late';
+    } else { const m = map[row.status] || [t('unknown'),'']; label = m[0]; cls = m[1]; }
+    if (row.is_early_leave) label += ' ' + t('early');
     if (row.leave_type && row.status === 'on_leave') {
-        const lt = { annual:'特休', sick:'病假', personal:'事假', compensatory:'補休', maternity:'產假', marriage:'婚假' };
-        label = '🌴 ' + (lt[row.leave_type] || row.leave_type);
+        const lt = currentLang === 'vi' ? { annual:'Nghỉ phép năm', sick:'Nghỉ bệnh', personal:'Nghỉ việc riêng', compensatory:'Nghỉ bù', maternity:'Nghỉ thai sản', marriage:'Nghỉ kết hôn' } : { annual:'特休', sick:'病假', personal:'事假', compensatory:'補休', maternity:'產假', marriage:'婚假' };
+        label = t('leave') + ' ' + (lt[row.leave_type] || row.leave_type);
     }
     return '<span class="status-badge ' + cls + '">' + label + '</span>';
 }
@@ -866,14 +983,14 @@ async function loadMonthlyData() {
 
 function renderMonthlyTable() {
     const tbody = document.getElementById('monthlyTableBody');
-    if (monthlyData.length === 0) { tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#999;padding:40px;">無資料</td></tr>'; return; }
+    if (monthlyData.length === 0) { tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#999;padding:40px;">' + t('noData') + '</td></tr>'; return; }
 
     let totE=0, totA=0, totL=0, totEl=0, totLv=0, totAb=0, totH=0;
     let html = '';
     monthlyData.forEach(r => {
         totE += r.expected_days; totA += r.actual_days; totL += r.late_days; totEl += r.early_leave_days; totLv += r.leave_days; totAb += r.absent_days; totH += parseFloat(r.total_work_hours) || 0;
         html += '<tr style="cursor:pointer;" onclick="toggleMonthDetail(\'' + r.employee_id + '\')">' +
-            '<td style="font-weight:700;white-space:nowrap;">' + esc(r.employee_name) + ' <span style="font-size:10px;color:#94A3B8;">▼</span></td>' +
+            '<td style="font-weight:700;white-space:nowrap;">' + esc(r.employee_name) + ' <span style="font-size:10px;color:#94A3B8;">?</span></td>' +
             '<td style="color:#64748B;font-size:11px;">' + esc(r.department || '-') + '</td>' +
             '<td style="text-align:center;">' + r.expected_days + '</td>' +
             '<td style="text-align:center;color:#059669;font-weight:700;">' + r.actual_days + '</td>' +
@@ -882,9 +999,9 @@ function renderMonthlyTable() {
             '<td style="text-align:center;' + (r.leave_days > 0 ? 'color:#2563EB;font-weight:700;' : '') + '">' + r.leave_days + '</td>' +
             '<td style="text-align:center;' + (r.absent_days > 0 ? 'color:#DC2626;font-weight:700;' : '') + '">' + r.absent_days + '</td>' +
             '<td style="text-align:right;font-weight:700;">' + fmtHours(r.total_work_hours) + '</td>' +
-        '</tr><tr class="expand-row" id="detail_' + r.employee_id + '"><td colspan="9" class="expand-cell"><div id="detailContent_' + r.employee_id + '">載入中...</div></td></tr>';
+        '</tr><tr class="expand-row" id="detail_' + r.employee_id + '"><td colspan="9" class="expand-cell"><div id="detailContent_' + r.employee_id + '">' + t('loading') + '</div></td></tr>';
     });
-    html += '<tr style="background:#F0F9FF;font-weight:800;"><td>合計</td><td></td>' +
+    html += '<tr style="background:#F0F9FF;font-weight:800;"><td>' + t('total') + '</td><td></td>' +
         '<td style="text-align:center;">' + totE + '</td><td style="text-align:center;color:#059669;">' + totA + '</td>' +
         '<td style="text-align:center;color:#EA580C;">' + totL + '</td><td style="text-align:center;color:#DC2626;">' + totEl + '</td>' +
         '<td style="text-align:center;color:#2563EB;">' + totLv + '</td><td style="text-align:center;color:#DC2626;">' + totAb + '</td>' +
@@ -1206,21 +1323,15 @@ async function loadScheduleData() {
 }
 
 function renderScheduleView(data, dates) {
-    const wd = ['日', '一', '二', '三', '四', '五', '六'];
+    const wd = [t('weekSun'), t('weekMon'), t('weekTue'), t('weekWed'), t('weekThu'), t('weekFri'), t('weekSat')];
     const employees = data?.employees || [];
     const schedules = data?.schedules || [];
     const shiftTypes = data?.shift_types || [];
-
-    // 班別 lookup
     const stMap = {};
     shiftTypes.forEach(st => { stMap[st.id] = st; });
-
-    // 排班 lookup
     const schMap = {};
     schedules.forEach(s => { schMap[s.employee_id + '_' + s.date] = s; });
-
-    // Header
-    let headHtml = '<th style="min-width:70px;position:sticky;left:0;background:#F8FAFC;z-index:2;">員工</th>';
+    let headHtml = '<th style="min-width:70px;position:sticky;left:0;background:#F8FAFC;z-index:2;">' + t('employee') + '</th>';
     dates.forEach(d => {
         const dow = d.getDay();
         const isWeekend = dow === 0 || dow === 6;
@@ -1228,13 +1339,10 @@ function renderScheduleView(data, dates) {
             wd[dow] + '<br><span style="font-size:11px;font-weight:500;">' + String(d.getMonth() + 1) + '/' + String(d.getDate()) + '</span></th>';
     });
     document.getElementById('schedHeaderRow').innerHTML = headHtml;
-
-    // Body
     if (employees.length === 0) {
-        document.getElementById('schedBody').innerHTML = '<tr><td colspan="8" style="text-align:center;color:#94A3B8;padding:30px;">尚無員工資料</td></tr>';
+        document.getElementById('schedBody').innerHTML = '<tr><td colspan="8" style="text-align:center;color:#94A3B8;padding:30px;">' + t('noEmployees') + '</td></tr>';
         return;
     }
-
     let bodyHtml = '';
     employees.forEach(emp => {
         bodyHtml += '<tr>';
@@ -1243,7 +1351,7 @@ function renderScheduleView(data, dates) {
             const key = emp.id + '_' + fmtDate(d);
             const sch = schMap[key];
             if (sch && sch.is_off_day) {
-                bodyHtml += '<td style="text-align:center;"><span style="display:inline-block;padding:4px 8px;border-radius:8px;font-size:11px;font-weight:700;background:#ECFDF5;color:#059669;">休</span></td>';
+                bodyHtml += '<td style="text-align:center;"><span style="display:inline-block;padding:4px 8px;border-radius:8px;font-size:11px;font-weight:700;background:#ECFDF5;color:#059669;">' + t('offDay') + '</span></td>';
             } else if (sch && sch.shift_type_id && stMap[sch.shift_type_id]) {
                 const st = stMap[sch.shift_type_id];
                 const startT = (st.start_time || '').substring(0, 5);
@@ -1254,21 +1362,11 @@ function renderScheduleView(data, dates) {
             } else if (emp.shift_mode === 'fixed') {
                 const fs = (emp.fixed_shift_start || '').substring(0, 5) || '08:00';
                 const fe = (emp.fixed_shift_end || '').substring(0, 5) || '17:00';
-                const dow = d.getDay();
-                if (false && (dow === 0 || dow === 6)) {
-                    bodyHtml += '<td style="text-align:center;"><span style="display:inline-block;padding:4px 8px;border-radius:8px;font-size:11px;font-weight:700;background:#F3F4F6;color:#9CA3AF;">-</span></td>';
-                } else {
-                    bodyHtml += '<td style="text-align:center;"><div style="padding:4px 6px;border-radius:8px;background:#F0FDF4;font-size:11px;">' +
-                        '<div style="font-weight:700;color:#15803D;">固定</div>' +
-                        '<div style="color:#64748B;font-size:10px;">' + fs + '-' + fe + '</div></div></td>';
-                }
+                bodyHtml += '<td style="text-align:center;"><div style="padding:4px 6px;border-radius:8px;background:#F0FDF4;font-size:11px;">' +
+                    '<div style="font-weight:700;color:#15803D;">' + t('fixedShift') + '</div>' +
+                    '<div style="color:#64748B;font-size:10px;">' + fs + '-' + fe + '</div></div></td>';
             } else if (emp.shift_mode === 'scheduled') {
-                const dow = d.getDay();
-                if (false && (dow === 0 || dow === 6)) {
-                    bodyHtml += '<td style="text-align:center;"><span style="display:inline-block;padding:4px 8px;border-radius:8px;font-size:11px;font-weight:700;background:#F3F4F6;color:#9CA3AF;">-</span></td>';
-                } else {
-                    bodyHtml += '<td style="text-align:center;"><span style="display:inline-block;padding:4px 8px;border-radius:8px;font-size:10px;font-weight:700;background:#FEE2E2;color:#DC2626;">未排</span></td>';
-                }
+                bodyHtml += '<td style="text-align:center;"><span style="display:inline-block;padding:4px 8px;border-radius:8px;font-size:10px;font-weight:700;background:#FEE2E2;color:#DC2626;">' + t('unset') + '</span></td>';
             } else {
                 bodyHtml += '<td style="text-align:center;color:#CBD5E1;">-</td>';
             }
@@ -1324,33 +1422,48 @@ async function loadHumanManagement() {
 function renderHumanShiftList() {
     const el = document.getElementById('humanShiftList');
     if (!el) return;
-    if (!humanShiftTypes.length) { el.innerHTML = '尚無班別，請先新增或按「建立預設」。'; return; }
+    if (!humanShiftTypes.length) { el.innerHTML = t('noShifts'); return; }
     el.innerHTML = humanShiftTypes.map(st => {
         const start = String(st.start_time || '').slice(0, 5);
         const end = String(st.end_time || '').slice(0, 5);
         const editable = !!st.company_id && canSaveHumanSchedule();
-        const readonlyLabel = canSaveHumanSchedule() ? '\u5171\u7528\u73ed\u5225' : '\u7121\u6b0a\u9650';
+        const readonlyLabel = canSaveHumanSchedule() ? t('sharedShift') : t('noPermission');
         return '<div class="shift-card">' +
-            '<div><div class="shift-card-name">' + esc(st.name) + '</div><div class="shift-card-time">' + esc(start + '-' + end) + (st.is_overnight ? ' · 跨日' : '') + '</div></div>' +
+            '<div><div class="shift-card-name">' + esc(st.name) + '</div><div class="shift-card-time">' + esc(start + '-' + end) + (st.is_overnight ? ' ? ' + t('overnight') : '') + '</div></div>' +
             '<div class="shift-card-actions">' +
-            (editable ? '<button class="shift-action-btn" onclick="editHumanShiftType(\'' + st.id + '\')">編輯</button><button class="shift-action-btn danger" onclick="deleteHumanShiftType(\'' + st.id + '\')">刪除</button>' : '<span style="font-size:12px;color:#94A3B8;">' + readonlyLabel + '</span>') +
+            (editable ? '<button class="shift-action-btn" onclick="editHumanShiftType(\'' + st.id + '\')">' + t('edit') + '</button><button class="shift-action-btn danger" onclick="deleteHumanShiftType(\'' + st.id + '\')">' + t('delete') + '</button>' : '<span style="font-size:12px;color:#94A3B8;">' + readonlyLabel + '</span>') +
             '</div></div>';
     }).join('');
 }
-function renderHumanLegend() { let html = humanShiftTypes.map(st => '<span style="display:inline-flex;align-items:center;padding:6px 10px;border-radius:999px;background:#DBEAFE;color:#1D4ED8;font-size:12px;font-weight:800;">' + esc(st.name) + ' ' + String(st.start_time || '').slice(0,5) + '-' + String(st.end_time || '').slice(0,5) + '</span>').join(''); html += '<span style="display:inline-flex;align-items:center;padding:6px 10px;border-radius:999px;background:#ECFDF5;color:#047857;font-size:12px;font-weight:800;">\u4f11</span>'; html += '<span style="display:inline-flex;align-items:center;padding:6px 10px;border-radius:999px;background:#FFF7ED;color:#C2410C;font-size:12px;font-weight:800;">\u672a\u6392</span>'; document.getElementById('humanLegend').innerHTML = html; }
+function renderHumanLegend() {
+    let html = humanShiftTypes.map(st => '<span style="display:inline-flex;align-items:center;padding:6px 10px;border-radius:999px;background:#DBEAFE;color:#1D4ED8;font-size:12px;font-weight:800;">' + esc(st.name) + ' ' + String(st.start_time || '').slice(0,5) + '-' + String(st.end_time || '').slice(0,5) + '</span>').join('');
+    html += '<span style="display:inline-flex;align-items:center;padding:6px 10px;border-radius:999px;background:#ECFDF5;color:#047857;font-size:12px;font-weight:800;">' + t('offDay') + '</span>';
+    html += '<span style="display:inline-flex;align-items:center;padding:6px 10px;border-radius:999px;background:#FFF7ED;color:#C2410C;font-size:12px;font-weight:800;">' + t('unset') + '</span>';
+    document.getElementById('humanLegend').innerHTML = html;
+}
 function renderHumanManagement(dates) {
-    renderHumanShiftList(); renderHumanLegend(); const wd = ['\u65e5','\u4e00','\u4e8c','\u4e09','\u56db','\u4e94','\u516d'];
-    let head = '<th class="hr-sticky" style="min-width:150px;">\u54e1\u5de5</th><th style="min-width:120px;">\u5de5\u6642\u6a21\u5f0f</th><th style="min-width:190px;">\u56fa\u5b9a\u73ed\u6642\u9593</th>';
-    dates.forEach(d => { const weekend = d.getDay() === 0 || d.getDay() === 6; head += '<th style="text-align:center;min-width:96px;' + (weekend ? 'color:#DC2626;' : '') + '">\u9031' + wd[d.getDay()] + '<br><span style="font-size:11px;font-weight:500;">' + (d.getMonth()+1) + '/' + d.getDate() + '</span></th>'; }); document.getElementById('humanHead').innerHTML = head;
-    if (humanEmployees.length === 0) { document.getElementById('humanBody').innerHTML = '<tr><td colspan="10" style="padding:36px;text-align:center;color:#94A3B8;">\u5c1a\u7121\u54e1\u5de5\u8cc7\u6599</td></tr>'; return; }
+    renderHumanShiftList(); renderHumanLegend(); const wd = [t('weekSun'), t('weekMon'), t('weekTue'), t('weekWed'), t('weekThu'), t('weekFri'), t('weekSat')];
+    let head = '<th class="hr-sticky" style="min-width:150px;">' + t('employee') + '</th><th style="min-width:120px;">' + t('hours') + '</th><th style="min-width:190px;">' + t('fixedShift') + '</th>';
+    dates.forEach(d => { const weekend = d.getDay() === 0 || d.getDay() === 6; head += '<th style="text-align:center;min-width:96px;' + (weekend ? 'color:#DC2626;' : '') + '">' + wd[d.getDay()] + '<br><span style="font-size:11px;font-weight:500;">' + (d.getMonth()+1) + '/' + d.getDate() + '</span></th>'; }); document.getElementById('humanHead').innerHTML = head;
+    if (humanEmployees.length === 0) { document.getElementById('humanBody').innerHTML = '<tr><td colspan="10" style="padding:36px;text-align:center;color:#94A3B8;">' + t('noEmployees') + '</td></tr>'; return; }
     const saveEnabled = canSaveHumanSchedule(); document.getElementById('humanSaveBtn').style.display = saveEnabled ? '' : 'none'; let html = '';
     const disabledAttr = saveEnabled ? '' : ' disabled';
-    humanEmployees.forEach(emp => { const mode = emp.shift_mode || 'fixed'; const fs = String(emp.fixed_shift_start || '10:30').slice(0,5); const fe = String(emp.fixed_shift_end || '21:30').slice(0,5); html += '<tr data-human-emp="' + esc(emp.id) + '">'; html += '<td class="hr-sticky"><div style="font-weight:900;color:#0F172A;">' + esc(emp.name) + '</div><div class="hr-meta">' + esc(emp.department || '-') + '</div></td>'; html += '<td><select class="hr-control"' + disabledAttr + ' onchange="saveHumanMode(\'' + emp.id + '\')"><option value="fixed"' + (mode !== 'scheduled' ? ' selected' : '') + '>\u56fa\u5b9a\u73ed</option><option value="scheduled"' + (mode === 'scheduled' ? ' selected' : '') + '>\u6392\u73ed\u5236</option></select></td>'; html += '<td><div class="hr-time-row"><input class="hr-control hr-start" type="time" value="' + esc(fs) + '"' + disabledAttr + ' onchange="saveHumanMode(\'' + emp.id + '\')"><span>~</span><input class="hr-control hr-end" type="time" value="' + esc(fe) + '"' + disabledAttr + ' onchange="saveHumanMode(\'' + emp.id + '\')"></div></td>'; dates.forEach(d => { const ds = fmtDate(d); const key = emp.id + '_' + ds; const val = Object.prototype.hasOwnProperty.call(humanDraft, key) ? humanDraft[key] : null; html += '<td>' + humanCellButton(emp, ds, val, mode, saveEnabled) + '</td>'; }); html += '</tr>'; });
+    humanEmployees.forEach(emp => { const mode = emp.shift_mode || 'fixed'; const fs = String(emp.fixed_shift_start || '10:30').slice(0,5); const fe = String(emp.fixed_shift_end || '21:30').slice(0,5); html += '<tr data-human-emp="' + esc(emp.id) + '">'; html += '<td class="hr-sticky"><div style="font-weight:900;color:#0F172A;">' + esc(emp.name) + '</div><div class="hr-meta">' + esc(emp.department || '-') + '</div></td>'; html += '<td><select class="hr-control"' + disabledAttr + ' onchange="saveHumanMode(\'' + emp.id + '\')"><option value="fixed"' + (mode !== 'scheduled' ? ' selected' : '') + '>' + t('fixedShift') + '</option><option value="scheduled"' + (mode === 'scheduled' ? ' selected' : '') + '>' + t('scheduledShift') + '</option></select></td>'; html += '<td><div class="hr-time-row"><input class="hr-control hr-start" type="time" value="' + esc(fs) + '"' + disabledAttr + ' onchange="saveHumanMode(\'' + emp.id + '\')"><span>~</span><input class="hr-control hr-end" type="time" value="' + esc(fe) + '"' + disabledAttr + ' onchange="saveHumanMode(\'' + emp.id + '\')"></div></td>'; dates.forEach(d => { const ds = fmtDate(d); const key = emp.id + '_' + ds; const val = Object.prototype.hasOwnProperty.call(humanDraft, key) ? humanDraft[key] : null; html += '<td>' + humanCellButton(emp, ds, val, mode, saveEnabled) + '</td>'; }); html += '</tr>'; });
     document.getElementById('humanBody').innerHTML = html; updateHumanStatus();
 }
-function humanCellButton(emp, dateStr, val, mode, saveEnabled) { if (mode !== 'scheduled') { const fs = String(emp.fixed_shift_start || '10:30').slice(0,5); const fe = String(emp.fixed_shift_end || '21:30').slice(0,5); return '<button class="hr-cell-btn" disabled>\u56fa\u5b9a<br><span style="font-size:10px;">' + esc(fs + '-' + fe) + '</span></button>'; } const key = emp.id + '_' + dateStr; let cls = 'unset', label = '\u672a\u6392', sub = ''; if (val === 'off') { cls = 'off'; label = '\u4f11'; } else if (val) { const st = humanShiftTypes.find(x => x.id === val); cls = 'shift'; label = st ? st.name : '\u73ed'; sub = st ? String(st.start_time || '').slice(0,5) + '-' + String(st.end_time || '').slice(0,5) : ''; } return '<button class="hr-cell-btn ' + cls + '" ' + (saveEnabled ? '' : 'disabled') + ' onclick="cycleHumanSchedule(\'' + key + '\')">' + esc(label) + (sub ? '<br><span style="font-size:10px;">' + esc(sub) + '</span>' : '') + '</button>'; }
+function humanCellButton(emp, dateStr, val, mode, saveEnabled) {
+    if (mode !== 'scheduled') { const fs = String(emp.fixed_shift_start || '10:30').slice(0,5); const fe = String(emp.fixed_shift_end || '21:30').slice(0,5); return '<button class="hr-cell-btn" disabled>' + t('fixedShift') + '<br><span style="font-size:10px;">' + esc(fs + '-' + fe) + '</span></button>'; }
+    const key = emp.id + '_' + dateStr; let cls = 'unset', label = t('unset'), sub = '';
+    if (val === 'off') { cls = 'off'; label = t('offDay'); } else if (val) { const st = humanShiftTypes.find(x => x.id === val); cls = 'shift'; label = st ? st.name : t('shift'); sub = st ? String(st.start_time || '').slice(0,5) + '-' + String(st.end_time || '').slice(0,5) : ''; }
+    return '<button class="hr-cell-btn ' + cls + '" ' + (saveEnabled ? '' : 'disabled') + ' onclick="cycleHumanSchedule(\'' + key + '\')">' + esc(label) + (sub ? '<br><span style="font-size:10px;">' + esc(sub) + '</span>' : '') + '</button>';
+}
 function cycleHumanSchedule(key) { const states = [null].concat(humanShiftTypes.map(st => st.id)).concat(['off']); const current = Object.prototype.hasOwnProperty.call(humanDraft, key) ? humanDraft[key] : null; const idx = states.findIndex(x => x === current); humanDraft[key] = states[(idx + 1 + states.length) % states.length]; renderHumanManagement(getHumanDates()); }
-function updateHumanStatus() { const changed = Object.keys(humanDraft).filter(key => (humanDraft[key] || null) !== (humanOriginal[key] || null)).length; const el = document.getElementById('humanStatus'); el.textContent = changed ? '\u5c1a\u672a\u5132\u5b58\uff1a' + changed + ' \u683c\u6392\u73ed\u5df2\u8b8a\u66f4' : '\u6392\u73ed\u5df2\u540c\u6b65'; el.style.color = changed ? '#C2410C' : '#64748B'; }
+function updateHumanStatus() {
+    const changed = Object.keys(humanDraft).filter(key => (humanDraft[key] || null) !== (humanOriginal[key] || null)).length;
+    const el = document.getElementById('humanStatus');
+    el.textContent = changed ? t('unsavedSchedule', { n: changed }) : t('scheduleSynced');
+    el.style.color = changed ? '#C2410C' : '#64748B';
+}
 function clearHumanShiftForm() {
     document.getElementById('shiftEditId').value = '';
     document.getElementById('shiftName').value = '';
