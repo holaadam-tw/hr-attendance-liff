@@ -149,6 +149,9 @@ body{font-family:'Noto Sans TC',-apple-system,sans-serif;background:var(--bg);co
 .traffic-sub{font-size:11px;color:#94A3B8;margin-top:4px;line-height:1.45;}
 .traffic-upload{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:16px;border:1px dashed #CBD5E1;border-radius:8px;background:#F8FAFC;margin-bottom:14px;}
 .traffic-upload input{max-width:100%;font-size:13px;font-family:inherit;}
+.traffic-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:12px 0;}
+.traffic-controls select,.traffic-controls button{padding:9px 12px;border:1px solid #CBD5E1;border-radius:10px;background:#fff;font-size:13px;font-weight:800;font-family:inherit;color:#334155;}
+.traffic-controls button{cursor:pointer;}
 .traffic-chart{height:270px;border:1px solid #E2E8F0;border-radius:8px;background:linear-gradient(180deg,#fff,#F8FAFC);padding:14px;margin-top:12px;overflow:hidden;}
 .traffic-chart svg{width:100%;height:100%;display:block;}
 .traffic-axis{font-size:11px;fill:#64748B;font-weight:800;}
@@ -370,16 +373,21 @@ body{font-family:'Noto Sans TC',-apple-system,sans-serif;background:var(--bg);co
                     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;">
                         <div>
                             <div style="font-size:20px;font-weight:900;color:#0F172A;">📈 來客流量</div>
-                            <div style="font-size:12px;color:#64748B;margin-top:5px;line-height:1.6;">匯入 Amego 發票 Excel，快速看每半小時來客波形、最後來客時間與尖峰區間。</div>
+                            <div style="font-size:12px;color:#64748B;margin-top:5px;line-height:1.6;">每天匯入 Amego 發票 Excel，系統會累積保存在此瀏覽器，可切換單日或全部日期查看來客波形。</div>
                         </div>
                         <a class="traffic-pill" href="https://invoice.amego.tw/vendor/60282181/invoice_report_list?date_start=2026%2F05%2F04&date_end=2026%2F05%2F04" target="_blank" rel="noopener">開啟 Amego 匯出 ↗</a>
                     </div>
                     <div class="traffic-upload">
                         <div>
                             <div style="font-weight:900;color:#0F172A;margin-bottom:4px;">匯入發票 Excel</div>
-                            <div style="font-size:12px;color:#64748B;line-height:1.6;">請從 Amego 下載發票報表後上傳。系統會扣掉作廢發票，不會把檔案上傳到資料庫。</div>
+                            <div style="font-size:12px;color:#64748B;line-height:1.6;">可一次選多個檔案，也可每天補匯。系統會扣掉作廢發票、用發票號碼去重，不會把檔案上傳到資料庫。</div>
                         </div>
-                        <input id="trafficFile" type="file" accept=".xlsx,.xls" onchange="handleTrafficFile(this.files && this.files[0])">
+                        <input id="trafficFile" type="file" accept=".xlsx,.xls" multiple onchange="handleTrafficFiles(this.files)">
+                    </div>
+                    <div class="traffic-controls">
+                        <select id="trafficDateSelect" onchange="renderStoredTraffic()"><option value="all">全部日期</option></select>
+                        <button onclick="clearTrafficData()">清除本機匯入資料</button>
+                        <span id="trafficStoredHint" style="font-size:12px;color:#64748B;font-weight:800;">尚未匯入</span>
                     </div>
                     <div class="traffic-grid">
                         <div class="traffic-card"><div class="traffic-label">有效發票</div><div class="traffic-value" id="trafficInvoiceCount">--</div><div class="traffic-sub" id="trafficVoidCount">作廢 -- 張</div></div>
@@ -395,6 +403,12 @@ body{font-family:'Noto Sans TC',-apple-system,sans-serif;background:var(--bg);co
                         <table class="traffic-table">
                             <thead><tr><th>時段</th><th style="text-align:right;">發票數</th><th style="text-align:right;">營收</th><th style="text-align:right;">每張平均</th><th>判讀</th></tr></thead>
                             <tbody id="trafficTableBody"><tr><td colspan="5" style="text-align:center;color:#94A3B8;padding:34px;">尚未匯入資料</td></tr></tbody>
+                        </table>
+                    </div>
+                    <div class="table-wrap" style="margin-top:14px;max-height:360px;">
+                        <table class="traffic-table">
+                            <thead><tr><th>日期</th><th style="text-align:right;">發票數</th><th style="text-align:right;">營收</th><th>第一張</th><th>最後來客</th><th>尖峰 15 分</th></tr></thead>
+                            <tbody id="trafficDailyBody"><tr><td colspan="6" style="text-align:center;color:#94A3B8;padding:34px;">尚未匯入資料</td></tr></tbody>
                         </table>
                     </div>
                 </div>
@@ -875,7 +889,7 @@ function switchTab(tab) {
     if (tab === 'daily') { loadDailyData(); startAutoRefresh(); }
     else if (tab === 'monthly') { stopAutoRefresh(); loadMonthlyData(); }
     else if (tab === 'schedule') { stopAutoRefresh(); loadScheduleData(); }
-    else if (tab === 'traffic') { stopAutoRefresh(); }
+    else if (tab === 'traffic') { stopAutoRefresh(); loadStoredTrafficData(); }
     else { stopAutoRefresh(); loadHumanManagement(); }
 }
 
@@ -977,6 +991,25 @@ function minuteLabel(min) {
     return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
 }
 
+function normalizeInvoiceDate(v, fallback) {
+    if (v !== null && v !== undefined && v !== '') {
+        if (typeof v === 'number') {
+            const d = new Date(Math.round((v - 25569) * 86400 * 1000));
+            if (!Number.isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+        }
+        const s = String(v).trim();
+        const m = s.match(/(20\d{2})[\/\-.年](\d{1,2})[\/\-.月](\d{1,2})/);
+        if (m) return m[1] + '-' + String(parseInt(m[2], 10)).padStart(2, '0') + '-' + String(parseInt(m[3], 10)).padStart(2, '0');
+    }
+    return fallback || getDailyDate();
+}
+
+function extractDateFromFileName(name) {
+    const s = String(name || '');
+    const m = s.match(/(20\d{2})[-_\/]?(\d{2})[-_\/]?(\d{2})/);
+    return m ? (m[1] + '-' + m[2] + '-' + m[3]) : '';
+}
+
 function findInvoiceColumn(row, candidates) {
     const keys = Object.keys(row || {});
     return keys.find(k => candidates.some(c => String(k).replace(/\s/g, '').includes(c))) || null;
@@ -994,22 +1027,72 @@ function getScheduledStaffCount(minute) {
     }).length;
 }
 
-async function handleTrafficFile(file) {
-    if (!file) return;
+function trafficStorageKey() {
+    return 'attendance_public_traffic_' + (companyId || 'default');
+}
+
+function emptyTrafficStore() {
+    return { invoices: [], voidNos: [], updatedAt: null };
+}
+
+function loadTrafficStore() {
+    try {
+        const raw = localStorage.getItem(trafficStorageKey());
+        if (!raw) return emptyTrafficStore();
+        const parsed = JSON.parse(raw);
+        return {
+            invoices: Array.isArray(parsed.invoices) ? parsed.invoices : [],
+            voidNos: Array.isArray(parsed.voidNos) ? parsed.voidNos : [],
+            updatedAt: parsed.updatedAt || null
+        };
+    } catch (e) {
+        return emptyTrafficStore();
+    }
+}
+
+function saveTrafficStore(store) {
+    store.updatedAt = new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Taipei' });
+    localStorage.setItem(trafficStorageKey(), JSON.stringify(store));
+}
+
+async function handleTrafficFiles(fileList) {
+    const files = Array.from(fileList || []);
+    if (files.length === 0) return;
     if (typeof XLSX === 'undefined') { showToast('⚠️ Excel 工具未載入'); return; }
     try {
-        const buf = await file.arrayBuffer();
-        const wb = XLSX.read(buf, { type: 'array', raw: false, cellDates: false });
-        const parsed = parseTrafficWorkbook(wb);
-        renderTrafficReport(parsed);
-        showToast('✅ 已讀取發票資料');
+        const store = loadTrafficStore();
+        const invoiceMap = new Map((store.invoices || []).map(inv => [inv.no, inv]));
+        const voidNos = new Set(store.voidNos || []);
+        let imported = 0;
+        for (const file of files) {
+            const buf = await file.arrayBuffer();
+            const wb = XLSX.read(buf, { type: 'array', raw: false, cellDates: false });
+            const parsed = parseTrafficWorkbook(wb, extractDateFromFileName(file.name));
+            parsed.voidNos.forEach(no => voidNos.add(no));
+            parsed.invoices.forEach(inv => {
+                if (!voidNos.has(inv.no)) {
+                    invoiceMap.set(inv.no, inv);
+                    imported += 1;
+                }
+            });
+        }
+        const invoices = Array.from(invoiceMap.values()).filter(inv => !voidNos.has(inv.no)).sort((a, b) => (a.date + minuteLabel(a.minute)).localeCompare(b.date + minuteLabel(b.minute)));
+        const nextStore = { invoices, voidNos: Array.from(voidNos), updatedAt: null };
+        saveTrafficStore(nextStore);
+        populateTrafficDateSelect(invoices);
+        const dates = Array.from(new Set(invoices.map(inv => inv.date))).sort();
+        const latest = dates[dates.length - 1] || 'all';
+        document.getElementById('trafficDateSelect').value = files.length === 1 ? latest : 'all';
+        renderStoredTraffic();
+        document.getElementById('trafficFile').value = '';
+        showToast('✅ 已匯入 ' + files.length + ' 個檔案，新增/更新 ' + imported + ' 張');
     } catch (e) {
         console.error('Traffic import error:', e);
         showToast('發票 Excel 讀取失敗：' + (e.message || ''));
     }
 }
 
-function parseTrafficWorkbook(wb) {
+function parseTrafficWorkbook(wb, fallbackDate) {
     const voidNos = new Set();
     const invoices = new Map();
     (wb.SheetNames || []).forEach(sheetName => {
@@ -1033,7 +1116,7 @@ function parseTrafficWorkbook(wb) {
             if (!invoices.has(key)) {
                 invoices.set(key, {
                     no: key,
-                    date: dateCol ? String(row[dateCol] || '').trim() : '',
+                    date: normalizeInvoiceDate(dateCol ? row[dateCol] : '', fallbackDate),
                     time: timeCol ? String(row[timeCol] || '').trim() : minuteLabel(minute),
                     minute,
                     amount
@@ -1043,7 +1126,7 @@ function parseTrafficWorkbook(wb) {
     });
     const effective = Array.from(invoices.values()).filter(inv => !voidNos.has(inv.no)).sort((a, b) => a.minute - b.minute);
     if (effective.length === 0) throw new Error('找不到可分析的有效發票列');
-    return { invoices: effective, voidCount: voidNos.size };
+    return { invoices: effective, voidNos: Array.from(voidNos), voidCount: voidNos.size };
 }
 
 function summarizeTraffic(invoices, size) {
@@ -1060,6 +1143,55 @@ function summarizeTraffic(invoices, size) {
     return bins;
 }
 
+function populateTrafficDateSelect(invoices) {
+    const select = document.getElementById('trafficDateSelect');
+    if (!select) return;
+    const current = select.value || 'all';
+    const dates = Array.from(new Set((invoices || []).map(inv => inv.date).filter(Boolean))).sort();
+    select.innerHTML = '<option value="all">全部日期</option>' + dates.map(date => '<option value="' + esc(date) + '">' + esc(date) + '</option>').join('');
+    select.value = dates.includes(current) ? current : 'all';
+}
+
+function loadStoredTrafficData() {
+    const store = loadTrafficStore();
+    populateTrafficDateSelect(store.invoices);
+    renderStoredTraffic();
+}
+
+function renderStoredTraffic() {
+    const store = loadTrafficStore();
+    const selected = document.getElementById('trafficDateSelect')?.value || 'all';
+    const invoices = selected === 'all' ? store.invoices : store.invoices.filter(inv => inv.date === selected);
+    document.getElementById('trafficStoredHint').textContent = store.invoices.length > 0
+        ? ('已匯入 ' + new Set(store.invoices.map(inv => inv.date)).size + ' 天 / ' + store.invoices.length + ' 張，更新 ' + (store.updatedAt || '--'))
+        : '尚未匯入';
+    if (invoices.length === 0) {
+        trafficReport = null;
+        document.getElementById('trafficInvoiceCount').textContent = '--';
+        document.getElementById('trafficVoidCount').textContent = '作廢 ' + (store.voidNos?.length || 0) + ' 張';
+        document.getElementById('trafficSales').textContent = '--';
+        document.getElementById('trafficFirstTime').textContent = '--';
+        document.getElementById('trafficLastTime').textContent = '--';
+        document.getElementById('trafficLastGap').textContent = '收班判斷參考';
+        document.getElementById('trafficPeak').textContent = '--';
+        document.getElementById('trafficPeakSales').textContent = '--';
+        document.getElementById('trafficChart').innerHTML = '<div style="height:100%;display:flex;align-items:center;justify-content:center;text-align:center;color:#94A3B8;font-weight:800;">請先匯入發票 Excel</div>';
+        document.getElementById('trafficTableBody').innerHTML = '<tr><td colspan="5" style="text-align:center;color:#94A3B8;padding:34px;">尚未匯入資料</td></tr>';
+        renderTrafficDailySummary(store.invoices);
+        return;
+    }
+    renderTrafficReport({ invoices, voidCount: store.voidNos?.length || 0, scope: selected });
+    renderTrafficDailySummary(store.invoices);
+}
+
+function clearTrafficData() {
+    if (!confirm('確定清除這台瀏覽器已匯入的發票資料？')) return;
+    localStorage.removeItem(trafficStorageKey());
+    populateTrafficDateSelect([]);
+    renderStoredTraffic();
+    showToast('已清除本機匯入資料');
+}
+
 function renderTrafficReport(parsed) {
     const invoices = parsed.invoices;
     const sales = invoices.reduce((sum, inv) => sum + inv.amount, 0);
@@ -1067,14 +1199,14 @@ function renderTrafficReport(parsed) {
     const last = invoices[invoices.length - 1];
     const bins30 = summarizeTraffic(invoices, 30);
     const peak15 = summarizeTraffic(invoices, 15).sort((a, b) => (b.count - a.count) || (b.sales - a.sales))[0];
-    trafficReport = { invoices, bins30, voidCount: parsed.voidCount, sales, first, last, peak15 };
+    trafficReport = { invoices, bins30, voidCount: parsed.voidCount, sales, first, last, peak15, scope: parsed.scope || 'all' };
 
     document.getElementById('trafficInvoiceCount').textContent = invoices.length;
     document.getElementById('trafficVoidCount').textContent = '作廢 ' + parsed.voidCount + ' 張';
     document.getElementById('trafficSales').textContent = fmtMoney(sales);
     document.getElementById('trafficFirstTime').textContent = minuteLabel(first.minute);
     document.getElementById('trafficLastTime').textContent = minuteLabel(last.minute);
-    document.getElementById('trafficLastGap').textContent = last.date ? ('日期 ' + last.date) : '當日最後一筆發票';
+    document.getElementById('trafficLastGap').textContent = parsed.scope === 'all' ? ('日期 ' + last.date) : '當日最後一筆發票';
     document.getElementById('trafficPeak').textContent = minuteLabel(peak15.start) + '-' + minuteLabel(peak15.end);
     document.getElementById('trafficPeakSales').textContent = peak15.count + ' 張，' + fmtMoney(peak15.sales);
 
@@ -1110,7 +1242,7 @@ function renderTrafficTable(bins) {
     const peakCount = Math.max(0, ...bins.map(b => b.count));
     const rows = bins.map(b => {
         const avg = b.count ? b.sales / b.count : 0;
-        const staff = getScheduledStaffCount(b.start);
+        const staff = trafficReport?.scope && trafficReport.scope !== 'all' && trafficReport.scope === getDailyDate() ? getScheduledStaffCount(b.start) : null;
         const note = b.count === peakCount && b.count > 0 ? '尖峰' : (b.count === 0 ? '空檔' : '穩定');
         const staffText = staff === null ? '' : '<div style="font-size:11px;color:#94A3B8;margin-top:3px;">排班 ' + staff + ' 人</div>';
         return '<tr>' +
@@ -1122,6 +1254,29 @@ function renderTrafficTable(bins) {
         '</tr>';
     }).join('');
     document.getElementById('trafficTableBody').innerHTML = rows || '<tr><td colspan="5" style="text-align:center;color:#94A3B8;padding:34px;">無資料</td></tr>';
+}
+
+function renderTrafficDailySummary(allInvoices) {
+    const body = document.getElementById('trafficDailyBody');
+    if (!body) return;
+    const dates = Array.from(new Set((allInvoices || []).map(inv => inv.date))).sort();
+    if (dates.length === 0) {
+        body.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#94A3B8;padding:34px;">尚未匯入資料</td></tr>';
+        return;
+    }
+    body.innerHTML = dates.map(date => {
+        const dayInvoices = allInvoices.filter(inv => inv.date === date).sort((a, b) => a.minute - b.minute);
+        const sales = dayInvoices.reduce((sum, inv) => sum + inv.amount, 0);
+        const peak = summarizeTraffic(dayInvoices, 15).sort((a, b) => (b.count - a.count) || (b.sales - a.sales))[0];
+        return '<tr style="cursor:pointer;" onclick="document.getElementById(\'trafficDateSelect\').value=\'' + esc(date) + '\';renderStoredTraffic();">' +
+            '<td style="font-weight:900;color:#0F172A;">' + esc(date) + '</td>' +
+            '<td style="text-align:right;font-weight:900;">' + dayInvoices.length + '</td>' +
+            '<td style="text-align:right;">' + fmtMoney(sales) + '</td>' +
+            '<td>' + minuteLabel(dayInvoices[0].minute) + '</td>' +
+            '<td>' + minuteLabel(dayInvoices[dayInvoices.length - 1].minute) + '</td>' +
+            '<td>' + minuteLabel(peak.start) + '-' + minuteLabel(peak.end) + ' / ' + peak.count + ' 張</td>' +
+        '</tr>';
+    }).join('');
 }
 
 function shiftBadge(row) {
@@ -1344,6 +1499,7 @@ function exportExcel() {
         const summaryRows = [
             { 指標: '有效發票', 數值: trafficReport.invoices.length },
             { 指標: '作廢發票', 數值: trafficReport.voidCount },
+            { 指標: '範圍', 數值: trafficReport.scope === 'all' ? '全部日期' : trafficReport.scope },
             { 指標: '營收', 數值: Math.round(trafficReport.sales) },
             { 指標: '第一張', 數值: minuteLabel(trafficReport.first.minute) },
             { 指標: '最後來客', 數值: minuteLabel(trafficReport.last.minute) },
@@ -1356,8 +1512,24 @@ function exportExcel() {
             平均客單: b.count ? Math.round(b.sales / b.count) : '',
             排班人數: getScheduledStaffCount(b.start) ?? ''
         }));
+        const allInvoices = loadTrafficStore().invoices || [];
+        const dailyRows = Array.from(new Set(allInvoices.map(inv => inv.date))).sort().map(date => {
+            const dayInvoices = allInvoices.filter(inv => inv.date === date).sort((a, b) => a.minute - b.minute);
+            const daySales = dayInvoices.reduce((sum, inv) => sum + inv.amount, 0);
+            const peak = summarizeTraffic(dayInvoices, 15).sort((a, b) => (b.count - a.count) || (b.sales - a.sales))[0];
+            return {
+                日期: date,
+                發票數: dayInvoices.length,
+                營收: Math.round(daySales),
+                第一張: minuteLabel(dayInvoices[0].minute),
+                最後來客: minuteLabel(dayInvoices[dayInvoices.length - 1].minute),
+                尖峰15分: minuteLabel(peak.start) + '-' + minuteLabel(peak.end),
+                尖峰張數: peak.count
+            };
+        });
         XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summaryRows), '來客摘要');
         XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(binRows), '半小時波形');
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(dailyRows), '每日摘要');
         XLSX.writeFile(wb, companyName + '_來客流量_' + getDailyDate() + '.xlsx');
     } else {
         const rows = monthlyData.map(r => ({
