@@ -878,6 +878,10 @@ function fmtHours(h) {
     return Math.round(h * 10) / 10 + 'h';
 }
 
+function fmtOptionalCount(v) {
+    return (v === null || v === undefined) ? '--' : v;
+}
+
 function shiftBadge(row) {
     if (row.is_off_day) return '<span class="status-badge s-off-day">' + t('offDay') + '</span>';
     if (!row.shift_name || row.shift_name === '??') return '<span class="status-badge" style="background:#FEF3C7;color:#92400E;">' + t('unset') + '</span>';
@@ -988,23 +992,23 @@ function renderMonthlyTable() {
     let totE=0, totA=0, totL=0, totEl=0, totLv=0, totAb=0, totH=0;
     let html = '';
     monthlyData.forEach(r => {
-        totE += r.expected_days; totA += r.actual_days; totL += r.late_days; totEl += r.early_leave_days; totLv += r.leave_days; totAb += r.absent_days; totH += parseFloat(r.total_work_hours) || 0;
+        totA += r.actual_days; totL += r.late_days; totEl += r.early_leave_days; totLv += r.leave_days; totH += parseFloat(r.total_work_hours) || 0;
         html += '<tr style="cursor:pointer;" onclick="toggleMonthDetail(\'' + r.employee_id + '\')">' +
             '<td style="font-weight:700;white-space:nowrap;">' + esc(r.employee_name) + ' <span style="font-size:10px;color:#94A3B8;">?</span></td>' +
             '<td style="color:#64748B;font-size:11px;">' + esc(r.department || '-') + '</td>' +
-            '<td style="text-align:center;">' + r.expected_days + '</td>' +
+            '<td style="text-align:center;color:#94A3B8;">' + fmtOptionalCount(r.expected_days) + '</td>' +
             '<td style="text-align:center;color:#059669;font-weight:700;">' + r.actual_days + '</td>' +
             '<td style="text-align:center;' + (r.late_days > 0 ? 'color:#EA580C;font-weight:700;' : '') + '">' + r.late_days + '</td>' +
             '<td style="text-align:center;' + (r.early_leave_days > 0 ? 'color:#DC2626;font-weight:700;' : '') + '">' + r.early_leave_days + '</td>' +
             '<td style="text-align:center;' + (r.leave_days > 0 ? 'color:#2563EB;font-weight:700;' : '') + '">' + r.leave_days + '</td>' +
-            '<td style="text-align:center;' + (r.absent_days > 0 ? 'color:#DC2626;font-weight:700;' : '') + '">' + r.absent_days + '</td>' +
+            '<td style="text-align:center;color:#94A3B8;">' + fmtOptionalCount(r.absent_days) + '</td>' +
             '<td style="text-align:right;font-weight:700;">' + fmtHours(r.total_work_hours) + '</td>' +
         '</tr><tr class="expand-row" id="detail_' + r.employee_id + '"><td colspan="9" class="expand-cell"><div id="detailContent_' + r.employee_id + '">' + t('loading') + '</div></td></tr>';
     });
     html += '<tr style="background:#F0F9FF;font-weight:800;"><td>' + t('total') + '</td><td></td>' +
-        '<td style="text-align:center;">' + totE + '</td><td style="text-align:center;color:#059669;">' + totA + '</td>' +
+        '<td style="text-align:center;color:#94A3B8;">--</td><td style="text-align:center;color:#059669;">' + totA + '</td>' +
         '<td style="text-align:center;color:#EA580C;">' + totL + '</td><td style="text-align:center;color:#DC2626;">' + totEl + '</td>' +
-        '<td style="text-align:center;color:#2563EB;">' + totLv + '</td><td style="text-align:center;color:#DC2626;">' + totAb + '</td>' +
+        '<td style="text-align:center;color:#2563EB;">' + totLv + '</td><td style="text-align:center;color:#94A3B8;">--</td>' +
         '<td style="text-align:right;">' + fmtHours(totH) + '</td></tr>';
     tbody.innerHTML = html;
 }
@@ -1096,8 +1100,8 @@ function exportExcel() {
     } else {
         const rows = monthlyData.map(r => ({
             '員工': r.employee_name, '部門': r.department || '',
-            '應出勤': r.expected_days, '實到': r.actual_days, '遲到': r.late_days,
-            '早退': r.early_leave_days, '請假': r.leave_days, '缺勤': r.absent_days,
+            '應出勤': r.expected_days ?? '', '實到': r.actual_days, '遲到': r.late_days,
+            '早退': r.early_leave_days, '請假': r.leave_days, '缺勤': r.absent_days ?? '',
             '總工時': Math.round((parseFloat(r.total_work_hours) || 0) * 10) / 10
         }));
         XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), '月度統計');

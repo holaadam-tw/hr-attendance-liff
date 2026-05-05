@@ -447,6 +447,10 @@
             return Math.round(h * 10) / 10 + 'h';
         }
 
+        function fmtOptionalCount(v) {
+            return (v === null || v === undefined) ? '--' : v;
+        }
+
         function shiftBadge(row) {
             if (row.is_off_day) return '<span class="status-badge s-off-day">休假</span>';
             if (!row.shift_name || row.shift_name === '未排班') return '<span class="status-badge" style="background:#FEF3C7;color:#92400E;">未排班</span>';
@@ -566,23 +570,21 @@
 
             let html = '';
             monthlyData.forEach(r => {
-                totExpected += r.expected_days;
                 totActual += r.actual_days;
                 totLate += r.late_days;
                 totEarly += r.early_leave_days;
                 totLeave += r.leave_days;
-                totAbsent += r.absent_days;
                 totHours += parseFloat(r.total_work_hours) || 0;
 
                 html += '<tr style="cursor:pointer;" onclick="toggleMonthDetail(\'' + r.employee_id + '\')">' +
                     '<td style="font-weight:700;white-space:nowrap;">' + escapeHTML(r.employee_name) + ' <span style="font-size:10px;color:#94A3B8;">▼</span></td>' +
                     '<td style="color:#64748B;font-size:11px;">' + escapeHTML(r.department || '-') + '</td>' +
-                    '<td style="text-align:center;">' + r.expected_days + '</td>' +
+                    '<td style="text-align:center;color:#94A3B8;">' + fmtOptionalCount(r.expected_days) + '</td>' +
                     '<td style="text-align:center;color:#059669;font-weight:700;">' + r.actual_days + '</td>' +
                     '<td style="text-align:center;' + (r.late_days > 0 ? 'color:#EA580C;font-weight:700;' : '') + '">' + r.late_days + '</td>' +
                     '<td style="text-align:center;' + (r.early_leave_days > 0 ? 'color:#DC2626;font-weight:700;' : '') + '">' + r.early_leave_days + '</td>' +
                     '<td style="text-align:center;' + (r.leave_days > 0 ? 'color:#2563EB;font-weight:700;' : '') + '">' + r.leave_days + '</td>' +
-                    '<td style="text-align:center;' + (r.absent_days > 0 ? 'color:#DC2626;font-weight:700;' : '') + '">' + r.absent_days + '</td>' +
+                    '<td style="text-align:center;color:#94A3B8;">' + fmtOptionalCount(r.absent_days) + '</td>' +
                     '<td style="text-align:right;font-weight:700;">' + fmtHours(r.total_work_hours) + '</td>' +
                 '</tr>' +
                 '<tr class="expand-row" id="detail_' + r.employee_id + '">' +
@@ -593,12 +595,12 @@
             // 合計
             html += '<tr style="background:#F0F9FF;font-weight:800;">' +
                 '<td>合計</td><td></td>' +
-                '<td style="text-align:center;">' + totExpected + '</td>' +
+                '<td style="text-align:center;color:#94A3B8;">--</td>' +
                 '<td style="text-align:center;color:#059669;">' + totActual + '</td>' +
                 '<td style="text-align:center;color:#EA580C;">' + totLate + '</td>' +
                 '<td style="text-align:center;color:#DC2626;">' + totEarly + '</td>' +
                 '<td style="text-align:center;color:#2563EB;">' + totLeave + '</td>' +
-                '<td style="text-align:center;color:#DC2626;">' + totAbsent + '</td>' +
+                '<td style="text-align:center;color:#94A3B8;">--</td>' +
                 '<td style="text-align:right;">' + fmtHours(totHours) + '</td>' +
             '</tr>';
 
@@ -695,12 +697,12 @@
                 const rows = monthlyData.map(r => ({
                     '員工': r.employee_name,
                     '部門': r.department || '',
-                    '應出勤': r.expected_days,
+                    '應出勤': r.expected_days ?? '',
                     '實到': r.actual_days,
                     '遲到': r.late_days,
                     '早退': r.early_leave_days,
                     '請假': r.leave_days,
-                    '缺勤': r.absent_days,
+                    '缺勤': r.absent_days ?? '',
                     '總工時': Math.round((parseFloat(r.total_work_hours) || 0) * 10) / 10
                 }));
                 const ws = XLSX.utils.json_to_sheet(rows);
