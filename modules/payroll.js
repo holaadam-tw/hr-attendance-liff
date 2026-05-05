@@ -26,6 +26,7 @@ let payrollEmployees = [];
 let payrollAdjustments = {};   // { empId: { amount: 0, note: '' } }
 let payrollBrackets = [];
 let payrollIsPublished = false;
+let payrollScheduleMap = {};
 
 export function clearPayrollState() {
     bonusEmployees = [];
@@ -35,6 +36,7 @@ export function clearPayrollState() {
     payrollAdjustments = {};
     payrollBrackets = [];
     payrollIsPublished = false;
+    payrollScheduleMap = {};
 }
 
 // ===== Tab 切換 =====
@@ -523,7 +525,7 @@ export async function loadPayrollData() {
             sb.from('overtime_requests').select('employee_id, hours, planned_hours, actual_hours, approved_hours, final_hours, source_type, ot_date, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).eq('status', 'approved').gte('ot_date', startDate).lte('ot_date', endDate).then(r => r).catch(() => ({ data: [] })),
             sb.from('payroll').select('*, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).eq('year', year).eq('month', month),
             sb.from('insurance_brackets').select('*').eq('is_active', true).order('salary_min').then(r => r).catch(() => ({ data: [] })),
-            sb.from('schedules').select('employee_id, date, is_off_day, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).gte('date', startDate).lte('date', endDate).then(r => r).catch(() => ({ data: [] }))
+            sb.from('schedules').select('employee_id, date, is_off_day, shift_types(start_time,end_time,is_overnight), employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).gte('date', startDate).lte('date', endDate).then(r => r).catch(() => ({ data: [] }))
         ]);
 
         if (empRes.error) throw empRes.error;
@@ -590,6 +592,7 @@ export async function loadPayrollData() {
             if (!schedMap[s.employee_id]) schedMap[s.employee_id] = {};
             schedMap[s.employee_id][s.date] = s;
         });
+        payrollScheduleMap = schedMap;
 
         payrollIsPublished = (existRes.data || []).some(p => p.is_published);
         if (payrollIsPublished) warnEl.style.display = 'block';
@@ -668,7 +671,16 @@ function toTaipeiDate(value) {
     return Number.isNaN(d.getTime()) ? null : d;
 }
 
-function calcCappedWorkHours(attendance) {
+function buildTaipeiDateTime(dateStr, timeStr, addDay = false) {
+    if (!dateStr || !timeStr) return null;
+    const t = String(timeStr).slice(0, 5);
+    const d = new Date(`${dateStr}T${t}:00+08:00`);
+    if (Number.isNaN(d.getTime())) return null;
+    if (addDay) d.setDate(d.getDate() + 1);
+    return d;
+}
+
+function calcCappedWorkHours(attendance, schedMap) {
     const rawHours = Number(attendance?.total_work_hours || 0);
     if (!attendance?.check_in_time || !attendance?.check_out_time) return rawHours;
 
@@ -677,12 +689,21 @@ function calcCappedWorkHours(attendance) {
     if (!checkIn || !checkOut) return rawHours;
 
     const workDate = attendance.date || checkIn.toLocaleDateString('sv-SE', { timeZone: 'Asia/Taipei' });
-    const cutoff = new Date(`${workDate}T21:30:00+08:00`);
-    if (Number.isNaN(cutoff.getTime())) return rawHours;
-    if (checkOut <= cutoff) return rawHours;
-    if (checkIn >= cutoff) return 0;
+    const schedule = schedMap?.[attendance.employee_id]?.[workDate];
+    const shift = schedule?.shift_types;
+    const shiftStart = shift?.start_time || null;
+    const shiftEnd = shift?.end_time || '21:30';
+    const isOvernight = Boolean(shift?.is_overnight) || (!!shiftStart && shiftEnd < shiftStart);
 
-    const cappedHours = (cutoff.getTime() - checkIn.getTime()) / 3600000;
+    const payableStart = shiftStart ? buildTaipeiDateTime(workDate, shiftStart) : checkIn;
+    const payableEnd = buildTaipeiDateTime(workDate, shiftEnd, isOvernight);
+    if (!payableStart || !payableEnd) return rawHours;
+
+    const effectiveStart = checkIn > payableStart ? checkIn : payableStart;
+    const effectiveEnd = checkOut < payableEnd ? checkOut : payableEnd;
+    if (effectiveEnd <= effectiveStart) return 0;
+
+    const cappedHours = (effectiveEnd.getTime() - effectiveStart.getTime()) / 3600000;
     return Math.max(0, Math.round(cappedHours * 100) / 100);
 }
 
@@ -698,7 +719,7 @@ function calcEmployeePayroll(emp, ss, atts, leaves, otHours, year, month, payrol
 
     const actualDays = atts.filter(a => a.check_in_time).length;
     const lateCount = atts.filter(a => a.is_late).length;
-    const totalWorkHours = atts.reduce((s, a) => s + calcCappedWorkHours(a), 0);
+    const totalWorkHours = atts.reduce((s, a) => s + calcCappedWorkHours(a, payrollScheduleMap), 0);
     const leaveDays = leaves.total;
     const personalLeaveDays = leaves.personal;
     const expectedDays = (expectedDaysOverride !== undefined && expectedDaysOverride !== null) ? expectedDaysOverride : (_ps.work_days_per_month || 22);
