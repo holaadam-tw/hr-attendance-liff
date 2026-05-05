@@ -142,7 +142,25 @@ body{font-family:'Noto Sans TC',-apple-system,sans-serif;background:var(--bg);co
 .shift-card-name{font-weight:900;color:#0F172A;font-size:13px;}
 .shift-card-time{font-size:12px;color:#64748B;margin-top:2px;}
 .shift-card-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;}
-@media (max-width: 900px){.container{width:100%;padding:12px}.shift-panel{grid-template-columns:1fr}.hr-table{min-width:1100px}.ov-tabs{top:0;border-radius:0;margin-left:-12px;margin-right:-12px}.ov-tab{font-size:13px;padding:10px 8px}.stat-grid{grid-template-columns:repeat(3,minmax(92px,1fr));overflow-x:auto}.entry-sections{grid-template-columns:1fr}.entry-grid{grid-template-columns:1fr}}
+.traffic-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin:14px 0;}
+.traffic-card{padding:16px;border-radius:8px;border:1px solid #E2E8F0;background:#fff;box-shadow:0 10px 24px rgba(15,23,42,.05);}
+.traffic-label{font-size:12px;font-weight:900;color:#64748B;margin-bottom:7px;}
+.traffic-value{font-size:24px;font-weight:900;color:#0F172A;line-height:1.15;}
+.traffic-sub{font-size:11px;color:#94A3B8;margin-top:4px;line-height:1.45;}
+.traffic-upload{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:16px;border:1px dashed #CBD5E1;border-radius:8px;background:#F8FAFC;margin-bottom:14px;}
+.traffic-upload input{max-width:100%;font-size:13px;font-family:inherit;}
+.traffic-chart{height:270px;border:1px solid #E2E8F0;border-radius:8px;background:linear-gradient(180deg,#fff,#F8FAFC);padding:14px;margin-top:12px;overflow:hidden;}
+.traffic-chart svg{width:100%;height:100%;display:block;}
+.traffic-axis{font-size:11px;fill:#64748B;font-weight:800;}
+.traffic-line{fill:none;stroke:#4F46E5;stroke-width:3;stroke-linecap:round;stroke-linejoin:round;}
+.traffic-area{fill:rgba(79,70,229,.12);}
+.traffic-dot{fill:#4F46E5;stroke:#fff;stroke-width:2;}
+.traffic-bar{fill:#10B981;opacity:.45;}
+.traffic-table{width:100%;border-collapse:separate;border-spacing:0;min-width:760px;font-size:13px;}
+.traffic-table th{background:#F8FAFC;padding:12px;text-align:left;color:#64748B;font-weight:900;border-bottom:1px solid #E2E8F0;position:sticky;top:0;z-index:1;white-space:nowrap;}
+.traffic-table td{padding:12px;border-bottom:1px solid #F1F5F9;background:#fff;}
+.traffic-pill{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;font-size:12px;font-weight:900;background:#EEF2FF;color:#4338CA;}
+@media (max-width: 900px){.container{width:100%;padding:12px}.shift-panel{grid-template-columns:1fr}.hr-table{min-width:1100px}.ov-tabs{top:0;border-radius:0;margin-left:-12px;margin-right:-12px}.ov-tab{font-size:13px;padding:10px 8px}.stat-grid{grid-template-columns:repeat(3,minmax(92px,1fr));overflow-x:auto}.entry-sections{grid-template-columns:1fr}.entry-grid{grid-template-columns:1fr}.traffic-grid{grid-template-columns:repeat(2,minmax(0,1fr));}.traffic-chart{height:220px;}}
 
 .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1E293B;color:#fff;padding:10px 24px;border-radius:10px;font-size:14px;font-weight:600;z-index:9999;opacity:0;transition:opacity 0.3s;pointer-events:none;}
 .toast.show{opacity:1;}
@@ -228,6 +246,7 @@ body{font-family:'Noto Sans TC',-apple-system,sans-serif;background:var(--bg);co
                 <button class="ov-tab active" id="tabDaily" onclick="switchTab('daily')">📅 今日</button>
                 <button class="ov-tab" id="tabMonthly" onclick="switchTab('monthly')">📊 月度</button>
                 <button class="ov-tab" id="tabSchedule" onclick="switchTab('schedule')">📋 週班表</button>
+                <button class="ov-tab" id="tabTraffic" onclick="switchTab('traffic')">📈 來客</button>
                 <button class="ov-tab" id="tabHuman" onclick="switchTab('human')">&#128101; &#20154;&#21147;&#31649;&#29702;</button>
             </div>
 
@@ -342,6 +361,42 @@ body{font-family:'Noto Sans TC',-apple-system,sans-serif;background:var(--bg);co
                             <tr><td colspan="8" style="text-align:center;color:#999;padding:40px;">載入中...</td></tr>
                         </tbody>
                     </table>
+                </div>
+            </div>
+
+            <!-- ====== 來客波形 ====== -->
+            <div id="trafficView" style="display:none;">
+                <div class="card">
+                    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+                        <div>
+                            <div style="font-size:20px;font-weight:900;color:#0F172A;">📈 來客流量</div>
+                            <div style="font-size:12px;color:#64748B;margin-top:5px;line-height:1.6;">匯入 Amego 發票 Excel，快速看每半小時來客波形、最後來客時間與尖峰區間。</div>
+                        </div>
+                        <a class="traffic-pill" href="https://invoice.amego.tw/vendor/60282181/invoice_report_list?date_start=2026%2F05%2F04&date_end=2026%2F05%2F04" target="_blank" rel="noopener">開啟 Amego 匯出 ↗</a>
+                    </div>
+                    <div class="traffic-upload">
+                        <div>
+                            <div style="font-weight:900;color:#0F172A;margin-bottom:4px;">匯入發票 Excel</div>
+                            <div style="font-size:12px;color:#64748B;line-height:1.6;">請從 Amego 下載發票報表後上傳。系統會扣掉作廢發票，不會把檔案上傳到資料庫。</div>
+                        </div>
+                        <input id="trafficFile" type="file" accept=".xlsx,.xls" onchange="handleTrafficFile(this.files && this.files[0])">
+                    </div>
+                    <div class="traffic-grid">
+                        <div class="traffic-card"><div class="traffic-label">有效發票</div><div class="traffic-value" id="trafficInvoiceCount">--</div><div class="traffic-sub" id="trafficVoidCount">作廢 -- 張</div></div>
+                        <div class="traffic-card"><div class="traffic-label">營收</div><div class="traffic-value" id="trafficSales">--</div><div class="traffic-sub">依發票總計加總</div></div>
+                        <div class="traffic-card"><div class="traffic-label">第一張</div><div class="traffic-value" id="trafficFirstTime">--</div><div class="traffic-sub">當日第一筆發票</div></div>
+                        <div class="traffic-card"><div class="traffic-label">最後來客</div><div class="traffic-value" id="trafficLastTime">--</div><div class="traffic-sub" id="trafficLastGap">收班判斷參考</div></div>
+                        <div class="traffic-card"><div class="traffic-label">尖峰 15 分</div><div class="traffic-value" id="trafficPeak">--</div><div class="traffic-sub" id="trafficPeakSales">--</div></div>
+                    </div>
+                    <div class="traffic-chart" id="trafficChart">
+                        <div style="height:100%;display:flex;align-items:center;justify-content:center;text-align:center;color:#94A3B8;font-weight:800;">請先匯入發票 Excel</div>
+                    </div>
+                    <div class="table-wrap" style="margin-top:14px;max-height:360px;">
+                        <table class="traffic-table">
+                            <thead><tr><th>時段</th><th style="text-align:right;">發票數</th><th style="text-align:right;">營收</th><th style="text-align:right;">每張平均</th><th>判讀</th></tr></thead>
+                            <tbody id="trafficTableBody"><tr><td colspan="5" style="text-align:center;color:#94A3B8;padding:34px;">尚未匯入資料</td></tr></tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 
@@ -514,6 +569,7 @@ let companyId = null;
 let companyName = '';
 let dailyData = [];
 let monthlyData = [];
+let trafficReport = null;
 let mYear = new Date().getFullYear();
 let mMonth = new Date().getMonth();
 let refreshTimer = null;
@@ -534,7 +590,7 @@ const I18N = {
         employeeEntry:'一般員工入口', adminEntry:'管理員入口', checkInEntry:'上班打卡', checkOutEntry:'下班打卡', registerEntry:'員工註冊', addLineFriend:'加入 LINE 好友', adminBackend:'管理後台', officialAccount:'官方帳號：@130oqrak',
         employeeHelpTitle:'員工怎麼使用', employeeHelp:'第一次使用：先加好友，再點員工註冊。平常打卡：直接從 LINE 點上班 / 下班打卡。',
         roleLoading:'確認身份中', roleManager:'管理員模式｜點我看員工模式', roleEmployeeSwitch:'員工視角｜點我回管理員模式', roleEmployee:'員工模式',
-        tabDaily:'📅 今日', tabMonthly:'📊 月度', tabSchedule:'📋 週班表', tabHuman:'👥 人力管理',
+        tabDaily:'📅 今日', tabMonthly:'📊 月度', tabSchedule:'📋 週班表', tabTraffic:'📈 來客', tabHuman:'👥 人力管理',
         qrCheckin:'📲 打卡 QR', qrRegister:'📱 註冊 QR', export:'📥 匯出',
         expected:'應出勤', checked:'已打卡', notChecked:'未打卡', late:'遲到', early:'早退', leave:'請假', absent:'缺勤', working:'上班中', completed:'✅ 完成', offDay:'休', unknown:'未知',
         allDept:'全部部門', allStatus:'全部狀態', lastUpdated:'更新：', autoRefresh:'每 30 秒自動更新', todayPrefix:'今日 ',
@@ -551,7 +607,7 @@ const I18N = {
         employeeEntry:'Lối vào nhân viên', adminEntry:'Lối vào quản lý', checkInEntry:'Chấm công vào', checkOutEntry:'Chấm công ra', registerEntry:'Đăng ký nhân viên', addLineFriend:'Thêm bạn LINE', adminBackend:'Trang quản lý', officialAccount:'Tài khoản chính thức: @130oqrak',
         employeeHelpTitle:'Cách nhân viên sử dụng', employeeHelp:'Lần đầu: thêm bạn LINE, rồi bấm đăng ký nhân viên. Hằng ngày: vào LINE bấm chấm công vào / chấm công ra.',
         roleLoading:'Đang kiểm tra quyền', roleManager:'Chế độ quản lý | bấm để xem như nhân viên', roleEmployeeSwitch:'Góc nhìn nhân viên | bấm về quản lý', roleEmployee:'Chế độ nhân viên',
-        tabDaily:'📅 Hôm nay', tabMonthly:'📊 Tháng', tabSchedule:'📋 Lịch tuần', tabHuman:'👥 Nhân sự',
+        tabDaily:'📅 Hôm nay', tabMonthly:'📊 Tháng', tabSchedule:'📋 Lịch tuần', tabTraffic:'📈 Khách', tabHuman:'👥 Nhân sự',
         qrCheckin:'📲 QR chấm công', qrRegister:'📱 QR đăng ký', export:'📥 Xuất file',
         expected:'Phải đi làm', checked:'Đã chấm', notChecked:'Chưa chấm', late:'Đi trễ', early:'Về sớm', leave:'Nghỉ phép', absent:'Vắng', working:'Đang làm', completed:'✅ Hoàn tất', offDay:'Nghỉ', unknown:'Không rõ',
         allDept:'Tất cả bộ phận', allStatus:'Tất cả trạng thái', lastUpdated:'Cập nhật: ', autoRefresh:'Tự động cập nhật mỗi 30 giây', todayPrefix:'Hôm nay ',
@@ -607,6 +663,7 @@ function applyTranslations() {
     setText('#tabDaily', t('tabDaily'));
     setText('#tabMonthly', t('tabMonthly'));
     setText('#tabSchedule', t('tabSchedule'));
+    setText('#tabTraffic', t('tabTraffic'));
     setText('#tabHuman', t('tabHuman'));
     const mt = document.querySelectorAll('#managerTools button');
     if (mt[0]) mt[0].textContent = t('qrCheckin');
@@ -671,6 +728,7 @@ function applyRoleAccess() {
     const pageTitle = document.getElementById('pageTitle');
     const tabDaily = document.getElementById('tabDaily');
     const tabMonthly = document.getElementById('tabMonthly');
+    const tabTraffic = document.getElementById('tabTraffic');
     const tabHuman = document.getElementById('tabHuman');
     const subtitle = document.querySelector('.entry-subtitle');
     const adminEntryBlock = document.getElementById('adminEntryBlock');
@@ -693,14 +751,16 @@ function applyRoleAccess() {
 
     managerTools.style.display = manager && !employeeView ? 'flex' : 'none';
     adminEntryBlock.style.display = manager && !employeeView ? 'block' : 'none';
+    if (tabTraffic) tabTraffic.style.display = manager && !employeeView ? '' : 'none';
     if (tabHuman) tabHuman.style.display = manager && !employeeView ? '' : 'none';
 
     if (employeeView) {
         pageTitle.textContent = '📅 今日與週班表';
         tabDaily.style.display = '';
         tabMonthly.style.display = 'none';
+        if (tabTraffic) tabTraffic.style.display = 'none';
         if (tabHuman) tabHuman.style.display = 'none';
-        if (currentTab === 'monthly' || currentTab === 'human') {
+        if (currentTab === 'monthly' || currentTab === 'traffic' || currentTab === 'human') {
             switchTab('daily');
         } else {
             switchTab(currentTab === 'schedule' ? 'schedule' : 'daily');
@@ -712,8 +772,9 @@ function applyRoleAccess() {
         pageTitle.textContent = '📊 打卡總覽';
         tabDaily.style.display = '';
         tabMonthly.style.display = '';
+        if (tabTraffic) tabTraffic.style.display = '';
         if (tabHuman) tabHuman.style.display = '';
-        switchTab(currentTab === 'schedule' || currentTab === 'human' ? currentTab : currentTab);
+        switchTab(currentTab === 'schedule' || currentTab === 'traffic' || currentTab === 'human' ? currentTab : currentTab);
         if (subtitle) {
             subtitle.textContent = '同一個入口自動區分權限。一般員工可查看今日與週班表；管理員可查看完整打卡總覽與工具。';
         }
@@ -794,21 +855,27 @@ async function init() {
 // === Tab 切換 ===
 function switchTab(tab) {
     const manager = isManagerRole(currentUserRole) && !viewingAsEmployee;
+    if (tab === 'traffic' && !manager) tab = 'daily';
     if (tab === 'human' && !manager) tab = 'daily';
     currentTab = tab;
     document.getElementById('tabDaily').classList.toggle('active', tab === 'daily');
     document.getElementById('tabMonthly').classList.toggle('active', tab === 'monthly');
     document.getElementById('tabSchedule').classList.toggle('active', tab === 'schedule');
+    const tabTraffic = document.getElementById('tabTraffic');
+    if (tabTraffic) tabTraffic.classList.toggle('active', tab === 'traffic');
     const tabHuman = document.getElementById('tabHuman');
     if (tabHuman) tabHuman.classList.toggle('active', tab === 'human');
     document.getElementById('dailyView').style.display = tab === 'daily' ? 'block' : 'none';
     document.getElementById('monthlyView').style.display = tab === 'monthly' ? 'block' : 'none';
     document.getElementById('scheduleView').style.display = tab === 'schedule' ? 'block' : 'none';
+    const trafficView = document.getElementById('trafficView');
+    if (trafficView) trafficView.style.display = tab === 'traffic' ? 'block' : 'none';
     const humanView = document.getElementById('humanView');
     if (humanView) humanView.style.display = tab === 'human' ? 'block' : 'none';
     if (tab === 'daily') { loadDailyData(); startAutoRefresh(); }
     else if (tab === 'monthly') { stopAutoRefresh(); loadMonthlyData(); }
     else if (tab === 'schedule') { stopAutoRefresh(); loadScheduleData(); }
+    else if (tab === 'traffic') { stopAutoRefresh(); }
     else { stopAutoRefresh(); loadHumanManagement(); }
 }
 
@@ -880,6 +947,181 @@ function fmtHours(h) {
 
 function fmtOptionalCount(v) {
     return (v === null || v === undefined) ? '--' : v;
+}
+
+function fmtMoney(n) {
+    return '$' + Math.round(Number(n) || 0).toLocaleString('zh-TW');
+}
+
+function parseMoney(v) {
+    if (v === null || v === undefined) return 0;
+    const n = Number(String(v).replace(/[^\d.-]/g, ''));
+    return Number.isFinite(n) ? n : 0;
+}
+
+function parseTimeToMinute(v) {
+    if (v === null || v === undefined || v === '') return null;
+    if (typeof v === 'number') {
+        const total = Math.round(v * 24 * 60);
+        return ((total % 1440) + 1440) % 1440;
+    }
+    const s = String(v).trim();
+    const m = s.match(/(\d{1,2})[:：](\d{2})(?:[:：](\d{2}))?/);
+    if (!m) return null;
+    return Math.min(1439, (parseInt(m[1], 10) * 60) + parseInt(m[2], 10));
+}
+
+function minuteLabel(min) {
+    const h = Math.floor(min / 60);
+    const m = min % 60;
+    return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
+}
+
+function findInvoiceColumn(row, candidates) {
+    const keys = Object.keys(row || {});
+    return keys.find(k => candidates.some(c => String(k).replace(/\s/g, '').includes(c))) || null;
+}
+
+function getScheduledStaffCount(minute) {
+    if (!dailyData || dailyData.length === 0) return null;
+    return dailyData.filter(r => {
+        if (r.status === 'off_day' || r.status === 'on_leave') return false;
+        const start = parseTimeToMinute(r.shift_start);
+        const end = parseTimeToMinute(r.shift_end);
+        if (start === null || end === null) return false;
+        if (end >= start) return minute >= start && minute < end;
+        return minute >= start || minute < end;
+    }).length;
+}
+
+async function handleTrafficFile(file) {
+    if (!file) return;
+    if (typeof XLSX === 'undefined') { showToast('⚠️ Excel 工具未載入'); return; }
+    try {
+        const buf = await file.arrayBuffer();
+        const wb = XLSX.read(buf, { type: 'array', raw: false, cellDates: false });
+        const parsed = parseTrafficWorkbook(wb);
+        renderTrafficReport(parsed);
+        showToast('✅ 已讀取發票資料');
+    } catch (e) {
+        console.error('Traffic import error:', e);
+        showToast('發票 Excel 讀取失敗：' + (e.message || ''));
+    }
+}
+
+function parseTrafficWorkbook(wb) {
+    const voidNos = new Set();
+    const invoices = new Map();
+    (wb.SheetNames || []).forEach(sheetName => {
+        const sheet = wb.Sheets[sheetName];
+        const rows = XLSX.utils.sheet_to_json(sheet, { defval: '', raw: false });
+        const isVoidSheet = /作廢|void|cancel/i.test(sheetName);
+        rows.forEach((row, idx) => {
+            const noCol = findInvoiceColumn(row, ['發票號碼', '發票字軌', '號碼', 'invoice']);
+            const dateCol = findInvoiceColumn(row, ['發票日期', '日期', 'date']);
+            const timeCol = findInvoiceColumn(row, ['發票時間', '時間', 'time']);
+            const totalCol = findInvoiceColumn(row, ['總計', '含稅總額', '銷售額', '金額', 'total']);
+            const invoiceNo = noCol ? String(row[noCol] || '').trim() : '';
+            if (isVoidSheet && invoiceNo) {
+                voidNos.add(invoiceNo);
+                return;
+            }
+            const minute = parseTimeToMinute(timeCol ? row[timeCol] : '');
+            const amount = parseMoney(totalCol ? row[totalCol] : 0);
+            if (minute === null || amount <= 0) return;
+            const key = invoiceNo || (sheetName + '_' + idx + '_' + minute + '_' + amount);
+            if (!invoices.has(key)) {
+                invoices.set(key, {
+                    no: key,
+                    date: dateCol ? String(row[dateCol] || '').trim() : '',
+                    time: timeCol ? String(row[timeCol] || '').trim() : minuteLabel(minute),
+                    minute,
+                    amount
+                });
+            }
+        });
+    });
+    const effective = Array.from(invoices.values()).filter(inv => !voidNos.has(inv.no)).sort((a, b) => a.minute - b.minute);
+    if (effective.length === 0) throw new Error('找不到可分析的有效發票列');
+    return { invoices: effective, voidCount: voidNos.size };
+}
+
+function summarizeTraffic(invoices, size) {
+    const bins = [];
+    const minMinute = Math.max(0, Math.floor(Math.min(...invoices.map(i => i.minute)) / 60) * 60);
+    const maxMinute = Math.min(24 * 60, Math.ceil((Math.max(...invoices.map(i => i.minute)) + 1) / 60) * 60);
+    for (let start = minMinute; start < maxMinute; start += size) {
+        bins.push({ start, end: Math.min(start + size, 24 * 60), count: 0, sales: 0 });
+    }
+    invoices.forEach(inv => {
+        const b = bins.find(x => inv.minute >= x.start && inv.minute < x.end);
+        if (b) { b.count += 1; b.sales += inv.amount; }
+    });
+    return bins;
+}
+
+function renderTrafficReport(parsed) {
+    const invoices = parsed.invoices;
+    const sales = invoices.reduce((sum, inv) => sum + inv.amount, 0);
+    const first = invoices[0];
+    const last = invoices[invoices.length - 1];
+    const bins30 = summarizeTraffic(invoices, 30);
+    const peak15 = summarizeTraffic(invoices, 15).sort((a, b) => (b.count - a.count) || (b.sales - a.sales))[0];
+    trafficReport = { invoices, bins30, voidCount: parsed.voidCount, sales, first, last, peak15 };
+
+    document.getElementById('trafficInvoiceCount').textContent = invoices.length;
+    document.getElementById('trafficVoidCount').textContent = '作廢 ' + parsed.voidCount + ' 張';
+    document.getElementById('trafficSales').textContent = fmtMoney(sales);
+    document.getElementById('trafficFirstTime').textContent = minuteLabel(first.minute);
+    document.getElementById('trafficLastTime').textContent = minuteLabel(last.minute);
+    document.getElementById('trafficLastGap').textContent = last.date ? ('日期 ' + last.date) : '當日最後一筆發票';
+    document.getElementById('trafficPeak').textContent = minuteLabel(peak15.start) + '-' + minuteLabel(peak15.end);
+    document.getElementById('trafficPeakSales').textContent = peak15.count + ' 張，' + fmtMoney(peak15.sales);
+
+    renderTrafficChart(bins30);
+    renderTrafficTable(bins30);
+}
+
+function renderTrafficChart(bins) {
+    const w = 1000, h = 230, padL = 44, padR = 20, padT = 20, padB = 38;
+    const maxCount = Math.max(1, ...bins.map(b => b.count));
+    const xStep = bins.length <= 1 ? 0 : (w - padL - padR) / (bins.length - 1);
+    const y = (count) => padT + (h - padT - padB) * (1 - count / maxCount);
+    const points = bins.map((b, i) => [padL + i * xStep, y(b.count)]);
+    const line = points.map(p => p.join(',')).join(' ');
+    const area = [[padL, h - padB]].concat(points).concat([[padL + (bins.length - 1) * xStep, h - padB]]).map(p => p.join(',')).join(' ');
+    const bars = bins.map((b, i) => {
+        const x = padL + i * xStep - Math.min(18, xStep * 0.35);
+        const bh = h - padB - y(b.count);
+        return '<rect class="traffic-bar" x="' + x + '" y="' + y(b.count) + '" width="' + Math.max(5, Math.min(36, xStep * 0.7)) + '" height="' + bh + '" rx="5"><title>' + minuteLabel(b.start) + ' ' + b.count + ' 張</title></rect>';
+    }).join('');
+    const dots = points.map((p, i) => '<circle class="traffic-dot" cx="' + p[0] + '" cy="' + p[1] + '" r="4"><title>' + minuteLabel(bins[i].start) + '-' + minuteLabel(bins[i].end) + '：' + bins[i].count + ' 張，' + fmtMoney(bins[i].sales) + '</title></circle>').join('');
+    const labels = bins.map((b, i) => i % 2 === 0 ? '<text class="traffic-axis" x="' + (padL + i * xStep) + '" y="' + (h - 12) + '" text-anchor="middle">' + minuteLabel(b.start) + '</text>' : '').join('');
+    document.getElementById('trafficChart').innerHTML =
+        '<svg viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none" role="img" aria-label="來客流量波形">' +
+        '<line x1="' + padL + '" y1="' + (h - padB) + '" x2="' + (w - padR) + '" y2="' + (h - padB) + '" stroke="#CBD5E1"/>' +
+        '<text class="traffic-axis" x="8" y="' + (padT + 4) + '">張數</text>' +
+        '<polygon class="traffic-area" points="' + area + '"></polygon>' +
+        bars + '<polyline class="traffic-line" points="' + line + '"></polyline>' + dots + labels +
+        '</svg>';
+}
+
+function renderTrafficTable(bins) {
+    const peakCount = Math.max(0, ...bins.map(b => b.count));
+    const rows = bins.map(b => {
+        const avg = b.count ? b.sales / b.count : 0;
+        const staff = getScheduledStaffCount(b.start);
+        const note = b.count === peakCount && b.count > 0 ? '尖峰' : (b.count === 0 ? '空檔' : '穩定');
+        const staffText = staff === null ? '' : '<div style="font-size:11px;color:#94A3B8;margin-top:3px;">排班 ' + staff + ' 人</div>';
+        return '<tr>' +
+            '<td style="font-weight:900;color:#0F172A;">' + minuteLabel(b.start) + ' - ' + minuteLabel(b.end) + staffText + '</td>' +
+            '<td style="text-align:right;font-weight:900;">' + b.count + '</td>' +
+            '<td style="text-align:right;">' + fmtMoney(b.sales) + '</td>' +
+            '<td style="text-align:right;">' + (b.count ? fmtMoney(avg) : '--') + '</td>' +
+            '<td><span class="status-badge ' + (note === '尖峰' ? 's-late' : note === '空檔' ? 's-off-day' : 's-working') + '">' + note + '</span></td>' +
+        '</tr>';
+    }).join('');
+    document.getElementById('trafficTableBody').innerHTML = rows || '<tr><td colspan="5" style="text-align:center;color:#94A3B8;padding:34px;">無資料</td></tr>';
 }
 
 function shiftBadge(row) {
@@ -1097,6 +1339,26 @@ function exportExcel() {
         }));
         XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), '今日打卡');
         XLSX.writeFile(wb, companyName + '_打卡總覽_' + getDailyDate() + '.xlsx');
+    } else if (currentTab === 'traffic') {
+        if (!trafficReport) { showToast('請先匯入發票 Excel'); return; }
+        const summaryRows = [
+            { 指標: '有效發票', 數值: trafficReport.invoices.length },
+            { 指標: '作廢發票', 數值: trafficReport.voidCount },
+            { 指標: '營收', 數值: Math.round(trafficReport.sales) },
+            { 指標: '第一張', 數值: minuteLabel(trafficReport.first.minute) },
+            { 指標: '最後來客', 數值: minuteLabel(trafficReport.last.minute) },
+            { 指標: '尖峰15分', 數值: minuteLabel(trafficReport.peak15.start) + '-' + minuteLabel(trafficReport.peak15.end) + ' / ' + trafficReport.peak15.count + '張' }
+        ];
+        const binRows = trafficReport.bins30.map(b => ({
+            時段: minuteLabel(b.start) + '-' + minuteLabel(b.end),
+            發票數: b.count,
+            營收: Math.round(b.sales),
+            平均客單: b.count ? Math.round(b.sales / b.count) : '',
+            排班人數: getScheduledStaffCount(b.start) ?? ''
+        }));
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summaryRows), '來客摘要');
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(binRows), '半小時波形');
+        XLSX.writeFile(wb, companyName + '_來客流量_' + getDailyDate() + '.xlsx');
     } else {
         const rows = monthlyData.map(r => ({
             '員工': r.employee_name, '部門': r.department || '',
