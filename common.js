@@ -32,12 +32,50 @@ let todayAttendance = null;
 let officeLocations = [];
 let isProcessing = false;
 
+function delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function initLiffWithRetry(maxAttempts = 3) {
+    let lastError = null;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+            await liff.init({ liffId: CONFIG.LIFF_ID });
+            return true;
+        } catch (error) {
+            lastError = error;
+            console.warn(`LIFF init attempt ${attempt}/${maxAttempts} failed:`, error);
+            if (attempt < maxAttempts) {
+                await delay(attempt * 900);
+            }
+        }
+    }
+    throw lastError;
+}
+
+function showLiffInitFailure(error) {
+    const msg = error && error.message ? error.message : String(error || 'unknown error');
+    const liffUrl = 'https://liff.line.me/' + CONFIG.LIFF_ID + (window.location.search || '');
+    document.body.innerHTML =
+        '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#F8FAFC;padding:24px;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;color:#0F172A;">' +
+            '<div style="width:100%;max-width:420px;background:#fff;border:1px solid #E2E8F0;border-radius:16px;padding:28px 22px;text-align:center;box-shadow:0 16px 40px rgba(15,23,42,.08);">' +
+                '<div style="font-size:44px;margin-bottom:12px;">📶</div>' +
+                '<h2 style="font-size:20px;font-weight:900;margin:0 0 10px;">LINE 登入初始化失敗</h2>' +
+                '<p style="font-size:14px;line-height:1.7;color:#64748B;margin:0 0 14px;">目前無法連到 LINE LIFF 服務。通常是 LINE 內建瀏覽器、手機網路或 LINE CDN 短暫連線失敗，不是您的帳號被停用。</p>' +
+                '<div style="font-size:12px;color:#94A3B8;background:#F8FAFC;border-radius:10px;padding:10px;margin-bottom:14px;word-break:break-word;">' + escapeHTML(msg) + '</div>' +
+                '<button onclick="location.reload()" style="width:100%;padding:13px;border:none;border-radius:10px;background:#4F46E5;color:#fff;font-size:15px;font-weight:800;font-family:inherit;cursor:pointer;margin-bottom:10px;">重新整理再試一次</button>' +
+                '<button onclick="location.href=\'' + escapeHTML(liffUrl) + '\'" style="width:100%;padding:13px;border:1px solid #CBD5E1;border-radius:10px;background:#fff;color:#334155;font-size:15px;font-weight:800;font-family:inherit;cursor:pointer;">用 LINE 正式入口開啟</button>' +
+                '<p style="font-size:12px;color:#94A3B8;line-height:1.6;margin:14px 0 0;">若仍失敗，請關掉 LINE 後重開，或切換 4G / Wi-Fi 再試。</p>' +
+            '</div>' +
+        '</div>';
+}
+
 // ===== 初始化 LIFF =====
 async function initializeLiff(options) {
     const opts = options || {};
     try {
         // 系統初始化
-        await liff.init({ liffId: CONFIG.LIFF_ID });
+        await initLiffWithRetry();
         if (!liff.isLoggedIn()) {
             // requireLineApp: 員工頁面（index/checkin）必須從 LINE 開啟
             // 其他頁面（admin/platform）允許瀏覽器 LINE OAuth 登入
@@ -66,6 +104,7 @@ async function initializeLiff(options) {
         return true;
     } catch (error) {
         console.error('LIFF 初始化失敗:', error);
+        showLiffInitFailure(error);
         showToast('⚠️ 系統初始化失敗，請重新整理');
         return false;
     }

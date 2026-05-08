@@ -198,3 +198,7 @@
 ## 2026-05-04 修復紀錄
 
 - **B22**：本米餐飲業六日上班，但週班表與月度統計仍把「未排班的六日」當休假。修正方向：新增 `074_weekend_workdays_for_food_service.sql`，公司只要設定 `default_weekend_work_start/end`，六日就列入今日狀態與月度應出勤；前端週班表/明細也不再硬把六日畫成休。
+
+## 2026-05-08 修復紀錄
+
+- **B23**：`liff.init()` 連線 LINE CDN manifest 失敗時，`index.html?goto=attendance_public` 會停在登入初始化失敗，使用者無法進入打卡總覽。修法：`common.js` 對 LIFF 初始化加入 3 次重試，最後顯示可理解錯誤頁，提供重新整理與 LIFF 正式入口按鈕。
