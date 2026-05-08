@@ -580,6 +580,7 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let companyId = null;
+const BENMI_COMPANY_ID = 'fb1f6b5f-dcd5-4262-a7de-e7c357662639';
 let companyName = '';
 let dailyData = [];
 let monthlyData = [];
@@ -715,6 +716,9 @@ function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.
 function showToast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2500); }
 function getTaiwanDate() { return new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Taipei' }); }
 function isManagerRole(role) { return role === 'admin' || role === 'manager'; }
+function isBenmiCompany() { return companyId === BENMI_COMPANY_ID; }
+function canShowTrafficTab() { return isBenmiCompany(); }
+function canShowHumanTab() { return isBenmiCompany(); }
 function buildCheckinUrl(action) { return 'https://liff.line.me/' + LIFF_ID + '?goto=checkin&action=' + action; }
 function buildRegisterUrl() { return 'https://liff.line.me/' + LIFF_ID + '?goto=register&company=' + companyId; }
 function buildAttendancePublicLiffUrl() { return 'https://liff.line.me/' + LIFF_ID + '?goto=attendance_public&company=' + encodeURIComponent(companyId || ''); }
@@ -737,6 +741,8 @@ function toggleViewMode() {
 function applyRoleAccess() {
     const manager = isManagerRole(currentUserRole);
     const employeeView = !manager || viewingAsEmployee;
+    const showTrafficTab = manager && !employeeView && canShowTrafficTab();
+    const showHumanTab = manager && !employeeView && canShowHumanTab();
     const roleHint = document.getElementById('roleHint');
     const managerTools = document.getElementById('managerTools');
     const pageTitle = document.getElementById('pageTitle');
@@ -765,8 +771,8 @@ function applyRoleAccess() {
 
     managerTools.style.display = manager && !employeeView ? 'flex' : 'none';
     adminEntryBlock.style.display = manager && !employeeView ? 'block' : 'none';
-    if (tabTraffic) tabTraffic.style.display = manager && !employeeView ? '' : 'none';
-    if (tabHuman) tabHuman.style.display = manager && !employeeView ? '' : 'none';
+    if (tabTraffic) tabTraffic.style.display = showTrafficTab ? '' : 'none';
+    if (tabHuman) tabHuman.style.display = showHumanTab ? '' : 'none';
 
     if (employeeView) {
         pageTitle.textContent = '📅 今日與週班表';
@@ -786,9 +792,13 @@ function applyRoleAccess() {
         pageTitle.textContent = '📊 打卡總覽';
         tabDaily.style.display = '';
         tabMonthly.style.display = '';
-        if (tabTraffic) tabTraffic.style.display = '';
-        if (tabHuman) tabHuman.style.display = '';
-        switchTab(currentTab === 'schedule' || currentTab === 'traffic' || currentTab === 'human' ? currentTab : currentTab);
+        if (tabTraffic) tabTraffic.style.display = showTrafficTab ? '' : 'none';
+        if (tabHuman) tabHuman.style.display = showHumanTab ? '' : 'none';
+        if ((currentTab === 'traffic' && !showTrafficTab) || (currentTab === 'human' && !showHumanTab)) {
+            switchTab('daily');
+        } else {
+            switchTab(currentTab);
+        }
         if (subtitle) {
             subtitle.textContent = '同一個入口自動區分權限。一般員工可查看今日與週班表；管理員可查看完整打卡總覽與工具。';
         }
@@ -869,8 +879,10 @@ async function init() {
 // === Tab 切換 ===
 function switchTab(tab) {
     const manager = isManagerRole(currentUserRole) && !viewingAsEmployee;
-    if (tab === 'traffic' && !manager) tab = 'daily';
-    if (tab === 'human' && !manager) tab = 'daily';
+    const showTrafficTab = manager && canShowTrafficTab();
+    const showHumanTab = manager && canShowHumanTab();
+    if (tab === 'traffic' && !showTrafficTab) tab = 'daily';
+    if (tab === 'human' && !showHumanTab) tab = 'daily';
     currentTab = tab;
     document.getElementById('tabDaily').classList.toggle('active', tab === 'daily');
     document.getElementById('tabMonthly').classList.toggle('active', tab === 'monthly');
