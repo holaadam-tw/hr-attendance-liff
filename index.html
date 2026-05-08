@@ -671,13 +671,15 @@
                 return;
             }
 
-            const initialized = await initializeLiff({ requireLineApp: true });
+            const _gotoParams = new URLSearchParams(window.location.search);
+            const _goto = _gotoParams.get('goto') || '';
+            const _requiresLineApp = !['attendance_public'].includes(_goto);
+            const initialized = await initializeLiff({ requireLineApp: _requiresLineApp });
             if (initialized) {
                 checkLiffParams();
 
                 // goto=register 提前處理（員工尚未註冊，不需等 checkUserStatus）
-                const _gotoParams = new URLSearchParams(window.location.search);
-                if (_gotoParams.get('goto') === 'register') {
+                if (_goto === 'register') {
                     const _regCompany = _gotoParams.get('company') || '';
                     if (liffProfile) {
                         sessionStorage.setItem('register_line_user_id', liffProfile.userId);
@@ -686,7 +688,7 @@
                     window.location.href = 'employee_register.html?company=' + _regCompany;
                     return;
                 }
-                if (_gotoParams.get('goto') === 'attendance_public') {
+                if (_goto === 'attendance_public') {
                     const _pubCompany = _gotoParams.get('company') || '';
                     if (liffProfile && liffProfile.userId && _pubCompany) {
                         sessionStorage.setItem('attendance_public_line_user_id_' + _pubCompany, liffProfile.userId);
