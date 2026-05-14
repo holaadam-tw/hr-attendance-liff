@@ -224,6 +224,11 @@
                 <div class="menu-item" data-feature="store_ordering" onclick="window.location.href='order.html?store=' + (window.currentCompanyId || '')">
                     <div class="icon">🍽️</div><div class="label">線上點餐</div>
                 </div>
+                <div class="menu-item admin-only" id="activeOrdersItem" data-feature="store_ordering" style="display:none;position:relative;" onclick="window.location.href='admin.html#restaurant'">
+                    <span id="activeOrdersBadge" class="menu-badge" style="display:none;"></span>
+                    <div class="icon">🧾</div><div class="label">訂單管理</div>
+                    <div style="font-size:10px;color:#94A3B8;margin-top:2px;">待完成訂單</div>
+                </div>
 
                 <!-- 申請管理 -->
                 <div class="menu-item" data-feature="requests" onclick="window.location.href='requests.html'">
