@@ -291,10 +291,17 @@ function renderStoreOrderList() {
         const itemCount = (o.items || []).reduce((s, i) => s + (i.qty || 1), 0);
         const pickup = o.pickup_number ? '#' + String(o.pickup_number).padStart(3, '0') + ' ' : '';
         const typeLabel = { dine_in:'內用', takeout:'外帶', delivery:'外送' };
+        const canComplete = !['completed', 'cancelled'].includes(o.status);
+        const completeButton = canComplete
+            ? `<button onclick="event.stopPropagation();updateOrderStatus('${o.id}','completed')" style="padding:8px 14px;border:none;border-radius:10px;background:#059669;color:#fff;font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap;font-family:inherit;">完成</button>`
+            : '';
         return `<div onclick="showOrderDetail('${o.id}')" style="background:#fff;border:1px solid #E2E8F0;border-radius:12px;padding:14px;margin-bottom:8px;cursor:pointer;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
                 <span style="font-weight:700;font-size:14px;">${pickup}#${escapeHTML(o.order_number)}</span>
-                <span style="font-size:11px;font-weight:600;padding:2px 10px;border-radius:10px;background:${st.bg};color:${st.color};">${st.label}</span>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <span style="font-size:11px;font-weight:600;padding:2px 10px;border-radius:10px;background:${st.bg};color:${st.color};">${st.label}</span>
+                    ${completeButton}
+                </div>
             </div>
             <div style="font-size:12px;color:#64748B;">
                 ${escapeHTML(o.customer_name || '?')}
