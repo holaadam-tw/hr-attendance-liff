@@ -1784,9 +1784,17 @@ document.addEventListener('keydown', function(e) {
 
 // ===== UTILS =====
 function escHtml(s) { if (!s) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#x27;'); }
+function settingValueIsTrue(value) {
+  if (value === true || value === 'true') return true;
+  if (typeof value === 'string') {
+    try { return JSON.parse(value) === true; } catch(e) { return value === 'true'; }
+  }
+  return false;
+}
 
 // ===== STATE =====
 let currentStoreId = null;
+let amegoInvoiceEnabled = false;
 let shopInfo = {};
 let categories = [];
 let menuItems = [];
@@ -2076,6 +2084,14 @@ async function loadStoreFromSupabase(slug) {
   } catch(e) {}
 
   // 2. 載入分類
+  try {
+    var invRes = await fetch(SUPABASE_URL + '/rest/v1/system_settings?company_id=eq.' + (window._storeCompanyId || currentStoreId) + '&key=eq.amego_invoice_enabled&limit=1', { headers });
+    var invData = await invRes.json();
+    amegoInvoiceEnabled = settingValueIsTrue(invData && invData.length > 0 ? invData[0].value : false);
+  } catch(e) {
+    amegoInvoiceEnabled = false;
+  }
+
   const catRes = await fetch(SUPABASE_URL + '/rest/v1/menu_categories?store_id=eq.' + currentStoreId + '&is_active=eq.true&order=sort_order', { headers });
   const catData = await catRes.json();
 
@@ -3781,6 +3797,40 @@ function animateAddToCart(event) {
   setTimeout(function() { dot.remove(); }, 600);
 }
 
+function renderInvoiceFields() {
+  if (!amegoInvoiceEnabled) return '';
+  return '' +
+    '<div style="padding:12px 0;border-top:1px solid #EEE;">' +
+      '<div style="font-size:13px;font-weight:700;margin-bottom:8px;">🧾 發票資料</div>' +
+      '<select id="confirmInvoiceType" onchange="toggleInvoiceFields()" style="width:100%;padding:12px;border:2px solid #E2E8F0;border-radius:10px;font-size:14px;font-family:inherit;box-sizing:border-box;margin-bottom:8px;">' +
+        '<option value="b2c">個人電子發票</option>' +
+        '<option value="b2b">公司統編</option>' +
+        '<option value="donation">捐贈</option>' +
+      '</select>' +
+      '<div id="invoiceB2cFields">' +
+        '<input type="email" id="confirmInvoiceEmail" placeholder="Email（選填，用於寄送發票通知）" style="width:100%;padding:12px;border:2px solid #E2E8F0;border-radius:10px;font-size:14px;font-family:inherit;box-sizing:border-box;margin-bottom:8px;">' +
+      '</div>' +
+      '<div id="invoiceB2bFields" style="display:none;">' +
+        '<input type="text" id="confirmInvoiceIdentifier" placeholder="公司統編" maxlength="8" style="width:100%;padding:12px;border:2px solid #E2E8F0;border-radius:10px;font-size:14px;font-family:inherit;box-sizing:border-box;margin-bottom:8px;">' +
+        '<input type="text" id="confirmInvoiceBuyerName" placeholder="公司抬頭" maxlength="60" style="width:100%;padding:12px;border:2px solid #E2E8F0;border-radius:10px;font-size:14px;font-family:inherit;box-sizing:border-box;margin-bottom:8px;">' +
+      '</div>' +
+      '<div id="invoiceDonationFields" style="display:none;">' +
+        '<input type="text" id="confirmInvoiceNpoban" placeholder="捐贈碼" maxlength="10" style="width:100%;padding:12px;border:2px solid #E2E8F0;border-radius:10px;font-size:14px;font-family:inherit;box-sizing:border-box;margin-bottom:8px;">' +
+      '</div>' +
+      '<div style="font-size:11px;color:#94A3B8;">發票會在店員結帳完成後開立；若開立失敗，店員可在後台重試。</div>' +
+    '</div>';
+}
+
+function toggleInvoiceFields() {
+  var type = document.getElementById('confirmInvoiceType')?.value || 'b2c';
+  var b2c = document.getElementById('invoiceB2cFields');
+  var b2b = document.getElementById('invoiceB2bFields');
+  var donation = document.getElementById('invoiceDonationFields');
+  if (b2c) b2c.style.display = type === 'b2c' ? '' : 'none';
+  if (b2b) b2b.style.display = type === 'b2b' ? '' : 'none';
+  if (donation) donation.style.display = type === 'donation' ? '' : 'none';
+}
+
 // ===== SUBMIT ORDER =====
 function submitOrder() {
   if (cart.length === 0) { showToast('請先選擇菜品'); return; }
@@ -3836,6 +3886,7 @@ function submitOrder() {
       '<div id="confirmPhoneError" style="display:none;color:#EF4444;font-size:12px;margin-top:-4px;margin-bottom:8px;font-weight:600;">📱 請填寫手機號碼才能點餐</div>' +
       '<div id="confirmMemberCard" style="display:none;background:#F8FAFC;border-radius:10px;padding:10px 12px;font-size:12px;"></div>' +
     '</div>' +
+    renderInvoiceFields() +
     '<div style="display:flex;gap:10px;margin-top:12px;">' +
       '<button onclick="clearCartFromConfirm()" style="flex:1;padding:14px;border:2px solid #EF4444;border-radius:12px;background:#FFF;font-size:14px;font-weight:700;color:#EF4444;cursor:pointer;">清空購物車</button>' +
       '<button onclick="closeConfirmOrder()" style="flex:1;padding:14px;border:2px solid #DDD;border-radius:12px;background:#FFF;font-size:15px;font-weight:700;color:#666;cursor:pointer;">返回修改</button>' +
@@ -3969,6 +4020,41 @@ function addUpsellItem(itemId) {
   setTimeout(function() { submitOrder(); }, 150);
 }
 
+function readInvoicePayload(memberPhone, customerName) {
+  if (!amegoInvoiceEnabled) return {};
+  var type = document.getElementById('confirmInvoiceType')?.value || 'b2c';
+  var payload = {
+    invoice_status: 'not_required',
+    invoice_type: type,
+    invoice_phone: memberPhone || null,
+    invoice_buyer_name: customerName || null
+  };
+  if (type === 'b2c') {
+    payload.invoice_email = document.getElementById('confirmInvoiceEmail')?.value?.trim() || null;
+  } else if (type === 'b2b') {
+    var identifier = document.getElementById('confirmInvoiceIdentifier')?.value?.trim() || '';
+    var buyerName = document.getElementById('confirmInvoiceBuyerName')?.value?.trim() || '';
+    if (!/^\d{8}$/.test(identifier)) {
+      showToast('請輸入 8 碼公司統編');
+      return null;
+    }
+    if (!buyerName) {
+      showToast('請輸入公司抬頭');
+      return null;
+    }
+    payload.invoice_buyer_identifier = identifier;
+    payload.invoice_buyer_name = buyerName;
+  } else if (type === 'donation') {
+    var npoban = document.getElementById('confirmInvoiceNpoban')?.value?.trim() || '';
+    if (!npoban) {
+      showToast('請輸入捐贈碼');
+      return null;
+    }
+    payload.invoice_npoban = npoban;
+  }
+  return payload;
+}
+
 async function confirmAndSubmitOrder() {
   var btn = document.getElementById('confirmSubmitBtn');
   btn.disabled = true;
@@ -3987,6 +4073,12 @@ async function confirmAndSubmitOrder() {
   // 從確認頁讀取手機和姓名
   const memberPhone = (document.getElementById('confirmPhone')?.value?.trim()) || (document.getElementById('memberPhone')?.value?.trim()) || '';
   const customerName = (document.getElementById('confirmName')?.value?.trim()) || (document.getElementById('customerNameInput')?.value?.trim()) || '';
+  const invoicePayload = readInvoicePayload(memberPhone, customerName);
+  if (invoicePayload === null) {
+    btn.disabled = false;
+    btn.textContent = '確認送出';
+    return;
+  }
 
   // 手機必填驗證
   if (!memberPhone || memberPhone.length < 9) {
@@ -4034,6 +4126,7 @@ async function confirmAndSubmitOrder() {
     customer_line_id: _lineUserId || null,  // 有值才存（LINE 推播用）
     notes: isTakeout ? '' : '用餐人數: ' + guestCount
   };
+  if (amegoInvoiceEnabled) Object.assign(order, invoicePayload);
   try {
     if (currentStoreId) {
       const res = await fetch(SUPABASE_URL + '/rest/v1/orders', {

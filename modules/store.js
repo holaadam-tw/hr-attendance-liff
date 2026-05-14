@@ -335,6 +335,7 @@ export function showOrderDetail(orderId) {
             </div>
         </div>
         ${o.notes ? '<div style="margin-top:8px;font-size:13px;color:#64748B;">備註：' + escapeHTML(o.notes) + '</div>' : ''}
+        ${renderOrderInvoiceStatus(o)}
     `;
     const actions = [];
     if (o.status === 'pending') {
@@ -344,11 +345,61 @@ export function showOrderDetail(orderId) {
     if (o.status === 'confirmed') actions.push(`<button onclick="updateOrderStatus('${o.id}','preparing')" style="flex:1;padding:10px;border:none;border-radius:10px;background:#7C3AED;color:#fff;font-weight:600;cursor:pointer;">🍳 開始準備</button>`);
     if (o.status === 'preparing') actions.push(`<button onclick="updateOrderStatus('${o.id}','ready')" style="flex:1;padding:10px;border:none;border-radius:10px;background:#059669;color:#fff;font-weight:600;cursor:pointer;">🔔 可取餐</button>`);
     if (o.status === 'ready') actions.push(`<button onclick="updateOrderStatus('${o.id}','completed')" style="flex:1;padding:10px;border:none;border-radius:10px;background:#64748B;color:#fff;font-weight:600;cursor:pointer;">✅ 完成</button>`);
+    if (isAmegoInvoiceEnabled() && o.status === 'completed' && o.invoice_status !== 'issued') {
+        actions.push(`<button onclick="retryAmegoInvoice('${o.id}')" style="flex:1;padding:10px;border:none;border-radius:10px;background:#F97316;color:#fff;font-weight:600;cursor:pointer;">重試開發票</button>`);
+    }
     document.getElementById('odActions').innerHTML = actions.join('');
     document.getElementById('orderDetailModal').style.display = 'flex';
 }
 
 export function closeOrderDetail() { document.getElementById('orderDetailModal').style.display = 'none'; }
+
+function isAmegoInvoiceEnabled() {
+    const v = getCachedSetting('amego_invoice_enabled');
+    return v === true || v === 'true';
+}
+
+function renderOrderInvoiceStatus(o) {
+    if (!o || (!o.invoice_status && !isAmegoInvoiceEnabled())) return '';
+    const status = o.invoice_status || 'not_required';
+    const map = {
+        not_required: { label: '未開發票', color: '#64748B', bg: '#F1F5F9' },
+        pending: { label: '發票開立中', color: '#92400E', bg: '#FEF3C7' },
+        issued: { label: '已開發票', color: '#059669', bg: '#D1FAE5' },
+        failed: { label: '發票失敗', color: '#DC2626', bg: '#FEE2E2' },
+        voided: { label: '發票已作廢', color: '#64748B', bg: '#F1F5F9' }
+    };
+    const st = map[status] || map.not_required;
+    const number = o.invoice_number ? '<div style="font-size:12px;color:#475569;margin-top:4px;">號碼：' + escapeHTML(o.invoice_number) + '</div>' : '';
+    const error = o.invoice_error ? '<div style="font-size:12px;color:#DC2626;margin-top:4px;word-break:break-word;">' + escapeHTML(o.invoice_error) + '</div>' : '';
+    return '<div style="margin-top:12px;padding:10px;border-radius:10px;background:' + st.bg + ';color:' + st.color + ';font-size:13px;font-weight:700;">' +
+        st.label + number + error + '</div>';
+}
+
+async function issueAmegoInvoice(orderId, manual) {
+    if (!isAmegoInvoiceEnabled()) {
+        if (manual) showToast('Amego 自動開票尚未啟用');
+        return null;
+    }
+    try {
+        const { data, error } = await sb.functions.invoke('issue-amego-invoice', { body: { order_id: orderId } });
+        if (error) throw error;
+        if (!data?.success) throw new Error(data?.error || 'Amego 開票失敗');
+        if (manual || data.invoice_number) showToast(data.invoice_number ? '發票已開立：' + data.invoice_number : '發票已開立');
+        return data;
+    } catch (e) {
+        console.error('Issue Amego invoice error:', e);
+        showToast('發票開立失敗：' + (e.message || '請稍後重試'));
+        return null;
+    }
+}
+
+window.retryAmegoInvoice = async function(orderId) {
+    await issueAmegoInvoice(orderId, true);
+    await loadStoreOrders();
+    const o = rdOrders.find(x => x.id === orderId);
+    if (o) showOrderDetail(orderId);
+};
 
 export async function updateOrderStatus(orderId, newStatus) {
     console.log('📦 updateOrderStatus:', orderId, newStatus);
@@ -370,6 +421,7 @@ export async function updateOrderStatus(orderId, newStatus) {
         // 訂單完成 → 自動集點
         if (newStatus === 'completed' && o) {
             try { await awardOrderLoyalty(o, window.currentCompanyId); } catch(e2) { console.warn('訂單集點失敗（不影響狀態）:', e2); }
+            try { await issueAmegoInvoice(orderId, false); } catch(e3) { console.warn('Amego 開票失敗（不影響訂單完成）:', e3); }
         }
         showToast('✅ 狀態已更新');
         closeOrderDetail();
