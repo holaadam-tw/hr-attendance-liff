@@ -225,9 +225,9 @@
                     <div class="icon">🍽️</div><div class="label">線上點餐</div>
                 </div>
                 <div class="menu-item admin-only" id="activeOrdersItem" data-feature="store_ordering" style="display:none;position:relative;" onclick="window.location.href='admin.html#restaurant'">
-                    <span id="activeOrdersBadge" class="menu-badge" style="display:none;"></span>
+                    <span id="activeOrdersBadge" class="menu-badge" style="display:none;">0</span>
                     <div class="icon">🧾</div><div class="label">訂單管理</div>
-                    <div style="font-size:10px;color:#94A3B8;margin-top:2px;">待完成訂單</div>
+                    <div id="activeOrdersHint" style="font-size:10px;color:#94A3B8;margin-top:2px;">待處理訂單</div>
                 </div>
 
                 <!-- 申請管理 -->
@@ -519,9 +519,12 @@
         async function loadActiveOrders() {
             const item = document.getElementById('activeOrdersItem');
             const badge = document.getElementById('activeOrdersBadge');
+            const hint = document.getElementById('activeOrdersHint');
             if (!item) return;
             // 管理員顯示此格子
             item.style.display = '';
+            if (badge) badge.style.display = 'none';
+            if (hint) hint.textContent = '待處理訂單';
 
             try {
                 let storeQ = sb.from('store_profiles').select('id');
@@ -535,8 +538,16 @@
                     .in('status', ['pending', 'confirmed', 'preparing', 'ready']);
 
                 if (count > 0 && badge) {
-                    badge.textContent = count;
+                    badge.textContent = count > 99 ? '99+' : String(count);
                     badge.style.display = '';
+                    if (hint) {
+                        hint.textContent = '目前 ' + count + ' 張待處理';
+                        hint.style.color = '#DC2626';
+                        hint.style.fontWeight = '800';
+                    }
+                } else if (hint) {
+                    hint.style.color = '#94A3B8';
+                    hint.style.fontWeight = '400';
                 }
             } catch(e) { console.log('載入訂單數失敗', e); }
         }

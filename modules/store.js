@@ -459,6 +459,14 @@ export async function updateOrderStatus(orderId, newStatus) {
         if (newStatus === 'completed' && o) {
             try { await awardOrderLoyalty(o, window.currentCompanyId); } catch(e2) { console.warn('訂單集點失敗（不影響狀態）:', e2); }
         }
+        if (newStatus === 'completed' && isAmegoInvoiceEnabled()) {
+            const filter = document.getElementById('rdStatusFilter');
+            if (filter) filter.value = 'completed';
+            await loadStoreOrders();
+            showOrderDetail(orderId);
+            showToast('✅ 訂單已完成，請確認後開立發票');
+            return;
+        }
         showToast('✅ 狀態已更新');
         closeOrderDetail();
         await loadStoreOrders();
