@@ -282,7 +282,7 @@ function renderStoreOrderList() {
         confirmed: { label:'已確認', color:'#1E40AF', bg:'#DBEAFE' },
         preparing: { label:'準備中', color:'#7C3AED', bg:'#F5F3FF' },
         ready: { label:'可取餐', color:'#059669', bg:'#D1FAE5' },
-        completed: { label:'已完成', color:'#64748B', bg:'#F1F5F9' },
+        completed: { label:'已完成', color:'#047857', bg:'#D1FAE5' },
         cancelled: { label:'已取消', color:'#DC2626', bg:'#FEF2F2' }
     };
     el.innerHTML = rdOrders.map(o => {
@@ -295,12 +295,14 @@ function renderStoreOrderList() {
         const completeButton = canComplete
             ? `<button onclick="event.stopPropagation();updateOrderStatus('${o.id}','completed')" style="padding:8px 14px;border:none;border-radius:10px;background:#059669;color:#fff;font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap;font-family:inherit;">完成</button>`
             : '';
+        const invoiceButton = renderOrderInvoiceAction(o, true);
         return `<div onclick="showOrderDetail('${o.id}')" style="background:#fff;border:1px solid #E2E8F0;border-radius:12px;padding:14px;margin-bottom:8px;cursor:pointer;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
                 <span style="font-weight:700;font-size:14px;">${pickup}#${escapeHTML(o.order_number)}</span>
                 <div style="display:flex;align-items:center;gap:8px;">
                     <span style="font-size:11px;font-weight:600;padding:2px 10px;border-radius:10px;background:${st.bg};color:${st.color};">${st.label}</span>
                     ${completeButton}
+                    ${invoiceButton}
                 </div>
             </div>
             <div style="font-size:12px;color:#64748B;">
@@ -351,10 +353,9 @@ export function showOrderDetail(orderId) {
     }
     if (o.status === 'confirmed') actions.push(`<button onclick="updateOrderStatus('${o.id}','preparing')" style="flex:1;padding:10px;border:none;border-radius:10px;background:#7C3AED;color:#fff;font-weight:600;cursor:pointer;">🍳 開始準備</button>`);
     if (o.status === 'preparing') actions.push(`<button onclick="updateOrderStatus('${o.id}','ready')" style="flex:1;padding:10px;border:none;border-radius:10px;background:#059669;color:#fff;font-weight:600;cursor:pointer;">🔔 可取餐</button>`);
-    if (o.status === 'ready') actions.push(`<button onclick="updateOrderStatus('${o.id}','completed')" style="flex:1;padding:10px;border:none;border-radius:10px;background:#64748B;color:#fff;font-weight:600;cursor:pointer;">✅ 完成</button>`);
-    if (isAmegoInvoiceEnabled() && o.status === 'completed' && o.invoice_status !== 'issued') {
-        actions.push(`<button onclick="retryAmegoInvoice('${o.id}')" style="flex:1;padding:10px;border:none;border-radius:10px;background:#F97316;color:#fff;font-weight:600;cursor:pointer;">重試開發票</button>`);
-    }
+    if (o.status === 'ready') actions.push(`<button onclick="updateOrderStatus('${o.id}','completed')" style="flex:1;padding:10px;border:none;border-radius:10px;background:#059669;color:#fff;font-weight:600;cursor:pointer;">✅ 完成</button>`);
+    const invoiceAction = renderOrderInvoiceAction(o, false);
+    if (invoiceAction) actions.push(invoiceAction);
     document.getElementById('odActions').innerHTML = actions.join('');
     document.getElementById('orderDetailModal').style.display = 'flex';
 }
@@ -383,6 +384,20 @@ function renderOrderInvoiceStatus(o) {
         st.label + number + error + '</div>';
 }
 
+function renderOrderInvoiceAction(o, compact) {
+    if (!isAmegoInvoiceEnabled() || !o || o.status !== 'completed' || o.invoice_status === 'issued') return '';
+    const failed = o.invoice_status === 'failed';
+    const pending = o.invoice_status === 'pending';
+    const label = pending ? '開票中' : (failed ? '重試開發票' : '開立發票');
+    const disabled = pending ? 'disabled' : '';
+    const background = pending ? '#CBD5E1' : '#F97316';
+    const cursor = pending ? 'not-allowed' : 'pointer';
+    if (compact) {
+        return `<button ${disabled} onclick="event.stopPropagation();issueOrderInvoice('${o.id}')" style="padding:8px 14px;border:none;border-radius:10px;background:${background};color:#fff;font-size:12px;font-weight:800;cursor:${cursor};white-space:nowrap;font-family:inherit;">${label}</button>`;
+    }
+    return `<button ${disabled} onclick="issueOrderInvoice('${o.id}')" style="flex:1;padding:10px;border:none;border-radius:10px;background:${background};color:#fff;font-weight:600;cursor:${cursor};">${label}</button>`;
+}
+
 async function issueAmegoInvoice(orderId, manual) {
     if (!isAmegoInvoiceEnabled()) {
         if (manual) showToast('Amego 自動開票尚未啟用');
@@ -401,12 +416,27 @@ async function issueAmegoInvoice(orderId, manual) {
     }
 }
 
-window.retryAmegoInvoice = async function(orderId) {
+window.issueOrderInvoice = async function(orderId) {
+    const o = rdOrders.find(x => x.id === orderId);
+    if (!o) {
+        showToast('找不到訂單，請重新整理');
+        return;
+    }
+    if (o.status !== 'completed') {
+        showToast('請先完成訂單，再開立發票');
+        return;
+    }
+    if (o.invoice_status === 'issued') {
+        showToast('此訂單已開立發票');
+        return;
+    }
+    if (!window.confirm('確認已收款並開立發票？開立後若金額錯誤需要到 Amego 作廢。')) return;
     await issueAmegoInvoice(orderId, true);
     await loadStoreOrders();
-    const o = rdOrders.find(x => x.id === orderId);
-    if (o) showOrderDetail(orderId);
+    const refreshed = rdOrders.find(x => x.id === orderId);
+    if (refreshed) showOrderDetail(orderId);
 };
+window.retryAmegoInvoice = window.issueOrderInvoice;
 
 export async function updateOrderStatus(orderId, newStatus) {
     console.log('📦 updateOrderStatus:', orderId, newStatus);
@@ -428,7 +458,6 @@ export async function updateOrderStatus(orderId, newStatus) {
         // 訂單完成 → 自動集點
         if (newStatus === 'completed' && o) {
             try { await awardOrderLoyalty(o, window.currentCompanyId); } catch(e2) { console.warn('訂單集點失敗（不影響狀態）:', e2); }
-            try { await issueAmegoInvoice(orderId, false); } catch(e3) { console.warn('Amego 開票失敗（不影響訂單完成）:', e3); }
         }
         showToast('✅ 狀態已更新');
         closeOrderDetail();
