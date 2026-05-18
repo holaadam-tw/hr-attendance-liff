@@ -125,10 +125,10 @@
             2: 'POSITION_UNAVAILABLE',
             3: 'TIMEOUT'
         };
-        const GPS_TIMEOUT_MS = 25000;
+        const GPS_TIMEOUT_MS = 10000;
         const GPS_MAX_AGE_MS = 60000;
-        const GPS_RELAXED_TIMEOUT_MS = 15000;
-        const GPS_RELAXED_MAX_AGE_MS = 300000;
+        const GPS_RELAXED_TIMEOUT_MS = 5000;
+        const GPS_RELAXED_MAX_AGE_MS = 600000;
 
         let gpsPermissionState = 'unknown';
         let lastGpsDiagnostic = {
@@ -245,7 +245,7 @@
 
         async function getDiagnosticGPS() {
             try {
-                const p = await getCurrentPositionWithOptions({ enableHighAccuracy: true, timeout: GPS_TIMEOUT_MS, maximumAge: GPS_MAX_AGE_MS });
+                const p = await getCurrentPositionWithOptions({ enableHighAccuracy: false, timeout: GPS_RELAXED_TIMEOUT_MS, maximumAge: GPS_RELAXED_MAX_AGE_MS });
                 markGpsSuccess(p);
                 return { latitude: p.coords.latitude, longitude: p.coords.longitude, accuracy: p.coords.accuracy };
             } catch(firstErr) {
@@ -265,7 +265,7 @@
             }
 
             try {
-                const p = await getCurrentPositionWithOptions({ enableHighAccuracy: false, timeout: GPS_RELAXED_TIMEOUT_MS, maximumAge: GPS_RELAXED_MAX_AGE_MS });
+                const p = await getCurrentPositionWithOptions({ enableHighAccuracy: true, timeout: GPS_TIMEOUT_MS, maximumAge: GPS_MAX_AGE_MS });
                 markGpsSuccess(p);
                 return { latitude: p.coords.latitude, longitude: p.coords.longitude, accuracy: p.coords.accuracy };
             } catch(secondErr) {
@@ -705,7 +705,7 @@
                         if (overlay) overlay.textContent = '📍 定位較慢，打卡時會再嘗試';
                     }
                 },
-                { enableHighAccuracy: true, timeout: GPS_TIMEOUT_MS, maximumAge: GPS_MAX_AGE_MS }
+                { enableHighAccuracy: false, timeout: GPS_RELAXED_TIMEOUT_MS, maximumAge: GPS_RELAXED_MAX_AGE_MS }
             );
         }
 
