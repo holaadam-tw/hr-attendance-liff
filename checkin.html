@@ -146,18 +146,32 @@
             return GPS_ERROR_NAMES[err.code] || err.name || 'UNKNOWN';
         }
 
+        function gpsPermissionLabel(permission, hasCoords) {
+            if (hasCoords === 'Yes' && permission === 'prompt') return '已取得定位（系統仍顯示詢問中）';
+            if (permission === 'granted') return '已允許';
+            if (permission === 'denied') return '已拒絕';
+            if (permission === 'prompt') return '等待允許';
+            if (permission === 'unsupported') return '此瀏覽器不支援權限查詢';
+            return permission || 'unknown';
+        }
+
         function updateLocationDiagnostic(next) {
             lastGpsDiagnostic = { ...lastGpsDiagnostic, ...next };
             const el = document.getElementById('locationDiagnostic');
             if (!el) return;
             el.style.display = 'block';
             const d = lastGpsDiagnostic;
+            const hasCoords = d.hasCoords === 'Yes';
+            const hasError = d.code && d.code !== '-';
+            const title = hasCoords && !hasError
+                ? '✅ 定位完成，可以打卡'
+                : (hasError ? '⚠️ 定位異常，請檢查設定' : '⏳ 正在確認定位');
             el.innerHTML =
-                '<strong>定位診斷</strong><br>' +
-                `權限狀態：${d.permission || 'unknown'}<br>` +
-                `GPS 錯誤代碼：${d.code || '-'}<br>` +
+                `<strong>定位診斷：${title}</strong><br>` +
+                `權限狀態：${gpsPermissionLabel(d.permission, d.hasCoords)}<br>` +
+                `GPS 錯誤：${hasError ? d.code : '無'}<br>` +
                 `精度：${d.accuracy || '-'}<br>` +
-                `取得座標：${d.hasCoords || 'No'}<br>` +
+                `取得座標：${hasCoords ? '成功' : '尚未取得'}<br>` +
                 `座標：${d.lat || '-'}, ${d.lng || '-'}<br>` +
                 `更新時間：${d.updatedAt || '-'}`;
         }
