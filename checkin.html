@@ -129,6 +129,7 @@
         const GPS_MAX_AGE_MS = 60000;
         const GPS_RELAXED_TIMEOUT_MS = 5000;
         const GPS_RELAXED_MAX_AGE_MS = 600000;
+        const GPS_STORAGE_KEY = 'last_gps_location';
 
         let gpsPermissionState = 'unknown';
         let lastGpsDiagnostic = {
@@ -148,6 +149,30 @@
         function gpsErrorCodeName(err) {
             if (!err) return '-';
             return GPS_ERROR_NAMES[err.code] || err.name || 'UNKNOWN';
+        }
+
+        function saveStoredGpsLocation(loc) {
+            try {
+                localStorage.setItem(GPS_STORAGE_KEY, JSON.stringify({ ...loc, ts: Date.now() }));
+            } catch(e) {}
+        }
+
+        function readStoredGpsLocation() {
+            try {
+                const raw = localStorage.getItem(GPS_STORAGE_KEY);
+                if (!raw) return null;
+                const loc = JSON.parse(raw);
+                const age = Date.now() - Number(loc.ts || 0);
+                if (age > GPS_RELAXED_MAX_AGE_MS) return null;
+                if (!Number.isFinite(loc.latitude) || !Number.isFinite(loc.longitude)) return null;
+                return {
+                    latitude: loc.latitude,
+                    longitude: loc.longitude,
+                    accuracy: loc.accuracy
+                };
+            } catch(e) {
+                return null;
+            }
         }
 
         function gpsPermissionLabel(permission, hasCoords) {
@@ -191,8 +216,9 @@
 
         function markGpsSuccess(position) {
             const coords = position.coords || {};
-            gpsPermissionState = gpsPermissionState === 'unknown' ? 'granted' : gpsPermissionState;
+            gpsPermissionState = 'granted';
             cachedLocation = { latitude: coords.latitude, longitude: coords.longitude, accuracy: coords.accuracy };
+            saveStoredGpsLocation(cachedLocation);
             updateLocationDiagnostic({
                 permission: gpsPermissionState,
                 code: '-',
@@ -275,6 +301,8 @@
         }
 
         async function resolveGpsLocation() {
+            const storedLocation = cachedLocation || readStoredGpsLocation();
+            if (storedLocation && !cachedLocation) cachedLocation = storedLocation;
             if (cachedLocation) {
                 updateLocationDiagnostic({
                     permission: gpsPermissionState === 'unknown' ? 'granted' : gpsPermissionState,
@@ -689,6 +717,21 @@
                 updatedAt: new Date().toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
             });
             const overlayBeforeGps = document.getElementById('overlayLocation');
+            const storedLocation = readStoredGpsLocation();
+            if (storedLocation) {
+                cachedLocation = storedLocation;
+                updateLocationDiagnostic({
+                    permission: 'granted',
+                    code: '-',
+                    accuracy: Number.isFinite(storedLocation.accuracy) ? `${Math.round(storedLocation.accuracy)} 公尺` : '-',
+                    hasCoords: 'Yes',
+                    lat: formatCoord(storedLocation.latitude),
+                    lng: formatCoord(storedLocation.longitude),
+                    updatedAt: new Date().toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
+                });
+                if (overlayBeforeGps) overlayBeforeGps.textContent = '📍 使用剛剛取得的定位';
+                return;
+            }
             if (overlayBeforeGps) overlayBeforeGps.textContent = '📍 預先定位中...';
             navigator.geolocation.getCurrentPosition(
                 p => {
@@ -702,7 +745,8 @@
                         showGPSWarning(statusBox);
                     } else {
                         const overlay = document.getElementById('overlayLocation');
-                        if (overlay) overlay.textContent = '📍 定位較慢，打卡時會再嘗試';
+                        if (overlay) overlay.textContent = '📍 定位較慢，可直接拍照打卡';
+                        showStatus(statusBox, 'info', '✅ 相機就緒；定位較慢沒關係，按下打卡時會重新定位');
                     }
                 },
                 { enableHighAccuracy: false, timeout: GPS_RELAXED_TIMEOUT_MS, maximumAge: GPS_RELAXED_MAX_AGE_MS }

@@ -539,6 +539,13 @@ async function initCompanySettings(companyId) {
 }
 
 // ===== GPS 功能 =====
+const COMMON_GPS_STORAGE_KEY = 'last_gps_location';
+function saveCommonGpsLocation(loc) {
+    try {
+        localStorage.setItem(COMMON_GPS_STORAGE_KEY, JSON.stringify({ ...loc, ts: Date.now() }));
+    } catch(e) {}
+}
+
 function preloadGPS() {
     const el = document.getElementById('locationStatus');
     if (!el) return;
@@ -549,6 +556,7 @@ function preloadGPS() {
     navigator.geolocation.getCurrentPosition(
         p => { 
             cachedLocation = { latitude: p.coords.latitude, longitude: p.coords.longitude, accuracy: p.coords.accuracy };
+            saveCommonGpsLocation(cachedLocation);
             
             let foundLocation = null;
             let minDistance = Infinity;
@@ -573,18 +581,26 @@ function preloadGPS() {
         },
         e => { 
             el.className = 'location-status';
-            el.innerHTML = '<span>❌ 定位失敗，請檢查權限</span>'; 
+            el.innerHTML = '<span>📍 定位較慢，可直接點打卡，打卡頁會再定位</span>'; 
         },
-        { timeout: 10000, enableHighAccuracy: true }
+        { timeout: 5000, enableHighAccuracy: false, maximumAge: 600000 }
     );
 }
 
 function getGPS() { 
     return new Promise((res, rej) => {
+        if (cachedLocation) {
+            res(cachedLocation);
+            return;
+        }
         navigator.geolocation.getCurrentPosition(
-            p => res({ latitude: p.coords.latitude, longitude: p.coords.longitude, accuracy: p.coords.accuracy }), 
+            p => {
+                cachedLocation = { latitude: p.coords.latitude, longitude: p.coords.longitude, accuracy: p.coords.accuracy };
+                saveCommonGpsLocation(cachedLocation);
+                res(cachedLocation);
+            }, 
             e => rej(e), 
-            { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+            { enableHighAccuracy: false, timeout: 5000, maximumAge: 600000 }
         );
     });
 }
