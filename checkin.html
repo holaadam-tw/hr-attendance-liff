@@ -125,6 +125,8 @@
             2: 'POSITION_UNAVAILABLE',
             3: 'TIMEOUT'
         };
+        const GPS_TIMEOUT_MS = 25000;
+        const GPS_MAX_AGE_MS = 60000;
 
         let gpsPermissionState = 'unknown';
         let lastGpsDiagnostic = {
@@ -150,9 +152,17 @@
             if (hasCoords === 'Yes' && permission === 'prompt') return '已取得定位（系統仍顯示詢問中）';
             if (permission === 'granted') return '已允許';
             if (permission === 'denied') return '已拒絕';
-            if (permission === 'prompt') return '等待允許';
+            if (permission === 'prompt') return '等待 LINE 回傳定位';
             if (permission === 'unsupported') return '此瀏覽器不支援權限查詢';
             return permission || 'unknown';
+        }
+
+        function gpsErrorLabel(code) {
+            if (!code || code === '-') return '無';
+            if (code === 'TIMEOUT') return '定位逾時（手機尚未回傳座標）';
+            if (code === 'POSITION_UNAVAILABLE') return '定位訊號不足';
+            if (code === 'PERMISSION_DENIED') return '定位權限被拒絕';
+            return code;
         }
 
         function updateLocationDiagnostic(next) {
@@ -165,11 +175,12 @@
             const hasError = d.code && d.code !== '-';
             const title = hasCoords && !hasError
                 ? '✅ 定位完成，可以打卡'
-                : (hasError ? '⚠️ 定位異常，請檢查設定' : '⏳ 正在確認定位');
+                : (d.code === 'TIMEOUT' ? '⏳ 定位比較慢，請稍等或重試'
+                    : (hasError ? '⚠️ 定位異常，請檢查設定' : '⏳ 正在確認定位'));
             el.innerHTML =
                 `<strong>定位診斷：${title}</strong><br>` +
                 `權限狀態：${gpsPermissionLabel(d.permission, d.hasCoords)}<br>` +
-                `GPS 錯誤：${hasError ? d.code : '無'}<br>` +
+                `GPS 狀態：${gpsErrorLabel(d.code)}<br>` +
                 `精度：${d.accuracy || '-'}<br>` +
                 `取得座標：${hasCoords ? '成功' : '尚未取得'}<br>` +
                 `座標：${d.lat || '-'}, ${d.lng || '-'}<br>` +
@@ -234,7 +245,7 @@
                         markGpsError(e);
                         reject(e);
                     },
-                    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                    { enableHighAccuracy: true, timeout: GPS_TIMEOUT_MS, maximumAge: GPS_MAX_AGE_MS }
                 );
             });
         }
@@ -643,9 +654,14 @@
                 },
                 e => {
                     markGpsError(e);
-                    showGPSWarning(statusBox);
+                    if (e.code === 1) {
+                        showGPSWarning(statusBox);
+                    } else {
+                        const overlay = document.getElementById('overlayLocation');
+                        if (overlay) overlay.textContent = '📍 定位較慢，打卡時會再嘗試';
+                    }
                 },
-                { enableHighAccuracy: true, timeout: 10000 }
+                { enableHighAccuracy: true, timeout: GPS_TIMEOUT_MS, maximumAge: GPS_MAX_AGE_MS }
             );
         }
 
