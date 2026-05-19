@@ -110,6 +110,39 @@
             };
         }
 
+        function getRpcFailureCode(rpcError, rpcData) {
+            return rpcData?.error || rpcError?.message || '';
+        }
+
+        async function submitCheckInRpc(rpcAction, loc, publicUrl) {
+            const payload = {
+                p_line_user_id: liffProfile.userId,
+                p_latitude: loc.latitude,
+                p_longitude: loc.longitude,
+                p_photo_url: publicUrl,
+                p_device_id: navigator.userAgent,
+                p_action: rpcAction
+            };
+
+            const primary = await sb.rpc('quick_check_in', payload);
+            const failureCode = getRpcFailureCode(primary.error, primary.data);
+            const shouldTryMakeupCheckout =
+                rpcAction === 'check_out' &&
+                (failureCode === 'no_open_check_in_record' || String(failureCode).includes('no_open_check_in_record'));
+
+            if (!shouldTryMakeupCheckout) return primary;
+
+            try {
+                const fallback = await sb.rpc('quick_check_out_after_clock_in_makeup', payload);
+                if (!fallback.error) return fallback;
+                console.warn('makeup checkout fallback failed:', fallback.error);
+            } catch(e) {
+                console.warn('makeup checkout fallback unavailable:', e);
+            }
+
+            return primary;
+        }
+
         // 更新時鐘
         function updateClock() {
             const now = new Date();
@@ -404,12 +437,7 @@
                 }
 
                 const rpcAction = currentCheckInType === 'in' ? 'check_in' : 'check_out';
-                const { data: rpcData, error: rpcError } = await sb.rpc('quick_check_in', {
-                    p_line_user_id: liffProfile.userId,
-                    p_latitude: loc.latitude, p_longitude: loc.longitude,
-                    p_photo_url: publicUrl, p_device_id: navigator.userAgent,
-                    p_action: rpcAction
-                });
+                const { data: rpcData, error: rpcError } = await submitCheckInRpc(rpcAction, loc, publicUrl);
 
                 clearTimeout(safetyTimer);
 
@@ -557,12 +585,7 @@
                     }
 
                     const rpcAction2 = currentCheckInType === 'in' ? 'check_in' : 'check_out';
-                    const { data: rpcData, error: rpcError } = await sb.rpc('quick_check_in', {
-                        p_line_user_id: liffProfile.userId,
-                        p_latitude: loc.latitude, p_longitude: loc.longitude,
-                        p_photo_url: publicUrl, p_device_id: navigator.userAgent,
-                        p_action: rpcAction2
-                    });
+                    const { data: rpcData, error: rpcError } = await submitCheckInRpc(rpcAction2, loc, publicUrl);
 
                     if (rpcError || !rpcData?.success) {
                         const mapped = mapCheckinError(rpcError, rpcData);
@@ -639,7 +662,7 @@
             if (msg === 'outside_allowed_location') return { title: '不在範圍內', message: '請移至公司附近再打卡' + (minDist ? `（目前距離約 ${minDist} 公尺）` : ''), canRetry: true };
             if (msg === 'already_checked_in_today') return { title: '重複打卡', message: '今日已完成上班打卡', canRetry: false };
             if (msg === 'already_checked_out_today') return { title: '重複打卡', message: '今日已完成上下班打卡', canRetry: false };
-            if (msg === 'no_open_check_in_record') return { title: '尚未上班', message: '今天還沒有上班打卡紀錄，請先完成上班打卡。', canRetry: false };
+            if (msg === 'no_open_check_in_record') return { title: '尚未上班', message: '今天還沒有上班打卡紀錄。若已到班但忘記上班卡，請先送「上班補打卡」；若上班、下班都忘記，請送兩筆補打卡。', canRetry: false };
             if (msg === 'checkout_time_expired') return { title: '超過時限', message: '已超過下班打卡時間，請申請補卡', canRetry: false };
             if (msg === 'overnight_shift_needs_check_out') return { title: '跨日班未完成', message: '請先完成昨日下班打卡', canRetry: true };
 
