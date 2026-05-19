@@ -904,12 +904,25 @@ async function submitMakeupPunch() {
     const type = document.getElementById('mpType')?.value; // clock_in / clock_out
     const time = document.getElementById('mpTime')?.value;
     const reasonType = document.getElementById('mpReasonType')?.value;
-    const reasonText = document.getElementById('mpReasonText')?.value;
+    const reasonText = (document.getElementById('mpReasonText')?.value || '').trim();
 
     if (!date || !time || !reasonType) return showToast('❌ 請填寫完整');
+    if (!reasonText) return showToast('❌ 請填寫補充說明');
 
-    const reasonLabel = {'forgot':'忘記打卡','field':'外出公務','phone_dead':'手機沒電','system_error':'系統故障','other':'其他'}[reasonType] || reasonType;
-    const reason = `[${reasonLabel}] ${reasonText || ''}`.trim();
+    const today = getTaiwanDate(0);
+    const yesterday = getTaiwanDate(-1);
+    if (date > today) return showToast('❌ 補打卡日期不能是未來日期');
+    if (date < yesterday) return showToast('❌ 補打卡請於當天或隔日提出');
+
+    const reasonLabel = {
+        'forgot': '忘記打卡',
+        'phone_dead': '手機問題',
+        'system_error': '系統問題',
+        'busy': '現場忙碌',
+        'manager_instruction': '主管指示',
+        'other': '其他'
+    }[reasonType] || reasonType;
+    const reason = `[${reasonLabel}] ${reasonText}`;
 
     const statusEl = document.getElementById('mpStatus');
     const mpBtn = document.querySelector('#makeupPunchPage .btn-primary') || document.querySelector('[onclick="submitMakeupPunch()"]');

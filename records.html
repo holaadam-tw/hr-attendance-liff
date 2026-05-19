@@ -111,7 +111,13 @@
             <button class="btn btn-secondary btn-auto-mb" onclick="window.location.href='index.html'">← 返回</button>
             <div class="checkin-page">
                 <h2>🔧 補打卡申請</h2>
-                <p class="desc-hint">忘記打卡？系統異常？在這裡申請補打卡，審核通過後自動寫入出勤記錄。</p>
+                <p class="desc-hint">只有「人有到但忘記打卡、手機問題、系統問題」才使用補打卡。請填實際到班/離班時間；送出後需主管審核，通過後才會寫入正式考勤。</p>
+                <div style="background:#FFF7ED;border:1px solid #FDBA74;color:#9A3412;border-radius:12px;padding:12px;margin-bottom:14px;font-size:12px;line-height:1.6;">
+                    <b>補打卡規則</b><br>
+                    1. 遲到請照實打卡，不可用補打卡改成準時。<br>
+                    2. 補打卡只能填實際時間，原因與說明必填。<br>
+                    3. 原則上當天提出，最晚隔日提出。
+                </div>
 
                 <div class="form-group">
                     <label>補打卡日期</label>
@@ -119,17 +125,17 @@
                 </div>
 
                 <div class="form-group">
-                    <label>打卡類型</label>
+                    <label>補打卡類型</label>
                     <div style="display:flex;gap:8px;">
                         <label style="flex:1;display:flex;align-items:center;gap:8px;padding:12px;border:2px solid #E5E7EB;border-radius:10px;cursor:pointer;transition:all 0.2s;" onclick="selectMpType('clock_in',this)">
                             <input type="radio" name="mpType" value="clock_in" id="mpTypeIn" checked style="display:none;">
                             <span style="font-size:20px;">☀️</span>
-                            <span style="font-weight:700;font-size:13px;">上班打卡</span>
+                            <span style="font-weight:700;font-size:13px;">上班補打卡</span>
                         </label>
                         <label style="flex:1;display:flex;align-items:center;gap:8px;padding:12px;border:2px solid #E5E7EB;border-radius:10px;cursor:pointer;transition:all 0.2s;" onclick="selectMpType('clock_out',this)">
                             <input type="radio" name="mpType" value="clock_out" id="mpTypeOut" style="display:none;">
                             <span style="font-size:20px;">🌙</span>
-                            <span style="font-weight:700;font-size:13px;">下班打卡</span>
+                            <span style="font-weight:700;font-size:13px;">下班補打卡</span>
                         </label>
                     </div>
                     <input type="hidden" id="mpType" value="clock_in">
@@ -138,22 +144,24 @@
                 <div class="form-group">
                     <label>實際打卡時間</label>
                     <input type="time" id="mpTime">
+                    <div style="font-size:11px;color:#94A3B8;margin-top:4px;">請填實際到班/離班時間，不是排班時間。</div>
                 </div>
 
                 <div class="form-group">
-                    <label>原因</label>
+                    <label>原因分類</label>
                     <select id="mpReasonType">
                         <option value="forgot">忘記打卡</option>
-                        <option value="field">外出公務</option>
-                        <option value="phone_dead">手機沒電</option>
-                        <option value="system_error">系統故障</option>
+                        <option value="phone_dead">手機問題</option>
+                        <option value="system_error">系統問題</option>
+                        <option value="busy">現場忙碌</option>
+                        <option value="manager_instruction">主管指示</option>
                         <option value="other">其他</option>
                     </select>
                 </div>
 
                 <div class="form-group">
-                    <label>補充說明 (選填)</label>
-                    <textarea id="mpReasonText" placeholder="例：當天忘記帶手機"></textarea>
+                    <label>補充說明（必填）</label>
+                    <textarea id="mpReasonText" placeholder="例：10:30 已到班，但現場忙忘記按上班打卡"></textarea>
                 </div>
 
                 <button class="btn btn-primary" onclick="submitMakeupPunch()">📤 提交補打卡申請</button>
@@ -359,12 +367,12 @@
         }
         function initMpDate() {
             const mpDate = document.getElementById('mpDate');
-            if (mpDate && !mpDate.value) {
-                const y = new Date(); y.setDate(y.getDate() - 1);
-                mpDate.value = fmtDate(y);
-                const min = new Date(); min.setDate(min.getDate() - 30);
+            if (mpDate) {
+                const today = new Date();
+                const min = new Date(); min.setDate(min.getDate() - 1);
+                if (!mpDate.value) mpDate.value = fmtDate(today);
                 mpDate.min = fmtDate(min);
-                mpDate.max = fmtDate(new Date());
+                mpDate.max = fmtDate(today);
             }
         }
 
