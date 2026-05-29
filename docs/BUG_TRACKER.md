@@ -202,3 +202,7 @@
 ## 2026-05-08 修復紀錄
 
 - **B23**：`liff.init()` 連線 LINE CDN manifest 失敗時，`index.html?goto=attendance_public` 會停在登入初始化失敗，使用者無法進入打卡總覽。修法：`common.js` 對 LIFF 初始化加入 3 次重試，最後顯示可理解錯誤頁，提供重新整理與 LIFF 正式入口按鈕。
+
+## 2026-05-29 修復紀錄
+
+- **B24**：公務機員工雖在員工管理標示為「公務機」，但 `checkUserStatus()` 登入查詢沒有帶出 `is_kiosk` / `no_checkin` 欄位，導致 `index.html` / `checkin.html` 判斷不到公務機身分，不會自動跳到 `kiosk.html`。修法：`common.js` 的平台管理員公司員工查詢與一般員工查詢都補上 `is_kiosk, no_checkin`。

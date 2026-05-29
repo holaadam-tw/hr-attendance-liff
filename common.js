@@ -302,7 +302,7 @@ async function checkUserStatus() {
             // 先查員工 + 設定（並行），再查考勤（需要 currentEmployee.id）
             const [empResult] = await Promise.all([
                 sb.from('employees')
-                    .select('id, name, role, department, position, employee_number, line_user_id, company_id, is_active, hire_date')
+                    .select('id, name, role, department, position, employee_number, line_user_id, company_id, is_active, hire_date, is_kiosk, no_checkin')
                     .eq('line_user_id', liffProfile.userId)
                     .eq('company_id', currentCompanyId)
                     .maybeSingle(),
@@ -335,7 +335,7 @@ async function checkUserStatus() {
         // === 一般員工流程（支援多公司） ===
         // 一次查出該 LINE user 所有員工記錄 + 對應公司資料
         const { data: allRows, error } = await sb.from('employees')
-            .select('id, name, role, department, position, employee_number, line_user_id, company_id, is_active, status, hire_date, companies(name, features, status, industry)')
+            .select('id, name, role, department, position, employee_number, line_user_id, company_id, is_active, status, hire_date, is_kiosk, no_checkin, companies(name, features, status, industry)')
             .eq('line_user_id', liffProfile.userId);
 
         if (error) {
