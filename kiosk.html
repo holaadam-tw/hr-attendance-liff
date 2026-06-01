@@ -9,12 +9,12 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0F172A; color: #fff; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; -webkit-user-select: none; user-select: none; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0F172A; color: #fff; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; -webkit-user-select: none; user-select: none; }
         .kiosk-container { width: 100%; max-width: 400px; padding: 20px; }
-        .kiosk-header { text-align: center; margin-bottom: 24px; }
+        .kiosk-header { text-align: center; margin-bottom: 18px; }
         .kiosk-header h1 { font-size: 20px; font-weight: 800; color: #F8FAFC; }
         .kiosk-header .company-name { font-size: 15px; color: #94A3B8; margin-top: 4px; }
-        .kiosk-header .clock { font-size: 48px; font-weight: 900; color: #fff; margin: 16px 0 8px; font-variant-numeric: tabular-nums; }
+        .kiosk-header .clock { font-size: 42px; font-weight: 900; color: #fff; margin: 12px 0 6px; font-variant-numeric: tabular-nums; }
         .kiosk-header .date { font-size: 14px; color: #64748B; }
 
         /* 輸入顯示 */
@@ -33,11 +33,12 @@
         .key-confirm.disabled { opacity: 0.3; pointer-events: none; }
 
         /* 員工確認畫面 */
-        .employee-card { background: #1E293B; border-radius: 20px; padding: 24px; text-align: center; margin-bottom: 16px; }
-        .employee-card .name { font-size: 28px; font-weight: 900; color: #F8FAFC; margin-bottom: 8px; }
-        .employee-card .info { font-size: 14px; color: #94A3B8; }
+        .employee-card { background: #1E293B; border-radius: 18px; padding: 16px; text-align: center; margin-bottom: 10px; }
+        .employee-card .name { font-size: 24px; font-weight: 900; color: #F8FAFC; margin-bottom: 4px; }
+        .employee-card .info { font-size: 13px; color: #94A3B8; }
+        .photo-status { display:none; background:#064E3B; border:2px solid #10B981; color:#A7F3D0; border-radius:14px; padding:12px 14px; margin:10px 0; text-align:center; font-size:15px; font-weight:900; line-height:1.4; }
         .action-buttons { display: flex; gap: 12px; margin-bottom: 12px; }
-        .action-btn { flex: 1; padding: 16px; border: none; border-radius: 14px; font-size: 16px; font-weight: 800; cursor: pointer; font-family: inherit; }
+        .action-btn { flex: 1; padding: 18px 12px; border: none; border-radius: 14px; font-size: 17px; font-weight: 900; cursor: pointer; font-family: inherit; }
         .btn-checkin { background: linear-gradient(135deg, #059669, #10B981); color: #fff; }
         .btn-checkout { background: linear-gradient(135deg, #7C3AED, #8B5CF6); color: #fff; }
         .btn-checkin:active, .btn-checkout:active { transform: scale(0.97); }
@@ -56,11 +57,24 @@
         .error-card .msg { font-size: 16px; color: #FCA5A5; margin-bottom: 16px; }
 
         /* 拍照 */
-        .camera-section { margin-bottom: 16px; text-align: center; }
-        .camera-section video { width: 100%; max-width: 320px; border-radius: 16px; background: #000; }
-        .photo-btn { width: 100%; padding: 16px; background: linear-gradient(135deg, #3B82F6, #2563EB); border: none; border-radius: 14px; color: #fff; font-size: 16px; font-weight: 800; cursor: pointer; font-family: inherit; margin-bottom: 12px; }
+        .camera-section { margin-bottom: 10px; text-align: center; }
+        .camera-section video { width: 100%; height: min(34vh, 260px); object-fit: cover; border-radius: 16px; background: #000; }
+        .photo-btn { width: 100%; padding: 18px; background: linear-gradient(135deg, #3B82F6, #2563EB); border: none; border-radius: 14px; color: #fff; font-size: 18px; font-weight: 900; cursor: pointer; font-family: inherit; margin-bottom: 10px; box-shadow: 0 12px 32px rgba(59,130,246,0.28); }
         .photo-btn:disabled { opacity: 0.5; }
         .photo-btn:active { transform: scale(0.97); }
+
+        @media (max-height: 720px) {
+            .kiosk-container { padding: 12px 18px; }
+            .kiosk-header { margin-bottom: 10px; }
+            .kiosk-header h1 { font-size: 18px; }
+            .kiosk-header .clock { font-size: 34px; margin: 8px 0 4px; }
+            .kiosk-header .date { font-size: 12px; }
+            .employee-card { padding: 12px; }
+            .employee-card .name { font-size: 21px; }
+            .camera-section video { height: min(30vh, 210px); }
+            .photo-btn { padding: 15px; font-size: 16px; }
+            .action-btn { padding: 15px 10px; font-size: 15px; }
+        }
 
         .hidden { display: none !important; }
 
@@ -107,12 +121,13 @@
                 <div id="empName" class="name"></div>
                 <div id="empInfo" class="info"></div>
             </div>
+            <button id="photoBtn" class="photo-btn" onclick="takePhoto()">📸 拍照</button>
             <div class="camera-section">
                 <video id="kioskVideo" autoplay playsinline muted style="display:none;"></video>
                 <canvas id="kioskCanvas" style="display:none;"></canvas>
                 <input type="file" id="kioskCaptureInput" accept="image/jpeg,image/png" capture="user" style="display:none">
             </div>
-            <button id="photoBtn" class="photo-btn" onclick="takePhoto()">📸 拍照</button>
+            <div id="photoStatus" class="photo-status">✅ 已拍照，請再按「上班打卡」或「下班打卡」才會送出。</div>
             <div class="action-buttons" id="actionBtns" style="display:none;">
                 <button class="action-btn btn-checkin" onclick="doCheckin('check_in')">☀️ 上班打卡</button>
                 <button class="action-btn btn-checkout" onclick="doCheckin('check_out')">🌙 下班打卡</button>
@@ -367,6 +382,7 @@
             (currentEmployee.employee_number || '') + ' · ' + (currentEmployee.department || '未分配');
         photoBlob = null;
         document.getElementById('actionBtns').style.display = 'none';
+        document.getElementById('photoStatus').style.display = 'none';
         document.getElementById('photoBtn').textContent = '📸 拍照';
         document.getElementById('photoBtn').disabled = false;
         openCamera();
@@ -449,6 +465,7 @@
     function onPhotoReady() {
         document.getElementById('photoBtn').textContent = '✅ 已拍照';
         document.getElementById('photoBtn').disabled = true;
+        document.getElementById('photoStatus').style.display = 'block';
         setActionButtonsBusy(false);
         document.getElementById('actionBtns').style.display = 'flex';
     }
@@ -744,6 +761,7 @@
         clearInterval(resultTimer);
         resultTimer = null;
         document.getElementById('kioskLunchOverlay')?.remove();
+        document.getElementById('photoStatus').style.display = 'none';
         inputStr = '';
         currentEmployee = null;
         photoBlob = null;
