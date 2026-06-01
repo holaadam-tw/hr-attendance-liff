@@ -262,7 +262,7 @@
         </div>
     </div>
 
-    <script src="common.js?v=20260529-kiosk"></script>
+    <script src="common.js?v=20260601-gps-manager"></script>
     <script>
         // === 全域錯誤監控 ===
         window._errLogCount = 0; window._errLogResetTs = 0;
@@ -478,13 +478,10 @@
                 }
 
                 let lat = 25.033, lon = 121.565; // 預設台北
-                if (cachedLocation) {
-                    lat = cachedLocation.latitude; lon = cachedLocation.longitude;
-                } else {
-                    try {
-                        const loc = await getGPS();
-                        lat = loc.latitude; lon = loc.longitude;
-                    } catch(e) { /* GPS 失敗，使用預設座標 */ }
+                const weatherLocation = cachedLocation || (typeof readCommonGpsLocation === 'function' ? readCommonGpsLocation() : null);
+                if (weatherLocation) {
+                    lat = weatherLocation.latitude;
+                    lon = weatherLocation.longitude;
                 }
                 // 天氣 + 地名同時取得
                 const [weatherRes, geoRes] = await Promise.all([

@@ -540,69 +540,267 @@ async function initCompanySettings(companyId) {
 
 // ===== GPS 功能 =====
 const COMMON_GPS_STORAGE_KEY = 'last_gps_location';
+const COMMON_GPS_HOME_MAX_ACCURACY_M = 500;
+const COMMON_GPS_HOME_QUICK_FALLBACK_MS = 4000;
+const COMMON_GPS_HOME_WATCH_TIMEOUT_MS = 15000;
+const COMMON_GPS_CACHE_TTL_MS = 600000;
+let commonGpsRequestPromise = null;
+let commonGpsWatchId = null;
+let commonGpsWatchTimer = null;
+let commonGpsBestLocation = null;
+const commonGpsListeners = new Set();
+
 function saveCommonGpsLocation(loc) {
     try {
         localStorage.setItem(COMMON_GPS_STORAGE_KEY, JSON.stringify({ ...loc, ts: Date.now() }));
     } catch(e) {}
 }
 
-function preloadGPS() {
-    const el = document.getElementById('locationStatus');
-    if (!el) return;
-    
+function readCommonGpsLocation(maxAgeMs = COMMON_GPS_CACHE_TTL_MS) {
+    try {
+        const raw = localStorage.getItem(COMMON_GPS_STORAGE_KEY);
+        if (!raw) return null;
+        const loc = JSON.parse(raw);
+        const age = Date.now() - Number(loc.ts || 0);
+        if (age > maxAgeMs) return null;
+        if (!Number.isFinite(loc.latitude) || !Number.isFinite(loc.longitude)) return null;
+        return loc;
+    } catch(e) {
+        return null;
+    }
+}
+
+function commonLocationFromPosition(position) {
+    const coords = position?.coords || {};
+    return {
+        latitude: coords.latitude,
+        longitude: coords.longitude,
+        accuracy: coords.accuracy
+    };
+}
+
+function commonHasValidLocation(loc) {
+    return !!loc && Number.isFinite(loc.latitude) && Number.isFinite(loc.longitude);
+}
+
+function commonHasUsableAccuracy(loc) {
+    return commonHasValidLocation(loc)
+        && Number.isFinite(loc.accuracy)
+        && loc.accuracy <= COMMON_GPS_HOME_MAX_ACCURACY_M;
+}
+
+function commonLocationIsBetter(candidate, current) {
+    if (!commonHasValidLocation(candidate)) return false;
+    if (!commonHasValidLocation(current)) return true;
+    if (!Number.isFinite(current.accuracy)) return true;
+    return Number.isFinite(candidate.accuracy) && candidate.accuracy < current.accuracy;
+}
+
+function commonNotifyGpsListeners(loc, isRefining = false) {
+    commonGpsListeners.forEach(listener => {
+        try {
+            listener(loc, isRefining);
+        } catch(e) {
+            console.warn('GPS listener failed:', e);
+        }
+    });
+}
+
+function commonCommitGpsLocation(loc, isRefining = false) {
+    if (!commonHasValidLocation(loc)) return null;
+    cachedLocation = loc;
+    commonGpsBestLocation = loc;
+    saveCommonGpsLocation(loc);
+    commonNotifyGpsListeners(loc, isRefining);
+    return loc;
+}
+
+function commonStopGpsWatch() {
+    if (commonGpsWatchId !== null && navigator.geolocation?.clearWatch) {
+        navigator.geolocation.clearWatch(commonGpsWatchId);
+        commonGpsWatchId = null;
+    }
+    if (commonGpsWatchTimer) {
+        clearTimeout(commonGpsWatchTimer);
+        commonGpsWatchTimer = null;
+    }
+}
+
+function commonRequestGps(options = {}) {
+    const allowPreciseWatch = options.allowPreciseWatch !== false;
+    const onUpdate = typeof options.onUpdate === 'function' ? options.onUpdate : null;
+    if (onUpdate) commonGpsListeners.add(onUpdate);
+
+    const releaseListener = () => {
+        if (onUpdate) commonGpsListeners.delete(onUpdate);
+    };
+
+    const existing = cachedLocation || readCommonGpsLocation();
+    if (commonHasValidLocation(existing)) {
+        commonCommitGpsLocation(existing, allowPreciseWatch && !commonHasUsableAccuracy(existing));
+        if (commonHasUsableAccuracy(existing) || !allowPreciseWatch) {
+            releaseListener();
+            return Promise.resolve(existing);
+        }
+    }
+
+    if (commonGpsRequestPromise) {
+        return commonGpsRequestPromise.finally(releaseListener);
+    }
+
+    if (!navigator.geolocation?.getCurrentPosition) {
+        releaseListener();
+        return Promise.reject(new Error('geolocation_unavailable'));
+    }
+
+    commonGpsRequestPromise = new Promise((resolve, reject) => {
+        let settled = false;
+        let quickDone = false;
+
+        const finish = (loc) => {
+            if (settled) return;
+            settled = true;
+            commonStopGpsWatch();
+            const finalLoc = commonCommitGpsLocation(loc, false);
+            commonGpsRequestPromise = null;
+            if (finalLoc) resolve(finalLoc);
+            else reject(new Error('gps_no_location'));
+        };
+
+        const fail = (error) => {
+            if (settled) return;
+            settled = true;
+            commonStopGpsWatch();
+            commonGpsRequestPromise = null;
+            reject(error);
+        };
+
+        const startPreciseWatch = (initialLocation = null) => {
+            if (settled) return;
+            if (initialLocation && commonLocationIsBetter(initialLocation, commonGpsBestLocation)) {
+                commonCommitGpsLocation(initialLocation, !commonHasUsableAccuracy(initialLocation));
+            }
+            if (!allowPreciseWatch) {
+                finish(commonGpsBestLocation || initialLocation);
+                return;
+            }
+            if (commonHasUsableAccuracy(commonGpsBestLocation)) {
+                finish(commonGpsBestLocation);
+                return;
+            }
+            if (commonGpsWatchId !== null) return;
+            if (!navigator.geolocation?.watchPosition) {
+                if (commonGpsBestLocation) finish(commonGpsBestLocation);
+                else fail(new Error('watch_position_unavailable'));
+                return;
+            }
+
+            commonGpsWatchId = navigator.geolocation.watchPosition(
+                position => {
+                    const loc = commonLocationFromPosition(position);
+                    if (!commonHasValidLocation(loc)) return;
+                    if (commonLocationIsBetter(loc, commonGpsBestLocation)) {
+                        commonCommitGpsLocation(loc, !commonHasUsableAccuracy(loc));
+                    }
+                    if (commonHasUsableAccuracy(loc)) finish(loc);
+                },
+                error => {
+                    if (error?.code === 1) fail(error);
+                },
+                { enableHighAccuracy: true, maximumAge: 0, timeout: COMMON_GPS_HOME_WATCH_TIMEOUT_MS }
+            );
+
+            commonGpsWatchTimer = setTimeout(() => {
+                if (commonGpsBestLocation) finish(commonGpsBestLocation);
+                else fail(new Error('gps_timeout'));
+            }, COMMON_GPS_HOME_WATCH_TIMEOUT_MS);
+        };
+
+        const quickFallbackTimer = setTimeout(() => {
+            if (!quickDone) startPreciseWatch();
+        }, COMMON_GPS_HOME_QUICK_FALLBACK_MS);
+
+        navigator.geolocation.getCurrentPosition(
+            position => {
+                quickDone = true;
+                clearTimeout(quickFallbackTimer);
+                const loc = commonLocationFromPosition(position);
+                if (commonHasUsableAccuracy(loc)) finish(loc);
+                else startPreciseWatch(loc);
+            },
+            error => {
+                quickDone = true;
+                clearTimeout(quickFallbackTimer);
+                if (error?.code === 1) fail(error);
+                else startPreciseWatch();
+            },
+            { timeout: 5000, enableHighAccuracy: false, maximumAge: COMMON_GPS_CACHE_TTL_MS }
+        );
+    }).finally(releaseListener);
+
+    return commonGpsRequestPromise;
+}
+
+function commonRenderHomeLocationStatus(el, loc, isRefining = false) {
+    cachedLocation = loc;
+    saveCommonGpsLocation(loc);
+
+    let foundLocation = null;
+    let minDistance = Infinity;
+
+    for (const office of officeLocations) {
+        const dist = calculateDistance(
+            cachedLocation.latitude, cachedLocation.longitude,
+            office.lat, office.lng
+        );
+        if (dist <= office.radius && dist < minDistance) {
+            minDistance = dist;
+            foundLocation = office.name;
+        }
+    }
+
+    if (isRefining) {
+        const accuracy = Number.isFinite(loc.accuracy) ? Math.round(loc.accuracy) : '-';
+        el.className = 'location-status loading';
+        el.innerHTML = `<div class="dot"></div><span>正在取得精準定位...目前精度 ${accuracy} 公尺</span>`;
+        return;
+    }
+
+    el.className = 'location-status ready';
+    if (foundLocation) {
+        el.innerHTML = `<div class="dot" style="background:#10b981;"></div><span>📍 定位：${escapeHTML(foundLocation)}</span>`;
+    } else if (!commonHasUsableAccuracy(loc)) {
+        const accuracy = Number.isFinite(loc.accuracy) ? Math.round(loc.accuracy) : '-';
+        el.innerHTML = `<div class="dot" style="background:#f59e0b;"></div><span>📍 已取得座標，精度 ${accuracy} 公尺，打卡頁會再校準</span>`;
+    } else {
+        el.innerHTML = `<div class="dot" style="background:#f59e0b;"></div><span>⚠️ 已定位，但不在打卡範圍</span>`;
+    }
+}
+
+function preloadGPSWithPrecisionWarmup(el) {
     el.className = 'location-status loading';
     el.innerHTML = '<div class="dot"></div><span>正在定位...</span>';
 
-    navigator.geolocation.getCurrentPosition(
-        p => { 
-            cachedLocation = { latitude: p.coords.latitude, longitude: p.coords.longitude, accuracy: p.coords.accuracy };
-            saveCommonGpsLocation(cachedLocation);
-            
-            let foundLocation = null;
-            let minDistance = Infinity;
-            
-            for (const loc of officeLocations) {
-                const dist = calculateDistance(
-                    cachedLocation.latitude, cachedLocation.longitude, 
-                    loc.lat, loc.lng
-                );
-                if (dist <= loc.radius && dist < minDistance) {
-                    minDistance = dist;
-                    foundLocation = loc.name;
-                }
-            }
-
-            el.className = 'location-status ready';
-            if (foundLocation) {
-                el.innerHTML = `<div class="dot" style="background:#10b981;"></div><span>📍 您在：${escapeHTML(foundLocation)}</span>`;
-            } else {
-                el.innerHTML = `<div class="dot" style="background:#f59e0b;"></div><span>⚠️ 未在打卡範圍內</span>`;
-            }
-        },
-        e => { 
+    const render = (loc, isRefining) => commonRenderHomeLocationStatus(el, loc, isRefining);
+    commonRequestGps({ allowPreciseWatch: true, onUpdate: render })
+        .then(loc => commonRenderHomeLocationStatus(el, loc, false))
+        .catch(error => {
             el.className = 'location-status';
-            el.innerHTML = '<span>📍 定位較慢，可直接點打卡，打卡頁會再定位</span>'; 
-        },
-        { timeout: 5000, enableHighAccuracy: false, maximumAge: 600000 }
-    );
+            if (error?.code === 1) {
+                el.innerHTML = '<span>📍 定位權限未允許，請開啟 LINE 的「使用 App 期間」與「精確位置」</span>';
+            } else {
+                el.innerHTML = '<span>📍 定位較慢，可直接點打卡，打卡頁會再定位</span>';
+            }
+        });
+}
+function preloadGPS() {
+    const el = document.getElementById('locationStatus');
+    if (!el) return;
+    preloadGPSWithPrecisionWarmup(el);
 }
 
 function getGPS() { 
-    return new Promise((res, rej) => {
-        if (cachedLocation) {
-            res(cachedLocation);
-            return;
-        }
-        navigator.geolocation.getCurrentPosition(
-            p => {
-                cachedLocation = { latitude: p.coords.latitude, longitude: p.coords.longitude, accuracy: p.coords.accuracy };
-                saveCommonGpsLocation(cachedLocation);
-                res(cachedLocation);
-            }, 
-            e => rej(e), 
-            { enableHighAccuracy: false, timeout: 5000, maximumAge: 600000 }
-        );
-    });
+    return commonRequestGps({ allowPreciseWatch: true });
 }
 
 // ===== 考勤功能 =====

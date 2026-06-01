@@ -212,3 +212,7 @@
 - **B25**：公務機拍照後按「上班打卡」可能在 LINE WebView 卡住。原因是公務機打卡雖然不強制定位，但送出前仍直接等待 `navigator.geolocation.getCurrentPosition()`；部分 LINE WebView 定位 callback 可能不回來，造成按鈕被 disabled 後看似沒有作動。修法：公務機定位改為最多等待 2 秒，逾時即以無定位資料繼續送出，並在按鈕上顯示「處理中...」。同時把 `index.html` / `checkin.html` 跳轉到 `kiosk.html` 加上版本參數，避免 LINE 快取舊公務機頁。
 
 - **B26**：iPhone / LINE WebView 已開「使用 App 期間」與「精確位置」後，第一筆定位仍可能是基地台粗定位（例如精度 5000m），導致畫面顯示已取得座標但仍無法打卡。修法：不放寬 GPS 規則；若第一筆精度 >500m，使用 `watchPosition` 最多等待 15 秒取得更精準座標，精度改善才放行，仍太差才提示到戶外或窗邊重試；若開頁時讀到粗定位快取，也會立即在背景啟動精準定位，保留打卡速度優化。
+
+- **B27**：iPhone 首頁預先定位可能停在「正在定位」，或只拿到粗略基地台座標，造成員工進打卡頁時仍要等很久。原因是首頁原本只呼叫一次 `getCurrentPosition(... enableHighAccuracy:false ...)`，失敗、逾時或精度太差時沒有持續暖機。修法：`preloadGPS()` 改成快速定位先行；4 秒未回或精度 >500m 時啟動高精度 `watchPosition` 最多 15 秒，把最佳座標寫入 `last_gps_location` 快取。打卡頁仍維持原本 GPS 精度規則，不放寬門檻。
+
+- **B28**：首頁天氣與打卡預定位同時觸發 GPS，可能讓 iPhone / LINE WebView 出現多個定位請求互相搶 callback。修法：`common.js` 加入共用 GPS manager，`preloadGPS()` / `getGPS()` 共用同一個定位 Promise 與 `watchPosition`；粗定位不覆蓋較精準定位。`index.html` 天氣改成只讀既有快取或預設台北座標，不再主動呼叫 GPS；`index.html` / `checkin.html` 更新 common.js cache-bust，避免 LINE 載入舊版。
