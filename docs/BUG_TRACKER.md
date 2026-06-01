@@ -216,3 +216,7 @@
 - **B27**：iPhone 首頁預先定位可能停在「正在定位」，或只拿到粗略基地台座標，造成員工進打卡頁時仍要等很久。原因是首頁原本只呼叫一次 `getCurrentPosition(... enableHighAccuracy:false ...)`，失敗、逾時或精度太差時沒有持續暖機。修法：`preloadGPS()` 改成快速定位先行；4 秒未回或精度 >500m 時啟動高精度 `watchPosition` 最多 15 秒，把最佳座標寫入 `last_gps_location` 快取。打卡頁仍維持原本 GPS 精度規則，不放寬門檻。
 
 - **B28**：首頁天氣與打卡預定位同時觸發 GPS，可能讓 iPhone / LINE WebView 出現多個定位請求互相搶 callback。修法：`common.js` 加入共用 GPS manager，`preloadGPS()` / `getGPS()` 共用同一個定位 Promise 與 `watchPosition`；粗定位不覆蓋較精準定位。`index.html` 天氣改成只讀既有快取或預設台北座標，不再主動呼叫 GPS；`index.html` / `checkin.html` 更新 common.js cache-bust，避免 LINE 載入舊版。
+
+- **B29**：iPhone 打卡頁仍抓不到定位。親驗後確認不是公務機改動造成：公務機 commit 只改 `is_kiosk/no_checkin` 查詢與 `kiosk.html` 自身流程；一般員工打卡頁的問題是 `checkin.html` 仍保留獨立 GPS preload / fallback，沒有完整接上 `common.js` GPS manager。修法：`checkin.html` 的預先定位與實際打卡定位都優先呼叫 `commonRequestGps({ allowPreciseWatch: true })`，共用 4 秒 fallback + 15 秒高精度 `watchPosition`。
+
+- **B30**：iPhone 已取得座標但精度仍 >500m 時，員工會卡在不能打卡。制度調整：不放寬正式打卡 GPS 門檻；若有座標但精度不足，前端改送既有「補打卡待審核」RPC，note 內保留照片 URL、座標、精度、送出時間與裝置資訊。主管在審核中心可查看照片與地圖，按通過後才由既有 `approve_makeup_request` 寫入正式出勤。

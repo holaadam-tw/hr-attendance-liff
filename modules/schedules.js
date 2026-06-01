@@ -289,6 +289,62 @@ export function switchMakeupTab(status) {
     loadMakeupApprovals(status);
 }
 
+function parseMakeupNote(note) {
+    if (!note) return null;
+    try {
+        const parsed = JSON.parse(note);
+        return parsed?.source === 'low_accuracy_gps_checkin' ? parsed : null;
+    } catch (e) {
+        return null;
+    }
+}
+
+function renderMakeupEvidence(request) {
+    const evidence = parseMakeupNote(request.note);
+    if (!evidence) {
+        return request.note
+            ? `<div style="font-size:12px;color:#64748B;margin-bottom:8px;">備註：${escapeHTML(request.note)}</div>`
+            : '';
+    }
+
+    const accuracyValue = Number(evidence.accuracy_m);
+    const accuracy = Number.isFinite(accuracyValue) ? `${Math.round(accuracyValue)}m` : '-';
+    const severity = Number.isFinite(accuracyValue) && accuracyValue >= 1000 ? {
+        label: '精度很差',
+        bg: '#FEF2F2',
+        border: '#FCA5A5',
+        color: '#991B1B',
+        chipBg: '#DC2626'
+    } : {
+        label: '精度不足',
+        bg: '#FFF7ED',
+        border: '#FDBA74',
+        color: '#9A3412',
+        chipBg: '#F97316'
+    };
+    const lat = Number.isFinite(Number(evidence.latitude)) ? Number(evidence.latitude).toFixed(6) : '-';
+    const lng = Number.isFinite(Number(evidence.longitude)) ? Number(evidence.longitude).toFixed(6) : '-';
+    const photoUrl = evidence.photo_url || '';
+    const mapUrl = lat !== '-' && lng !== '-' ? `https://www.google.com/maps?q=${lat},${lng}` : '';
+
+    return `
+        <div style="background:${severity.bg};border:2px solid ${severity.border};border-radius:12px;padding:10px;margin:8px 0;color:${severity.color};font-size:12px;line-height:1.6;">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;">
+                <span style="font-weight:900;">⚠️ GPS 低精度待核認</span>
+                <span style="background:${severity.chipBg};color:#fff;border-radius:999px;padding:2px 8px;font-weight:900;">${severity.label}</span>
+                <span style="background:#fff;border:1px solid ${severity.border};border-radius:999px;padding:2px 8px;font-weight:900;">精度 ${escapeHTML(accuracy)}</span>
+            </div>
+            <div style="font-weight:700;">原因：手機有回傳座標，但 GPS 精度超過 500m，未直接寫入正式出勤。</div>
+            <div>座標：${escapeHTML(lat)}, ${escapeHTML(lng)}</div>
+            <div>送出時間：${escapeHTML(evidence.submitted_at || '')}</div>
+            <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
+                ${photoUrl ? `<a href="${escapeHTML(photoUrl)}" target="_blank" rel="noopener" style="padding:6px 10px;border-radius:8px;background:#FFFFFF;color:#C2410C;text-decoration:none;font-weight:800;border:1px solid #FDBA74;">📷 查看照片</a>` : ''}
+                ${mapUrl ? `<a href="${escapeHTML(mapUrl)}" target="_blank" rel="noopener" style="padding:6px 10px;border-radius:8px;background:#FFFFFF;color:#C2410C;text-decoration:none;font-weight:800;border:1px solid #FDBA74;">🗺️ 查看地圖</a>` : ''}
+            </div>
+        </div>
+    `;
+}
+
 export async function loadMakeupApprovals(status) {
     const listEl = document.getElementById('makeupApprovalList');
     if (!listEl) return;
@@ -316,6 +372,7 @@ export async function loadMakeupApprovals(status) {
                     <span style="padding:4px 10px;background:#F5F3FF;border-radius:8px;color:#7C3AED;font-weight:700;">${typeMap[r.punch_type] || r.punch_type} ${r.punch_time || ''}</span>
                 </div>
                 <div style="font-size:12px;color:#64748B;margin-bottom:8px;">${escapeHTML(r.reason || '')}</div>
+                ${renderMakeupEvidence(r)}
                 <div style="display:flex;gap:8px;">
                     <button onclick="approveMakeupPunch('${r.id}')" style="flex:1;padding:10px;border:none;border-radius:10px;background:#ECFDF5;color:#059669;font-weight:700;font-size:13px;cursor:pointer;">✅ 通過</button>
                     <button onclick="rejectMakeupPunchPrompt('${r.id}')" style="flex:1;padding:10px;border:none;border-radius:10px;background:#FEF2F2;color:#DC2626;font-weight:700;font-size:13px;cursor:pointer;">❌ 拒絕</button>

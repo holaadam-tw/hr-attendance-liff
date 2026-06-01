@@ -143,6 +143,74 @@
             return primary;
         }
 
+        function getTaiwanNowParts() {
+            const parts = new Intl.DateTimeFormat('sv-SE', {
+                timeZone: 'Asia/Taipei',
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+                hour12: false
+            }).formatToParts(new Date()).reduce((acc, part) => {
+                acc[part.type] = part.value;
+                return acc;
+            }, {});
+
+            return {
+                date: `${parts.year}-${parts.month}-${parts.day}`,
+                time: `${parts.hour}:${parts.minute}:${parts.second}`,
+                displayTime: `${parts.hour}:${parts.minute}`,
+                submittedAt: `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}:${parts.second}`
+            };
+        }
+
+        function buildLowAccuracyReviewNote(rpcAction, loc, publicUrl, nowParts) {
+            return JSON.stringify({
+                source: 'low_accuracy_gps_checkin',
+                action: rpcAction,
+                photo_url: publicUrl,
+                latitude: loc.latitude,
+                longitude: loc.longitude,
+                accuracy_m: Math.round(loc.accuracy),
+                submitted_at: nowParts.submittedAt,
+                device: navigator.userAgent
+            });
+        }
+
+        async function submitLowAccuracyReviewRequest(rpcAction, loc, publicUrl) {
+            const nowParts = getTaiwanNowParts();
+            const typeText = rpcAction === 'check_out' ? '下班' : '上班';
+            const accuracyText = Number.isFinite(loc?.accuracy) ? `${Math.round(loc.accuracy)}m` : '未知';
+            const { data, error } = await sb.rpc('submit_makeup_punch', {
+                p_line_user_id: liffProfile.userId,
+                p_punch_date: nowParts.date,
+                p_punch_type: rpcAction === 'check_out' ? 'clock_out' : 'clock_in',
+                p_punch_time: nowParts.time,
+                p_reason: `GPS 精度不足（${accuracyText}），${typeText}打卡待主管核認`,
+                p_note: buildLowAccuracyReviewNote(rpcAction, loc, publicUrl, nowParts)
+            });
+
+            if (error || !data?.success) {
+                throw new Error(data?.error || error?.message || '送出待審核打卡失敗');
+            }
+
+            return { typeText, nowParts };
+        }
+
+        function showLowAccuracyPendingSuccess(typeText, nowParts, loc) {
+            stopCamera();
+            const accuracyText = Number.isFinite(loc?.accuracy) ? `${Math.round(loc.accuracy)}m` : '未知';
+            showStatus(
+                document.getElementById('checkInStatus'),
+                'success',
+                `✅ 已送出${typeText}打卡待審核（${nowParts.displayTime}，GPS 精度 ${accuracyText}）。主管核准後才會正式計入出勤。`
+            );
+            showToast('✅ 已送主管審核');
+            setTimeout(() => { window.location.href = 'index.html'; }, 2500);
+        }
+
         // 更新時鐘
         function updateClock() {
             const now = new Date();
@@ -185,6 +253,9 @@
 
         function gpsErrorCodeName(err) {
             if (!err) return '-';
+            if (err.message === 'gps_timeout') return 'TIMEOUT';
+            if (err.message === 'geolocation_unavailable') return 'POSITION_UNAVAILABLE';
+            if (err.message === 'watch_position_unavailable') return 'POSITION_UNAVAILABLE';
             return GPS_ERROR_NAMES[err.code] || err.name || 'UNKNOWN';
         }
 
@@ -269,6 +340,35 @@
                 lng: formatCoord(coords.longitude),
                 updatedAt: new Date().toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
             });
+        }
+
+        function applyGpsLocation(loc, overlay, statusBox, isRefining = false) {
+            if (!loc || !Number.isFinite(loc.latitude) || !Number.isFinite(loc.longitude)) return null;
+            cachedLocation = {
+                latitude: loc.latitude,
+                longitude: loc.longitude,
+                accuracy: loc.accuracy
+            };
+            gpsPermissionState = gpsPermissionState === 'unknown' ? 'granted' : gpsPermissionState;
+            saveStoredGpsLocation(cachedLocation);
+            updateLocationDiagnostic({
+                permission: gpsPermissionState,
+                code: '-',
+                accuracy: Number.isFinite(cachedLocation.accuracy) ? `${Math.round(cachedLocation.accuracy)} 公尺` : '-',
+                hasCoords: 'Yes',
+                lat: formatCoord(cachedLocation.latitude),
+                lng: formatCoord(cachedLocation.longitude),
+                updatedAt: new Date().toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
+            });
+
+            const isLowAccuracy = Number.isFinite(cachedLocation.accuracy) && cachedLocation.accuracy > GPS_MAX_ACCURACY_M;
+            if (overlay) {
+                if (isRefining) overlay.textContent = '📍 精準定位中...';
+                else if (isLowAccuracy) overlay.textContent = '📍 定位精度仍不足，請到窗邊重試';
+                else overlay.textContent = '📍 預先定位完成';
+            }
+            if (statusBox && isRefining) updateGpsWaitingStatus(statusBox, cachedLocation);
+            return cachedLocation;
         }
 
         function getCurrentPositionWithOptions(options) {
@@ -472,6 +572,21 @@
                 }
                 return cachedLocation;
             }
+            if (typeof commonRequestGps === 'function') {
+                const overlay = document.getElementById('overlayLocation');
+                const statusBox = document.getElementById('checkInStatus');
+                try {
+                    const loc = await commonRequestGps({
+                        allowPreciseWatch: true,
+                        onUpdate: (updatedLoc, isRefining) => applyGpsLocation(updatedLoc, overlay, statusBox, isRefining)
+                    });
+                    const appliedLoc = applyGpsLocation(loc, overlay, statusBox, false);
+                    if (appliedLoc) return appliedLoc;
+                } catch (err) {
+                    if (err?.code === 1) throw err;
+                    markGpsError(err);
+                }
+            }
             return getDiagnosticGPS();
         }
 
@@ -552,9 +667,10 @@
                         return;
                     }
                     if (loc.accuracy > GPS_MAX_ACCURACY_M) {
+                        showStatus(statusBox, 'info', `📍 GPS 精度 ${Math.round(loc.accuracy)}m，改送主管審核...`);
+                        const pending = await submitLowAccuracyReviewRequest(currentCheckInType === 'in' ? 'check_in' : 'check_out', loc, publicUrl);
                         clearTimeout(safetyTimer);
-                        showStatus(statusBox, 'warning', `⚠️ GPS 訊號太弱（精度 ${Math.round(loc.accuracy)}m），請到戶外或窗邊重試`);
-                        btn.disabled = false; btn.textContent = '📸 重試';
+                        showLowAccuracyPendingSuccess(pending.typeText, pending.nowParts, loc);
                         return;
                     }
                 }
@@ -703,8 +819,10 @@
                             btn.disabled = false; btn.textContent = '📸 開啟相機拍照'; return;
                         }
                         if (loc.accuracy > GPS_MAX_ACCURACY_M) {
-                            showStatus(statusBox, 'warning', `⚠️ GPS 訊號太弱（精度 ${Math.round(loc.accuracy)}m），請到戶外或窗邊重試`);
-                            btn.disabled = false; btn.textContent = '📸 開啟相機拍照'; return;
+                            showStatus(statusBox, 'info', `📍 GPS 精度 ${Math.round(loc.accuracy)}m，改送主管審核...`);
+                            const pending = await submitLowAccuracyReviewRequest(currentCheckInType === 'in' ? 'check_in' : 'check_out', loc, publicUrl);
+                            showLowAccuracyPendingSuccess(pending.typeText, pending.nowParts, loc);
+                            return;
                         }
                     }
 
@@ -885,6 +1003,24 @@
                 return;
             }
             if (overlayBeforeGps) overlayBeforeGps.textContent = '📍 預先定位中...';
+            if (typeof commonRequestGps === 'function') {
+                commonRequestGps({
+                    allowPreciseWatch: true,
+                    onUpdate: (loc, isRefining) => applyGpsLocation(loc, overlayBeforeGps, statusBox, isRefining)
+                })
+                    .then(loc => applyGpsLocation(loc, overlayBeforeGps, statusBox, false))
+                    .catch(e => {
+                        markGpsError(e);
+                        if (e.code === 1) {
+                            showGPSWarning(statusBox);
+                        } else {
+                            const overlay = document.getElementById('overlayLocation');
+                            if (overlay) overlay.textContent = '📍 定位較慢，可直接拍照打卡';
+                            showStatus(statusBox, 'info', '✅ 相機就緒；定位較慢沒關係，按下打卡時會重新定位');
+                        }
+                    });
+                return;
+            }
             navigator.geolocation.getCurrentPosition(
                 p => {
                     markGpsSuccess(p);
