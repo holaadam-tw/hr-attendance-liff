@@ -220,3 +220,5 @@
 - **B29**：iPhone 打卡頁仍抓不到定位。親驗後確認不是公務機改動造成：公務機 commit 只改 `is_kiosk/no_checkin` 查詢與 `kiosk.html` 自身流程；一般員工打卡頁的問題是 `checkin.html` 仍保留獨立 GPS preload / fallback，沒有完整接上 `common.js` GPS manager。修法：`checkin.html` 的預先定位與實際打卡定位都優先呼叫 `commonRequestGps({ allowPreciseWatch: true })`，共用 4 秒 fallback + 15 秒高精度 `watchPosition`。
 
 - **B30**：iPhone 已取得座標但精度仍 >500m 時，員工會卡在不能打卡。制度調整：不放寬正式打卡 GPS 門檻；若有座標但精度不足，前端改送既有「補打卡待審核」RPC，note 內保留照片 URL、座標、精度、送出時間與裝置資訊。主管在審核中心可查看照片與地圖，按通過後才由既有 `approve_makeup_request` 寫入正式出勤。
+
+- **B31**：公務機打卡仍可能出現 `record "v_schedule" is not assigned yet`。原因是公務機走 `kiosk_check_in`，不是已修過的 `quick_check_in`；當員工設為排班制但當天沒有排班時，`v_schedule` 沒有被 SELECT INTO 賦值就被讀取。修法：新增 `migrations/081_fix_kiosk_v_schedule_record.sql`，用 `v_schedule_found` 保護 RECORD 存取，沒有排班時 fallback 到固定班或公司預設上下班時間；`kiosk.html` 也把舊 SQL 錯誤轉成可讀提示。

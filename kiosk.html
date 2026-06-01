@@ -444,13 +444,13 @@
 
             if (error) throw error;
             if (!data?.success) {
-                showError(data?.error || '打卡失敗');
+                showError(formatKioskError(data?.error || '打卡失敗'));
                 return;
             }
 
             showResult(data);
         } catch (e) {
-            showError(e.message || '打卡失敗，請重試');
+            showError(formatKioskError(e.message || '打卡失敗，請重試'));
         } finally {
             isPunching = false;
             if (!document.getElementById('stepEmployee').classList.contains('hidden')) {
@@ -488,6 +488,14 @@
     }
 
     // ===== 錯誤畫面 =====
+    function formatKioskError(msg) {
+        const text = String(msg || '打卡失敗');
+        if (text.includes('v_schedule') && text.includes('not assigned')) {
+            return '公務機打卡設定尚未更新：今天沒有排班時會打卡失敗。請通知管理員執行 081 SQL 後再重試。';
+        }
+        return text;
+    }
+
     function showError(msg) {
         stopCamera();
         document.getElementById('stepInput').classList.add('hidden');
