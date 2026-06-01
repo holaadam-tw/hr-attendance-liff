@@ -206,3 +206,7 @@
 ## 2026-05-29 修復紀錄
 
 - **B24**：公務機員工雖在員工管理標示為「公務機」，但 `checkUserStatus()` 登入查詢沒有帶出 `is_kiosk` / `no_checkin` 欄位，導致 `index.html` / `checkin.html` 判斷不到公務機身分，不會自動跳到 `kiosk.html`。修法：`common.js` 的平台管理員公司員工查詢與一般員工查詢都補上 `is_kiosk, no_checkin`。
+
+## 2026-06-01 修復紀錄
+
+- **B25**：公務機拍照後按「上班打卡」可能在 LINE WebView 卡住。原因是公務機打卡雖然不強制定位，但送出前仍直接等待 `navigator.geolocation.getCurrentPosition()`；部分 LINE WebView 定位 callback 可能不回來，造成按鈕被 disabled 後看似沒有作動。修法：公務機定位改為最多等待 2 秒，逾時即以無定位資料繼續送出，並在按鈕上顯示「處理中...」。同時把 `index.html` / `checkin.html` 跳轉到 `kiosk.html` 加上版本參數，避免 LINE 快取舊公務機頁。

@@ -170,6 +170,33 @@
     let photoBlob = null;
     let videoStream = null;
     let idleTimer = null;
+    let isPunching = false;
+
+    function setActionButtonsBusy(isBusy) {
+        const checkinBtn = document.querySelector('.btn-checkin');
+        const checkoutBtn = document.querySelector('.btn-checkout');
+        [checkinBtn, checkoutBtn].forEach(btn => {
+            if (!btn) return;
+            btn.disabled = isBusy;
+            btn.style.opacity = isBusy ? '0.5' : '1';
+        });
+        if (checkinBtn) checkinBtn.textContent = isBusy ? '處理中...' : '☀️ 上班打卡';
+        if (checkoutBtn) checkoutBtn.textContent = isBusy ? '處理中...' : '🌙 下班打卡';
+    }
+
+    async function getOptionalKioskPosition(timeoutMs = 2000) {
+        if (!navigator.geolocation) return null;
+        return Promise.race([
+            new Promise(resolve => {
+                navigator.geolocation.getCurrentPosition(
+                    pos => resolve(pos),
+                    () => resolve(null),
+                    { enableHighAccuracy: false, maximumAge: 300000, timeout: timeoutMs }
+                );
+            }),
+            new Promise(resolve => setTimeout(() => resolve(null), timeoutMs + 300))
+        ]);
+    }
 
     // ===== 時鐘 =====
     function updateClock() {
@@ -327,6 +354,10 @@
             canvas.width = w; canvas.height = h;
             canvas.getContext('2d').drawImage(video, 0, 0, w, h);
             canvas.toBlob(blob => {
+                if (!blob) {
+                    showError('照片處理失敗，請重新拍照。');
+                    return;
+                }
                 photoBlob = blob;
                 stopCamera();
                 onPhotoReady();
@@ -350,6 +381,10 @@
                 canvas.width = w; canvas.height = h;
                 canvas.getContext('2d').drawImage(img, 0, 0, w, h);
                 canvas.toBlob(blob => {
+                    if (!blob) {
+                        showError('照片處理失敗，請重新拍照。');
+                        return;
+                    }
                     photoBlob = blob;
                     onPhotoReady();
                 }, 'image/jpeg', 0.6);
@@ -363,13 +398,20 @@
     function onPhotoReady() {
         document.getElementById('photoBtn').textContent = '✅ 已拍照';
         document.getElementById('photoBtn').disabled = true;
+        setActionButtonsBusy(false);
         document.getElementById('actionBtns').style.display = 'flex';
     }
 
     // ===== 打卡 =====
     async function doCheckin(action) {
-        const btns = document.querySelectorAll('.action-btn');
-        btns.forEach(b => { b.disabled = true; b.style.opacity = '0.5'; });
+        if (isPunching) return;
+        if (!currentEmployee || !currentEmployee.employee_id) {
+            showError('員工資料未載入，請重新輸入工號。');
+            return;
+        }
+
+        isPunching = true;
+        setActionButtonsBusy(true);
 
         try {
             // 上傳照片
@@ -385,13 +427,11 @@
 
             // GPS（公務機可能有定位）
             let lat = null, lng = null;
-            try {
-                const pos = await new Promise((resolve, reject) => {
-                    navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 3000 });
-                });
+            const pos = await getOptionalKioskPosition(2000);
+            if (pos) {
                 lat = pos.coords.latitude;
                 lng = pos.coords.longitude;
-            } catch (e) { }
+            }
 
             const { data, error } = await sb.rpc('kiosk_check_in', {
                 p_kiosk_line_user_id: kioskLineUserId,
@@ -411,6 +451,11 @@
             showResult(data);
         } catch (e) {
             showError(e.message || '打卡失敗，請重試');
+        } finally {
+            isPunching = false;
+            if (!document.getElementById('stepEmployee').classList.contains('hidden')) {
+                setActionButtonsBusy(false);
+            }
         }
     }
 
@@ -458,6 +503,8 @@
         inputStr = '';
         currentEmployee = null;
         photoBlob = null;
+        isPunching = false;
+        setActionButtonsBusy(false);
         updateInputDisplay();
         document.getElementById('stepInput').classList.remove('hidden');
         document.getElementById('stepEmployee').classList.add('hidden');
