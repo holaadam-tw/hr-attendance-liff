@@ -165,12 +165,18 @@
     const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     let kioskLineUserId = null;
+    let kioskCompanyId = null;
+    let kioskLunchEnabled = false;
+    let kioskLunchDeadline = '9:00';
     let inputStr = '';
     let currentEmployee = null;
     let photoBlob = null;
     let videoStream = null;
     let idleTimer = null;
+    let resultTimer = null;
     let isPunching = false;
+    let selectedLunch = null;
+    let lunchPromptEmployee = null;
 
     function setActionButtonsBusy(isBusy) {
         const checkinBtn = document.querySelector('.btn-checkin');
@@ -230,8 +236,10 @@
                 p_kiosk_line_user_id: kioskLineUserId
             });
             if (data?.success && data.name) {
+                kioskCompanyId = data.company_id || null;
                 document.getElementById('companyName').textContent = data.name;
                 document.getElementById('kioskTitle').textContent = data.name + ' 公務機打卡';
+                loadKioskLunchSettings(kioskCompanyId).catch(e => console.warn('公務機便當設定讀取失敗:', e));
             } else {
                 document.getElementById('stepInput').innerHTML = '<div class="error-card"><div class="icon">⚠️</div><div class="msg">' + (data?.error || '此帳號非公務機') + '<br><br><span style="font-size:13px;color:#64748B;">請聯繫管理員設定公務機帳號</span></div></div>';
                 return;
@@ -240,6 +248,49 @@
             document.getElementById('stepInput').innerHTML = '<div class="error-card"><div class="icon">⚠️</div><div class="msg">連線失敗，請重試</div></div>';
         }
     });
+
+    async function loadKioskLunchSettings(companyId) {
+        if (!companyId) {
+            kioskLunchEnabled = false;
+            return;
+        }
+
+        let enabled = false;
+
+        const { data: company } = await sb.from('companies')
+            .select('industry, features')
+            .eq('id', companyId)
+            .maybeSingle();
+
+        const industryLunchDefaults = {
+            general: false,
+            manufacturing: true,
+            restaurant: true,
+            service: false,
+            clinic: false,
+            retail: false
+        };
+        enabled = industryLunchDefaults[company?.industry || 'general'] === true;
+        if (company?.features && typeof company.features === 'object' && company.features.lunch !== undefined) {
+            enabled = company.features.lunch === true;
+        }
+
+        const { data: settings } = await sb.from('system_settings')
+            .select('key, value')
+            .eq('company_id', companyId)
+            .in('key', ['feature_visibility', 'lunch_deadline']);
+
+        (settings || []).forEach(row => {
+            if (row.key === 'feature_visibility' && row.value && typeof row.value === 'object' && row.value.lunch === false) {
+                enabled = false;
+            }
+            if (row.key === 'lunch_deadline' && row.value) {
+                kioskLunchDeadline = String(row.value);
+            }
+        });
+
+        kioskLunchEnabled = enabled;
+    }
 
     // ===== 閒置計時 =====
     function resetIdleTimer() {
@@ -448,7 +499,7 @@
                 return;
             }
 
-            showResult(data);
+            await showResult(data);
         } catch (e) {
             showError(formatKioskError(e.message || '打卡失敗，請重試'));
         } finally {
@@ -460,7 +511,7 @@
     }
 
     // ===== 結果畫面 =====
-    function showResult(data) {
+    async function showResult(data) {
         stopCamera();
         document.getElementById('stepEmployee').classList.add('hidden');
         document.getElementById('stepResult').classList.remove('hidden');
@@ -473,18 +524,200 @@
         const nowTime = new Date().toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
         document.getElementById('resultTime').textContent = nowTime;
 
+        if (isCheckIn) {
+            try {
+                const employeeForLunch = currentEmployee ? { ...currentEmployee } : null;
+                const shouldPromptLunch = await shouldPromptKioskLunch(employeeForLunch);
+                if (shouldPromptLunch) {
+                    document.getElementById('resultCountdown').textContent = '請選擇今日便當';
+                    showKioskLunchPopup(employeeForLunch);
+                    return;
+                }
+            } catch (e) {
+                console.warn('公務機便當檢查失敗:', e);
+            }
+        }
+
+        startResultCountdown();
+    }
+
+    function startResultCountdown(startSec = 3) {
+        clearInterval(resultTimer);
         let sec = 3;
+        if (Number.isFinite(startSec) && startSec > 0) sec = startSec;
         const cdEl = document.getElementById('resultCountdown');
         cdEl.textContent = sec + ' 秒後返回...';
-        const timer = setInterval(() => {
+        resultTimer = setInterval(() => {
             sec--;
             if (sec <= 0) {
-                clearInterval(timer);
+                clearInterval(resultTimer);
+                resultTimer = null;
                 resetToInput();
             } else {
                 cdEl.textContent = sec + ' 秒後返回...';
             }
         }, 1000);
+    }
+
+    function getKioskTaiwanDate(offsetDays = 0) {
+        const now = new Date();
+        const tw = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Taipei' }));
+        tw.setDate(tw.getDate() + offsetDays);
+        const y = tw.getFullYear();
+        const m = String(tw.getMonth() + 1).padStart(2, '0');
+        const d = String(tw.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+    }
+
+    async function shouldPromptKioskLunch(employee) {
+        if (!kioskLunchEnabled || !employee?.employee_id) return false;
+
+        const deadline = kioskLunchDeadline || '9:00';
+        const [dlHour, dlMin] = deadline.includes(':')
+            ? deadline.split(':').map(Number)
+            : [parseInt(deadline, 10) || 9, 0];
+        const nowTw = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Taipei' }));
+        if (nowTw.getHours() > dlHour || (nowTw.getHours() === dlHour && nowTw.getMinutes() >= dlMin)) {
+            return false;
+        }
+
+        const { data, error } = await sb.from('lunch_orders')
+            .select('id, status')
+            .eq('employee_id', employee.employee_id)
+            .eq('order_date', getKioskTaiwanDate())
+            .maybeSingle();
+
+        if (error) {
+            console.warn('公務機查詢便當紀錄失敗:', error);
+            return false;
+        }
+        return !(data && data.status !== 'cancelled');
+    }
+
+    function showKioskLunchPopup(employee) {
+        lunchPromptEmployee = employee;
+        selectedLunch = null;
+
+        const overlay = document.createElement('div');
+        overlay.id = 'kioskLunchOverlay';
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,0.82);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;';
+        overlay.innerHTML = `
+            <div style="background:#fff;color:#0F172A;border-radius:22px;padding:24px;width:100%;max-width:360px;box-shadow:0 24px 80px rgba(0,0,0,0.45);">
+                <div style="text-align:center;margin-bottom:16px;">
+                    <div style="font-size:42px;margin-bottom:8px;">🍱</div>
+                    <h3 style="font-size:20px;font-weight:900;margin:0;">今日便當訂購</h3>
+                    <p style="font-size:13px;color:#64748B;margin-top:6px;">${escapeHtml(employee?.name || '員工')}，請選擇今日午餐</p>
+                </div>
+
+                <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px;">
+                    <button type="button" class="kiosk-lunch-opt" onclick="selectKioskLunch('regular')" style="display:flex;align-items:center;gap:12px;width:100%;padding:16px;border:2px solid #E2E8F0;border-radius:16px;background:#fff;color:#0F172A;text-align:left;font-family:inherit;cursor:pointer;">
+                        <span style="font-size:30px;">🍖</span>
+                        <span style="flex:1;"><b style="font-size:16px;">葷食便當</b><br><span style="font-size:12px;color:#64748B;">今日主菜由餐廳安排</span></span>
+                        <span id="kioskLunchCheckRegular" style="width:24px;height:24px;border:2px solid #CBD5E1;border-radius:50%;display:flex;align-items:center;justify-content:center;"></span>
+                    </button>
+                    <button type="button" class="kiosk-lunch-opt" onclick="selectKioskLunch('vegetarian')" style="display:flex;align-items:center;gap:12px;width:100%;padding:16px;border:2px solid #E2E8F0;border-radius:16px;background:#fff;color:#0F172A;text-align:left;font-family:inherit;cursor:pointer;">
+                        <span style="font-size:30px;">🥗</span>
+                        <span style="flex:1;"><b style="font-size:16px;">素食便當</b><br><span style="font-size:12px;color:#64748B;">蔬食料理</span></span>
+                        <span id="kioskLunchCheckVeg" style="width:24px;height:24px;border:2px solid #CBD5E1;border-radius:50%;display:flex;align-items:center;justify-content:center;"></span>
+                    </button>
+                    <button type="button" class="kiosk-lunch-opt" onclick="selectKioskLunch('none')" style="display:flex;align-items:center;gap:12px;width:100%;padding:16px;border:2px solid #E2E8F0;border-radius:16px;background:#fff;color:#0F172A;text-align:left;font-family:inherit;cursor:pointer;">
+                        <span style="font-size:30px;">🚫</span>
+                        <span style="flex:1;"><b style="font-size:16px;">不訂購</b><br><span style="font-size:12px;color:#64748B;">今日不需要便當</span></span>
+                        <span id="kioskLunchCheckNone" style="width:24px;height:24px;border:2px solid #CBD5E1;border-radius:50%;display:flex;align-items:center;justify-content:center;"></span>
+                    </button>
+                </div>
+
+                <button id="kioskLunchConfirmBtn" type="button" onclick="confirmKioskLunch()" disabled style="width:100%;padding:15px;border:none;border-radius:14px;background:#CBD5E1;color:#fff;font-size:16px;font-weight:900;font-family:inherit;cursor:pointer;">請先選擇</button>
+                <button type="button" onclick="skipKioskLunch()" style="width:100%;padding:12px;border:none;background:transparent;color:#64748B;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;margin-top:8px;">稍後再決定</button>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+    }
+
+    function selectKioskLunch(type) {
+        selectedLunch = type;
+        document.querySelectorAll('.kiosk-lunch-opt').forEach(opt => {
+            opt.style.borderColor = '#E2E8F0';
+            opt.style.background = '#fff';
+        });
+        ['kioskLunchCheckRegular', 'kioskLunchCheckVeg', 'kioskLunchCheckNone'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) {
+                el.style.borderColor = '#CBD5E1';
+                el.style.background = 'transparent';
+                el.textContent = '';
+            }
+        });
+
+        const idx = { regular: 0, vegetarian: 1, none: 2 }[type];
+        const opts = document.querySelectorAll('.kiosk-lunch-opt');
+        if (opts[idx]) {
+            opts[idx].style.borderColor = '#4F46E5';
+            opts[idx].style.background = '#EEF2FF';
+        }
+
+        const checkId = { regular: 'kioskLunchCheckRegular', vegetarian: 'kioskLunchCheckVeg', none: 'kioskLunchCheckNone' }[type];
+        const checkEl = document.getElementById(checkId);
+        if (checkEl) {
+            checkEl.style.borderColor = '#4F46E5';
+            checkEl.style.background = '#4F46E5';
+            checkEl.textContent = '✓';
+            checkEl.style.color = '#fff';
+            checkEl.style.fontWeight = '900';
+        }
+
+        const btn = document.getElementById('kioskLunchConfirmBtn');
+        const labels = { regular: '確認訂購葷食便當', vegetarian: '確認訂購素食便當', none: '確認不訂購' };
+        btn.disabled = false;
+        btn.style.background = 'linear-gradient(135deg,#4F46E5,#7C3AED)';
+        btn.textContent = labels[type] || '確認';
+    }
+
+    async function confirmKioskLunch() {
+        if (!selectedLunch || !lunchPromptEmployee?.employee_id) return;
+
+        const btn = document.getElementById('kioskLunchConfirmBtn');
+        btn.disabled = true;
+        btn.textContent = '提交中...';
+
+        try {
+            const isNone = selectedLunch === 'none';
+            await sb.from('lunch_orders').upsert({
+                employee_id: lunchPromptEmployee.employee_id,
+                order_date: getKioskTaiwanDate(),
+                is_vegetarian: selectedLunch === 'vegetarian',
+                status: isNone ? 'cancelled' : 'ordered',
+                notes: isNone ? '公務機：今日不訂購' : '公務機訂購'
+            }, { onConflict: 'employee_id,order_date' });
+
+            document.getElementById('kioskLunchOverlay')?.remove();
+            document.getElementById('resultCountdown').textContent = isNone ? '已記錄不訂購' : '便當訂購成功';
+            lunchPromptEmployee = null;
+            selectedLunch = null;
+            startResultCountdown(2);
+        } catch (e) {
+            console.error('公務機便當訂購失敗:', e);
+            btn.disabled = false;
+            btn.textContent = '訂購失敗，請重試';
+            btn.style.background = 'linear-gradient(135deg,#DC2626,#B91C1C)';
+        }
+    }
+
+    function skipKioskLunch() {
+        document.getElementById('kioskLunchOverlay')?.remove();
+        lunchPromptEmployee = null;
+        selectedLunch = null;
+        startResultCountdown(1);
+    }
+
+    function escapeHtml(text) {
+        return String(text || '').replace(/[&<>"']/g, ch => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#39;'
+        }[ch]));
     }
 
     // ===== 錯誤畫面 =====
@@ -508,9 +741,14 @@
     // ===== 重設 =====
     function resetToInput() {
         stopCamera();
+        clearInterval(resultTimer);
+        resultTimer = null;
+        document.getElementById('kioskLunchOverlay')?.remove();
         inputStr = '';
         currentEmployee = null;
         photoBlob = null;
+        selectedLunch = null;
+        lunchPromptEmployee = null;
         isPunching = false;
         setActionButtonsBusy(false);
         updateInputDisplay();

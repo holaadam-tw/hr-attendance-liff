@@ -224,3 +224,5 @@
 - **B31**：公務機打卡仍可能出現 `record "v_schedule" is not assigned yet`。原因是公務機走 `kiosk_check_in`，不是已修過的 `quick_check_in`；當員工設為排班制但當天沒有排班時，`v_schedule` 沒有被 SELECT INTO 賦值就被讀取。修法：新增 `migrations/081_fix_kiosk_v_schedule_record.sql`，用 `v_schedule_found` 保護 RECORD 存取，沒有排班時 fallback 到固定班或公司預設上下班時間；`kiosk.html` 也把舊 SQL 錯誤轉成可讀提示。
 
 - **B32**：081 第一版仍用 `IF v_schedule_found AND v_schedule.shift_* IS NOT NULL` 保護 RECORD；現場公務機仍回報相同錯誤。原因是 PL/pgSQL/SQL expression 不應依賴 `AND` short-circuit 來保護未賦值 RECORD 欄位。修法：新增 `migrations/082_fix_kiosk_v_schedule_nested_guard.sql`，改成巢狀 IF，只有 `v_schedule_found = true` 時才讀 `v_schedule` 欄位。
+
+- **B33**：公務機上班打卡成功後不會提示便當訂購，導致使用公務機的員工可能漏訂。修法：`kiosk.html` 在上班打卡成功後讀取公司 `lunch` 功能與 `lunch_deadline`，若未過截止且該員工今日尚未訂餐，直接在公務機頁彈出葷食/素食/不訂購選單；送出或略過後回到輸入下一位員工，不影響下班打卡。
