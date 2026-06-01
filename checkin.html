@@ -162,6 +162,9 @@
         const GPS_MAX_AGE_MS = 60000;
         const GPS_RELAXED_TIMEOUT_MS = 5000;
         const GPS_RELAXED_MAX_AGE_MS = 600000;
+        const GPS_MIN_ACCURACY_M = 5;
+        const GPS_MAX_ACCURACY_M = 500;
+        const GPS_REFINEMENT_TIMEOUT_MS = 15000;
         const GPS_STORAGE_KEY = 'last_gps_location';
 
         let gpsPermissionState = 'unknown';
@@ -174,6 +177,7 @@
             lng: '-',
             updatedAt: '-'
         };
+        let gpsRefinementPromise = null;
 
         function formatCoord(value) {
             return Number.isFinite(value) ? value.toFixed(6) : '-';
@@ -233,10 +237,14 @@
             const d = lastGpsDiagnostic;
             const hasCoords = d.hasCoords === 'Yes';
             const hasError = d.code && d.code !== '-';
-            const title = hasCoords && !hasError
-                ? '✅ 定位完成，可以打卡'
+            const diagnosticAccuracy = Number.parseFloat(String(d.accuracy || '').replace(/[^\d.]/g, ''));
+            const isLowAccuracy = hasCoords && Number.isFinite(diagnosticAccuracy) && diagnosticAccuracy > GPS_MAX_ACCURACY_M;
+            const title = isLowAccuracy
+                ? '⏳ 正在取得精準定位，請停留在門口或窗邊'
+                : (hasCoords && !hasError
+                    ? '✅ 定位完成，可以打卡'
                 : (d.code === 'TIMEOUT' ? '⏳ 定位比較慢，請稍等或重試'
-                    : (hasError ? '⚠️ 定位異常，請檢查設定' : '⏳ 正在確認定位'));
+                        : (hasError ? '⚠️ 定位異常，請檢查設定' : '⏳ 正在確認定位')));
             el.innerHTML =
                 `<strong>定位診斷：${title}</strong><br>` +
                 `權限狀態：${gpsPermissionLabel(d.permission, d.hasCoords)}<br>` +
@@ -267,6 +275,116 @@
             return new Promise((resolve, reject) => {
                 navigator.geolocation.getCurrentPosition(resolve, reject, options);
             });
+        }
+
+        function locationFromPosition(position) {
+            const coords = position?.coords || {};
+            return {
+                latitude: coords.latitude,
+                longitude: coords.longitude,
+                accuracy: coords.accuracy
+            };
+        }
+
+        function isAccuracyUsable(loc) {
+            return !Number.isFinite(loc?.accuracy) ||
+                (loc.accuracy >= GPS_MIN_ACCURACY_M && loc.accuracy <= GPS_MAX_ACCURACY_M);
+        }
+
+        function updateGpsWaitingStatus(statusBox, loc) {
+            const accuracyText = Number.isFinite(loc?.accuracy) ? `目前精度 ${Math.round(loc.accuracy)} 公尺` : '正在取得精度';
+            showStatus(statusBox, 'info', `📍 iPhone 正在取得精準定位，請停留在門口或窗邊 10-15 秒（${accuracyText}）`);
+        }
+
+        function waitForPreciseGps(initialLoc, statusBox) {
+            if (!navigator.geolocation?.watchPosition) return Promise.resolve(initialLoc);
+
+            return new Promise((resolve, reject) => {
+                let watchId = null;
+                let settled = false;
+                let bestLoc = initialLoc;
+
+                const finish = (result, isReject = false) => {
+                    if (settled) return;
+                    settled = true;
+                    if (watchId !== null) {
+                        try { navigator.geolocation.clearWatch(watchId); } catch(e) {}
+                    }
+                    clearTimeout(timer);
+                    if (isReject) reject(result);
+                    else resolve(result);
+                };
+
+                const timer = setTimeout(() => finish(bestLoc), GPS_REFINEMENT_TIMEOUT_MS);
+
+                if (initialLoc) updateGpsWaitingStatus(statusBox, initialLoc);
+
+                watchId = navigator.geolocation.watchPosition(
+                    position => {
+                        markGpsSuccess(position);
+                        const loc = locationFromPosition(position);
+                        if (!bestLoc || !Number.isFinite(bestLoc.accuracy) ||
+                            (Number.isFinite(loc.accuracy) && loc.accuracy < bestLoc.accuracy)) {
+                            bestLoc = loc;
+                        }
+                        if (isAccuracyUsable(loc)) {
+                            finish(loc);
+                            return;
+                        }
+                        updateGpsWaitingStatus(statusBox, bestLoc);
+                    },
+                    err => {
+                        if (err?.code === 1) {
+                            markGpsError(err);
+                            finish(err, true);
+                            return;
+                        }
+                        updateGpsWaitingStatus(statusBox, bestLoc);
+                    },
+                    { enableHighAccuracy: true, timeout: GPS_REFINEMENT_TIMEOUT_MS, maximumAge: 0 }
+                );
+            });
+        }
+
+        async function refineGpsIfNeeded(loc, statusBox) {
+            if (!Number.isFinite(loc?.accuracy) || loc.accuracy <= GPS_MAX_ACCURACY_M) return loc;
+            return waitForPreciseGps(loc, statusBox);
+        }
+
+        function startBackgroundGpsRefinement(loc, statusBox, overlay) {
+            if (!Number.isFinite(loc?.accuracy) || loc.accuracy <= GPS_MAX_ACCURACY_M) return false;
+            if (gpsRefinementPromise) return true;
+
+            if (overlay) overlay.textContent = '📍 精準定位中...';
+            gpsRefinementPromise = refineGpsIfNeeded(loc, statusBox)
+                .then(refined => {
+                    if (refined && isAccuracyUsable(refined)) {
+                        cachedLocation = refined;
+                        saveStoredGpsLocation(refined);
+                        updateLocationDiagnostic({
+                            permission: gpsPermissionState === 'unknown' ? 'granted' : gpsPermissionState,
+                            code: '-',
+                            accuracy: Number.isFinite(refined.accuracy) ? `${Math.round(refined.accuracy)} 公尺` : '-',
+                            hasCoords: 'Yes',
+                            lat: formatCoord(refined.latitude),
+                            lng: formatCoord(refined.longitude),
+                            updatedAt: new Date().toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
+                        });
+                        if (overlay) overlay.textContent = '📍 精準定位完成';
+                    } else if (overlay) {
+                        overlay.textContent = '📍 定位精度仍不足，請到窗邊重試';
+                    }
+                    return refined || loc;
+                })
+                .catch(err => {
+                    if (err?.code === 1) markGpsError(err);
+                    if (overlay) overlay.textContent = '📍 定位較慢，可直接拍照打卡';
+                    return loc;
+                })
+                .finally(() => {
+                    gpsRefinementPromise = null;
+                });
+            return true;
         }
 
         function markGpsError(err) {
@@ -348,6 +466,10 @@
                 });
                 const overlay = document.getElementById('overlayLocation');
                 if (overlay) overlay.textContent = '📍 使用預先定位';
+                if (Number.isFinite(cachedLocation.accuracy) && cachedLocation.accuracy > GPS_MAX_ACCURACY_M && gpsRefinementPromise) {
+                    const refined = await gpsRefinementPromise;
+                    if (refined) cachedLocation = refined;
+                }
                 return cachedLocation;
             }
             return getDiagnosticGPS();
@@ -420,17 +542,18 @@
                     btn.disabled = false; btn.textContent = '📸 重試';
                     return;
                 }
+                loc = await refineGpsIfNeeded(loc, statusBox);
 
                 if (loc.accuracy !== undefined) {
-                    if (loc.accuracy < 5) {
+                    if (loc.accuracy < GPS_MIN_ACCURACY_M) {
                         clearTimeout(safetyTimer);
                         showStatus(statusBox, 'warning', '⚠️ GPS 精度異常（過於精確），請關閉模擬定位 App 後重試');
                         btn.disabled = false; btn.textContent = '📸 重試';
                         return;
                     }
-                    if (loc.accuracy > 500) {
+                    if (loc.accuracy > GPS_MAX_ACCURACY_M) {
                         clearTimeout(safetyTimer);
-                        showStatus(statusBox, 'warning', '⚠️ GPS 訊號太弱（精度 >500m），請到戶外或窗邊重試');
+                        showStatus(statusBox, 'warning', `⚠️ GPS 訊號太弱（精度 ${Math.round(loc.accuracy)}m），請到戶外或窗邊重試`);
                         btn.disabled = false; btn.textContent = '📸 重試';
                         return;
                     }
@@ -573,13 +696,14 @@
                         btn.disabled = false; btn.textContent = '📸 開啟相機拍照';
                         return;
                     }
+                    loc = await refineGpsIfNeeded(loc, statusBox);
                     if (loc.accuracy !== undefined) {
-                        if (loc.accuracy < 5) {
+                        if (loc.accuracy < GPS_MIN_ACCURACY_M) {
                             showStatus(statusBox, 'warning', '⚠️ GPS 精度異常（過於精確），請關閉模擬定位 App 後重試');
                             btn.disabled = false; btn.textContent = '📸 開啟相機拍照'; return;
                         }
-                        if (loc.accuracy > 500) {
-                            showStatus(statusBox, 'warning', '⚠️ GPS 訊號太弱（精度 >500m），請到戶外或窗邊重試');
+                        if (loc.accuracy > GPS_MAX_ACCURACY_M) {
+                            showStatus(statusBox, 'warning', `⚠️ GPS 訊號太弱（精度 ${Math.round(loc.accuracy)}m），請到戶外或窗邊重試`);
                             btn.disabled = false; btn.textContent = '📸 開啟相機拍照'; return;
                         }
                     }
@@ -752,7 +876,12 @@
                     lng: formatCoord(storedLocation.longitude),
                     updatedAt: new Date().toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false })
                 });
-                if (overlayBeforeGps) overlayBeforeGps.textContent = '📍 使用剛剛取得的定位';
+                if (overlayBeforeGps) {
+                    overlayBeforeGps.textContent = Number.isFinite(storedLocation.accuracy) && storedLocation.accuracy > GPS_MAX_ACCURACY_M
+                        ? '📍 精準定位中...'
+                        : '📍 使用剛剛取得的定位';
+                }
+                startBackgroundGpsRefinement(storedLocation, statusBox, overlayBeforeGps);
                 return;
             }
             if (overlayBeforeGps) overlayBeforeGps.textContent = '📍 預先定位中...';
@@ -760,7 +889,12 @@
                 p => {
                     markGpsSuccess(p);
                     const overlay = document.getElementById('overlayLocation');
-                    if (overlay) overlay.textContent = '📍 預先定位完成';
+                    const loc = locationFromPosition(p);
+                    if (Number.isFinite(loc.accuracy) && loc.accuracy > GPS_MAX_ACCURACY_M) {
+                        startBackgroundGpsRefinement(loc, statusBox, overlay);
+                    } else if (overlay) {
+                        overlay.textContent = '📍 預先定位完成';
+                    }
                 },
                 e => {
                     markGpsError(e);
