@@ -222,3 +222,5 @@
 - **B30**：iPhone 已取得座標但精度仍 >500m 時，員工會卡在不能打卡。制度調整：不放寬正式打卡 GPS 門檻；若有座標但精度不足，前端改送既有「補打卡待審核」RPC，note 內保留照片 URL、座標、精度、送出時間與裝置資訊。主管在審核中心可查看照片與地圖，按通過後才由既有 `approve_makeup_request` 寫入正式出勤。
 
 - **B31**：公務機打卡仍可能出現 `record "v_schedule" is not assigned yet`。原因是公務機走 `kiosk_check_in`，不是已修過的 `quick_check_in`；當員工設為排班制但當天沒有排班時，`v_schedule` 沒有被 SELECT INTO 賦值就被讀取。修法：新增 `migrations/081_fix_kiosk_v_schedule_record.sql`，用 `v_schedule_found` 保護 RECORD 存取，沒有排班時 fallback 到固定班或公司預設上下班時間；`kiosk.html` 也把舊 SQL 錯誤轉成可讀提示。
+
+- **B32**：081 第一版仍用 `IF v_schedule_found AND v_schedule.shift_* IS NOT NULL` 保護 RECORD；現場公務機仍回報相同錯誤。原因是 PL/pgSQL/SQL expression 不應依賴 `AND` short-circuit 來保護未賦值 RECORD 欄位。修法：新增 `migrations/082_fix_kiosk_v_schedule_nested_guard.sql`，改成巢狀 IF，只有 `v_schedule_found = true` 時才讀 `v_schedule` 欄位。

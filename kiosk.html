@@ -491,7 +491,7 @@
     function formatKioskError(msg) {
         const text = String(msg || '打卡失敗');
         if (text.includes('v_schedule') && text.includes('not assigned')) {
-            return '公務機打卡設定尚未更新：今天沒有排班時會打卡失敗。請通知管理員執行 081 SQL 後再重試。';
+            return '公務機打卡設定尚未更新：今天沒有排班時會打卡失敗。請通知管理員執行最新公務機 SQL 後再重試。';
         }
         return text;
     }
