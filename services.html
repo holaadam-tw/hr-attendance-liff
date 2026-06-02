@@ -18,7 +18,7 @@
     <div class="container">
         <!-- 便當訂購頁面 -->
         <div id="lunchPage" class="page active">
-            <button class="btn btn-secondary btn-auto-mb" onclick="window.location.href='index.html'">← 返回</button>
+            <button class="btn btn-secondary btn-auto-mb" onclick="leaveLunchPage()">← 返回</button>
             <div class="checkin-page">
                 <h2>🍱 便當訂購</h2>
                 <div class="lunar-notice" id="lunarNotice">🌙 明天是農曆初一/十五，建議訂購素食</div>
@@ -100,7 +100,7 @@
 
         <!-- 系統設定頁面 -->
         <div id="settingsPage" class="page">
-            <button class="btn btn-secondary btn-auto-mb" onclick="window.location.href='index.html'">← 返回</button>
+            <button class="btn btn-secondary btn-auto-mb" onclick="leaveLunchPage()">← 返回</button>
             <div class="checkin-page">
                 <h2>⚙️ 系統設定</h2>
                 
@@ -366,6 +366,20 @@
             btn.textContent = labels[type];
         }
 
+        function leaveLunchPage() {
+            if (sessionStorage.getItem('fromCheckin') === '1') {
+                if (sessionStorage.getItem('lunchSkipWarned') !== '1') {
+                    sessionStorage.setItem('lunchSkipWarned', '1');
+                    showToast('請先選擇今日便當狀態：葷食、素食或不訂購');
+                    return;
+                }
+                sessionStorage.removeItem('fromCheckin');
+                sessionStorage.removeItem('lunchSkipWarned');
+                sessionStorage.setItem('lunchToast', '⚠️ 今日便當尚未選擇');
+            }
+            window.location.href = 'index.html';
+        }
+
         async function submitLunchOrderNew() {
             if (!selectedLunchType || !currentEmployee) return;
             const dateEl = document.getElementById('lunchDate');
@@ -389,6 +403,7 @@
                 // 從打卡跳過來的 → 訂完跳首頁
                 if (sessionStorage.getItem('fromCheckin') === '1') {
                     sessionStorage.removeItem('fromCheckin');
+                    sessionStorage.removeItem('lunchSkipWarned');
                     sessionStorage.setItem('lunchToast', selectedLunchType === 'none' ? '🚫 便當：今日不訂購' : '✅ 便當訂購成功');
                     setTimeout(() => { window.location.href = 'index.html'; }, 800);
                 }

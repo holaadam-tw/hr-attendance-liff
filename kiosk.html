@@ -192,6 +192,7 @@
     let isPunching = false;
     let selectedLunch = null;
     let lunchPromptEmployee = null;
+    let lunchSkipWarned = false;
 
     function setActionButtonsBusy(isBusy) {
         const checkinBtn = document.querySelector('.btn-checkin');
@@ -614,6 +615,7 @@
     function showKioskLunchPopup(employee) {
         lunchPromptEmployee = employee;
         selectedLunch = null;
+        lunchSkipWarned = false;
 
         const overlay = document.createElement('div');
         overlay.id = 'kioskLunchOverlay';
@@ -711,6 +713,7 @@
             document.getElementById('resultCountdown').textContent = isNone ? '已記錄不訂購' : '便當訂購成功';
             lunchPromptEmployee = null;
             selectedLunch = null;
+            lunchSkipWarned = false;
             startResultCountdown(2);
         } catch (e) {
             console.error('公務機便當訂購失敗:', e);
@@ -721,9 +724,16 @@
     }
 
     function skipKioskLunch() {
+        if (!lunchSkipWarned) {
+            lunchSkipWarned = true;
+            const cdEl = document.getElementById('resultCountdown');
+            if (cdEl) cdEl.textContent = '請先選擇今日便當狀態';
+            return;
+        }
         document.getElementById('kioskLunchOverlay')?.remove();
         lunchPromptEmployee = null;
         selectedLunch = null;
+        lunchSkipWarned = false;
         startResultCountdown(1);
     }
 
@@ -767,6 +777,7 @@
         photoBlob = null;
         selectedLunch = null;
         lunchPromptEmployee = null;
+        lunchSkipWarned = false;
         isPunching = false;
         setActionButtonsBusy(false);
         updateInputDisplay();
