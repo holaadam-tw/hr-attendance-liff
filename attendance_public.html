@@ -45,6 +45,10 @@ body{font-family:'Noto Sans TC',-apple-system,sans-serif;background:var(--bg);co
 .daily-sort-btn:hover{background:#EEF2FF;color:#3730A3;}
 .daily-sort-mark{font-size:10px;color:#94A3B8;line-height:1;}
 .daily-sort-btn.active .daily-sort-mark{color:#4F46E5;}
+.daily-drag-handle{font-size:12px;color:#94A3B8;line-height:1;cursor:grab;}
+.emp-table th[draggable="true"]{user-select:none;}
+.daily-header-dragging .daily-sort-btn{opacity:.55;}
+.daily-drag-over .daily-sort-btn{background:#EEF2FF;color:#3730A3;box-shadow:inset 3px 0 0 #4F46E5;}
 
 .status-badge{padding:3px 8px;border-radius:8px;font-size:10px;font-weight:700;white-space:nowrap;display:inline-block;}
 .s-working{background:#DBEAFE;color:#1D4ED8;}
@@ -327,7 +331,7 @@ body{font-family:'Noto Sans TC',-apple-system,sans-serif;background:var(--bg);co
                 <div class="table-wrap">
                     <table class="emp-table">
                         <thead>
-                            <tr><th>員工</th><th>部門</th><th>班別</th><th>上班</th><th>下班</th><th>工時</th><th>狀態</th><th>便當</th></tr>
+                            <tr><th>員工</th><th>便當</th><th>部門</th><th>班別</th><th>上班</th><th>下班</th><th>工時</th><th>狀態</th></tr>
                         </thead>
                         <tbody id="dailyTableBody">
                             <tr><td colspan="8" style="text-align:center;color:#999;padding:40px;">載入中...</td></tr>
@@ -599,6 +603,9 @@ let companyName = '';
 let dailyData = [];
 let dailySort = { key: 'status', direction: 'asc' };
 let dailyLunchOrders = new Map();
+const DAILY_COLUMN_DEFAULT_ORDER = ['employee', 'lunch', 'department', 'shift', 'check_in', 'check_out', 'hours', 'status'];
+let dailyColumnOrder = DAILY_COLUMN_DEFAULT_ORDER.slice();
+let dailyColumnDragKey = null;
 let monthlyData = [];
 let trafficReport = null;
 let mYear = new Date().getFullYear();
@@ -738,6 +745,96 @@ function applyTranslations() {
     }
 }
 function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = String(s); return d.innerHTML; }
+function getDailyColumnStorageKey() { return 'attendance_public_daily_columns_' + (companyId || 'default'); }
+function normalizeDailyColumnOrder(order) {
+    const valid = new Set(DAILY_COLUMN_DEFAULT_ORDER);
+    const seen = new Set();
+    const normalized = [];
+    (Array.isArray(order) ? order : []).forEach(key => {
+        if (valid.has(key) && !seen.has(key)) {
+            seen.add(key);
+            normalized.push(key);
+        }
+    });
+    DAILY_COLUMN_DEFAULT_ORDER.forEach(key => {
+        if (!seen.has(key)) normalized.push(key);
+    });
+    return normalized;
+}
+function loadDailyColumnOrder() {
+    try {
+        const raw = localStorage.getItem(getDailyColumnStorageKey());
+        dailyColumnOrder = normalizeDailyColumnOrder(raw ? JSON.parse(raw) : null);
+    } catch (e) {
+        dailyColumnOrder = DAILY_COLUMN_DEFAULT_ORDER.slice();
+    }
+}
+function saveDailyColumnOrder() {
+    try { localStorage.setItem(getDailyColumnStorageKey(), JSON.stringify(dailyColumnOrder)); } catch (e) {}
+}
+function dailyColumnDefs() {
+    return {
+        employee: { key:'employee', label:t('employee') },
+        lunch: { key:'lunch', label:t('lunchStatus') },
+        department: { key:'department', label:t('department') },
+        shift: { key:'shift', label:t('shift') },
+        check_in: { key:'check_in', label:t('checkIn') },
+        check_out: { key:'check_out', label:t('checkOut') },
+        hours: { key:'hours', label:t('hours') },
+        status: { key:'status', label:t('status') }
+    };
+}
+function getDailyColumns() {
+    const defs = dailyColumnDefs();
+    dailyColumnOrder = normalizeDailyColumnOrder(dailyColumnOrder);
+    return dailyColumnOrder.map(key => defs[key]).filter(Boolean);
+}
+function moveDailyColumn(fromKey, toKey) {
+    if (!fromKey || !toKey || fromKey === toKey) return;
+    const order = normalizeDailyColumnOrder(dailyColumnOrder);
+    const fromIndex = order.indexOf(fromKey);
+    const toIndex = order.indexOf(toKey);
+    if (fromIndex < 0 || toIndex < 0) return;
+    const [moved] = order.splice(fromIndex, 1);
+    order.splice(toIndex, 0, moved);
+    dailyColumnOrder = order;
+    saveDailyColumnOrder();
+    renderDailyTable();
+}
+function clearDailyColumnDragStyles() {
+    document.querySelectorAll('#dailyView .emp-table thead th').forEach(th => {
+        th.classList.remove('daily-header-dragging', 'daily-drag-over');
+    });
+}
+function onDailyColumnDragStart(event, key) {
+    dailyColumnDragKey = key;
+    event.currentTarget.classList.add('daily-header-dragging');
+    if (event.dataTransfer) {
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('text/plain', key);
+    }
+}
+function onDailyColumnDragOver(event, key) {
+    if (!dailyColumnDragKey || dailyColumnDragKey === key) return;
+    event.preventDefault();
+    clearDailyColumnDragStyles();
+    event.currentTarget.classList.add('daily-drag-over');
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+}
+function onDailyColumnDragLeave(event) {
+    event.currentTarget.classList.remove('daily-drag-over');
+}
+function onDailyColumnDrop(event, key) {
+    event.preventDefault();
+    const fromKey = (event.dataTransfer && event.dataTransfer.getData('text/plain')) || dailyColumnDragKey;
+    clearDailyColumnDragStyles();
+    dailyColumnDragKey = null;
+    moveDailyColumn(fromKey, key);
+}
+function onDailyColumnDragEnd() {
+    clearDailyColumnDragStyles();
+    dailyColumnDragKey = null;
+}
 function showToast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2500); }
 function getTaiwanDate() { return new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Taipei' }); }
 function isManagerRole(role) { return role === 'admin' || role === 'manager'; }
@@ -854,6 +951,7 @@ async function init() {
             showError('請提供公司代碼', '使用方式：在網址後加上 ?company=公司ID\n請向管理員索取連結。');
             return;
         }
+        loadDailyColumnOrder();
 
         // 身份驗證：本頁不是 LIFF endpoint，需先經 index.html endpoint 取得 LINE profile 後再回來。
         const profile = getCachedAttendanceProfile();
@@ -1004,26 +1102,22 @@ function setDailySort(key) {
 }
 
 function updateDailySortHeaders() {
-    const heads = document.querySelectorAll('#dailyView .emp-table thead th');
-    const headers = [
-        ['employee', t('employee')],
-        ['department', t('department')],
-        ['shift', t('shift')],
-        ['check_in', t('checkIn')],
-        ['check_out', t('checkOut')],
-        ['hours', t('hours')],
-        ['status', t('status')],
-        ['lunch', t('lunchStatus')]
-    ];
-    headers.forEach(([key, label], i) => {
-        const th = heads[i];
-        if (!th) return;
+    const row = document.querySelector('#dailyView .emp-table thead tr');
+    if (!row) return;
+    row.innerHTML = getDailyColumns().map(col => {
+        const key = col.key;
+        const label = col.label;
         const active = dailySort.key === key;
         const mark = active ? (dailySort.direction === 'asc' ? '▲' : '▼') : '↕';
-        th.classList.add('sortable');
-        th.innerHTML = '<button type="button" class="daily-sort-btn' + (active ? ' active' : '') + '" onclick="setDailySort(\'' + key + '\')" aria-label="' + esc(label) + '排序">' +
-            '<span>' + esc(label) + '</span><span class="daily-sort-mark">' + mark + '</span></button>';
-    });
+        return '<th class="sortable" draggable="true" data-column="' + esc(key) + '"' +
+            ' ondragstart="onDailyColumnDragStart(event,\'' + key + '\')"' +
+            ' ondragover="onDailyColumnDragOver(event,\'' + key + '\')"' +
+            ' ondragleave="onDailyColumnDragLeave(event)"' +
+            ' ondrop="onDailyColumnDrop(event,\'' + key + '\')"' +
+            ' ondragend="onDailyColumnDragEnd()">' +
+            '<button type="button" class="daily-sort-btn' + (active ? ' active' : '') + '" onclick="setDailySort(\'' + key + '\')" aria-label="' + esc(label) + '排序">' +
+            '<span class="daily-drag-handle" aria-hidden="true">⋮⋮</span><span>' + esc(label) + '</span><span class="daily-sort-mark">' + mark + '</span></button></th>';
+    }).join('');
 }
 
 function dailyStatusRank(row) {
@@ -1449,24 +1543,30 @@ function statusBadge(row) {
     return '<span class="status-badge ' + cls + '">' + label + '</span>';
 }
 
+function dailyCellHtml(r, key) {
+    if (key === 'employee') return '<td style="font-weight:700;white-space:nowrap;">' + esc(r.employee_name) + '</td>';
+    if (key === 'lunch') return '<td>' + lunchBadge(r) + '</td>';
+    if (key === 'department') return '<td style="color:#64748B;font-size:11px;">' + esc(r.department || '-') + '</td>';
+    if (key === 'shift') return '<td>' + shiftBadge(r) + '</td>';
+    if (key === 'check_in') {
+        return '<td class="time-cell">' + fmtTime(r.check_in_time) + (r.is_late ? ' <span class="late-flag">遲到</span>' : '') +
+            (r.check_in_location ? '<span class="loc-hint" title="' + esc(r.check_in_location) + '">📍' + esc(r.check_in_location) + '</span>' : '') + '</td>';
+    }
+    if (key === 'check_out') return '<td class="time-cell">' + fmtTime(r.check_out_time) + (r.is_early_leave ? ' <span class="early-flag">早退</span>' : '') + '</td>';
+    if (key === 'hours') return '<td class="time-cell">' + fmtHours(r.total_work_hours) + '</td>';
+    if (key === 'status') return '<td>' + statusBadge(r) + '</td>';
+    return '<td></td>';
+}
+
 function renderDailyTable() {
     const rows = getFilteredDaily();
     const tbody = document.getElementById('dailyTableBody');
+    const columns = getDailyColumns();
     updateDailySortHeaders();
-    if (rows.length === 0) { tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#999;padding:40px;">無資料</td></tr>'; return; }
+    if (rows.length === 0) { tbody.innerHTML = '<tr><td colspan="' + columns.length + '" style="text-align:center;color:#999;padding:40px;">無資料</td></tr>'; return; }
     let html = '';
     rows.forEach(r => {
-        html += '<tr>' +
-            '<td style="font-weight:700;white-space:nowrap;">' + esc(r.employee_name) + '</td>' +
-            '<td style="color:#64748B;font-size:11px;">' + esc(r.department || '-') + '</td>' +
-            '<td>' + shiftBadge(r) + '</td>' +
-            '<td class="time-cell">' + fmtTime(r.check_in_time) + (r.is_late ? ' <span class="late-flag">遲到</span>' : '') +
-                (r.check_in_location ? '<span class="loc-hint" title="' + esc(r.check_in_location) + '">📍' + esc(r.check_in_location) + '</span>' : '') + '</td>' +
-            '<td class="time-cell">' + fmtTime(r.check_out_time) + (r.is_early_leave ? ' <span class="early-flag">早退</span>' : '') + '</td>' +
-            '<td class="time-cell">' + fmtHours(r.total_work_hours) + '</td>' +
-            '<td>' + statusBadge(r) + '</td>' +
-            '<td>' + lunchBadge(r) + '</td>' +
-        '</tr>';
+        html += '<tr>' + columns.map(col => dailyCellHtml(r, col.key)).join('') + '</tr>';
     });
     tbody.innerHTML = html;
 }
