@@ -40,6 +40,11 @@ body{font-family:'Noto Sans TC',-apple-system,sans-serif;background:var(--bg);co
 .emp-table th{background:#F8FAFC;padding:13px 12px;text-align:left;font-weight:900;color:#475569;border-bottom:1px solid #CBD5E1;position:sticky;top:0;z-index:1;white-space:nowrap;}
 .emp-table td{padding:13px 12px;border-bottom:1px solid #EEF2F7;vertical-align:middle;background:#fff;}
 .emp-table tr:hover td{background:#F8FAFC;}
+.emp-table th.sortable{padding:0;}
+.daily-sort-btn{width:100%;padding:13px 12px;border:none;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer;display:flex;align-items:center;gap:5px;justify-content:flex-start;}
+.daily-sort-btn:hover{background:#EEF2FF;color:#3730A3;}
+.daily-sort-mark{font-size:10px;color:#94A3B8;line-height:1;}
+.daily-sort-btn.active .daily-sort-mark{color:#4F46E5;}
 
 .status-badge{padding:3px 8px;border-radius:8px;font-size:10px;font-weight:700;white-space:nowrap;display:inline-block;}
 .s-working{background:#DBEAFE;color:#1D4ED8;}
@@ -580,9 +585,14 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let companyId = null;
+const DACHENG_COMPANY_ID = '8a669e2c-7521-43e9-9300-5c004c57e9db';
 const BENMI_COMPANY_ID = 'fb1f6b5f-dcd5-4262-a7de-e7c357662639';
+const DAILY_HIDDEN_EMPLOYEES_BY_COMPANY = {
+    [DACHENG_COMPANY_ID]: new Set(['Adam', '黃璿如', '黃秀梅'])
+};
 let companyName = '';
 let dailyData = [];
+let dailySort = { key: 'status', direction: 'asc' };
 let monthlyData = [];
 let trafficReport = null;
 let mYear = new Date().getFullYear();
@@ -594,6 +604,7 @@ let monthHolidayMap = {};
 let currentUserRole = null;
 let currentEmployeeId = null;
 let currentUserCanSchedule = false;
+let currentUserIsKiosk = false;
 let currentLineUserId = null;
 let viewingAsEmployee = false;
 const LINE_ADD_FRIEND_URL = 'https://line.me/R/ti/p/@130oqrak';
@@ -689,8 +700,7 @@ function applyTranslations() {
     const statusOpts = document.querySelectorAll('#filterStatus option');
     const statusLabels = ['', t('working'), t('notChecked'), t('completed'), t('late'), t('leave'), t('absent')];
     statusOpts.forEach((opt, i) => { if (statusLabels[i]) opt.textContent = statusLabels[i]; });
-    const dailyHeads = document.querySelectorAll('#dailyView .emp-table thead th');
-    [t('employee'), t('department'), t('shift'), t('checkIn'), t('checkOut'), t('hours'), t('status')].forEach((v, i) => { if (dailyHeads[i]) dailyHeads[i].textContent = v; });
+    updateDailySortHeaders();
     const monthlyHeads = document.querySelectorAll('#monthlyView .emp-table thead th');
     [t('employee'), t('department'), t('expectedDays'), t('actualDays'), t('late'), t('early'), t('leaveDays'), t('absentDays'), t('totalHours')].forEach((v, i) => { if (monthlyHeads[i]) monthlyHeads[i].textContent = v; });
     setText('#humanView .hr-toolbar div div:first-child', t('humanTitle'));
@@ -705,17 +715,27 @@ function applyTranslations() {
     if (overnightLabel) overnightLabel.lastChild.textContent = ' ' + t('overnight');
     setTexts('.shift-form-actions button', [t('save'), t('clear'), t('seedDefaults')]);
     const manager = isManagerRole(currentUserRole);
-    const employeeView = !manager || viewingAsEmployee;
+    const overviewReader = canReadAttendanceOverview();
+    const employeeView = !overviewReader || viewingAsEmployee;
     setText('#pageTitle', employeeView ? t('pageTitleEmployee') : t('pageTitleManager'));
     const roleHint = document.getElementById('roleHint');
-    if (roleHint) roleHint.textContent = manager ? (employeeView ? t('roleEmployeeSwitch') : t('roleManager')) : t('roleEmployee');
+    if (roleHint) {
+        roleHint.textContent = manager
+            ? (employeeView ? t('roleEmployeeSwitch') : t('roleManager'))
+            : (currentUserIsKiosk && !employeeView ? '公務機只讀模式' : t('roleEmployee'));
+    }
     const subtitle = document.querySelector('.entry-subtitle');
-    if (subtitle) subtitle.textContent = employeeView && manager ? t('entrySubtitleEmployee') : t('entrySubtitleManager');
+    if (subtitle) {
+        subtitle.textContent = currentUserIsKiosk && !employeeView
+            ? '公務機只讀：可查看今日、月度、週班表；不可編輯、匯出或進入管理後台。'
+            : (employeeView && manager ? t('entrySubtitleEmployee') : t('entrySubtitleManager'));
+    }
 }
 function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = String(s); return d.innerHTML; }
 function showToast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2500); }
 function getTaiwanDate() { return new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Taipei' }); }
 function isManagerRole(role) { return role === 'admin' || role === 'manager'; }
+function canReadAttendanceOverview() { return isManagerRole(currentUserRole) || currentUserIsKiosk; }
 function isBenmiCompany() { return companyId === BENMI_COMPANY_ID; }
 function canShowTrafficTab() { return isBenmiCompany(); }
 function canShowHumanTab() { return isBenmiCompany(); }
@@ -740,7 +760,8 @@ function toggleViewMode() {
 
 function applyRoleAccess() {
     const manager = isManagerRole(currentUserRole);
-    const employeeView = !manager || viewingAsEmployee;
+    const overviewReader = canReadAttendanceOverview();
+    const employeeView = !overviewReader || viewingAsEmployee;
     const showTrafficTab = manager && !employeeView && canShowTrafficTab();
     const showHumanTab = manager && !employeeView && canShowHumanTab();
     const roleHint = document.getElementById('roleHint');
@@ -755,7 +776,7 @@ function applyRoleAccess() {
 
     roleHint.onclick = manager ? toggleViewMode : null;
     roleHint.classList.toggle('clickable', manager);
-    roleHint.classList.toggle('role-manager', manager && !employeeView);
+    roleHint.classList.toggle('role-manager', overviewReader && !employeeView);
     roleHint.classList.toggle('role-employee', employeeView);
 
     if (manager && !employeeView) {
@@ -764,6 +785,9 @@ function applyRoleAccess() {
     } else if (manager && employeeView) {
         roleHint.textContent = '員工視角｜點我回管理員模式';
         roleHint.title = '切回管理員完整模式';
+    } else if (currentUserIsKiosk && !employeeView) {
+        roleHint.textContent = '公務機只讀模式';
+        roleHint.title = '只能查看打卡總覽，不能編輯或進入管理後台';
     } else {
         roleHint.textContent = '員工模式';
         roleHint.title = '';
@@ -800,7 +824,9 @@ function applyRoleAccess() {
             switchTab(currentTab);
         }
         if (subtitle) {
-            subtitle.textContent = '同一個入口自動區分權限。一般員工可查看今日與週班表；管理員可查看完整打卡總覽與工具。';
+            subtitle.textContent = currentUserIsKiosk
+                ? '公務機只讀：可查看今日、月度、週班表；不可編輯、匯出或進入管理後台。'
+                : '同一個入口自動區分權限。一般員工可查看今日與週班表；管理員可查看完整打卡總覽與工具。';
         }
     }
 }
@@ -839,7 +865,7 @@ async function init() {
 
         // 驗證呼叫者是該公司的 admin/manager
         const { data: emp } = await sb.from('employees')
-            .select('id, role, can_schedule')
+            .select('id, role, can_schedule, is_kiosk')
             .eq('line_user_id', profile.userId)
             .eq('company_id', companyId)
             .eq('is_active', true)
@@ -851,6 +877,7 @@ async function init() {
         currentUserRole = emp.role || 'user';
         currentEmployeeId = emp.id;
         currentUserCanSchedule = !!emp.can_schedule;
+        currentUserIsKiosk = !!emp.is_kiosk;
         currentLineUserId = profile.userId;
 
         companyName = company.name;
@@ -879,6 +906,8 @@ async function init() {
 // === Tab 切換 ===
 function switchTab(tab) {
     const manager = isManagerRole(currentUserRole) && !viewingAsEmployee;
+    const overviewReader = canReadAttendanceOverview() && !viewingAsEmployee;
+    if (tab === 'monthly' && !overviewReader) tab = 'daily';
     const showTrafficTab = manager && canShowTrafficTab();
     const showHumanTab = manager && canShowHumanTab();
     if (tab === 'traffic' && !showTrafficTab) tab = 'daily';
@@ -919,7 +948,7 @@ async function loadDailyData() {
     try {
         const { data, error } = await sb.rpc('get_company_daily_attendance', { p_company_id: companyId, p_date: dateStr });
         if (error) throw error;
-        dailyData = data || [];
+        dailyData = (data || []).filter(row => !shouldHideDailyEmployee(row));
         updateDailyStats();
         updateDeptFilter();
         renderDailyTable();
@@ -952,13 +981,93 @@ function updateDeptFilter() {
 
 function applyDailyFilter() { renderDailyTable(); }
 
+function shouldHideDailyEmployee(row) {
+    const hiddenNames = DAILY_HIDDEN_EMPLOYEES_BY_COMPANY[companyId];
+    if (!hiddenNames) return false;
+    return hiddenNames.has(String(row.employee_name || '').trim());
+}
+
+function setDailySort(key) {
+    if (dailySort.key === key) {
+        dailySort.direction = dailySort.direction === 'asc' ? 'desc' : 'asc';
+    } else {
+        dailySort = { key, direction: 'asc' };
+    }
+    renderDailyTable();
+}
+
+function updateDailySortHeaders() {
+    const heads = document.querySelectorAll('#dailyView .emp-table thead th');
+    const headers = [
+        ['employee', t('employee')],
+        ['department', t('department')],
+        ['shift', t('shift')],
+        ['check_in', t('checkIn')],
+        ['check_out', t('checkOut')],
+        ['hours', t('hours')],
+        ['status', t('status')]
+    ];
+    headers.forEach(([key, label], i) => {
+        const th = heads[i];
+        if (!th) return;
+        const active = dailySort.key === key;
+        const mark = active ? (dailySort.direction === 'asc' ? '▲' : '▼') : '↕';
+        th.classList.add('sortable');
+        th.innerHTML = '<button type="button" class="daily-sort-btn' + (active ? ' active' : '') + '" onclick="setDailySort(\'' + key + '\')" aria-label="' + esc(label) + '排序">' +
+            '<span>' + esc(label) + '</span><span class="daily-sort-mark">' + mark + '</span></button>';
+    });
+}
+
+function dailyStatusRank(row) {
+    if (row.status === 'not_checked') return 0;
+    if (row.status === 'absent') return 1;
+    if (row.status === 'working') return row.is_late ? 2 : 3;
+    if (row.status === 'on_leave') return 4;
+    if (row.status === 'completed') return row.is_late ? 5 : 6;
+    return 9;
+}
+
+function dailyTimeSortValue(v) {
+    if (!v) return Number.POSITIVE_INFINITY;
+    const ms = Date.parse(v);
+    return Number.isFinite(ms) ? ms : Number.POSITIVE_INFINITY;
+}
+
+function dailySortValue(row, key) {
+    if (key === 'employee') return String(row.employee_name || '');
+    if (key === 'department') return String(row.department || '');
+    if (key === 'shift') return String(row.shift_name || '') + ' ' + String(row.shift_start || '') + ' ' + String(row.shift_end || '');
+    if (key === 'check_in') return dailyTimeSortValue(row.check_in_time);
+    if (key === 'check_out') return dailyTimeSortValue(row.check_out_time);
+    if (key === 'hours') return Number(row.total_work_hours) || 0;
+    if (key === 'status') return dailyStatusRank(row);
+    return '';
+}
+
+function sortDailyRows(rows) {
+    const direction = dailySort.direction === 'desc' ? -1 : 1;
+    const key = dailySort.key || 'status';
+    return rows.slice().sort((a, b) => {
+        const av = dailySortValue(a, key);
+        const bv = dailySortValue(b, key);
+        let cmp = 0;
+        if (typeof av === 'number' && typeof bv === 'number') {
+            cmp = av === bv ? 0 : (av < bv ? -1 : 1);
+        } else {
+            cmp = String(av).localeCompare(String(bv), currentLang === 'vi' ? 'vi' : 'zh-Hant');
+        }
+        if (cmp !== 0) return cmp * direction;
+        return String(a.employee_name || '').localeCompare(String(b.employee_name || ''), currentLang === 'vi' ? 'vi' : 'zh-Hant');
+    });
+}
+
 function getFilteredDaily() {
     let filtered = dailyData.filter(r => r.status !== 'off_day');
     const dept = document.getElementById('filterDept').value;
     const status = document.getElementById('filterStatus').value;
     if (dept) filtered = filtered.filter(r => r.department === dept);
     if (status) { filtered = status === 'late' ? filtered.filter(r => r.is_late) : filtered.filter(r => r.status === status); }
-    return filtered;
+    return sortDailyRows(filtered);
 }
 
 function fmtTime(ts) {
@@ -1317,6 +1426,7 @@ function statusBadge(row) {
 function renderDailyTable() {
     const rows = getFilteredDaily();
     const tbody = document.getElementById('dailyTableBody');
+    updateDailySortHeaders();
     if (rows.length === 0) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#999;padding:40px;">無資料</td></tr>'; return; }
     let html = '';
     rows.forEach(r => {
