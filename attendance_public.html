@@ -54,6 +54,11 @@ body{font-family:'Noto Sans TC',-apple-system,sans-serif;background:var(--bg);co
 .s-on-leave{background:#F3F4F6;color:#6B7280;}
 .s-absent{background:#FEE2E2;color:#991B1B;}
 .s-off-day{background:#F3F4F6;color:#9CA3AF;}
+.lunch-badge{padding:3px 8px;border-radius:8px;font-size:10px;font-weight:800;white-space:nowrap;display:inline-block;}
+.lunch-regular{background:#FEF3C7;color:#92400E;}
+.lunch-vegetarian{background:#DCFCE7;color:#15803D;}
+.lunch-none{background:#F3F4F6;color:#475569;}
+.lunch-unset{background:#EEF2FF;color:#4338CA;}
 
 .time-cell{font-family:'SF Mono',monospace;font-size:12px;}
 .late-flag{color:#EA580C;font-size:10px;font-weight:700;}
@@ -322,10 +327,10 @@ body{font-family:'Noto Sans TC',-apple-system,sans-serif;background:var(--bg);co
                 <div class="table-wrap">
                     <table class="emp-table">
                         <thead>
-                            <tr><th>員工</th><th>部門</th><th>班別</th><th>上班</th><th>下班</th><th>工時</th><th>狀態</th></tr>
+                            <tr><th>員工</th><th>部門</th><th>班別</th><th>上班</th><th>下班</th><th>工時</th><th>狀態</th><th>便當</th></tr>
                         </thead>
                         <tbody id="dailyTableBody">
-                            <tr><td colspan="7" style="text-align:center;color:#999;padding:40px;">載入中...</td></tr>
+                            <tr><td colspan="8" style="text-align:center;color:#999;padding:40px;">載入中...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -593,6 +598,7 @@ const DAILY_HIDDEN_EMPLOYEES_BY_COMPANY = {
 let companyName = '';
 let dailyData = [];
 let dailySort = { key: 'status', direction: 'asc' };
+let dailyLunchOrders = new Map();
 let monthlyData = [];
 let trafficReport = null;
 let mYear = new Date().getFullYear();
@@ -625,7 +631,7 @@ const I18N = {
         fixedShift:'固定班', scheduledShift:'排班制', unset:'未排', defaultShift:'預設班', sharedShift:'共用班別', noPermission:'無權限', edit:'編輯', delete:'刪除', save:'儲存', clear:'清空', seedDefaults:'建立預設',
         humanTitle:'👥 人力管理', humanSubtitle:'電腦版排班工作台。員工模式可直接儲存；排班格子點擊後再按儲存排班。', saveSchedule:'💾 儲存排班', thisWeek:'本週', shiftMaintain:'班別新增 / 編輯', shiftName:'班別名稱', startTime:'開始', endTime:'結束', shiftCode:'代碼（可選）', overnight:'跨日班', currentShifts:'目前班別', noShifts:'尚無班別，請先新增或按「建立預設」。',
         noEmployees:'尚無員工資料', scheduleSynced:'排班已同步', unsavedSchedule:'尚未儲存：{n} 格排班已變更', saveModeOk:'工時模式已儲存', saveFail:'儲存失敗：', scheduleSaved:'排班已儲存', noScheduleChanges:'沒有排班變更', missingManager:'缺少管理者身份',
-        lunchTitle:'便當統計', orders:'份', open:'↗', prev:'◀', next:'▶'
+        lunchTitle:'便當統計', lunchStatus:'便當', lunchRegular:'葷食', lunchVegetarian:'素食', lunchNone:'不訂購', lunchUnset:'未選', orders:'份', open:'↗', prev:'◀', next:'▶'
     },
     vi: {
         langLabel:'Ngôn ngữ', loading:'Đang tải...', loadFailed:'Tải thất bại', noData:'Không có dữ liệu', employee:'Nhân viên', department:'Bộ phận', shift:'Ca làm', checkIn:'Giờ vào', checkOut:'Giờ ra', hours:'Giờ công', status:'Trạng thái',
@@ -642,7 +648,7 @@ const I18N = {
         fixedShift:'Ca cố định', scheduledShift:'Theo lịch', unset:'Chưa xếp', defaultShift:'Ca mặc định', sharedShift:'Ca dùng chung', noPermission:'Không có quyền', edit:'Sửa', delete:'Xóa', save:'Lưu', clear:'Xóa form', seedDefaults:'Tạo ca mặc định',
         humanTitle:'👥 Quản lý nhân sự', humanSubtitle:'Bảng xếp ca bản máy tính. Có thể lưu chế độ giờ làm; bấm ô lịch rồi bấm lưu lịch.', saveSchedule:'💾 Lưu lịch', thisWeek:'Tuần này', shiftMaintain:'Thêm / sửa ca', shiftName:'Tên ca', startTime:'Bắt đầu', endTime:'Kết thúc', shiftCode:'Mã ca (tùy chọn)', overnight:'Ca qua ngày', currentShifts:'Ca hiện có', noShifts:'Chưa có ca. Hãy thêm ca hoặc bấm tạo ca mặc định.',
         noEmployees:'Chưa có dữ liệu nhân viên', scheduleSynced:'Lịch đã đồng bộ', unsavedSchedule:'Chưa lưu: đã đổi {n} ô lịch', saveModeOk:'Đã lưu chế độ giờ làm', saveFail:'Lưu thất bại: ', scheduleSaved:'Đã lưu lịch', noScheduleChanges:'Không có thay đổi lịch', missingManager:'Thiếu thân phận quản lý',
-        lunchTitle:'Thống kê cơm', orders:'phần', open:'↗', prev:'◀', next:'▶'
+        lunchTitle:'Thống kê cơm', lunchStatus:'Cơm', lunchRegular:'Mặn', lunchVegetarian:'Chay', lunchNone:'Không đặt', lunchUnset:'Chưa chọn', orders:'phần', open:'↗', prev:'◀', next:'▶'
     }
 };
 
@@ -949,6 +955,7 @@ async function loadDailyData() {
         const { data, error } = await sb.rpc('get_company_daily_attendance', { p_company_id: companyId, p_date: dateStr });
         if (error) throw error;
         dailyData = (data || []).filter(row => !shouldHideDailyEmployee(row));
+        dailyLunchOrders = new Map();
         updateDailyStats();
         updateDeptFilter();
         renderDailyTable();
@@ -956,7 +963,7 @@ async function loadDailyData() {
         loadLunchStats(dateStr);
     } catch (e) {
         console.error('Load daily error:', e);
-        document.getElementById('dailyTableBody').innerHTML = '<tr><td colspan="7" style="text-align:center;color:#ef4444;padding:20px;">載入失敗：' + esc(e.message || '') + '</td></tr>';
+        document.getElementById('dailyTableBody').innerHTML = '<tr><td colspan="8" style="text-align:center;color:#ef4444;padding:20px;">載入失敗：' + esc(e.message || '') + '</td></tr>';
     }
 }
 
@@ -1005,7 +1012,8 @@ function updateDailySortHeaders() {
         ['check_in', t('checkIn')],
         ['check_out', t('checkOut')],
         ['hours', t('hours')],
-        ['status', t('status')]
+        ['status', t('status')],
+        ['lunch', t('lunchStatus')]
     ];
     headers.forEach(([key, label], i) => {
         const th = heads[i];
@@ -1027,6 +1035,23 @@ function dailyStatusRank(row) {
     return 9;
 }
 
+function lunchStatusInfo(row) {
+    const order = dailyLunchOrders.get(row.employee_id);
+    if (!order) return { rank: 3, label: t('lunchUnset'), cls: 'lunch-unset' };
+    if (order.status === 'cancelled') return { rank: 2, label: t('lunchNone'), cls: 'lunch-none' };
+    if (order.is_vegetarian) return { rank: 1, label: t('lunchVegetarian'), cls: 'lunch-vegetarian' };
+    return { rank: 0, label: t('lunchRegular'), cls: 'lunch-regular' };
+}
+
+function lunchStatusRank(row) {
+    return lunchStatusInfo(row).rank;
+}
+
+function lunchBadge(row) {
+    const info = lunchStatusInfo(row);
+    return '<span class="lunch-badge ' + info.cls + '">' + esc(info.label) + '</span>';
+}
+
 function dailyTimeSortValue(v) {
     if (!v) return Number.POSITIVE_INFINITY;
     const ms = Date.parse(v);
@@ -1041,6 +1066,7 @@ function dailySortValue(row, key) {
     if (key === 'check_out') return dailyTimeSortValue(row.check_out_time);
     if (key === 'hours') return Number(row.total_work_hours) || 0;
     if (key === 'status') return dailyStatusRank(row);
+    if (key === 'lunch') return lunchStatusRank(row);
     return '';
 }
 
@@ -1427,7 +1453,7 @@ function renderDailyTable() {
     const rows = getFilteredDaily();
     const tbody = document.getElementById('dailyTableBody');
     updateDailySortHeaders();
-    if (rows.length === 0) { tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#999;padding:40px;">無資料</td></tr>'; return; }
+    if (rows.length === 0) { tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:#999;padding:40px;">無資料</td></tr>'; return; }
     let html = '';
     rows.forEach(r => {
         html += '<tr>' +
@@ -1439,6 +1465,7 @@ function renderDailyTable() {
             '<td class="time-cell">' + fmtTime(r.check_out_time) + (r.is_early_leave ? ' <span class="early-flag">早退</span>' : '') + '</td>' +
             '<td class="time-cell">' + fmtHours(r.total_work_hours) + '</td>' +
             '<td>' + statusBadge(r) + '</td>' +
+            '<td>' + lunchBadge(r) + '</td>' +
         '</tr>';
     });
     tbody.innerHTML = html;
@@ -1612,7 +1639,8 @@ function exportExcel() {
             '工時': r.total_work_hours > 0 ? Math.round(r.total_work_hours * 10) / 10 : '',
             '遲到': r.is_late ? '是' : '', '早退': r.is_early_leave ? '是' : '',
             '打卡地點': r.check_in_location || '',
-            '狀態': { working:'上班中', completed:'完成', not_checked:'未打卡', on_leave:'請假', absent:'缺勤' }[r.status] || r.status
+            '狀態': { working:'上班中', completed:'完成', not_checked:'未打卡', on_leave:'請假', absent:'缺勤' }[r.status] || r.status,
+            '便當狀態': lunchStatusInfo(r).label
         }));
         XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), '今日打卡');
         XLSX.writeFile(wb, companyName + '_打卡總覽_' + getDailyDate() + '.xlsx');
@@ -1783,7 +1811,12 @@ async function checkLunchFeature() {
 
 async function loadLunchStats(dateStr) {
     const card = document.getElementById('lunchStatCard');
-    if (!card || !lunchFeatureEnabled) { if (card) card.style.display = 'none'; return; }
+    if (!card || !lunchFeatureEnabled) {
+        dailyLunchOrders = new Map();
+        renderDailyTable();
+        if (card) card.style.display = 'none';
+        return;
+    }
 
     try {
         const { data, error } = await sb.from('lunch_orders')
@@ -1793,9 +1826,14 @@ async function loadLunchStats(dateStr) {
 
         if (error) throw error;
 
+        dailyLunchOrders = new Map();
+        (data || []).forEach(o => {
+            if (o.employee_id) dailyLunchOrders.set(o.employee_id, o);
+        });
         lunchData = (data || []).filter(o => o.status !== 'cancelled');
         document.getElementById('lunchOrderCount').textContent = lunchData.length;
         card.style.display = 'block';
+        renderDailyTable();
 
         const contentEl = document.getElementById('lunchDetailContent');
         if (!contentEl) return;
@@ -1821,6 +1859,8 @@ async function loadLunchStats(dateStr) {
         contentEl.innerHTML = html || '<div style="color:#94A3B8;text-align:center;">無訂購資料</div>';
     } catch(e) {
         console.error('Load lunch error:', e);
+        dailyLunchOrders = new Map();
+        renderDailyTable();
         card.style.display = 'none';
     }
 }
