@@ -22,21 +22,27 @@ export function switchApprovalType(type, btn) {
 }
 
 // ===== 請假審核 =====
-export function switchLeaveTab(status) {
+function leavePeriodLabel(period) {
+    const map = { full_day: '全日', am: '上午半天', pm: '下午半天' };
+    return map[period || 'full_day'] || '全日';
+}
+
+export function switchLeaveTab(status, btn = null) {
     document.querySelectorAll('#leaveApprovalTabs .tab-btn').forEach(btn => { btn.className = 'tab-btn inactive'; });
-    event.target.className = 'tab-btn active';
+    const targetBtn = btn || (typeof event !== 'undefined' ? event.target : null);
+    if (targetBtn) targetBtn.className = 'tab-btn active';
     loadLeaveApprovals(status);
 }
 
 export async function loadLeaveApprovals(status) {
     const listEl = document.getElementById('leaveApprovalList');
     if (!listEl) return;
+    listEl.innerHTML = '<p style="text-align:center;color:#666;">載入中...</p>';
     try {
-        const { data, error } = await sb.from('leave_requests')
-            .select(`*, employees!inner(name, employee_number, department, company_id)`)
-            .eq('employees.company_id', window.currentCompanyId)
-            .eq('status', status)
-            .order('created_at', { ascending: false });
+        const { data, error } = await sb.rpc('get_leave_approval_requests', {
+            p_company_id: window.currentCompanyId,
+            p_status: status
+        });
         if (error) throw error;
         const typeMap = { 'annual': '特休', 'sick': '病假', 'personal': '事假', 'compensatory': '補休' };
         const statusText = { 'pending': '待審核', 'approved': '已通過', 'rejected': '已拒絕' };
@@ -45,17 +51,18 @@ export async function loadLeaveApprovals(status) {
             html += `
                 <div class="attendance-item">
                     <div class="date">
-                        <span>${request.employees?.name || '未知'} - ${typeMap[request.leave_type] || request.leave_type}</span>
+                        <span>${escapeHTML(request.employee_name || '未知')} - ${typeMap[request.leave_type] || escapeHTML(request.leave_type || '')}</span>
                         <span style="font-size:12px;color:#999;">${request.created_at?.split('T')[0] || ''}</span>
                     </div>
                     <div class="details">
                         <span>${request.start_date} ~ ${request.end_date}</span>
-                        <span>${request.employees?.department || '-'}</span>
+                        <span>${request.days || 1} 天 · ${leavePeriodLabel(request.leave_period)}</span>
+                        <span>${escapeHTML(request.department || '-')}</span>
                     </div>
-                    <div style="font-size:12px;color:#666;margin-top:5px;">${request.reason || '無原因'}</div>
+                    <div style="font-size:12px;color:#666;margin-top:5px;">${escapeHTML(request.reason || '無原因')}</div>
                     ${request.status === 'rejected' && request.rejection_reason ? `
                         <div style="font-size:12px;color:#DC2626;margin-top:6px;padding:8px 10px;background:#FEF2F2;border-radius:8px;">
-                            ❌ 拒絕原因：${request.rejection_reason}
+                            ❌ 拒絕原因：${escapeHTML(request.rejection_reason)}
                         </div>` : ''}
                     ${status === 'pending' ? `
                         <div style="margin-top:8px;display:flex;gap:6px;">
@@ -67,7 +74,9 @@ export async function loadLeaveApprovals(status) {
         listEl.innerHTML = html || `<p style="text-align:center;color:#999;">無${statusText[status] || ''}的請假申請</p>`;
     } catch (err) {
         console.error(err);
-        listEl.innerHTML = '<p style="text-align:center;color:#ef4444;">載入失敗</p>';
+        const msg = String(err?.message || '');
+        const needsSql = msg.includes('get_leave_approval_requests') || msg.includes('Could not find the function');
+        listEl.innerHTML = `<p style="text-align:center;color:#ef4444;">載入失敗${needsSql ? '，請先執行 086 SQL' : ''}</p>`;
     }
 }
 
@@ -388,7 +397,7 @@ export async function loadLeaveCal() {
     try {
         const { data: emps } = await sb.from('employees').select('id, name, department').eq('company_id', window.currentCompanyId).eq('is_active', true).order('department').order('name');
         employees = emps || [];
-        const { data: lvs } = await sb.from('leave_requests').select('employee_id, start_date, end_date, leave_type, status, employees!inner(company_id)')
+        const { data: lvs } = await sb.from('leave_requests').select('employee_id, start_date, end_date, days, leave_type, leave_period, status, employees!inner(company_id)')
             .eq('employees.company_id', window.currentCompanyId)
             .in('status', ['approved', 'pending']).or(`and(start_date.lte.${me},end_date.gte.${ms})`);
         leaves = lvs || [];
@@ -453,7 +462,8 @@ export async function loadLeaveCal() {
                 const bg = over ? '#FCA5A5' : (typeColor[lv.leave_type] || '#F1F5F9');
                 const emoji = typeEmoji[lv.leave_type] || '📝';
                 const pending = lv.status === 'pending' ? 'opacity:0.6;' : '';
-                bodyHtml += `<td style="text-align:center;background:${bg};border-bottom:1px solid #F1F5F9;${pending}font-size:10px;cursor:default;" title="${emp.name} ${lv.leave_type}${lv.status === 'pending' ? ' (待審)' : ''}${over ? ' ⚠超限' : ''}">${emoji}</td>`;
+                const periodLabel = leavePeriodLabel(lv.leave_period);
+                bodyHtml += `<td style="text-align:center;background:${bg};border-bottom:1px solid #F1F5F9;${pending}font-size:10px;cursor:default;" title="${emp.name} ${lv.leave_type} ${periodLabel} ${lv.days || 1}天${lv.status === 'pending' ? ' (待審)' : ''}${over ? ' ⚠超限' : ''}">${emoji}${lv.leave_period && lv.leave_period !== 'full_day' ? '<span style="font-size:9px;">半</span>' : ''}</td>`;
             } else if (isW) {
                 bodyHtml += `<td style="background:#F8FAFC;border-bottom:1px solid #F1F5F9;"></td>`;
             } else {

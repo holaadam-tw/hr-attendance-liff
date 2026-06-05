@@ -63,6 +63,16 @@
 | B17 | 排班覆蓋無提示 | d9abb3b | 儲存前查既有排班 → confirm 提示 |
 | B18 | 公告 expire_at 可設過去日期 | d9abb3b | 過去日期顯示 confirm 警告 |
 
+## 🔵 2026-06-04 修復中的 Bug（大正請假 / 補卡顯示）
+
+| # | Bug | 狀態 | 說明 |
+|---|-----|------|------|
+| B19 | 今日總覽看不到待審補打卡 | ✅ 已修前端 | `attendance_public.html` 讀取 `get_pending_makeup_requests`，表格狀態顯示「待審補上班 / 待審補下班」，並加待審補卡統計 |
+| B20 | 今日總覽看不到待審請假 | ✅ 已修前端 | `attendance_public.html` 讀取 `leave_requests` pending/approved，待審假單顯示「待審請假」 |
+| B21 | 請假只能整天，不能請半天 | 🟡 待執行 SQL | 前端已加入全日 / 上午半天 / 下午半天；新增 `migrations/084_half_day_leave_and_pending_makeup.sql`，需執行後半天才正式可送出 |
+| B22 | 請假衝突檢查未隔離公司 | ✅ 已修前端查詢 | `common.js` 改用 `employees!inner(company_id)`，避免跨公司請假互相影響人力上限 |
+| B23 | 補打卡每月 3 次上限造成正常補卡被擋 | 🟡 待執行 SQL | 新增 `migrations/085_remove_makeup_monthly_limit.sql`，重建 `submit_makeup_punch`，移除每月 3 次限制，只阻擋同一天同類型 pending/approved 重複申請 |
+
 ## 🔵 2026-04-22 修復的 Bug（薪資連動審查）
 
 | # | Bug | Commit | 說明 |
@@ -230,3 +240,7 @@
 - **B34**：公務機員工確認頁的拍照按鈕位置太低，小螢幕需要往下拉；拍照完成後也不夠明確提醒「還要再按上班/下班才送出」。修法：`kiosk.html` 改成緊湊版面，拍照按鈕上移到相機預覽前，相機高度固定且在矮螢幕縮小；拍照後顯示醒目提示「已拍照，請再按上班或下班」。
 
 - **B35**：本米排班制規則被套用到所有公司，導致大正科技薪資計算也不顯示/不計算應出勤、缺勤與缺勤扣款。修法：`modules/payroll.js` 改為公司別分流；本米維持排班制不自動扣缺勤，大正科技與其他一般公司恢復固定班/一般薪資計算。另新增 `migrations/083_company_specific_expected_absent_days.sql`，讓月度總覽 RPC 同步依公司分流。
+
+- **B36**：一般打卡頁已能把 GPS 精度 >500m 改送待審，但「精度正常、座標飄到公司半徑外」仍直接擋下。修法：`checkin.html` 在 `quick_check_in` 回傳 `outside_allowed_location` 且 `min_distance <= 1000m` 時，改送補打卡待審核；超過 1000m 仍直接擋。`modules/schedules.js` 審核卡片新增「GPS 範圍外疑似飄移」標示，顯示距離公司、精度、照片與地圖連結。
+
+- **B37**：審核中心請假清單直接讀 `leave_requests`，遇到 RLS / schema 差異會顯示「載入失敗」；補打卡審核只讀 pending，且 GPS 待核與一般補卡混在一起，主管按通過後若有重複申請仍像沒作用。修法：新增 `migrations/086_approval_center_gps_review.sql`，提供 `get_leave_approval_requests`、`get_makeup_review_requests`，並讓 `approve_makeup_request` 通過一筆後自動關閉同員工同日同類型重複 pending。前端改為「待審核 / GPS 待核 / 一般補卡 / 已通過 / 已拒絕」分頁，通過時顯示處理狀態。

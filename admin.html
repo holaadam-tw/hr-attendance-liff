@@ -726,9 +726,9 @@
                 <!-- 請假審核 -->
                 <div id="aprLeave" class="aprContent">
                     <div class="tabs" id="leaveApprovalTabs">
-                        <button class="tab-btn active" onclick="switchLeaveTab('pending')">待審核</button>
-                        <button class="tab-btn inactive" onclick="switchLeaveTab('approved')">已通過</button>
-                        <button class="tab-btn inactive" onclick="switchLeaveTab('rejected')">已拒絕</button>
+                        <button class="tab-btn active" onclick="switchLeaveTab('pending', this)">待審核</button>
+                        <button class="tab-btn inactive" onclick="switchLeaveTab('approved', this)">已通過</button>
+                        <button class="tab-btn inactive" onclick="switchLeaveTab('rejected', this)">已拒絕</button>
                     </div>
                     <div id="leaveApprovalList"><p style="text-align:center;color:#666;">載入中...</p></div>
                 </div>
@@ -736,9 +736,11 @@
                 <!-- 補打卡審核 -->
                 <div id="aprMakeup" class="aprContent" style="display:none;">
                     <div class="tabs" id="makeupApprovalTabs">
-                        <button class="tab-btn active" onclick="switchMakeupTab('pending')">待審核</button>
-                        <button class="tab-btn inactive" onclick="switchMakeupTab('approved')">已通過</button>
-                        <button class="tab-btn inactive" onclick="switchMakeupTab('rejected')">已拒絕</button>
+                        <button class="tab-btn active" onclick="switchMakeupTab('pending', 'all', this)">待審核</button>
+                        <button class="tab-btn inactive" onclick="switchMakeupTab('pending', 'gps_review', this)">GPS 待核</button>
+                        <button class="tab-btn inactive" onclick="switchMakeupTab('pending', 'manual', this)">一般補卡</button>
+                        <button class="tab-btn inactive" onclick="switchMakeupTab('approved', 'all', this)">已通過</button>
+                        <button class="tab-btn inactive" onclick="switchMakeupTab('rejected', 'all', this)">已拒絕</button>
                     </div>
                     <div id="makeupApprovalList"><p style="text-align:center;color:#666;">載入中...</p></div>
                 </div>

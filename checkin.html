@@ -166,49 +166,89 @@
             };
         }
 
-        function buildLowAccuracyReviewNote(rpcAction, loc, publicUrl, nowParts) {
+        function buildGpsReviewNote(rpcAction, loc, publicUrl, nowParts, reviewType, extra = {}) {
             return JSON.stringify({
-                source: 'low_accuracy_gps_checkin',
+                source: reviewType === 'outside_range_gps' ? 'outside_range_gps_checkin' : 'low_accuracy_gps_checkin',
+                review_type: reviewType,
                 action: rpcAction,
                 photo_url: publicUrl,
                 latitude: loc.latitude,
                 longitude: loc.longitude,
-                accuracy_m: Math.round(loc.accuracy),
+                accuracy_m: Number.isFinite(loc?.accuracy) ? Math.round(loc.accuracy) : null,
+                min_distance_m: Number.isFinite(extra.minDistance) ? Math.round(extra.minDistance) : null,
+                review_distance_limit_m: GPS_OUTSIDE_REVIEW_MAX_DISTANCE_M,
                 submitted_at: nowParts.submittedAt,
                 device: navigator.userAgent
             });
         }
 
-        async function submitLowAccuracyReviewRequest(rpcAction, loc, publicUrl) {
+        async function submitGpsReviewRequest(rpcAction, loc, publicUrl, options = {}) {
             const nowParts = getTaiwanNowParts();
             const typeText = rpcAction === 'check_out' ? '下班' : '上班';
             const accuracyText = Number.isFinite(loc?.accuracy) ? `${Math.round(loc.accuracy)}m` : '未知';
+            const minDistance = Number(options.minDistance);
+            const reason = options.reviewType === 'outside_range_gps'
+                ? `GPS 範圍外疑似飄移（距離公司約 ${Math.round(minDistance)}m），${typeText}打卡待主管核認`
+                : `GPS 精度不足（${accuracyText}），${typeText}打卡待主管核認`;
             const { data, error } = await sb.rpc('submit_makeup_punch', {
                 p_line_user_id: liffProfile.userId,
                 p_punch_date: nowParts.date,
                 p_punch_type: rpcAction === 'check_out' ? 'clock_out' : 'clock_in',
                 p_punch_time: nowParts.time,
-                p_reason: `GPS 精度不足（${accuracyText}），${typeText}打卡待主管核認`,
-                p_note: buildLowAccuracyReviewNote(rpcAction, loc, publicUrl, nowParts)
+                p_reason: reason,
+                p_note: buildGpsReviewNote(rpcAction, loc, publicUrl, nowParts, options.reviewType || 'low_accuracy_gps', {
+                    minDistance
+                })
             });
 
             if (error || !data?.success) {
                 throw new Error(data?.error || error?.message || '送出待審核打卡失敗');
             }
 
-            return { typeText, nowParts };
+            return { typeText, nowParts, reviewType: options.reviewType || 'low_accuracy_gps', minDistance };
         }
 
-        function showLowAccuracyPendingSuccess(typeText, nowParts, loc) {
+        async function submitLowAccuracyReviewRequest(rpcAction, loc, publicUrl) {
+            return submitGpsReviewRequest(rpcAction, loc, publicUrl, { reviewType: 'low_accuracy_gps' });
+        }
+
+        function showLowAccuracyPendingSuccess(typeText, nowParts, loc, options = {}) {
             stopCamera();
             const accuracyText = Number.isFinite(loc?.accuracy) ? `${Math.round(loc.accuracy)}m` : '未知';
+            const detailText = options.reviewType === 'outside_range_gps'
+                ? `距離公司約 ${Math.round(options.minDistance)}m，疑似定位飄移`
+                : `GPS 精度 ${accuracyText}`;
             showStatus(
                 document.getElementById('checkInStatus'),
                 'success',
-                `✅ 已送出${typeText}打卡待審核（${nowParts.displayTime}，GPS 精度 ${accuracyText}）。主管核准後才會正式計入出勤。`
+                `✅ 已送出${typeText}打卡待審核（${nowParts.displayTime}，${detailText}）。主管核准後才會正式計入出勤。`
             );
             showToast('✅ 已送主管審核');
             setTimeout(() => { window.location.href = 'index.html'; }, 2500);
+        }
+
+        function getOutsideRangeDistance(rpcData) {
+            const minDistance = Number(rpcData?.min_distance);
+            return Number.isFinite(minDistance) ? minDistance : null;
+        }
+
+        function canSubmitOutsideRangeReview(rpcData) {
+            const minDistance = getOutsideRangeDistance(rpcData);
+            return rpcData?.error === 'outside_allowed_location' &&
+                minDistance !== null &&
+                minDistance <= GPS_OUTSIDE_REVIEW_MAX_DISTANCE_M;
+        }
+
+        async function submitOutsideRangeReviewIfAllowed(rpcData, rpcAction, loc, publicUrl, statusBox) {
+            if (!canSubmitOutsideRangeReview(rpcData)) return false;
+            const minDistance = getOutsideRangeDistance(rpcData);
+            showStatus(statusBox, 'info', `📍 距離公司約 ${Math.round(minDistance)}m，改送主管審核...`);
+            const pending = await submitGpsReviewRequest(rpcAction, loc, publicUrl, {
+                reviewType: 'outside_range_gps',
+                minDistance
+            });
+            showLowAccuracyPendingSuccess(pending.typeText, pending.nowParts, loc, pending);
+            return true;
         }
 
         // 更新時鐘
@@ -232,6 +272,7 @@
         const GPS_RELAXED_MAX_AGE_MS = 600000;
         const GPS_MIN_ACCURACY_M = 0;
         const GPS_MAX_ACCURACY_M = 500;
+        const GPS_OUTSIDE_REVIEW_MAX_DISTANCE_M = 1000;
         const GPS_REFINEMENT_TIMEOUT_MS = 15000;
         const GPS_STORAGE_KEY = 'last_gps_location';
 
@@ -681,6 +722,9 @@
                 clearTimeout(safetyTimer);
 
                 if (rpcError || !rpcData?.success) {
+                    if (!rpcError && await submitOutsideRangeReviewIfAllowed(rpcData, rpcAction, loc, publicUrl, statusBox)) {
+                        return;
+                    }
                     stopCamera();
                     const mapped = mapCheckinError(rpcError, rpcData);
                     showCheckinError(mapped.title, mapped.message, mapped.canRetry);
@@ -830,6 +874,9 @@
                     const { data: rpcData, error: rpcError } = await submitCheckInRpc(rpcAction2, loc, publicUrl);
 
                     if (rpcError || !rpcData?.success) {
+                        if (!rpcError && await submitOutsideRangeReviewIfAllowed(rpcData, rpcAction2, loc, publicUrl, statusBox)) {
+                            return;
+                        }
                         const mapped = mapCheckinError(rpcError, rpcData);
                         showCheckinError(mapped.title, mapped.message, mapped.canRetry);
                         return;

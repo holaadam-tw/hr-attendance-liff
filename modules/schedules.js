@@ -283,17 +283,46 @@ export async function copyLastWeek() {
 }
 
 // ===== 補打卡審核 =====
-export function switchMakeupTab(status) {
+let currentMakeupStatus = 'pending';
+let currentMakeupFilter = 'all';
+
+export function switchMakeupTab(status, filter = 'all', btn = null) {
     document.querySelectorAll('#makeupApprovalTabs .tab-btn').forEach(btn => { btn.className = 'tab-btn inactive'; });
-    event.target.className = 'tab-btn active';
-    loadMakeupApprovals(status);
+    const targetBtn = btn || (typeof event !== 'undefined' ? event.target : null);
+    if (targetBtn) targetBtn.className = 'tab-btn active';
+    loadMakeupApprovals(status, filter);
+}
+
+function makeupEmptyText(status, filter) {
+    if (status === 'pending' && filter === 'gps_review') return '無待核認的 GPS 打卡';
+    if (status === 'pending' && filter === 'manual') return '無待審核的一般補打卡';
+    const statusMap = { pending: '待審核', approved: '已通過', rejected: '已拒絕' };
+    return `無${statusMap[status] || ''}的補打卡申請`;
+}
+
+function setMakeupCardBusy(id, text, isError = false) {
+    const card = document.querySelector(`[data-makeup-card-id="${id}"]`);
+    if (!card) return;
+    card.querySelectorAll('button').forEach(btn => { btn.disabled = true; btn.style.opacity = '0.55'; });
+    const statusEl = card.querySelector('[data-makeup-card-status]');
+    if (statusEl) {
+        statusEl.style.display = 'block';
+        statusEl.style.color = isError ? '#DC2626' : '#4F46E5';
+        statusEl.textContent = text;
+    }
+}
+
+function releaseMakeupCard(id) {
+    const card = document.querySelector(`[data-makeup-card-id="${id}"]`);
+    if (!card) return;
+    card.querySelectorAll('button').forEach(btn => { btn.disabled = false; btn.style.opacity = '1'; });
 }
 
 function parseMakeupNote(note) {
     if (!note) return null;
     try {
         const parsed = JSON.parse(note);
-        return parsed?.source === 'low_accuracy_gps_checkin' ? parsed : null;
+        return ['low_accuracy_gps_checkin', 'outside_range_gps_checkin'].includes(parsed?.source) ? parsed : null;
     } catch (e) {
         return null;
     }
@@ -309,7 +338,18 @@ function renderMakeupEvidence(request) {
 
     const accuracyValue = Number(evidence.accuracy_m);
     const accuracy = Number.isFinite(accuracyValue) ? `${Math.round(accuracyValue)}m` : '-';
-    const severity = Number.isFinite(accuracyValue) && accuracyValue >= 1000 ? {
+    const isOutsideRange = evidence.source === 'outside_range_gps_checkin' || evidence.review_type === 'outside_range_gps';
+    const minDistanceValue = Number(evidence.min_distance_m);
+    const minDistance = Number.isFinite(minDistanceValue) ? `${Math.round(minDistanceValue)}m` : '-';
+    const reviewLimitValue = Number(evidence.review_distance_limit_m);
+    const reviewLimit = Number.isFinite(reviewLimitValue) ? `${Math.round(reviewLimitValue)}m` : '1000m';
+    const severity = isOutsideRange ? {
+        label: '範圍外待核',
+        bg: '#EEF2FF',
+        border: '#A5B4FC',
+        color: '#3730A3',
+        chipBg: '#4F46E5'
+    } : Number.isFinite(accuracyValue) && accuracyValue >= 1000 ? {
         label: '精度很差',
         bg: '#FEF2F2',
         border: '#FCA5A5',
@@ -326,15 +366,20 @@ function renderMakeupEvidence(request) {
     const lng = Number.isFinite(Number(evidence.longitude)) ? Number(evidence.longitude).toFixed(6) : '-';
     const photoUrl = evidence.photo_url || '';
     const mapUrl = lat !== '-' && lng !== '-' ? `https://www.google.com/maps?q=${lat},${lng}` : '';
+    const title = isOutsideRange ? '📍 GPS 範圍外疑似飄移待核認' : '⚠️ GPS 低精度待核認';
+    const reason = isOutsideRange
+        ? `原因：手機座標距離公司約 ${minDistance}，在待審上限 ${reviewLimit} 內，未直接寫入正式出勤。`
+        : '原因：手機有回傳座標，但 GPS 精度超過 500m，未直接寫入正式出勤。';
 
     return `
         <div style="background:${severity.bg};border:2px solid ${severity.border};border-radius:12px;padding:10px;margin:8px 0;color:${severity.color};font-size:12px;line-height:1.6;">
             <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;">
-                <span style="font-weight:900;">⚠️ GPS 低精度待核認</span>
+                <span style="font-weight:900;">${title}</span>
                 <span style="background:${severity.chipBg};color:#fff;border-radius:999px;padding:2px 8px;font-weight:900;">${severity.label}</span>
                 <span style="background:#fff;border:1px solid ${severity.border};border-radius:999px;padding:2px 8px;font-weight:900;">精度 ${escapeHTML(accuracy)}</span>
+                ${isOutsideRange ? `<span style="background:#fff;border:1px solid ${severity.border};border-radius:999px;padding:2px 8px;font-weight:900;">距離 ${escapeHTML(minDistance)}</span>` : ''}
             </div>
-            <div style="font-weight:700;">原因：手機有回傳座標，但 GPS 精度超過 500m，未直接寫入正式出勤。</div>
+            <div style="font-weight:700;">${escapeHTML(reason)}</div>
             <div>座標：${escapeHTML(lat)}, ${escapeHTML(lng)}</div>
             <div>送出時間：${escapeHTML(evidence.submitted_at || '')}</div>
             <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
@@ -345,24 +390,46 @@ function renderMakeupEvidence(request) {
     `;
 }
 
-export async function loadMakeupApprovals(status) {
+export async function loadMakeupApprovals(status = 'pending', filter = 'all') {
     const listEl = document.getElementById('makeupApprovalList');
     if (!listEl) return;
+    currentMakeupStatus = status;
+    currentMakeupFilter = filter;
     listEl.innerHTML = '<p style="text-align:center;color:#666;">載入中...</p>';
     try {
-        // 使用 SECURITY DEFINER RPC 繞過 RLS（049 SQL）
-        const { data, error } = await sb.rpc('get_pending_makeup_requests', {
-            p_company_id: window.currentCompanyId
+        let data = null;
+        let error = null;
+        const reviewResult = await sb.rpc('get_makeup_review_requests', {
+            p_company_id: window.currentCompanyId,
+            p_status: status,
+            p_review_filter: filter
         });
+        data = reviewResult.data;
+        error = reviewResult.error;
+
+        const missingReviewRpc = error && (
+            String(error.message || '').includes('get_makeup_review_requests') ||
+            String(error.message || '').includes('Could not find the function')
+        );
+
+        if (missingReviewRpc && status === 'pending' && filter === 'all') {
+            const fallback = await sb.rpc('get_pending_makeup_requests', {
+                p_company_id: window.currentCompanyId
+            });
+            data = fallback.data;
+            error = fallback.error;
+        }
+
         if (error) throw error;
 
         if (!data || data.length === 0) {
-            listEl.innerHTML = '<p style="text-align:center;color:#999;">無待審核的補打卡申請</p>';
+            listEl.innerHTML = `<p style="text-align:center;color:#999;">${makeupEmptyText(status, filter)}</p>`;
             return;
         }
         const typeMap = { clock_in: '☀️ 上班', clock_out: '🌙 下班' };
+        const statusMap = { pending: '待審核', approved: '已通過', rejected: '已拒絕' };
         listEl.innerHTML = data.map(r => `
-            <div style="background:#fff;border-radius:14px;padding:14px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,0.06);">
+            <div data-makeup-card-id="${r.id}" style="background:#fff;border-radius:14px;padding:14px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,0.06);">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
                     <span style="font-weight:800;font-size:14px;">${escapeHTML(r.employee_name || '?')}</span>
                     <span style="font-size:11px;color:#94A3B8;">${escapeHTML(r.department || '')} · ${escapeHTML(r.employee_number || '')}</span>
@@ -370,19 +437,29 @@ export async function loadMakeupApprovals(status) {
                 <div style="display:flex;gap:8px;margin-bottom:8px;font-size:13px;">
                     <span style="padding:4px 10px;background:#EFF6FF;border-radius:8px;color:#2563EB;font-weight:700;">📅 ${r.punch_date}</span>
                     <span style="padding:4px 10px;background:#F5F3FF;border-radius:8px;color:#7C3AED;font-weight:700;">${typeMap[r.punch_type] || r.punch_type} ${r.punch_time || ''}</span>
+                    <span style="padding:4px 10px;background:#F8FAFC;border-radius:8px;color:#64748B;font-weight:700;">${statusMap[r.status] || r.status}</span>
                 </div>
                 <div style="font-size:12px;color:#64748B;margin-bottom:8px;">${escapeHTML(r.reason || '')}</div>
                 ${renderMakeupEvidence(r)}
+                <div data-makeup-card-status style="display:none;font-size:12px;font-weight:800;margin:8px 0;"></div>
+                ${r.status === 'pending' ? `
                 <div style="display:flex;gap:8px;">
                     <button onclick="approveMakeupPunch('${r.id}')" style="flex:1;padding:10px;border:none;border-radius:10px;background:#ECFDF5;color:#059669;font-weight:700;font-size:13px;cursor:pointer;">✅ 通過</button>
                     <button onclick="rejectMakeupPunchPrompt('${r.id}')" style="flex:1;padding:10px;border:none;border-radius:10px;background:#FEF2F2;color:#DC2626;font-weight:700;font-size:13px;cursor:pointer;">❌ 拒絕</button>
                 </div>
+                ` : ''}
             </div>
         `).join('');
-    } catch (e) { console.error(e); listEl.innerHTML = '<p style="text-align:center;color:#ef4444;">載入失敗</p>'; }
+    } catch (e) {
+        console.error(e);
+        const msg = String(e?.message || '');
+        const needsSql = msg.includes('get_makeup_review_requests') || msg.includes('Could not find the function');
+        listEl.innerHTML = `<p style="text-align:center;color:#ef4444;">載入失敗${needsSql ? '，請先執行 086 SQL' : ''}</p>`;
+    }
 }
 
 export async function approveMakeupPunch(id) {
+    setMakeupCardBusy(id, '正在通過並寫入正式出勤...');
     try {
         const approverId = window.currentAdminEmployee?.id || null;
         const { data: result, error } = await sb.rpc('approve_makeup_request', {
@@ -392,10 +469,16 @@ export async function approveMakeupPunch(id) {
         if (error) throw error;
         if (result && !result.success) throw new Error(result.error);
 
-        showToast('✅ 已通過並寫入出勤');
+        const closed = Number(result?.closed_duplicates || 0);
+        showToast(closed > 0 ? `✅ 已通過，並關閉 ${closed} 筆重複申請` : '✅ 已通過並寫入出勤');
         writeAuditLog('approve', 'makeup_punch_requests', id, '');
-        loadMakeupApprovals('pending');
-    } catch (e) { console.error(e); showToast('❌ 審核失敗: ' + friendlyError(e)); }
+        loadMakeupApprovals(currentMakeupStatus, currentMakeupFilter);
+    } catch (e) {
+        console.error(e);
+        setMakeupCardBusy(id, '審核失敗：' + friendlyError(e), true);
+        releaseMakeupCard(id);
+        showToast('❌ 審核失敗: ' + friendlyError(e));
+    }
 }
 
 export function rejectMakeupPunchPrompt(id) {
@@ -405,6 +488,7 @@ export function rejectMakeupPunchPrompt(id) {
 }
 
 export async function rejectMakeupPunch(id, reason) {
+    setMakeupCardBusy(id, '正在拒絕申請...');
     try {
         const approverId = window.currentAdminEmployee?.id || null;
         const { data: result, error } = await sb.rpc('reject_makeup_request', {
@@ -416,8 +500,11 @@ export async function rejectMakeupPunch(id, reason) {
         if (result && !result.success) throw new Error(result.error);
 
         showToast('❌ 已拒絕');
-        loadMakeupApprovals('pending');
-    } catch (e) { showToast('❌ 操作失敗: ' + friendlyError(e)); }
+        loadMakeupApprovals(currentMakeupStatus, currentMakeupFilter);
+    } catch (e) {
+        releaseMakeupCard(id);
+        showToast('❌ 操作失敗: ' + friendlyError(e));
+    }
 }
 
 // ===== 加班審核 =====
