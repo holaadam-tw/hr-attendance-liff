@@ -342,7 +342,7 @@ function renderMakeupEvidence(request) {
     const minDistanceValue = Number(evidence.min_distance_m);
     const minDistance = Number.isFinite(minDistanceValue) ? `${Math.round(minDistanceValue)}m` : '-';
     const reviewLimitValue = Number(evidence.review_distance_limit_m);
-    const reviewLimit = Number.isFinite(reviewLimitValue) ? `${Math.round(reviewLimitValue)}m` : '1000m';
+    const reviewLimit = Number.isFinite(reviewLimitValue) ? `${Math.round(reviewLimitValue)}m` : '5000m';
     const severity = isOutsideRange ? {
         label: '範圍外待核',
         bg: '#EEF2FF',
