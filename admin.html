@@ -306,6 +306,9 @@
                     <button id="empTab_pending" onclick="switchEmployeeTab('pending')" style="flex:1; min-width:50px; padding:10px 4px; border:none; font-size:11px; font-weight:700; cursor:pointer; font-family:inherit; background:#fff; color:#64748B; position:relative;">
                         待審核 <span id="pendingBadge" style="display:none; position:absolute; top:4px; right:4px; background:#EF4444; color:#fff; font-size:9px; min-width:16px; height:16px; border-radius:8px; line-height:16px; text-align:center; padding:0 3px;"></span>
                     </button>
+                    <button id="empTab_vietnamese" onclick="switchEmployeeTab('vietnamese')" style="flex:1; min-width:64px; padding:10px 4px; border:none; font-size:11px; font-weight:700; cursor:pointer; font-family:inherit; background:#fff; color:#64748B; position:relative;">
+                        越南介面<span id="vietnameseBadge" style="display:none; position:absolute; top:4px; right:4px; background:#059669; color:#fff; font-size:9px; min-width:16px; height:16px; border-radius:8px; line-height:16px; text-align:center; padding:0 3px;"></span>
+                    </button>
                     <button id="empTab_resigned" onclick="switchEmployeeTab('resigned')" style="flex:1; min-width:50px; padding:10px 4px; border:none; font-size:11px; font-weight:700; cursor:pointer; font-family:inherit; background:#fff; color:#64748B;">
                         已離職
                     </button>
@@ -339,6 +342,12 @@
                 </div>
 
                 <!-- 已離職員工列表 -->
+                <div id="vietnameseEmployeeSection" style="display:none;">
+                    <div id="vietnameseEmployeeList">
+                        <p style="text-align:center;color:#666;">載入中...</p>
+                    </div>
+                </div>
+
                 <div id="resignedEmployeeSection" style="display:none;">
                     <div id="resignedEmployeeList">
                         <p style="text-align:center;color:#666;">載入中...</p>

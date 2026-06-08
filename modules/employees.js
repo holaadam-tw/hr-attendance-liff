@@ -135,8 +135,9 @@ export async function loadEmployeeList() {
     const listEl = document.getElementById('employeeList');
     if (!listEl) return;
 
-    // 同時更新待審核 badge
+    // 同時更新分頁 badge
     loadPendingCount();
+    loadVietnameseCount();
 
     try {
         const { data, error } = await sb.from('employees')
@@ -355,11 +356,12 @@ let currentEmpTab = 'active';
 
 export function switchEmployeeTab(tab) {
     currentEmpTab = tab;
-    const tabs = ['active', 'unbind', 'pending', 'resigned', 'all'];
+    const tabs = ['active', 'unbind', 'pending', 'vietnamese', 'resigned', 'all'];
     const sections = {
         active: 'activeEmployeeSection',
         unbind: 'unbindEmployeeSection',
         pending: 'pendingEmployeeSection',
+        vietnamese: 'vietnameseEmployeeSection',
         resigned: 'resignedEmployeeSection',
         all: 'allEmployeeSection'
     };
@@ -387,6 +389,7 @@ export function switchEmployeeTab(tab) {
     if (tab === 'active') loadEmployeeList();
     else if (tab === 'unbind') loadUnbindEmployees();
     else if (tab === 'pending') loadPendingEmployees();
+    else if (tab === 'vietnamese') loadVietnameseEmployees();
     else if (tab === 'resigned') loadResignedEmployees();
     else if (tab === 'all') loadAllEmployees();
 }
@@ -622,6 +625,92 @@ export async function rejectEmployee(empId, empName) {
     } catch (err) {
         console.error('Reject error:', err);
         showToast('❌ 操作失敗: ' + friendlyError(err));
+    }
+}
+
+// ===== 越南文介面員工列表 =====
+export async function loadVietnameseEmployees() {
+    const listEl = document.getElementById('vietnameseEmployeeList');
+    if (!listEl) return;
+
+    try {
+        const { data, error } = await sb.from('employees')
+            .select('id, name, employee_number, department, position, role, phone, line_user_id, preferred_language')
+            .eq('company_id', window.currentCompanyId)
+            .eq('is_active', true)
+            .eq('status', 'approved')
+            .eq('preferred_language', 'vi-VN')
+            .order('department', { ascending: true })
+            .order('employee_number', { ascending: true });
+
+        if (error) throw error;
+
+        const badge = document.getElementById('vietnameseBadge');
+        if (badge) {
+            if (data && data.length > 0) {
+                badge.textContent = data.length;
+                badge.style.display = 'inline-block';
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+
+        if (!data || data.length === 0) {
+            listEl.innerHTML = '<p style="text-align:center;color:#999;padding:40px 0;">目前沒有員工使用越南文介面</p>';
+            return;
+        }
+
+        const roleNames = { admin: '管理員', manager: '主管', user: '一般員工' };
+        listEl.innerHTML = data.map(emp => `
+            <div class="attendance-item" style="border-left:4px solid #10B981;">
+                <div class="date">
+                    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                        <span style="font-weight:800;">${escapeHTML(emp.name)} - ${escapeHTML(emp.employee_number || '-')}</span>
+                        ${employeeLanguageBadge(emp)}
+                        <span style="padding:3px 9px;border-radius:999px;font-size:11px;background:#F8FAFC;color:#475569;border:1px solid #E2E8F0;font-weight:800;">${roleNames[emp.role] || '一般員工'}</span>
+                    </div>
+                </div>
+                <div class="details" style="margin-top:6px;">
+                    <span>${escapeHTML(emp.department || '-')} · ${escapeHTML(emp.position || '-')}</span>
+                    <span>${emp.line_user_id ? '✅ 已綁定' : '⏳ 未綁定'}</span>
+                </div>
+                <div style="font-size:12px;color:#64748B;margin-top:5px;">
+                    ${emp.phone ? '📱 ' + escapeHTML(emp.phone) : '📱 未設定手機'}
+                </div>
+                <div style="margin-top:8px;">
+                    <button data-id="${emp.id}" onclick="openEditEmployeeModal(this.dataset.id)" style="padding:7px 12px;border:1px solid #BBF7D0;border-radius:8px;background:#F0FDF4;font-size:11px;font-weight:800;cursor:pointer;color:#047857;">✏️ 編輯語言</button>
+                </div>
+            </div>
+        `).join('');
+    } catch (err) {
+        console.error('Load Vietnamese employees error:', err);
+        listEl.innerHTML = '<p style="text-align:center;color:#ef4444;">載入失敗</p>';
+    }
+}
+
+// ===== 載入越南文介面數量（用於 badge 更新） =====
+export async function loadVietnameseCount() {
+    try {
+        const { count, error } = await sb.from('employees')
+            .select('id', { count: 'exact', head: true })
+            .eq('company_id', window.currentCompanyId)
+            .eq('is_active', true)
+            .eq('status', 'approved')
+            .eq('preferred_language', 'vi-VN');
+
+        if (!error) {
+            const badge = document.getElementById('vietnameseBadge');
+            if (badge) {
+                if (count > 0) {
+                    badge.textContent = count;
+                    badge.style.display = 'inline-block';
+                } else {
+                    badge.style.display = 'none';
+                }
+            }
+        }
+    } catch (e) {
+        console.error('Load Vietnamese count error:', e);
     }
 }
 
