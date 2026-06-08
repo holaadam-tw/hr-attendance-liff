@@ -7,6 +7,7 @@
     <title>🍱 服務功能 - 員工服務中心</title>
     <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="i18n.js?v=20260608-employee-lang"></script>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -16,11 +17,12 @@
     </div>
 
     <div class="container">
+        <div id="servicesLanguageSwitch"></div>
         <!-- 便當訂購頁面 -->
         <div id="lunchPage" class="page active">
-            <button class="btn btn-secondary btn-auto-mb" onclick="leaveLunchPage()">← 返回</button>
+            <button class="btn btn-secondary btn-auto-mb" onclick="leaveLunchPage()" data-i18n="backHome">← 返回</button>
             <div class="checkin-page">
-                <h2>🍱 便當訂購</h2>
+                <h2>🍱 <span data-i18n="lunchOrder">便當訂購</span></h2>
                 <div class="lunar-notice" id="lunarNotice">🌙 明天是農曆初一/十五，建議訂購素食</div>
                 
                 <!-- 截止時間提醒 -->
@@ -28,16 +30,16 @@
 
                 <!-- 我的今日訂單 -->
                 <div id="myOrderCard" class="order-card hidden">
-                    <div class="text-heading-sm">📋 我的訂單</div>
+                    <div class="text-heading-sm">📋 <span data-i18n="myOrder">我的訂單</span></div>
                     <div id="myOrderContent" style="font-size:13px;"></div>
                     <div id="myOrderActions" style="margin-top:12px;" class="flex-gap-8"></div>
                 </div>
                 
                 <div class="lunch-summary">
-                    <h3 style="margin-bottom:10px;">📊 今日統計</h3>
-                    <div class="stat-row"><span>總數</span><span id="totalOrders">0</span></div>
-                    <div class="stat-row"><span>🥗 素食</span><span id="vegCount">0</span></div>
-                    <div class="stat-row"><span>🍖 葷食</span><span id="regularCount">0</span></div>
+                    <h3 style="margin-bottom:10px;">📊 <span data-i18n="todayStats">今日統計</span></h3>
+                    <div class="stat-row"><span data-i18n="total">總數</span><span id="totalOrders">0</span></div>
+                    <div class="stat-row"><span>🥗 <span data-i18n="vegetarian">素食</span></span><span id="vegCount">0</span></div>
+                    <div class="stat-row"><span>🍖 <span data-i18n="regular">葷食</span></span><span id="regularCount">0</span></div>
                 </div>
 
                 <!-- 便當管理員報表（僅指定人員可見） -->
@@ -69,29 +71,29 @@
 
                 <!-- 訂購表單 -->
                 <div id="lunchForm">
-                    <div class="form-group"><label>訂購日期</label><input type="date" id="lunchDate"></div>
+                    <div class="form-group"><label data-i18n="orderDate">訂購日期</label><input type="date" id="lunchDate"></div>
                     
                     <!-- 便當選擇卡片 -->
                     <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px;">
                         <div class="lunch-choice choice-card" onclick="selectLunchType('regular')">
                             <span style="font-size:28px;">🍖</span>
-                            <div class="flex-1"><b>葷食便當</b><br><span class="text-sm-secondary">今日主菜由餐廳安排</span></div>
+                            <div class="flex-1"><b data-i18n="regularLunch">葷食便當</b><br><span class="text-sm-secondary" data-i18n="lunchRegularDesc">今日主菜由餐廳安排</span></div>
                             <div class="lunch-check choice-check" id="lunchCheckRegular"></div>
                         </div>
                         <div class="lunch-choice choice-card" onclick="selectLunchType('vegetarian')">
                             <span style="font-size:28px;">🥗</span>
-                            <div class="flex-1"><b>素食便當</b><br><span class="text-sm-secondary">健康蔬食料理</span></div>
+                            <div class="flex-1"><b data-i18n="vegetarianLunch">素食便當</b><br><span class="text-sm-secondary" data-i18n="lunchVegetarianDesc">健康蔬食料理</span></div>
                             <div class="lunch-check choice-check" id="lunchCheckVeg"></div>
                         </div>
                         <div class="lunch-choice choice-card" onclick="selectLunchType('none')">
                             <span style="font-size:28px;">🚫</span>
-                            <div class="flex-1"><b>不訂購</b><br><span style="font-size:11px;color:#94A3B8;">今日不需要便當</span></div>
+                            <div class="flex-1"><b data-i18n="noLunch">不訂購</b><br><span style="font-size:11px;color:#94A3B8;" data-i18n="lunchNoneDesc">今日不需要便當</span></div>
                             <div class="lunch-check choice-check" id="lunchCheckNone"></div>
                         </div>
                     </div>
 
-                    <div class="form-group"><label>備註 (選填)</label><input type="text" id="lunchNotes" placeholder="例：不要飯"></div>
-                    <button class="btn btn-success" id="lunchSubmitBtn" onclick="submitLunchOrderNew()" disabled style="opacity:0.5;">請先選擇便當類型</button>
+                    <div class="form-group"><label data-i18n="lunchNotes">備註 (選填)</label><input type="text" id="lunchNotes" placeholder="例：不要飯"></div>
+                    <button class="btn btn-success" id="lunchSubmitBtn" onclick="submitLunchOrderNew()" disabled style="opacity:0.5;" data-i18n="chooseLunchFirst">請先選擇便當類型</button>
                 </div>
             </div>
         </div>
@@ -180,6 +182,13 @@
 
             if(id==='lunchPage') { loadLunchSummary(); checkMyOrder(); checkDeadline(); loadLunchManagerReport(); checkLunarNotice(); }
             if(id==='settingsPage') renderLocationList();
+        }
+
+        function mountServicesLanguageSwitch() {
+            const host = document.getElementById('servicesLanguageSwitch');
+            if (!host || host.dataset.ready === '1' || !window.EmployeeI18N) return;
+            host.appendChild(EmployeeI18N.createLanguageSwitch({ persist: true }));
+            host.dataset.ready = '1';
         }
 
         // ===== 農曆日曆（初一/十五提醒） =====
@@ -320,7 +329,7 @@
                 const isVeg = data.is_vegetarian;
                 const isCancelled = data.status === 'cancelled';
                 const emoji = isCancelled ? '🚫' : (isVeg ? '🥗' : '🍖');
-                const label = isCancelled ? '不訂購' : (isVeg ? '素食便當' : '葷食便當');
+                const label = isCancelled ? tEmployee('noLunch') : (isVeg ? tEmployee('vegetarianLunch') : tEmployee('regularLunch'));
                 const statusColor = isCancelled ? '#EA580C' : '#059669';
                 
                 content.innerHTML = `
@@ -328,21 +337,21 @@
                         <span style="font-size:28px;">${emoji}</span>
                         <div class="flex-1">
                             <div style="font-weight:700;">${label}</div>
-                            <div class="text-sm-secondary">訂購日期：${data.order_date}${data.notes ? ' · ' + data.notes : ''}</div>
+                            <div class="text-sm-secondary">${tEmployee('orderDate')}：${data.order_date}${data.notes ? ' · ' + data.notes : ''}</div>
                         </div>
-                        <span style="font-size:11px;font-weight:700;color:${statusColor};">${isCancelled ? '已取消' : '已訂購'}</span>
+                        <span style="font-size:11px;font-weight:700;color:${statusColor};">${isCancelled ? tEmployee('cancelled') : tEmployee('ordered')}</span>
                     </div>
                 `;
                 
                 // 截止前可修改
                 if (!isPastLunchDeadline()) {
                     actions.innerHTML = `
-                        <button class="modify-btn" onclick="modifyLunchOrder('vegetarian')" style="border-color:#059669;background:#ECFDF5;color:#059669;">🥗 改素食</button>
-                        <button class="modify-btn" onclick="modifyLunchOrder('regular')" style="border-color:#2563EB;background:#EFF6FF;color:#2563EB;">🍖 改葷食</button>
-                        <button class="modify-btn" onclick="cancelLunchOrder()" style="border-color:#DC2626;background:#FEF2F2;color:#DC2626;">❌ 取消</button>
+                        <button class="modify-btn" onclick="modifyLunchOrder('vegetarian')" style="border-color:#059669;background:#ECFDF5;color:#059669;">${tEmployee('changeVegetarian')}</button>
+                        <button class="modify-btn" onclick="modifyLunchOrder('regular')" style="border-color:#2563EB;background:#EFF6FF;color:#2563EB;">${tEmployee('changeRegular')}</button>
+                        <button class="modify-btn" onclick="cancelLunchOrder()" style="border-color:#DC2626;background:#FEF2F2;color:#DC2626;">${tEmployee('cancelOrder')}</button>
                     `;
                 } else {
-                    actions.innerHTML = '<span style="font-size:12px;color:#94A3B8;">⏰ 已過截止時間，無法修改</span>';
+                    actions.innerHTML = `<span style="font-size:12px;color:#94A3B8;">${tEmployee('lunchLocked')}</span>`;
                 }
             } catch(e) { console.error(e); }
         }
@@ -362,7 +371,7 @@
             
             const btn = document.getElementById('lunchSubmitBtn');
             btn.disabled = false; btn.style.opacity = '1';
-            const labels = { regular: '✅ 確認訂購葷食便當', vegetarian: '✅ 確認訂購素食便當', none: '✅ 確認不訂購' };
+            const labels = { regular: tEmployee('confirmRegularLunch'), vegetarian: tEmployee('confirmVegetarianLunch'), none: tEmployee('confirmNoLunch') };
             btn.textContent = labels[type];
         }
 
@@ -370,12 +379,12 @@
             if (sessionStorage.getItem('fromCheckin') === '1') {
                 if (sessionStorage.getItem('lunchSkipWarned') !== '1') {
                     sessionStorage.setItem('lunchSkipWarned', '1');
-                    showToast('請先選擇今日便當狀態：葷食、素食或不訂購');
+                    showToast(tEmployee('chooseLunchStatusFirst'));
                     return;
                 }
                 sessionStorage.removeItem('fromCheckin');
                 sessionStorage.removeItem('lunchSkipWarned');
-                sessionStorage.setItem('lunchToast', '⚠️ 今日便當尚未選擇');
+                sessionStorage.setItem('lunchToast', tEmployee('lunchNotSelected'));
             }
             window.location.href = 'index.html';
         }
@@ -383,9 +392,13 @@
         async function submitLunchOrderNew() {
             if (!selectedLunchType || !currentEmployee) return;
             const dateEl = document.getElementById('lunchDate');
-            if (!dateEl?.value) return showToast('請選擇日期');
+            if (!dateEl?.value) return showToast(tEmployee('chooseDate'));
             
-            const msgs = { regular:'確定訂購「葷食便當」？', vegetarian:'確定訂購「素食便當」？', none:'確定不訂購便當？' };
+            const msgs = {
+                regular: tEmployee('confirmRegularLunchQuestion'),
+                vegetarian: tEmployee('confirmVegetarianLunchQuestion'),
+                none: tEmployee('confirmNoLunchQuestion')
+            };
             if (!confirm(msgs[selectedLunchType])) return;
             
             try {
@@ -397,14 +410,14 @@
                     notes: document.getElementById('lunchNotes')?.value || (selectedLunchType === 'none' ? '今日不訂購' : '')
                 }, { onConflict: 'employee_id,order_date' });
                 
-                showToast(selectedLunchType === 'none' ? '🚫 已確認不訂購' : '✅ 訂購成功！');
+                showToast(selectedLunchType === 'none' ? tEmployee('lunchNoneSaved') : tEmployee('lunchSuccess'));
                 checkMyOrder();
                 loadLunchSummary();
                 // 從打卡跳過來的 → 訂完跳首頁
                 if (sessionStorage.getItem('fromCheckin') === '1') {
                     sessionStorage.removeItem('fromCheckin');
                     sessionStorage.removeItem('lunchSkipWarned');
-                    sessionStorage.setItem('lunchToast', selectedLunchType === 'none' ? '🚫 便當：今日不訂購' : '✅ 便當訂購成功');
+                    sessionStorage.setItem('lunchToast', selectedLunchType === 'none' ? tEmployee('lunchTodayNone') : tEmployee('lunchOrderSaved'));
                     setTimeout(() => { window.location.href = 'index.html'; }, 800);
                 }
             } catch(e) { showToast('❌ 訂購失敗：' + friendlyError(e)); }
@@ -552,11 +565,19 @@
             if (initialized) {
                 const isLoggedIn = await checkUserStatus();
                 if (isLoggedIn) {
+                    mountServicesLanguageSwitch();
+                    window.EmployeeI18N?.applyI18n();
                     showPage(pageId);
                 } else {
                     window.location.href = 'index.html';
                 }
             }
+        });
+
+        window.addEventListener('employee-language-change', function () {
+            window.EmployeeI18N?.applyI18n();
+            checkMyOrder();
+            checkDeadline();
         });
     </script>
 

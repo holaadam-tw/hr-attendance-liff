@@ -7,6 +7,7 @@ const CONFIG = {
 };
 
 const sb = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+window.sb = sb;
 
 // 全域變數
 let liffProfile = null;
@@ -302,7 +303,7 @@ async function checkUserStatus() {
             // 先查員工 + 設定（並行），再查考勤（需要 currentEmployee.id）
             const [empResult] = await Promise.all([
                 sb.from('employees')
-                    .select('id, name, role, department, position, employee_number, line_user_id, company_id, is_active, hire_date, is_kiosk, no_checkin')
+                    .select('id, name, role, department, position, employee_number, line_user_id, company_id, is_active, hire_date, is_kiosk, no_checkin, preferred_language')
                     .eq('line_user_id', liffProfile.userId)
                     .eq('company_id', currentCompanyId)
                     .maybeSingle(),
@@ -318,9 +319,11 @@ async function checkUserStatus() {
                 position: '平台管理員',
                 employee_number: 'PA-001',
                 line_user_id: padmin.line_user_id,
-                company_id: currentCompanyId
+                company_id: currentCompanyId,
+                preferred_language: 'zh-TW'
             };
             window.currentEmployee = currentEmployee;
+            window.EmployeeI18N?.initEmployeeLanguage(currentEmployee);
 
             // 現在 currentEmployee 已設定，可以查考勤
             if (currentEmployee.id) await checkTodayAttendance();
@@ -335,7 +338,7 @@ async function checkUserStatus() {
         // === 一般員工流程（支援多公司） ===
         // 一次查出該 LINE user 所有員工記錄 + 對應公司資料
         const { data: allRows, error } = await sb.from('employees')
-            .select('id, name, role, department, position, employee_number, line_user_id, company_id, is_active, status, hire_date, is_kiosk, no_checkin, companies(name, features, status, industry)')
+            .select('id, name, role, department, position, employee_number, line_user_id, company_id, is_active, status, hire_date, is_kiosk, no_checkin, preferred_language, companies(name, features, status, industry)')
             .eq('line_user_id', liffProfile.userId);
 
         if (error) {
@@ -390,6 +393,7 @@ async function checkUserStatus() {
         currentCompanyId = selected.company_id || null;
         window.currentCompanyId = currentCompanyId;
         window.currentEmployee = currentEmployee;
+        window.EmployeeI18N?.initEmployeeLanguage(currentEmployee);
 
         // 用 JOIN 帶回的公司資料，省掉額外一次查詢
         if (selected.companies) {

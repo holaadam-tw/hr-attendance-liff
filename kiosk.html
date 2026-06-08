@@ -7,6 +7,7 @@
     <title>公務機打卡</title>
     <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="i18n.js?v=20260608-employee-lang"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0F172A; color: #fff; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; -webkit-user-select: none; user-select: none; }
@@ -80,13 +81,15 @@
 
         /* 提示 */
         .hint { font-size: 12px; color: #475569; text-align: center; margin-top: 8px; }
+        #kioskLanguageSwitch .employee-lang-switch { justify-content: center !important; margin-bottom: 14px !important; }
     </style>
 </head>
 <body>
     <div class="kiosk-container">
+        <div id="kioskLanguageSwitch"></div>
         <!-- 頁頭 -->
         <div class="kiosk-header">
-            <h1 id="kioskTitle">公務機打卡</h1>
+            <h1 id="kioskTitle" data-i18n="kioskTitle">公務機打卡</h1>
             <div id="companyName" class="company-name"></div>
             <div id="kioskClock" class="clock">--:--</div>
             <div id="kioskDate" class="date"></div>
@@ -96,7 +99,7 @@
         <div id="stepInput">
             <div class="input-display">
                 <span id="inputValue" class="value" style="display:none;"></span>
-                <span id="inputPlaceholder" class="placeholder">輸入工號、手機或驗證碼</span>
+                <span id="inputPlaceholder" class="placeholder" data-i18n="kioskInputPlaceholder">輸入工號、手機或驗證碼</span>
             </div>
             <div class="keypad">
                 <button class="key" onclick="pressKey('1')">1</button>
@@ -108,11 +111,11 @@
                 <button class="key" onclick="pressKey('7')">7</button>
                 <button class="key" onclick="pressKey('8')">8</button>
                 <button class="key" onclick="pressKey('9')">9</button>
-                <button class="key key-clear" onclick="clearInput()">清除</button>
+                <button class="key key-clear" onclick="clearInput()" data-i18n="clear">清除</button>
                 <button class="key" onclick="pressKey('0')">0</button>
-                <button id="confirmBtn" class="key key-confirm disabled" onclick="lookupEmployee()">確認</button>
+                <button id="confirmBtn" class="key key-confirm disabled" onclick="lookupEmployee()" data-i18n="confirm">確認</button>
             </div>
-            <div class="hint">輸入工號、手機號碼或身分證後4碼</div>
+            <div class="hint" data-i18n="kioskHint">輸入工號、手機號碼或身分證後4碼</div>
         </div>
 
         <!-- Step 2: 確認員工 + 拍照 + 打卡 -->
@@ -121,18 +124,18 @@
                 <div id="empName" class="name"></div>
                 <div id="empInfo" class="info"></div>
             </div>
-            <button id="photoBtn" class="photo-btn" onclick="takePhoto()">📸 拍照</button>
+            <button id="photoBtn" class="photo-btn" onclick="takePhoto()" data-i18n="photo">📸 拍照</button>
             <div class="camera-section">
                 <video id="kioskVideo" autoplay playsinline muted style="display:none;"></video>
                 <canvas id="kioskCanvas" style="display:none;"></canvas>
                 <input type="file" id="kioskCaptureInput" accept="image/jpeg,image/png" capture="user" style="display:none">
             </div>
-            <div id="photoStatus" class="photo-status">✅ 已拍照，請再按「上班打卡」或「下班打卡」才會送出。</div>
+            <div id="photoStatus" class="photo-status" data-i18n="photoDone">✅ 已拍照，請再按「上班打卡」或「下班打卡」才會送出。</div>
             <div class="action-buttons" id="actionBtns" style="display:none;">
-                <button class="action-btn btn-checkin" onclick="doCheckin('check_in')">☀️ 上班打卡</button>
-                <button class="action-btn btn-checkout" onclick="doCheckin('check_out')">🌙 下班打卡</button>
+                <button class="action-btn btn-checkin" onclick="doCheckin('check_in')">☀️ <span data-i18n="checkIn">上班打卡</span></button>
+                <button class="action-btn btn-checkout" onclick="doCheckin('check_out')">🌙 <span data-i18n="checkOut">下班打卡</span></button>
             </div>
-            <button class="btn-cancel" onclick="resetToInput()">← 取消</button>
+            <button class="btn-cancel" onclick="resetToInput()" data-i18n="cancel">← 取消</button>
         </div>
 
         <!-- Step 3: 結果 -->
@@ -151,7 +154,7 @@
             <div class="error-card">
                 <div class="icon">❌</div>
                 <div id="errorMsg" class="msg"></div>
-                <button class="btn-cancel" onclick="resetToInput()">← 重新輸入</button>
+                <button class="btn-cancel" onclick="resetToInput()" data-i18n="retryInput">← 重新輸入</button>
             </div>
         </div>
     </div>
@@ -178,6 +181,7 @@
     const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5zc3Vpc3l2bHJxbnFmeHVwa2xiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkyOTAwMzUsImV4cCI6MjA4NDg2NjAzNX0.q_B6v3gf1TOCuAq7z0xIw10wDueCSJn0p37VzdMfmbc';
     const LIFF_ID = '2008962829-bnsS1bbB';
     const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    window.sb = sb;
 
     let kioskLineUserId = null;
     let kioskCompanyId = null;
@@ -194,6 +198,36 @@
     let lunchPromptEmployee = null;
     let lunchSkipWarned = false;
 
+    function tk(key, params) {
+        return window.tEmployee ? tEmployee(key, params) : key;
+    }
+
+    function mountKioskLanguageSwitch() {
+        const host = document.getElementById('kioskLanguageSwitch');
+        if (!host || host.dataset.ready === '1' || !window.EmployeeI18N) return;
+        host.appendChild(EmployeeI18N.createLanguageSwitch({ persist: false, store: false }));
+        host.dataset.ready = '1';
+    }
+
+    function setKioskLanguage(lang) {
+        if (!window.EmployeeI18N) return;
+        EmployeeI18N.setPageLanguage(lang || EmployeeI18N.currentLanguage(), null, { persist: false, store: false });
+        refreshKioskStaticText();
+    }
+
+    function refreshKioskStaticText() {
+        window.EmployeeI18N?.applyI18n();
+        const title = document.getElementById('kioskTitle');
+        if (title && title.dataset.companyName) {
+            title.textContent = title.dataset.companyName + ' ' + tk('kioskTitle');
+        }
+        if (!photoBlob) {
+            const photoBtn = document.getElementById('photoBtn');
+            if (photoBtn) photoBtn.textContent = tk('photo');
+        }
+        setActionButtonsBusy(isPunching);
+    }
+
     function setActionButtonsBusy(isBusy) {
         const checkinBtn = document.querySelector('.btn-checkin');
         const checkoutBtn = document.querySelector('.btn-checkout');
@@ -202,8 +236,8 @@
             btn.disabled = isBusy;
             btn.style.opacity = isBusy ? '0.5' : '1';
         });
-        if (checkinBtn) checkinBtn.textContent = isBusy ? '處理中...' : '☀️ 上班打卡';
-        if (checkoutBtn) checkoutBtn.textContent = isBusy ? '處理中...' : '🌙 下班打卡';
+        if (checkinBtn) checkinBtn.innerHTML = isBusy ? tk('processing') : '☀️ ' + tk('checkIn');
+        if (checkoutBtn) checkoutBtn.innerHTML = isBusy ? tk('processing') : '🌙 ' + tk('checkOut');
     }
 
     async function getOptionalKioskPosition(timeoutMs = 2000) {
@@ -233,6 +267,8 @@
 
     // ===== 初始化（LIFF 認證） =====
     window.addEventListener('load', async () => {
+        mountKioskLanguageSwitch();
+        setKioskLanguage('zh-TW');
         try {
             await liff.init({ liffId: LIFF_ID });
             if (!liff.isLoggedIn()) {
@@ -254,7 +290,8 @@
             if (data?.success && data.name) {
                 kioskCompanyId = data.company_id || null;
                 document.getElementById('companyName').textContent = data.name;
-                document.getElementById('kioskTitle').textContent = data.name + ' 公務機打卡';
+                document.getElementById('kioskTitle').dataset.companyName = data.name;
+                refreshKioskStaticText();
                 loadKioskLunchSettings(kioskCompanyId).catch(e => console.warn('公務機便當設定讀取失敗:', e));
             } else {
                 document.getElementById('stepInput').innerHTML = '<div class="error-card"><div class="icon">⚠️</div><div class="msg">' + (data?.error || '此帳號非公務機') + '<br><br><span style="font-size:13px;color:#64748B;">請聯繫管理員設定公務機帳號</span></div></div>';
@@ -360,16 +397,17 @@
 
             if (error) throw error;
             if (!data?.success) {
-                showError(data?.error || '查詢失敗');
+                showError(data?.error || tk('lookupFailed'));
                 return;
             }
 
             currentEmployee = data;
+            setKioskLanguage(data.preferred_language || window.EmployeeI18N?.currentLanguage());
             showEmployeeStep();
         } catch (e) {
-            showError(e.message || '網路錯誤，請重試');
+            showError(e.message || tk('networkRetry'));
         } finally {
-            confirmBtn.textContent = '確認';
+            confirmBtn.textContent = tk('confirm');
             confirmBtn.classList.remove('disabled');
         }
     }
@@ -384,8 +422,9 @@
         photoBlob = null;
         document.getElementById('actionBtns').style.display = 'none';
         document.getElementById('photoStatus').style.display = 'none';
-        document.getElementById('photoBtn').textContent = '📸 拍照';
+        document.getElementById('photoBtn').textContent = tk('photoCaptured');
         document.getElementById('photoBtn').disabled = false;
+        refreshKioskStaticText();
         openCamera();
     }
 
@@ -423,7 +462,7 @@
             canvas.getContext('2d').drawImage(video, 0, 0, w, h);
             canvas.toBlob(blob => {
                 if (!blob) {
-                    showError('照片處理失敗，請重新拍照。');
+                    showError(tk('photoProcessFailedRetry'));
                     return;
                 }
                 photoBlob = blob;
@@ -450,7 +489,7 @@
                 canvas.getContext('2d').drawImage(img, 0, 0, w, h);
                 canvas.toBlob(blob => {
                     if (!blob) {
-                        showError('照片處理失敗，請重新拍照。');
+                        showError(tk('photoProcessFailedRetry'));
                         return;
                     }
                     photoBlob = blob;
@@ -464,7 +503,7 @@
     });
 
     function onPhotoReady() {
-        document.getElementById('photoBtn').textContent = '✅ 已拍照';
+        document.getElementById('photoBtn').textContent = tk('photo');
         document.getElementById('photoBtn').disabled = true;
         document.getElementById('photoStatus').style.display = 'block';
         setActionButtonsBusy(false);
@@ -475,7 +514,7 @@
     async function doCheckin(action) {
         if (isPunching) return;
         if (!currentEmployee || !currentEmployee.employee_id) {
-            showError('員工資料未載入，請重新輸入工號。');
+            showError(tk('employeeNotLoaded'));
             return;
         }
 
@@ -537,7 +576,7 @@
         const isCheckIn = data.type === 'check_in';
         document.getElementById('resultIcon').textContent = isCheckIn ? '☀️' : '🌙';
         document.getElementById('resultName').textContent = data.name;
-        document.getElementById('resultMsg').textContent = isCheckIn ? '上班打卡成功' : '下班打卡成功';
+        document.getElementById('resultMsg').textContent = isCheckIn ? tk('kioskCheckInSuccess') : tk('kioskCheckOutSuccess');
 
         const nowTime = new Date().toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
         document.getElementById('resultTime').textContent = nowTime;
@@ -547,7 +586,7 @@
                 const employeeForLunch = currentEmployee ? { ...currentEmployee } : null;
                 const shouldPromptLunch = await shouldPromptKioskLunch(employeeForLunch);
                 if (shouldPromptLunch) {
-                    document.getElementById('resultCountdown').textContent = '請選擇今日便當';
+                    document.getElementById('resultCountdown').textContent = tk('chooseLunchToday');
                     showKioskLunchPopup(employeeForLunch);
                     return;
                 }
@@ -564,7 +603,7 @@
         let sec = 3;
         if (Number.isFinite(startSec) && startSec > 0) sec = startSec;
         const cdEl = document.getElementById('resultCountdown');
-        cdEl.textContent = sec + ' 秒後返回...';
+        cdEl.textContent = tk('returnSeconds', { sec: sec });
         resultTimer = setInterval(() => {
             sec--;
             if (sec <= 0) {
@@ -572,7 +611,7 @@
                 resultTimer = null;
                 resetToInput();
             } else {
-                cdEl.textContent = sec + ' 秒後返回...';
+                cdEl.textContent = tk('returnSeconds', { sec: sec });
             }
         }, 1000);
     }
@@ -624,30 +663,30 @@
             <div style="background:#fff;color:#0F172A;border-radius:22px;padding:24px;width:100%;max-width:360px;box-shadow:0 24px 80px rgba(0,0,0,0.45);">
                 <div style="text-align:center;margin-bottom:16px;">
                     <div style="font-size:42px;margin-bottom:8px;">🍱</div>
-                    <h3 style="font-size:20px;font-weight:900;margin:0;">今日便當訂購</h3>
-                    <p style="font-size:13px;color:#64748B;margin-top:6px;">${escapeHtml(employee?.name || '員工')}，請選擇今日午餐</p>
+                    <h3 style="font-size:20px;font-weight:900;margin:0;">${tk('lunchPromptTitle')}</h3>
+                    <p style="font-size:13px;color:#64748B;margin-top:6px;">${escapeHtml(tk('kioskLunchPromptBody', { name: employee?.name || '' }))}</p>
                 </div>
 
                 <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px;">
                     <button type="button" class="kiosk-lunch-opt" onclick="selectKioskLunch('regular')" style="display:flex;align-items:center;gap:12px;width:100%;padding:16px;border:2px solid #E2E8F0;border-radius:16px;background:#fff;color:#0F172A;text-align:left;font-family:inherit;cursor:pointer;">
                         <span style="font-size:30px;">🍖</span>
-                        <span style="flex:1;"><b style="font-size:16px;">葷食便當</b><br><span style="font-size:12px;color:#64748B;">今日主菜由餐廳安排</span></span>
+                        <span style="flex:1;"><b style="font-size:16px;">${tk('regularLunch')}</b><br><span style="font-size:12px;color:#64748B;">${tk('lunchRegularDesc')}</span></span>
                         <span id="kioskLunchCheckRegular" style="width:24px;height:24px;border:2px solid #CBD5E1;border-radius:50%;display:flex;align-items:center;justify-content:center;"></span>
                     </button>
                     <button type="button" class="kiosk-lunch-opt" onclick="selectKioskLunch('vegetarian')" style="display:flex;align-items:center;gap:12px;width:100%;padding:16px;border:2px solid #E2E8F0;border-radius:16px;background:#fff;color:#0F172A;text-align:left;font-family:inherit;cursor:pointer;">
                         <span style="font-size:30px;">🥗</span>
-                        <span style="flex:1;"><b style="font-size:16px;">素食便當</b><br><span style="font-size:12px;color:#64748B;">蔬食料理</span></span>
+                        <span style="flex:1;"><b style="font-size:16px;">${tk('vegetarianLunch')}</b><br><span style="font-size:12px;color:#64748B;">${tk('lunchVegetarianDesc')}</span></span>
                         <span id="kioskLunchCheckVeg" style="width:24px;height:24px;border:2px solid #CBD5E1;border-radius:50%;display:flex;align-items:center;justify-content:center;"></span>
                     </button>
                     <button type="button" class="kiosk-lunch-opt" onclick="selectKioskLunch('none')" style="display:flex;align-items:center;gap:12px;width:100%;padding:16px;border:2px solid #E2E8F0;border-radius:16px;background:#fff;color:#0F172A;text-align:left;font-family:inherit;cursor:pointer;">
                         <span style="font-size:30px;">🚫</span>
-                        <span style="flex:1;"><b style="font-size:16px;">不訂購</b><br><span style="font-size:12px;color:#64748B;">今日不需要便當</span></span>
+                        <span style="flex:1;"><b style="font-size:16px;">${tk('noLunch')}</b><br><span style="font-size:12px;color:#64748B;">${tk('lunchNoneDesc')}</span></span>
                         <span id="kioskLunchCheckNone" style="width:24px;height:24px;border:2px solid #CBD5E1;border-radius:50%;display:flex;align-items:center;justify-content:center;"></span>
                     </button>
                 </div>
 
-                <button id="kioskLunchConfirmBtn" type="button" onclick="confirmKioskLunch()" disabled style="width:100%;padding:15px;border:none;border-radius:14px;background:#CBD5E1;color:#fff;font-size:16px;font-weight:900;font-family:inherit;cursor:pointer;">請先選擇</button>
-                <button type="button" onclick="skipKioskLunch()" style="width:100%;padding:12px;border:none;background:transparent;color:#64748B;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;margin-top:8px;">稍後再決定</button>
+                <button id="kioskLunchConfirmBtn" type="button" onclick="confirmKioskLunch()" disabled style="width:100%;padding:15px;border:none;border-radius:14px;background:#CBD5E1;color:#fff;font-size:16px;font-weight:900;font-family:inherit;cursor:pointer;">${tk('chooseLunchFirst')}</button>
+                <button type="button" onclick="skipKioskLunch()" style="width:100%;padding:12px;border:none;background:transparent;color:#64748B;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;margin-top:8px;">${tk('decideLater')}</button>
             </div>
         `;
         document.body.appendChild(overlay);
@@ -686,10 +725,10 @@
         }
 
         const btn = document.getElementById('kioskLunchConfirmBtn');
-        const labels = { regular: '確認訂購葷食便當', vegetarian: '確認訂購素食便當', none: '確認不訂購' };
+        const labels = { regular: tk('confirmRegularLunch'), vegetarian: tk('confirmVegetarianLunch'), none: tk('confirmNoLunch') };
         btn.disabled = false;
         btn.style.background = 'linear-gradient(135deg,#4F46E5,#7C3AED)';
-        btn.textContent = labels[type] || '確認';
+        btn.textContent = labels[type] || tk('confirm');
     }
 
     async function confirmKioskLunch() {
@@ -697,7 +736,7 @@
 
         const btn = document.getElementById('kioskLunchConfirmBtn');
         btn.disabled = true;
-        btn.textContent = '提交中...';
+        btn.textContent = tk('submitting');
 
         try {
             const isNone = selectedLunch === 'none';
@@ -710,7 +749,7 @@
             }, { onConflict: 'employee_id,order_date' });
 
             document.getElementById('kioskLunchOverlay')?.remove();
-            document.getElementById('resultCountdown').textContent = isNone ? '已記錄不訂購' : '便當訂購成功';
+            document.getElementById('resultCountdown').textContent = isNone ? tk('lunchRecordedNone') : tk('lunchOrderSaved');
             lunchPromptEmployee = null;
             selectedLunch = null;
             lunchSkipWarned = false;
@@ -718,7 +757,7 @@
         } catch (e) {
             console.error('公務機便當訂購失敗:', e);
             btn.disabled = false;
-            btn.textContent = '訂購失敗，請重試';
+            btn.textContent = tk('lunchSubmitFailed');
             btn.style.background = 'linear-gradient(135deg,#DC2626,#B91C1C)';
         }
     }
@@ -727,7 +766,7 @@
         if (!lunchSkipWarned) {
             lunchSkipWarned = true;
             const cdEl = document.getElementById('resultCountdown');
-            if (cdEl) cdEl.textContent = '請先選擇今日便當狀態';
+            if (cdEl) cdEl.textContent = tk('chooseLunchStatusFirst');
             return;
         }
         document.getElementById('kioskLunchOverlay')?.remove();
@@ -785,6 +824,7 @@
         document.getElementById('stepEmployee').classList.add('hidden');
         document.getElementById('stepResult').classList.add('hidden');
         document.getElementById('stepError').classList.add('hidden');
+        setKioskLanguage('zh-TW');
     }
     </script>
 </body>

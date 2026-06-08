@@ -8,6 +8,7 @@
 <title>員工登記</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<script src="i18n.js?v=20260608-employee-lang"></script>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;900&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -55,16 +56,17 @@ input:focus,select:focus{outline:none;border-color:var(--primary);box-shadow:0 0
 </head>
 <body>
 <div class="container">
+  <div id="registerLanguageSwitch"></div>
   <div class="logo-section">
     <div class="logo-icon">📋</div>
-    <div class="logo-title">員工登記</div>
-    <div class="logo-sub">填寫資料後等待管理員審核</div>
+    <div class="logo-title" data-i18n="registerTitle">員工登記</div>
+    <div class="logo-sub" data-i18n="registerSubtitle">填寫資料後等待管理員審核</div>
   </div>
 
   <!-- 載入中 -->
   <div id="loadingView" class="loading-view">
     <div class="spinner"></div>
-    <p style="color:var(--text-muted);">載入中...</p>
+    <p style="color:var(--text-muted);" data-i18n="loading">載入中...</p>
   </div>
 
   <!-- 錯誤頁面 -->
@@ -79,7 +81,7 @@ input:focus,select:focus{outline:none;border-color:var(--primary);box-shadow:0 0
   <!-- 登記表單 -->
   <div id="formView" class="hidden">
     <div class="card" style="text-align:center;padding:16px 24px;margin-bottom:16px;">
-      <p style="font-size:13px;color:var(--text-muted);margin-bottom:4px;">登記公司</p>
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:4px;" data-i18n="registerCompany">登記公司</p>
       <div class="company-badge" id="companyNameBadge"></div>
     </div>
 
@@ -87,31 +89,39 @@ input:focus,select:focus{outline:none;border-color:var(--primary);box-shadow:0 0
       <h2>📝 個人資料</h2>
 
       <div class="form-group">
-        <label class="required">姓名</label>
+        <label class="required" data-i18n="name">姓名</label>
         <input type="text" id="regName" placeholder="請輸入真實姓名">
       </div>
 
       <div class="form-group">
-        <label class="required">手機號碼</label>
+        <label class="required" data-i18n="phone">手機號碼</label>
         <input type="tel" id="regPhone" placeholder="0912345678" maxlength="10">
         <div class="error-msg" id="phoneError">請輸入正確的手機號碼格式</div>
       </div>
 
       <div class="form-group">
-        <label>部門</label>
+        <label data-i18n="department">部門</label>
         <select id="regDepartment">
           <option value="">-- 選擇部門 --</option>
         </select>
       </div>
 
       <div class="form-group">
-        <label>職位</label>
+        <label data-i18n="position">職位</label>
         <input type="text" id="regPosition" placeholder="例如：專員">
       </div>
 
       <div class="form-group">
-        <label>到職日</label>
+        <label data-i18n="hireDate">到職日</label>
         <input type="date" id="regHireDate">
+      </div>
+
+      <div class="form-group">
+        <label data-i18n="systemLanguage">系統語言</label>
+        <select id="regLanguage" data-lang-select>
+          <option value="zh-TW">中文</option>
+          <option value="vi-VN">Tiếng Việt</option>
+        </select>
       </div>
     </div>
 
@@ -119,25 +129,25 @@ input:focus,select:focus{outline:none;border-color:var(--primary);box-shadow:0 0
       <h2>🆘 緊急聯絡人</h2>
 
       <div class="form-group">
-        <label>聯絡人姓名</label>
+        <label data-i18n="emergencyContact">聯絡人姓名</label>
         <input type="text" id="regEmergencyContact" placeholder="例如：王大明">
       </div>
 
       <div class="form-group">
-        <label>聯絡人電話</label>
+        <label data-i18n="emergencyPhone">聯絡人電話</label>
         <input type="tel" id="regEmergencyPhone" placeholder="0912345678" maxlength="10">
       </div>
     </div>
 
-    <button class="btn btn-primary" id="submitBtn" onclick="submitRegistration()">📨 送出登記</button>
+    <button class="btn btn-primary" id="submitBtn" onclick="submitRegistration()" data-i18n="submitRegistration">📨 送出登記</button>
   </div>
 
   <!-- 成功頁面 -->
   <div id="successView" class="hidden">
     <div class="card success-view">
       <div class="success-icon">✅</div>
-      <h2 style="justify-content:center;font-size:20px;">登記成功！</h2>
-      <p style="color:var(--text-muted);font-size:13px;margin-top:8px;line-height:1.6;">
+      <h2 style="justify-content:center;font-size:20px;" data-i18n="registrationSuccess">登記成功！</h2>
+      <p style="color:var(--text-muted);font-size:13px;margin-top:8px;line-height:1.6;" data-i18n="registrationSuccessBody">
         您的登記資料已送出，<br>請等待管理員審核。<br>
         審核通過後即可從 LINE 使用所有功能。
       </p>
@@ -174,15 +184,32 @@ window.onerror = function(msg, src, line, col, err) {
 const SUPABASE_URL = 'https://nssuisyvlrqnqfxupklb.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5zc3Vpc3l2bHJxbnFmeHVwa2xiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkyOTAwMzUsImV4cCI6MjA4NDg2NjAzNX0.q_B6v3gf1TOCuAq7z0xIw10wDueCSJn0p37VzdMfmbc';
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+window.sb = sb;
 
 let companyId = null;
 let companyName = '';
 let lineUserId = null;
 let lineDisplayName = '';
 
+function mountRegisterLanguageSwitch() {
+    const host = document.getElementById('registerLanguageSwitch');
+    if (!host || host.dataset.ready === '1' || !window.EmployeeI18N) return;
+    host.appendChild(EmployeeI18N.createLanguageSwitch({ persist: false }));
+    host.dataset.ready = '1';
+}
+
+function currentRegisterLanguage() {
+    return window.EmployeeI18N ? EmployeeI18N.currentLanguage() : 'zh-TW';
+}
+
 // ===== 初始化 =====
 async function init() {
     try {
+        mountRegisterLanguageSwitch();
+        if (window.EmployeeI18N) {
+            EmployeeI18N.setPageLanguage(EmployeeI18N.currentLanguage(), null, { persist: false });
+        }
+
         // 從 URL 取得 company_id
         const params = new URLSearchParams(window.location.search);
         companyId = params.get('company');
@@ -319,6 +346,7 @@ async function submitRegistration() {
     const hireDate = document.getElementById('regHireDate').value;
     const emergencyContact = document.getElementById('regEmergencyContact').value.trim();
     const emergencyPhone = document.getElementById('regEmergencyPhone').value.trim();
+    const preferredLanguage = currentRegisterLanguage();
 
     // 必填驗證
     if (!name) {
@@ -348,7 +376,7 @@ async function submitRegistration() {
     }
 
     btn.disabled = true;
-    btn.textContent = '送出中...';
+    btn.textContent = tEmployee('submitting');
 
     try {
         // 檢查同 LINE 帳號是否已登記（優先用 line_user_id）
@@ -366,7 +394,7 @@ async function submitRegistration() {
                     showToast('此 LINE 帳號已是在職員工', true);
                 }
                 btn.disabled = false;
-                btn.textContent = '📨 送出登記';
+                btn.textContent = tEmployee('submitRegistration');
                 return;
             }
         }
@@ -382,12 +410,12 @@ async function submitRegistration() {
             if (existing.status === 'pending') {
                 showToast('此手機號碼已登記過，正在等待審核', true);
                 btn.disabled = false;
-                btn.textContent = '📨 送出登記';
+                btn.textContent = tEmployee('submitRegistration');
                 return;
             } else if (existing.status === 'approved' || existing.is_active) {
                 showToast('此手機號碼已是在職員工', true);
                 btn.disabled = false;
-                btn.textContent = '📨 送出登記';
+                btn.textContent = tEmployee('submitRegistration');
                 return;
             } else if (existing.status === 'rejected') {
                 // 被拒絕過的可以重新登記 → 更新資料（含 line_user_id）
@@ -399,6 +427,7 @@ async function submitRegistration() {
                     hire_date: hireDate || null,
                     emergency_contact: emergencyContact || null,
                     emergency_phone: emergencyPhone || null,
+                    preferred_language: preferredLanguage,
                     status: 'pending',
                     is_active: false,
                     updated_at: new Date().toISOString()
@@ -427,6 +456,7 @@ async function submitRegistration() {
             hire_date: hireDate || null,
             emergency_contact: emergencyContact || null,
             emergency_phone: emergencyPhone || null,
+            preferred_language: preferredLanguage,
             line_user_id: lineUserId,
             company_id: companyId,
             is_active: false,
@@ -449,7 +479,7 @@ async function submitRegistration() {
         console.error('Error details:', JSON.stringify(e));
         showToast('送出失敗：' + errMsg, true);
         btn.disabled = false;
-        btn.textContent = '📨 送出登記';
+        btn.textContent = tEmployee('submitRegistration');
     }
 }
 
@@ -470,12 +500,27 @@ function showToast(msg, isError) {
 
 // 手機輸入即時清除錯誤提示
 document.addEventListener('DOMContentLoaded', function() {
+    mountRegisterLanguageSwitch();
+    window.EmployeeI18N?.applyI18n();
     const phoneInput = document.getElementById('regPhone');
     if (phoneInput) {
         phoneInput.addEventListener('input', function() {
             document.getElementById('phoneError').style.display = 'none';
         });
     }
+    const langInput = document.getElementById('regLanguage');
+    if (langInput) {
+        langInput.value = currentRegisterLanguage();
+        langInput.addEventListener('change', function () {
+            window.EmployeeI18N?.setPageLanguage(this.value, null, { persist: false });
+        });
+    }
+});
+
+window.addEventListener('employee-language-change', function () {
+    window.EmployeeI18N?.applyI18n();
+    const langInput = document.getElementById('regLanguage');
+    if (langInput) langInput.value = currentRegisterLanguage();
 });
 
 // 啟動

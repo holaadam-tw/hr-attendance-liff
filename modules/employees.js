@@ -812,7 +812,11 @@ export async function loadAllEmployees() {
 export async function openEditEmployeeModal(empId) {
     document.getElementById('editEmpId').value = empId;
     try {
-        const { data } = await sb.from('employees').select('*').eq('id', empId).single();
+        const { data } = await sb.from('employees')
+            .select('*')
+            .eq('id', empId)
+            .eq('company_id', window.currentCompanyId)
+            .single();
         if (data) {
             document.getElementById('editEmpName').value = data.name || '';
             loadDepartmentOptions('editEmpDept', data.department || '');
@@ -820,6 +824,8 @@ export async function openEditEmployeeModal(empId) {
             document.getElementById('editEmpPhone').value = data.phone || '';
             document.getElementById('editEmpHireDate').value = data.hire_date || '';
             document.getElementById('editEmpType').value = data.employment_type || 'fulltime';
+            const langEl = document.getElementById('editEmpPreferredLanguage');
+            if (langEl) langEl.value = data.preferred_language || 'zh-TW';
             // 排班權限 + 免打卡（工時模式改在人力管理 tab 設定）
             const canScheduleEl = document.getElementById('editCanSchedule');
             if (canScheduleEl) canScheduleEl.checked = !!data.can_schedule;
@@ -876,6 +882,7 @@ export async function saveEditEmployee() {
         phone: document.getElementById('editEmpPhone').value.trim() || null,
         hire_date: document.getElementById('editEmpHireDate').value || null,
         employment_type: document.getElementById('editEmpType').value,
+        preferred_language: document.getElementById('editEmpPreferredLanguage')?.value || 'zh-TW',
         line_user_id: lineVal || null,
         is_bound: !!lineVal,
         can_schedule: !!document.getElementById('editCanSchedule')?.checked,
@@ -894,7 +901,10 @@ export async function saveEditEmployee() {
     }
     if (!updates.name) { showToast('⚠️ 姓名不可為空'); return; }
     try {
-        const { error } = await sb.from('employees').update(updates).eq('id', empId);
+        const { error } = await sb.from('employees')
+            .update(updates)
+            .eq('id', empId)
+            .eq('company_id', window.currentCompanyId);
         if (error) throw error;
         showToast('✅ 員工資料已更新');
         closeEditEmployeeModal();

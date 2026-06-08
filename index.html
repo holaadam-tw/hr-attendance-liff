@@ -7,6 +7,7 @@
     <title>🏢 員工服務中心</title>
     <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="i18n.js?v=20260608-employee-lang"></script>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -115,6 +116,7 @@
 
         <!-- 首頁 -->
         <div id="homePage" class="page">
+            <div id="homeLanguageSwitch"></div>
             <!-- 用戶卡片 -->
             <div class="user-card">
                 <div id="homeCompanyName" style="font-size:13px;font-weight:700;color:#4F46E5;margin-bottom:8px;display:none;"></div>
@@ -157,7 +159,7 @@
             <div class="card" style="padding:16px;">
 
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-                    <span style="font-size:14px;font-weight:700;color:#0F172A;">📋 今日資訊</span>
+                    <span style="font-size:14px;font-weight:700;color:#0F172A;"><span>📋</span> <span data-i18n="todayInfo">今日資訊</span></span>
                     <div style="display:flex;align-items:center;gap:8px;">
                         <span id="weatherInfo" style="font-size:12px;color:#64748B;display:none;"></span>
                         <span id="todayDate" style="font-size:12px;color:#64748B;"></span>
@@ -165,17 +167,17 @@
                 </div>
                 <div class="today-info">
                     <div class="today-info-item" id="todayShiftCard" style="background:#DBEAFE;">
-                        <div class="today-info-label" style="color:#1E40AF;">今日班別</div>
+                        <div class="today-info-label" style="color:#1E40AF;" data-i18n="todayShift">今日班別</div>
                         <div class="today-info-value" id="todayShift" style="color:#1E40AF;">早班</div>
                         <div class="today-info-sub" style="color:#1E40AF;">08:00 - 17:00</div>
                     </div>
                     <div class="today-info-item" id="todayCheckinCard" style="background:#D1FAE5;">
-                        <div class="today-info-label" style="color:#065F46;">上班打卡</div>
+                        <div class="today-info-label" style="color:#065F46;" data-i18n="checkInTime">上班打卡</div>
                         <div class="today-info-value" id="todayCheckinTime" style="color:#059669;">--:--</div>
                         <div class="today-info-sub" id="todayCheckinStatus" style="color:#065F46;">尚未打卡</div>
                     </div>
                     <div class="today-info-item" style="background:#F1F5F9;">
-                        <div class="today-info-label" style="color:#64748B;">下班打卡</div>
+                        <div class="today-info-label" style="color:#64748B;" data-i18n="checkOutTime">下班打卡</div>
                         <div class="today-info-value" id="todayCheckoutTime" style="color:#64748B;">--:--</div>
                         <div class="today-info-sub" id="todayCheckoutStatus" style="color:#64748B;">尚未打卡</div>
                     </div>
@@ -188,12 +190,12 @@
             <div class="primary-actions">
                 <div class="primary-btn checkin" id="checkInBtn" onclick="startCheckIn()">
                     <div class="icon">☀️</div>
-                    <div class="label">上班打卡</div>
+                    <div class="label" data-i18n="checkIn">上班打卡</div>
                     <span class="badge-corner">AM</span>
                 </div>
                 <div class="primary-btn checkout" id="checkOutBtn" onclick="startCheckOut()">
                     <div class="icon">🌙</div>
-                    <div class="label">下班打卡</div>
+                    <div class="label" data-i18n="checkOut">下班打卡</div>
                     <span class="badge-corner">PM</span>
                 </div>
             </div>
@@ -202,21 +204,21 @@
             <div class="menu-grid" id="smartMenuGrid" style="opacity:0;transition:opacity .3s ease;">
                 <!-- 通用功能 -->
                 <div class="menu-item" data-feature="leave" onclick="window.location.href='records.html'">
-                    <div class="icon">📝</div><div class="label">我要請假</div>
+                    <div class="icon">📝</div><div class="label" data-i18n="leaveRequest">我要請假</div>
                 </div>
                 <div class="menu-item" data-feature="attendance" onclick="window.location.href='records.html#attendance'">
-                    <div class="icon">📊</div><div class="label">考勤查詢</div>
+                    <div class="icon">📊</div><div class="label" data-i18n="attendanceRecords">考勤查詢</div>
                 </div>
                 <div class="menu-item" data-feature="attendance" onclick="window.location.href='records.html#overtime'">
                     <div class="icon">⏰</div><div class="label">加班報備</div>
                 </div>
                 <div class="menu-item" data-feature="attendance" onclick="window.location.href='records.html#makeup'">
-                    <div class="icon">🔧</div><div class="label">補打卡</div>
+                    <div class="icon">🔧</div><div class="label" data-i18n="makeupPunch">補打卡</div>
                 </div>
 
                 <!-- 加值功能 -->
                 <div class="menu-item" data-feature="lunch" onclick="window.location.href='services.html'">
-                    <div class="icon">🍱</div><div class="label">便當訂購</div>
+                    <div class="icon">🍱</div><div class="label" data-i18n="lunchOrder">便當訂購</div>
                 </div>
                 <div class="menu-item" data-feature="fieldwork,sales_target" onclick="window.location.href='fieldwork.html'">
                     <div class="icon">📍</div><div class="label">外勤/業務</div>
@@ -365,6 +367,13 @@
             document.title = title;
         }
 
+        function mountHomeLanguageSwitch() {
+            const host = document.getElementById('homeLanguageSwitch');
+            if (!host || host.dataset.ready === '1' || !window.EmployeeI18N) return;
+            host.appendChild(EmployeeI18N.createLanguageSwitch({ persist: true }));
+            host.dataset.ready = '1';
+        }
+
         // 更新今日資訊
         function updateTodayInfo() {
             const now = new Date();
@@ -396,7 +405,7 @@
                     const actualMin = inLocal.getHours() * 60 + inLocal.getMinutes();
                     isLate = actualMin > scheduledMin;
                 }
-                document.getElementById('todayCheckinStatus').textContent = isLate ? '⚠️ 遲到' : '✅ 準時';
+                document.getElementById('todayCheckinStatus').textContent = isLate ? tEmployee('late') : tEmployee('onTime');
                 document.getElementById('todayCheckinCard').style.background = isLate ? '#FEE2E2' : '#D1FAE5';
                 document.getElementById('todayCheckinTime').style.color = isLate ? '#EF4444' : '#059669';
 
@@ -418,7 +427,7 @@
                 const timeStr = outTime.toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', hour12: false });
                 document.getElementById('todayCheckoutTime').textContent = timeStr;
                 const outLoc = data.check_out_location ? ` 📍 ${escapeHTML(data.check_out_location)}` : '';
-                document.getElementById('todayCheckoutStatus').textContent = '✅ 已下班' + outLoc;
+                document.getElementById('todayCheckoutStatus').textContent = tEmployee('checkedOut') + outLoc;
             }
         }
 
@@ -747,6 +756,8 @@
                     // 立即顯示首頁（不等次要資料）
                     if (skeleton) skeleton.style.display = 'none';
                     showPage('homePage');
+                    mountHomeLanguageSwitch();
+                    window.EmployeeI18N?.applyI18n();
 
                     updateTodayInfo();
 
@@ -861,6 +872,10 @@
         });
         window.addEventListener('focus', function() {
             checkRefreshFlag();
+        });
+        window.addEventListener('employee-language-change', function() {
+            updateTodayInfo();
+            loadTodayStatus();
         });
     </script>
 </body>
