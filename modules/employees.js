@@ -125,6 +125,11 @@ export function closeQRModal() {
     document.getElementById('qrModal').style.display = 'none';
 }
 
+function employeeLanguageBadge(emp) {
+    if ((emp?.preferred_language || 'zh-TW') !== 'vi-VN') return '';
+    return `<span title="此員工使用越南文介面" style="padding:3px 9px;border-radius:999px;font-size:11px;background:#ECFDF5;color:#047857;border:1px solid #A7F3D0;font-weight:800;">越南文介面</span>`;
+}
+
 // ===== 載入員工列表 =====
 export async function loadEmployeeList() {
     const listEl = document.getElementById('employeeList');
@@ -167,6 +172,7 @@ export async function loadEmployeeList() {
                                 display: inline-block; font-weight: bold;">
                                 ${roleNames[emp.role] || '未知'}
                             </span>
+                            ${employeeLanguageBadge(emp)}
                         </div>
                     </div>
                     <div class="details">
@@ -392,7 +398,7 @@ export async function loadUnbindEmployees() {
 
     try {
         const { data, error } = await sb.from('employees')
-            .select('id, name, employee_number, department, position')
+            .select('id, name, employee_number, department, position, preferred_language')
             .eq('company_id', window.currentCompanyId)
             .eq('is_active', true)
             .eq('status', 'approved')
@@ -422,7 +428,7 @@ export async function loadUnbindEmployees() {
             html += `
                 <div class="attendance-item" style="border-left:4px solid #F59E0B;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
                     <div style="min-width:0;flex:1;">
-                        <div style="font-weight:700;font-size:14px;">${escapeHTML(emp.name)}</div>
+                        <div style="font-weight:700;font-size:14px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">${escapeHTML(emp.name)}${employeeLanguageBadge(emp)}</div>
                         <div style="font-size:12px;color:#64748B;">${escapeHTML(emp.employee_number || '')} · ${escapeHTML(emp.department || '')} · ${escapeHTML(emp.position || '')}</div>
                     </div>
                     <div style="display:flex;gap:6px;align-items:center;">
@@ -486,7 +492,7 @@ export async function loadPendingEmployees() {
 
     try {
         const { data, error } = await sb.from('employees')
-            .select('id, name, phone, department, position, hire_date, line_user_id, emergency_contact, emergency_phone, created_at, status')
+            .select('id, name, phone, department, position, hire_date, line_user_id, emergency_contact, emergency_phone, created_at, status, preferred_language')
             .eq('company_id', window.currentCompanyId)
             .eq('status', 'pending')
             .eq('is_active', false)
@@ -518,6 +524,7 @@ export async function loadPendingEmployees() {
                     <div class="date">
                         <div style="display:flex; align-items:center; gap:8px;">
                             <span style="font-weight:700;">${escapeHTML(emp.name)}</span>
+                            ${employeeLanguageBadge(emp)}
                             <span style="padding:3px 10px; border-radius:15px; font-size:11px; background:#FEF3C7; color:#92400E; font-weight:bold;">
                                 ⏳ 待審核
                             </span>
@@ -716,7 +723,7 @@ export async function loadResignedEmployees() {
 
     try {
         const { data, error } = await sb.from('employees')
-            .select('id, name, employee_number, department, position, hire_date, resigned_date, resign_reason, resign_note, status')
+            .select('id, name, employee_number, department, position, hire_date, resigned_date, resign_reason, resign_note, status, preferred_language')
             .eq('company_id', window.currentCompanyId)
             .eq('status', 'resigned')
             .order('resigned_date', { ascending: false });
@@ -736,6 +743,7 @@ export async function loadResignedEmployees() {
                     <div class="date">
                         <div style="display:flex; align-items:center; gap:8px;">
                             <span style="font-weight:700;">${escapeHTML(emp.name)} - ${escapeHTML(emp.employee_number || '-')}</span>
+                            ${employeeLanguageBadge(emp)}
                             <span style="padding:3px 10px; border-radius:15px; font-size:11px; background:#F3F4F6; color:#6B7280; font-weight:bold;">已離職</span>
                         </div>
                     </div>
@@ -767,7 +775,7 @@ export async function loadAllEmployees() {
 
     try {
         const { data, error } = await sb.from('employees')
-            .select('id, name, employee_number, department, position, is_active, status, hire_date, resigned_date')
+            .select('id, name, employee_number, department, position, is_active, status, hire_date, resigned_date, preferred_language')
             .eq('company_id', window.currentCompanyId)
             .in('status', ['approved', 'resigned'])
             .order('is_active', { ascending: false })
@@ -788,6 +796,7 @@ export async function loadAllEmployees() {
                     <div class="date">
                         <div style="display:flex; align-items:center; gap:8px;">
                             <span style="font-weight:700;">${escapeHTML(emp.name)} - ${escapeHTML(emp.employee_number || '-')}</span>
+                            ${employeeLanguageBadge(emp)}
                             <span style="padding:3px 10px; border-radius:15px; font-size:11px; background:${isResigned ? '#F3F4F6' : '#DCFCE7'}; color:${isResigned ? '#6B7280' : '#059669'}; font-weight:bold;">
                                 ${isResigned ? '已離職' : '在職'}
                             </span>
