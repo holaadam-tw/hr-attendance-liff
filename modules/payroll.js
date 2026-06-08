@@ -29,6 +29,23 @@ let payrollBrackets = [];
 let payrollIsPublished = false;
 let payrollScheduleMap = {};
 
+function calcLeaveOverlapDays(leave, rangeStart, rangeEnd) {
+    const ls = new Date((leave.start_date || rangeStart) + 'T00:00:00+08:00');
+    const le = new Date((leave.end_date || leave.start_date || rangeEnd) + 'T00:00:00+08:00');
+    const rs = new Date(rangeStart + 'T00:00:00+08:00');
+    const re = new Date(rangeEnd + 'T00:00:00+08:00');
+    const overlapStart = ls > rs ? ls : rs;
+    const overlapEnd = le < re ? le : re;
+    if (overlapEnd < overlapStart) return 0;
+    const overlapDays = Math.max(0, (overlapEnd - overlapStart) / 86400000 + 1);
+    const originalDays = Math.max(1, (le - ls) / 86400000 + 1);
+    const storedDays = Number(leave.days);
+    if (Number.isFinite(storedDays) && storedDays > 0) {
+        return storedDays * (overlapDays / originalDays);
+    }
+    return overlapDays;
+}
+
 export function clearPayrollState() {
     bonusEmployees = [];
     bonusPerformance = {};
@@ -106,15 +123,9 @@ export async function loadHybridBonusData() {
         const lateMap = {};
         (attRes.data || []).forEach(a => { if (!lateMap[a.employee_id]) lateMap[a.employee_id] = 0; if (a.is_late) lateMap[a.employee_id]++; });
         const leaveMap = {};
-        const bYearStart = new Date(year, 0, 1);
-        const bYearEnd = new Date(year, 11, 31);
         (leaveRes.data || []).forEach(l => {
             if (!leaveMap[l.employee_id]) leaveMap[l.employee_id] = 0;
-            const ls = new Date((l.start_date || `${year}-01-01`) + 'T00:00:00+08:00');
-            const le = new Date((l.end_date || `${year}-12-31`) + 'T00:00:00+08:00');
-            const os = ls > bYearStart ? ls : bYearStart;
-            const oe = le < bYearEnd ? le : bYearEnd;
-            leaveMap[l.employee_id] += Math.max(0, (oe - os) / 86400000 + 1);
+            leaveMap[l.employee_id] += calcLeaveOverlapDays(l, `${year}-01-01`, `${year}-12-31`);
         });
 
         const yearEnd = new Date(year, 11, 31);
@@ -559,15 +570,9 @@ export async function loadPayrollData() {
         });
 
         const leaveMap = {};
-        const pStart = new Date(startDate + 'T00:00:00+08:00');
-        const pEnd = new Date(endDate + 'T00:00:00+08:00');
         (leaveRes.data || []).forEach(l => {
             if (!leaveMap[l.employee_id]) leaveMap[l.employee_id] = { total: 0, personal: 0 };
-            const ls = new Date((l.start_date || startDate) + 'T00:00:00+08:00');
-            const le = new Date((l.end_date || endDate) + 'T00:00:00+08:00');
-            const overlapStart = ls > pStart ? ls : pStart;
-            const overlapEnd = le < pEnd ? le : pEnd;
-            const overlapDays = Math.max(0, (overlapEnd - overlapStart) / 86400000 + 1);
+            const overlapDays = calcLeaveOverlapDays(l, startDate, endDate);
             leaveMap[l.employee_id].total += overlapDays;
             if (l.leave_type === 'personal') leaveMap[l.employee_id].personal += overlapDays;
         });

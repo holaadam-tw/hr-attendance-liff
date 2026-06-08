@@ -23,8 +23,18 @@ export function switchApprovalType(type, btn) {
 
 // ===== 請假審核 =====
 function leavePeriodLabel(period) {
-    const map = { full_day: '全日', am: '上午半天', pm: '下午半天' };
+    const map = { full_day: '全日', am: '上午半天', pm: '下午半天', hourly: '小時請假' };
     return map[period || 'full_day'] || '全日';
+}
+
+function leaveDurationLabel(request) {
+    const days = Number(request?.days || 0);
+    if (request?.leave_period === 'hourly') {
+        const hours = Number.isFinite(days) && days > 0 ? days * 8 : 0;
+        const hoursText = Number.isInteger(hours) ? String(hours) : hours.toFixed(1);
+        return `${hoursText} 小時 · ${leavePeriodLabel('hourly')}`;
+    }
+    return `${request?.days || 1} 天 · ${leavePeriodLabel(request?.leave_period)}`;
 }
 
 export function switchLeaveTab(status, btn = null) {
@@ -56,7 +66,7 @@ export async function loadLeaveApprovals(status) {
                     </div>
                     <div class="details">
                         <span>${request.start_date} ~ ${request.end_date}</span>
-                        <span>${request.days || 1} 天 · ${leavePeriodLabel(request.leave_period)}</span>
+                        <span>${leaveDurationLabel(request)}</span>
                         <span>${escapeHTML(request.department || '-')}</span>
                     </div>
                     <div style="font-size:12px;color:#666;margin-top:5px;">${escapeHTML(request.reason || '無原因')}</div>

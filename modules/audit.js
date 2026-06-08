@@ -43,8 +43,13 @@ export async function exportReport(type) {
         } else if (type === 'leave') {
             const { data } = await sb.from('leave_requests').select('*, employees!inner(name, employee_number, department, company_id)').eq('employees.company_id', window.currentCompanyId).order('created_at', { ascending: false }).limit(200);
             const tm = { annual: '特休', sick: '病假', personal: '事假', compensatory: '補休' };
-            rows.push(['工號', '姓名', '部門', '假別', '開始', '結束', '天數', '原因', '狀態', '拒絕原因']);
-            (data || []).forEach(r => rows.push([r.employees?.employee_number, r.employees?.name, r.employees?.department, tm[r.leave_type] || r.leave_type, r.start_date, r.end_date, r.days || 1, r.reason || '', r.status, r.rejection_reason || '']));
+            const periodLabel = (r) => {
+                if (r.leave_period === 'hourly') return `${r.leave_hours || 0} 小時`;
+                const periodMap = { full_day: '全日', am: '上午半天', pm: '下午半天' };
+                return periodMap[r.leave_period || 'full_day'] || '全日';
+            };
+            rows.push(['工號', '姓名', '部門', '假別', '時段', '開始', '結束', '天數', '原因', '狀態', '拒絕原因']);
+            (data || []).forEach(r => rows.push([r.employees?.employee_number, r.employees?.name, r.employees?.department, tm[r.leave_type] || r.leave_type, periodLabel(r), r.start_date, r.end_date, r.days || 1, r.reason || '', r.status, r.rejection_reason || '']));
             fn = `請假報表_${ms}.csv`;
         } else if (type === 'overtime') {
             const { data } = await sb.from('overtime_requests').select('*, employees!inner(name, employee_number, department, company_id)').eq('employees.company_id', window.currentCompanyId).order('ot_date', { ascending: false }).limit(200);

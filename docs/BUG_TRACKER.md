@@ -71,8 +71,9 @@
 | B20 | 今日總覽看不到待審請假 | ✅ 已修前端 | `attendance_public.html` 讀取 `leave_requests` pending/approved，待審假單顯示「待審請假」 |
 | B21 | 請假只能整天，不能請半天 / 小時 | ✅ 已執行 SQL + 前端已修 | `migrations/084_half_day_leave_and_pending_makeup.sql` 已執行；支援全日 / 上午半天 / 下午半天 / 小時請假，最低 1 小時，扣薪以 8 小時 = 1 天折算 |
 | B22 | 請假衝突檢查未隔離公司 | ✅ 已修前端查詢 | `common.js` 改用 `employees!inner(company_id)`，避免跨公司請假互相影響人力上限 |
-| B23 | 補打卡每月 3 次上限造成正常補卡被擋 | 🟡 待執行 SQL | 新增 `migrations/085_remove_makeup_monthly_limit.sql`，重建 `submit_makeup_punch`，移除每月 3 次限制，只阻擋同一天同類型 pending/approved 重複申請 |
+| B23 | 補打卡每月 3 次上限造成正常補卡被擋 | ✅ 正式 DB 已確認 | `migrations/085_remove_makeup_monthly_limit.sql` 已執行；`submit_makeup_punch` 已移除每月 3 次限制，只阻擋同一天同類型 pending/approved 重複申請 |
 | B24 | GPS 已取得座標但範圍判斷顯示 `999999m` | ✅ 已修前端 | `quick_check_in` 回傳無效距離時，`checkin.html` 改用已載入公司打卡點重新計算最近距離；5000m 內改送主管核認，不再直接擋下 |
+| B38 | 半天 / 小時請假未完整進薪資與報表 | ✅ 已修程式待上線 | `modules/payroll.js` 改用 `leave_requests.days` 計算扣薪，半天=0.5、小時假=時數/8；`modules/audit.js` 匯出請假報表新增「時段」欄；`modules/leave.js` 審核中心補上小時假標籤 |
 
 ## 🔵 2026-04-22 修復的 Bug（薪資連動審查）
 
@@ -244,4 +245,4 @@
 
 - **B36**：一般打卡頁已能把 GPS 精度 >500m 改送待審，但「精度正常、座標飄到公司半徑外」仍直接擋下。修法：`checkin.html` 在 `quick_check_in` 回傳 `outside_allowed_location` 且 `min_distance <= 5000m` 時，改送補打卡待審核；超過 5000m 仍直接擋。`modules/schedules.js` 審核卡片新增「GPS 範圍外疑似飄移」標示，顯示距離公司、精度、照片與地圖連結。
 
-- **B37**：審核中心請假清單直接讀 `leave_requests`，遇到 RLS / schema 差異會顯示「載入失敗」；補打卡審核只讀 pending，且 GPS 待核與一般補卡混在一起，主管按通過後若有重複申請仍像沒作用。修法：新增 `migrations/086_approval_center_gps_review.sql`，提供 `get_leave_approval_requests`、`get_makeup_review_requests`，並讓 `approve_makeup_request` 通過一筆後自動關閉同員工同日同類型重複 pending。前端改為「待審核 / GPS 待核 / 一般補卡 / 已通過 / 已拒絕」分頁，通過時顯示處理狀態。
+- **B37**：審核中心請假清單直接讀 `leave_requests`，遇到 RLS / schema 差異會顯示「載入失敗」；補打卡審核只讀 pending，且 GPS 待核與一般補卡混在一起，主管按通過後若有重複申請仍像沒作用。修法：新增 `migrations/086_approval_center_gps_review.sql`，提供 `get_leave_approval_requests`、`get_makeup_review_requests`，並讓 `approve_makeup_request` 通過一筆後自動關閉同員工同日同類型重複 pending。前端改為「待審核 / GPS 待核 / 一般補卡 / 已通過 / 已拒絕」分頁，通過時顯示處理狀態。2026-06-08 已查正式 DB：三個 RPC 均存在。
