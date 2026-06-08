@@ -63,6 +63,7 @@ body{font-family:'Noto Sans TC',-apple-system,sans-serif;background:var(--bg);co
 .lunch-vegetarian{background:#DCFCE7;color:#15803D;}
 .lunch-none{background:#F3F4F6;color:#475569;}
 .lunch-unset{background:#EEF2FF;color:#4338CA;}
+.pending-makeup-badge{background:#FFF7ED;color:#C2410C;border:1px solid #FDBA74;}
 
 .time-cell{font-family:'SF Mono',monospace;font-size:12px;}
 .late-flag{color:#EA580C;font-size:10px;font-weight:700;}
@@ -289,6 +290,9 @@ body{font-family:'Noto Sans TC',-apple-system,sans-serif;background:var(--bg);co
                     <div class="stat-card" style="background:#FFF1F2;"><div class="stat-num" style="color:#BE123C;" id="dEarly">0</div><div class="stat-label" style="color:#BE123C;">早退</div></div>
                     <div class="stat-card" style="background:#F3F4F6;"><div class="stat-num" style="color:#6B7280;" id="dLeave">0</div><div class="stat-label" style="color:#6B7280;">請假</div></div>
                 </div>
+                <div class="stat-grid">
+                    <div class="stat-card" style="background:#FFF7ED;"><div class="stat-num" style="color:#C2410C;" id="dPendingMakeup">0</div><div class="stat-label" style="color:#C2410C;">待審補卡</div></div>
+                </div>
 
                 <!-- 便當訂購統計 -->
                 <div id="lunchStatCard" style="display:none;margin-bottom:16px;cursor:pointer;" onclick="toggleLunchDetail()">
@@ -317,6 +321,7 @@ body{font-family:'Noto Sans TC',-apple-system,sans-serif;background:var(--bg);co
                         <option value="working">上班中</option>
                         <option value="not_checked">未打卡</option>
                         <option value="completed">已完成</option>
+                        <option value="pending_makeup">待審補卡</option>
                         <option value="late">遲到</option>
                         <option value="on_leave">請假</option>
                         <option value="absent">缺勤</option>
@@ -603,6 +608,8 @@ let companyName = '';
 let dailyData = [];
 let dailySort = { key: 'status', direction: 'asc' };
 let dailyLunchOrders = new Map();
+let dailyPendingMakeups = new Map();
+let dailyLeaveRequests = new Map();
 const DAILY_COLUMN_DEFAULT_ORDER = ['employee', 'lunch', 'department', 'shift', 'check_in', 'check_out', 'hours', 'status'];
 let dailyColumnOrder = DAILY_COLUMN_DEFAULT_ORDER.slice();
 let dailyColumnDragKey = null;
@@ -638,7 +645,7 @@ const I18N = {
         fixedShift:'固定班', scheduledShift:'排班制', unset:'未排', defaultShift:'預設班', sharedShift:'共用班別', noPermission:'無權限', edit:'編輯', delete:'刪除', save:'儲存', clear:'清空', seedDefaults:'建立預設',
         humanTitle:'👥 人力管理', humanSubtitle:'電腦版排班工作台。員工模式可直接儲存；排班格子點擊後再按儲存排班。', saveSchedule:'💾 儲存排班', thisWeek:'本週', shiftMaintain:'班別新增 / 編輯', shiftName:'班別名稱', startTime:'開始', endTime:'結束', shiftCode:'代碼（可選）', overnight:'跨日班', currentShifts:'目前班別', noShifts:'尚無班別，請先新增或按「建立預設」。',
         noEmployees:'尚無員工資料', scheduleSynced:'排班已同步', unsavedSchedule:'尚未儲存：{n} 格排班已變更', saveModeOk:'工時模式已儲存', saveFail:'儲存失敗：', scheduleSaved:'排班已儲存', noScheduleChanges:'沒有排班變更', missingManager:'缺少管理者身份',
-        lunchTitle:'便當統計', lunchStatus:'便當', lunchRegular:'葷食', lunchVegetarian:'素食', lunchNone:'不訂購', lunchUnset:'未選', orders:'份', open:'↗', prev:'◀', next:'▶'
+        lunchTitle:'便當統計', lunchStatus:'便當', lunchRegular:'葷食', lunchVegetarian:'素食', lunchNone:'不訂購', lunchUnset:'未選', pendingMakeup:'待審補卡', pendingClockIn:'待審補上班', pendingClockOut:'待審補下班', pendingLeave:'待審請假', orders:'份', open:'↗', prev:'◀', next:'▶'
     },
     vi: {
         langLabel:'Ngôn ngữ', loading:'Đang tải...', loadFailed:'Tải thất bại', noData:'Không có dữ liệu', employee:'Nhân viên', department:'Bộ phận', shift:'Ca làm', checkIn:'Giờ vào', checkOut:'Giờ ra', hours:'Giờ công', status:'Trạng thái',
@@ -655,7 +662,7 @@ const I18N = {
         fixedShift:'Ca cố định', scheduledShift:'Theo lịch', unset:'Chưa xếp', defaultShift:'Ca mặc định', sharedShift:'Ca dùng chung', noPermission:'Không có quyền', edit:'Sửa', delete:'Xóa', save:'Lưu', clear:'Xóa form', seedDefaults:'Tạo ca mặc định',
         humanTitle:'👥 Quản lý nhân sự', humanSubtitle:'Bảng xếp ca bản máy tính. Có thể lưu chế độ giờ làm; bấm ô lịch rồi bấm lưu lịch.', saveSchedule:'💾 Lưu lịch', thisWeek:'Tuần này', shiftMaintain:'Thêm / sửa ca', shiftName:'Tên ca', startTime:'Bắt đầu', endTime:'Kết thúc', shiftCode:'Mã ca (tùy chọn)', overnight:'Ca qua ngày', currentShifts:'Ca hiện có', noShifts:'Chưa có ca. Hãy thêm ca hoặc bấm tạo ca mặc định.',
         noEmployees:'Chưa có dữ liệu nhân viên', scheduleSynced:'Lịch đã đồng bộ', unsavedSchedule:'Chưa lưu: đã đổi {n} ô lịch', saveModeOk:'Đã lưu chế độ giờ làm', saveFail:'Lưu thất bại: ', scheduleSaved:'Đã lưu lịch', noScheduleChanges:'Không có thay đổi lịch', missingManager:'Thiếu thân phận quản lý',
-        lunchTitle:'Thống kê cơm', lunchStatus:'Cơm', lunchRegular:'Mặn', lunchVegetarian:'Chay', lunchNone:'Không đặt', lunchUnset:'Chưa chọn', orders:'phần', open:'↗', prev:'◀', next:'▶'
+        lunchTitle:'Thống kê cơm', lunchStatus:'Cơm', lunchRegular:'Mặn', lunchVegetarian:'Chay', lunchNone:'Không đặt', lunchUnset:'Chưa chọn', pendingMakeup:'Chờ duyệt bổ sung', pendingClockIn:'Chờ duyệt giờ vào', pendingClockOut:'Chờ duyệt giờ ra', pendingLeave:'Chờ duyệt nghỉ phép', orders:'phần', open:'↗', prev:'◀', next:'▶'
     }
 };
 
@@ -711,7 +718,7 @@ function applyTranslations() {
     setText('#filterDept option[value=""]', t('allDept'));
     setText('#filterStatus option[value=""]', t('allStatus'));
     const statusOpts = document.querySelectorAll('#filterStatus option');
-    const statusLabels = ['', t('working'), t('notChecked'), t('completed'), t('late'), t('leave'), t('absent')];
+    const statusLabels = ['', t('working'), t('notChecked'), t('completed'), t('pendingMakeup'), t('late'), t('leave'), t('absent')];
     statusOpts.forEach((opt, i) => { if (statusLabels[i]) opt.textContent = statusLabels[i]; });
     updateDailySortHeaders();
     const monthlyHeads = document.querySelectorAll('#monthlyView .emp-table thead th');
@@ -1042,6 +1049,53 @@ function switchTab(tab) {
 function getDailyDate() { return document.getElementById('dailyDatePicker').value || getTaiwanDate(); }
 function onDailyDateChange() { loadDailyData(); }
 
+function hasPendingMakeup(row) {
+    return Array.isArray(row?.pending_makeups) && row.pending_makeups.length > 0;
+}
+
+function hasPendingLeave(row) {
+    return row?.daily_leave?.status === 'pending';
+}
+
+function leaveTypeLabel(type) {
+    const zh = { annual:'特休', sick:'病假', personal:'事假', compensatory:'補休', maternity:'產假', marriage:'婚假' };
+    const vi = { annual:'Phép năm', sick:'Nghỉ bệnh', personal:'Việc riêng', compensatory:'Nghỉ bù', maternity:'Thai sản', marriage:'Kết hôn' };
+    return (currentLang === 'vi' ? vi : zh)[type] || type || '';
+}
+
+function leavePeriodLabel(period) {
+    const zh = { full_day:'全日', am:'上午半天', pm:'下午半天' };
+    const vi = { full_day:'Cả ngày', am:'Nửa ngày sáng', pm:'Nửa ngày chiều' };
+    return (currentLang === 'vi' ? vi : zh)[period || 'full_day'] || '';
+}
+
+function buildPendingMakeupMap(requests, dateStr) {
+    const map = new Map();
+    (requests || []).forEach(r => {
+        if (String(r.punch_date || '') !== dateStr) return;
+        if (!map.has(r.employee_id)) map.set(r.employee_id, []);
+        map.get(r.employee_id).push(r);
+    });
+    return map;
+}
+
+function buildDailyLeaveMap(requests, dateStr) {
+    const map = new Map();
+    (requests || []).forEach(r => {
+        if (dateStr < r.start_date || dateStr > (r.end_date || r.start_date)) return;
+        map.set(r.employee_id, r);
+    });
+    return map;
+}
+
+function attachDailyMarkers(rows, pendingMap, leaveMap) {
+    return (rows || []).map(row => ({
+        ...row,
+        pending_makeups: pendingMap.get(row.employee_id) || [],
+        daily_leave: leaveMap.get(row.employee_id) || null
+    }));
+}
+
 async function loadDailyData() {
     const dateStr = getDailyDate();
     const dayNames = t('weekdays');
@@ -1050,9 +1104,24 @@ async function loadDailyData() {
     document.getElementById('dailyDayLabel').textContent = dayNames[d.getDay()];
 
     try {
-        const { data, error } = await sb.rpc('get_company_daily_attendance', { p_company_id: companyId, p_date: dateStr });
-        if (error) throw error;
-        dailyData = (data || []).filter(row => !shouldHideDailyEmployee(row));
+        const [dailyRes, makeupRes, leaveRes] = await Promise.all([
+            sb.rpc('get_company_daily_attendance', { p_company_id: companyId, p_date: dateStr }),
+            sb.rpc('get_pending_makeup_requests', { p_company_id: companyId }).catch(e => ({ data: [], error: e })),
+            sb.from('leave_requests')
+                .select('employee_id, leave_type, leave_period, days, start_date, end_date, status, employees!inner(company_id)')
+                .eq('employees.company_id', companyId)
+                .in('status', ['approved', 'pending'])
+                .lte('start_date', dateStr)
+                .gte('end_date', dateStr)
+                .limit(500)
+                .catch(e => ({ data: [], error: e }))
+        ]);
+        if (dailyRes.error) throw dailyRes.error;
+        if (makeupRes.error) console.warn('Load pending makeup warning:', makeupRes.error);
+        if (leaveRes.error) console.warn('Load daily leave warning:', leaveRes.error);
+        dailyPendingMakeups = buildPendingMakeupMap(makeupRes.data || [], dateStr);
+        dailyLeaveRequests = buildDailyLeaveMap(leaveRes.data || [], dateStr);
+        dailyData = attachDailyMarkers(dailyRes.data || [], dailyPendingMakeups, dailyLeaveRequests).filter(row => !shouldHideDailyEmployee(row));
         dailyLunchOrders = new Map();
         updateDailyStats();
         updateDeptFilter();
@@ -1069,10 +1138,12 @@ function updateDailyStats() {
     const d = dailyData.filter(r => r.status !== 'off_day');
     document.getElementById('dExpected').textContent = d.length;
     document.getElementById('dChecked').textContent = d.filter(r => r.status === 'working' || r.status === 'completed').length;
-    document.getElementById('dNotChecked').textContent = d.filter(r => r.status === 'not_checked' || r.status === 'absent').length;
+    document.getElementById('dNotChecked').textContent = d.filter(r => (r.status === 'not_checked' || r.status === 'absent') && !hasPendingMakeup(r) && !hasPendingLeave(r)).length;
     document.getElementById('dLate').textContent = d.filter(r => r.is_late).length;
     document.getElementById('dEarly').textContent = d.filter(r => r.is_early_leave).length;
-    document.getElementById('dLeave').textContent = d.filter(r => r.status === 'on_leave').length;
+    document.getElementById('dLeave').textContent = d.filter(r => r.status === 'on_leave' || hasPendingLeave(r)).length;
+    const pendingEl = document.getElementById('dPendingMakeup');
+    if (pendingEl) pendingEl.textContent = d.filter(hasPendingMakeup).length;
 }
 
 function updateDeptFilter() {
@@ -1121,6 +1192,8 @@ function updateDailySortHeaders() {
 }
 
 function dailyStatusRank(row) {
+    if (hasPendingMakeup(row)) return -1;
+    if (hasPendingLeave(row)) return -0.5;
     if (row.status === 'not_checked') return 0;
     if (row.status === 'absent') return 1;
     if (row.status === 'working') return row.is_late ? 2 : 3;
@@ -1144,6 +1217,19 @@ function lunchStatusRank(row) {
 function lunchBadge(row) {
     const info = lunchStatusInfo(row);
     return '<span class="lunch-badge ' + info.cls + '">' + esc(info.label) + '</span>';
+}
+
+function pendingMakeupLabel(row) {
+    if (!hasPendingMakeup(row)) return '';
+    const labels = row.pending_makeups.map(r => r.punch_type === 'clock_out' ? t('pendingClockOut') : t('pendingClockIn'));
+    return [...new Set(labels)].join('、');
+}
+
+function dailyLeaveLabel(row) {
+    if (!row?.daily_leave) return '';
+    const leave = row.daily_leave;
+    const prefix = leave.status === 'pending' ? t('pendingLeave') : t('leave');
+    return `${prefix} ${leaveTypeLabel(leave.leave_type)} ${leavePeriodLabel(leave.leave_period)}`;
 }
 
 function dailyTimeSortValue(v) {
@@ -1186,7 +1272,15 @@ function getFilteredDaily() {
     const dept = document.getElementById('filterDept').value;
     const status = document.getElementById('filterStatus').value;
     if (dept) filtered = filtered.filter(r => r.department === dept);
-    if (status) { filtered = status === 'late' ? filtered.filter(r => r.is_late) : filtered.filter(r => r.status === status); }
+    if (status) {
+        filtered = status === 'late'
+            ? filtered.filter(r => r.is_late)
+            : status === 'pending_makeup'
+                ? filtered.filter(hasPendingMakeup)
+                : status === 'on_leave'
+                    ? filtered.filter(r => r.status === 'on_leave' || hasPendingLeave(r))
+                : filtered.filter(r => r.status === status);
+    }
     return sortDailyRows(filtered);
 }
 
@@ -1532,13 +1626,19 @@ function shiftBadge(row) {
 function statusBadge(row) {
     const map = { working:[t('working'),'s-working'], completed:[t('completed'),'s-completed'], not_checked:[t('notChecked'),'s-not-checked'], on_leave:[t('leave'),'s-on-leave'], absent:[t('absent'),'s-absent'], off_day:[t('offDay'),'s-off-day'] };
     let label, cls;
-    if (row.is_late && (row.status === 'working' || row.status === 'completed')) {
+    if (hasPendingMakeup(row)) {
+        label = pendingMakeupLabel(row);
+        cls = 'pending-makeup-badge';
+    } else if (hasPendingLeave(row)) {
+        label = dailyLeaveLabel(row);
+        cls = 'pending-makeup-badge';
+    } else if (row.is_late && (row.status === 'working' || row.status === 'completed')) {
         label = '?? ' + t('late') + '?' + (row.status === 'working' ? t('working') : t('completed')); cls = 's-late';
     } else { const m = map[row.status] || [t('unknown'),'']; label = m[0]; cls = m[1]; }
     if (row.is_early_leave) label += ' ' + t('early');
+    if (!hasPendingLeave(row) && row.daily_leave && row.status !== 'on_leave') label += ' · ' + dailyLeaveLabel(row);
     if (row.leave_type && row.status === 'on_leave') {
-        const lt = currentLang === 'vi' ? { annual:'Nghỉ phép năm', sick:'Nghỉ bệnh', personal:'Nghỉ việc riêng', compensatory:'Nghỉ bù', maternity:'Nghỉ thai sản', marriage:'Nghỉ kết hôn' } : { annual:'特休', sick:'病假', personal:'事假', compensatory:'補休', maternity:'產假', marriage:'婚假' };
-        label = t('leave') + ' ' + (lt[row.leave_type] || row.leave_type);
+        label = dailyLeaveLabel(row) || (t('leave') + ' ' + leaveTypeLabel(row.leave_type));
     }
     return '<span class="status-badge ' + cls + '">' + label + '</span>';
 }
@@ -1549,10 +1649,14 @@ function dailyCellHtml(r, key) {
     if (key === 'department') return '<td style="color:#64748B;font-size:11px;">' + esc(r.department || '-') + '</td>';
     if (key === 'shift') return '<td>' + shiftBadge(r) + '</td>';
     if (key === 'check_in') {
-        return '<td class="time-cell">' + fmtTime(r.check_in_time) + (r.is_late ? ' <span class="late-flag">遲到</span>' : '') +
+        const pendingIn = (r.pending_makeups || []).find(m => m.punch_type === 'clock_in');
+        return '<td class="time-cell">' + fmtTime(r.check_in_time) + (pendingIn ? ' <span class="late-flag" style="background:#FFF7ED;color:#C2410C;">待審 ' + esc(String(pendingIn.punch_time || '').substring(0,5)) + '</span>' : '') + (r.is_late ? ' <span class="late-flag">遲到</span>' : '') +
             (r.check_in_location ? '<span class="loc-hint" title="' + esc(r.check_in_location) + '">📍' + esc(r.check_in_location) + '</span>' : '') + '</td>';
     }
-    if (key === 'check_out') return '<td class="time-cell">' + fmtTime(r.check_out_time) + (r.is_early_leave ? ' <span class="early-flag">早退</span>' : '') + '</td>';
+    if (key === 'check_out') {
+        const pendingOut = (r.pending_makeups || []).find(m => m.punch_type === 'clock_out');
+        return '<td class="time-cell">' + fmtTime(r.check_out_time) + (pendingOut ? ' <span class="early-flag" style="background:#FFF7ED;color:#C2410C;">待審 ' + esc(String(pendingOut.punch_time || '').substring(0,5)) + '</span>' : '') + (r.is_early_leave ? ' <span class="early-flag">早退</span>' : '') + '</td>';
+    }
     if (key === 'hours') return '<td class="time-cell">' + fmtHours(r.total_work_hours) + '</td>';
     if (key === 'status') return '<td>' + statusBadge(r) + '</td>';
     return '<td></td>';
@@ -1739,7 +1843,7 @@ function exportExcel() {
             '工時': r.total_work_hours > 0 ? Math.round(r.total_work_hours * 10) / 10 : '',
             '遲到': r.is_late ? '是' : '', '早退': r.is_early_leave ? '是' : '',
             '打卡地點': r.check_in_location || '',
-            '狀態': { working:'上班中', completed:'完成', not_checked:'未打卡', on_leave:'請假', absent:'缺勤' }[r.status] || r.status,
+            '狀態': pendingMakeupLabel(r) || (hasPendingLeave(r) ? dailyLeaveLabel(r) : '') || { working:'上班中', completed:'完成', not_checked:'未打卡', on_leave:'請假', absent:'缺勤' }[r.status] || r.status,
             '便當狀態': lunchStatusInfo(r).label
         }));
         XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), '今日打卡');

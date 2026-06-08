@@ -935,7 +935,8 @@ async function checkLeaveAvailability(startDate, endDate) {
 
         // 2. 查詢日期範圍內所有已核准/待審假單（排除自己）
         const { data: leaves } = await sb.from('leave_requests')
-            .select('employee_id, start_date, end_date, status, employees(name)')
+            .select('employee_id, start_date, end_date, status, employees!inner(name, company_id)')
+            .eq('employees.company_id', window.currentCompanyId)
             .neq('employee_id', currentEmployee.id)
             .in('status', ['approved', 'pending'])
             .or(`and(start_date.lte.${endDate},end_date.gte.${startDate})`)
@@ -992,16 +993,34 @@ async function checkLeaveAvailability(startDate, endDate) {
     }
 }
 
+function getLeavePeriodLabel(period) {
+    const map = {
+        full_day: '全日',
+        am: '上午半天',
+        pm: '下午半天',
+        hourly: '小時請假'
+    };
+    return map[period || 'full_day'] || '全日';
+}
+
 async function submitLeave() {
     if (!currentEmployee) return showToast('❌ 請先登入');
     const type = document.getElementById('leaveType')?.value;
     const start = document.getElementById('leaveStartDate')?.value;
     const end = document.getElementById('leaveEndDate')?.value;
+    const period = document.getElementById('leavePeriod')?.value || 'full_day';
+    const leaveHours = Number(document.getElementById('leaveHours')?.value);
     const reason = document.getElementById('leaveReason')?.value;
     if (!start || !end || !reason) return showToast('請填寫完整');
 
     if (new Date(end) < new Date(start)) {
         return showToast('❌ 結束日期不能早於開始日期');
+    }
+    if ((period === 'am' || period === 'pm') && start !== end) {
+        return showToast('❌ 半天請假只能選同一天');
+    }
+    if (period === 'hourly' && (!Number.isInteger(leaveHours) || leaveHours < 1)) {
+        return showToast('❌ 小時請假最低 1 小時，請填整數時數');
     }
 
     const submitBtn = document.getElementById('leaveSubmitBtn');
@@ -1026,13 +1045,26 @@ async function submitLeave() {
 
     try {
         // 使用 SECURITY DEFINER RPC 繞過 RLS（048 SQL）
-        const { data: rpcResult, error: rpcError } = await sb.rpc('submit_leave_request', {
+        const leavePayload = {
             p_line_user_id: liffProfile.userId,
             p_leave_type: type,
             p_start_date: start,
             p_end_date: end,
+            p_leave_period: period,
+            p_leave_hours: period === 'hourly' ? leaveHours : null,
             p_reason: reason || ''
-        });
+        };
+        let { data: rpcResult, error: rpcError } = await sb.rpc('submit_leave_request', leavePayload);
+        const rpcMessage = rpcError?.message || '';
+        if (rpcError && /p_leave_period|p_leave_hours|schema cache|function .*submit_leave_request/i.test(rpcMessage)) {
+            if (period !== 'full_day') {
+                throw new Error('半天/小時請假資料庫尚未更新，請先執行 migrations/084_half_day_leave_and_pending_makeup.sql');
+            }
+            const fallbackPayload = { ...leavePayload };
+            delete fallbackPayload.p_leave_period;
+            delete fallbackPayload.p_leave_hours;
+            ({ data: rpcResult, error: rpcError } = await sb.rpc('submit_leave_request', fallbackPayload));
+        }
         if (rpcError) throw rpcError;
         if (rpcResult && !rpcResult.success) throw new Error(rpcResult.error);
         showToast('✅ 申請成功');
@@ -1048,7 +1080,8 @@ async function submitLeave() {
 
         // 通知管理員
         const typeNames = { annual:'特休', sick:'病假', personal:'事假', compensatory:'補休' };
-        sendAdminNotify(`🔔 ${currentEmployee.name} 申請${typeNames[type]||type}\n📅 ${start} ~ ${end}\n📝 ${reason || '無附原因'}`);
+        const periodNote = period === 'hourly' ? `${leaveHours} 小時` : getLeavePeriodLabel(period);
+        sendAdminNotify(`🔔 ${currentEmployee.name} 申請${typeNames[type]||type}（${periodNote}）\n📅 ${start} ~ ${end}\n📝 ${reason || '無附原因'}`);
     } catch(e) {
         showToast('❌ 申請失敗：' + friendlyError(e));
     } finally {
@@ -1084,7 +1117,7 @@ async function loadLeaveHistory() {
                 </div>
                 <div class="details">
                     <span>${escapeHTML(r.start_date)} ~ ${escapeHTML(r.end_date)}</span>
-                    <span>${r.days || 1} 天</span>
+                    <span>${r.leave_period === 'hourly' && r.leave_hours ? `${escapeHTML(String(r.leave_hours))} 小時 · 扣薪 ${escapeHTML(String(r.days || 0))} 天` : `${r.days || 1} 天 · ${escapeHTML(getLeavePeriodLabel(r.leave_period))}`}</span>
                 </div>
                 <div class="text-sm-muted">${escapeHTML(r.reason)}</div>
                 ${r.status === 'rejected' && r.rejection_reason ?
@@ -1399,7 +1432,7 @@ async function loadMonthlyAttendance() {
             const monthStart = `${year}-${String(month).padStart(2,'0')}-01`;
             const monthEnd = fmtDate(new Date(year, month, 0));
             const { data: leaveData } = await sb.from('leave_requests')
-                .select('start_date, end_date')
+                .select('start_date, end_date, days')
                 .eq('employee_id', currentEmployee.id)
                 .eq('status', 'approved')
                 .lte('start_date', monthEnd)
@@ -1414,7 +1447,13 @@ async function loadMonthlyAttendance() {
                     const overlapStart = reqStart > monthStartDate ? reqStart : monthStartDate;
                     const overlapEnd = reqEnd < monthEndDate ? reqEnd : monthEndDate;
                     if (overlapEnd < overlapStart) return sum;
-                    return sum + ((overlapEnd - overlapStart) / 86400000 + 1);
+                    const overlapDays = (overlapEnd - overlapStart) / 86400000 + 1;
+                    const storedDays = Number(r.days);
+                    const originalDays = Math.max(1, (reqEnd - reqStart) / 86400000 + 1);
+                    if (Number.isFinite(storedDays) && storedDays > 0) {
+                        return sum + (storedDays * (overlapDays / originalDays));
+                    }
+                    return sum + overlapDays;
                 }, 0);
             }
         } catch(e) { console.warn('查詢當月請假天數失敗', e); }

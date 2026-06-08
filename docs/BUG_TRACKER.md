@@ -69,9 +69,10 @@
 |---|-----|------|------|
 | B19 | 今日總覽看不到待審補打卡 | ✅ 已修前端 | `attendance_public.html` 讀取 `get_pending_makeup_requests`，表格狀態顯示「待審補上班 / 待審補下班」，並加待審補卡統計 |
 | B20 | 今日總覽看不到待審請假 | ✅ 已修前端 | `attendance_public.html` 讀取 `leave_requests` pending/approved，待審假單顯示「待審請假」 |
-| B21 | 請假只能整天，不能請半天 | 🟡 待執行 SQL | 前端已加入全日 / 上午半天 / 下午半天；新增 `migrations/084_half_day_leave_and_pending_makeup.sql`，需執行後半天才正式可送出 |
+| B21 | 請假只能整天，不能請半天 / 小時 | ✅ 已執行 SQL + 前端已修 | `migrations/084_half_day_leave_and_pending_makeup.sql` 已執行；支援全日 / 上午半天 / 下午半天 / 小時請假，最低 1 小時，扣薪以 8 小時 = 1 天折算 |
 | B22 | 請假衝突檢查未隔離公司 | ✅ 已修前端查詢 | `common.js` 改用 `employees!inner(company_id)`，避免跨公司請假互相影響人力上限 |
 | B23 | 補打卡每月 3 次上限造成正常補卡被擋 | 🟡 待執行 SQL | 新增 `migrations/085_remove_makeup_monthly_limit.sql`，重建 `submit_makeup_punch`，移除每月 3 次限制，只阻擋同一天同類型 pending/approved 重複申請 |
+| B24 | GPS 已取得座標但範圍判斷顯示 `999999m` | ✅ 已修前端 | `quick_check_in` 回傳無效距離時，`checkin.html` 改用已載入公司打卡點重新計算最近距離；5000m 內改送主管核認，不再直接擋下 |
 
 ## 🔵 2026-04-22 修復的 Bug（薪資連動審查）
 

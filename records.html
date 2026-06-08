@@ -7,6 +7,7 @@
     <title>📊 查詢記錄 - 員工服務中心</title>
     <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="i18n.js?v=20260608-employee-lang"></script>
     <link rel="stylesheet" href="style.css">
     <style>
         .att-nav { display: flex; align-items: center; justify-content: center; gap: 16px; margin-bottom: 16px; }
@@ -56,6 +57,7 @@
     <div id="loadingPage" class="loading-screen"><div class="spinner"></div><p>系統載入中...</p></div>
 
     <div class="container">
+        <div id="recordsLanguageSwitch"></div>
         <!-- 打卡成功 Banner -->
         <div id="checkinSuccessBanner" style="display:none; margin:10px 16px 0; padding:14px 18px; background:linear-gradient(135deg,#059669,#10B981); color:#fff; border-radius:14px; font-size:14px; font-weight:700; box-shadow:0 4px 12px rgba(16,185,129,0.3); transition:opacity 0.5s; position:relative;">
             <span id="checkinSuccessText"></span>
@@ -73,34 +75,48 @@
 
         <!-- 頁面導航 -->
         <div class="flex-gap-8" style="padding:10px 16px 0;">
-            <button class="recTab rec-tab active" onclick="showPage('leavePage')">📝 請假</button>
-            <button class="recTab rec-tab" onclick="showPage('makeupPunchPage')">🔧 補卡</button>
+            <button class="recTab rec-tab active" onclick="showPage('leavePage')">📝 <span data-i18n="leave">請假</span></button>
+            <button class="recTab rec-tab" onclick="showPage('makeupPunchPage')">🔧 <span data-i18n="makeupPunch">補卡</span></button>
             <button class="recTab rec-tab" onclick="showPage('overtimePage')">⏰ 加班</button>
             <button class="recTab rec-tab" onclick="showPage('attendancePage')">📊 考勤</button>
         </div>
 
         <!-- 請假頁面 -->
         <div id="leavePage" class="page active">
-            <button class="btn btn-secondary btn-auto-mb" onclick="window.location.href='index.html'">← 返回</button>
+            <button class="btn btn-secondary btn-auto-mb" onclick="window.location.href='index.html'" data-i18n="backHome">← 返回</button>
             <div class="checkin-page">
-                <h2>📝 請假申請</h2>
-                <div class="form-group"><label>假別</label>
+                <h2>📝 <span data-i18n="leaveRequest">請假申請</span></h2>
+                <div class="form-group"><label data-i18n="leaveType">假別</label>
                     <select id="leaveType">
                         <option value="annual">特休假</option><option value="sick">病假</option>
                         <option value="personal">事假</option><option value="compensatory">補休</option>
                     </select>
                 </div>
-                <div class="form-group"><label>開始日期</label><input type="date" id="leaveStartDate" onchange="onLeaveDateChange()"></div>
-                <div class="form-group"><label>結束日期</label><input type="date" id="leaveEndDate" onchange="onLeaveDateChange()"></div>
+                <div class="form-group"><label data-i18n="startDate">開始日期</label><input type="date" id="leaveStartDate" onchange="onLeaveDateChange()"></div>
+                <div class="form-group"><label data-i18n="endDate">結束日期</label><input type="date" id="leaveEndDate" onchange="onLeaveDateChange()"></div>
+                <div class="form-group"><label data-i18n="leavePeriod">請假時段</label>
+                    <select id="leavePeriod" onchange="onLeaveDateChange()">
+                        <option value="full_day">全日（1 天）</option>
+                        <option value="am">上午半天（0.5 天）</option>
+                        <option value="pm">下午半天（0.5 天）</option>
+                        <option value="hourly" data-i18n="hourlyLeave">小時請假</option>
+                    </select>
+                    <div style="font-size:11px;color:#94A3B8;margin-top:4px;">半天請假只能選同一天；小時請假最低 1 小時，扣薪按 8 小時 = 1 天計算。</div>
+                </div>
+                <div class="form-group" id="leaveHoursGroup" style="display:none;">
+                    <label data-i18n="leaveHours">請假時數</label>
+                    <input type="number" id="leaveHours" min="1" step="1" placeholder="例如：1、2、3" onchange="onLeaveDateChange()" oninput="onLeaveDateChange()">
+                    <div style="font-size:11px;color:#94A3B8;margin-top:4px;" data-i18n="leaveHoursHint">最低 1 小時；系統以每 8 小時折算 1 天扣薪。</div>
+                </div>
 
                 <!-- 即時衝突警告 -->
                 <div id="leaveConflictWarn" style="display:none;padding:12px 14px;border-radius:12px;margin-bottom:12px;font-size:13px;line-height:1.6;"></div>
 
-                <div class="form-group"><label>原因</label><textarea id="leaveReason"></textarea></div>
-                <button class="btn btn-primary" id="leaveSubmitBtn" onclick="submitLeave()">📤 提交申請</button>
+                <div class="form-group"><label data-i18n="leaveReason">原因</label><textarea id="leaveReason"></textarea></div>
+                <button class="btn btn-primary" id="leaveSubmitBtn" onclick="submitLeave()" data-i18n="submitRequest">📤 提交申請</button>
                 <div id="leaveStatus" class="status-box"></div>
                 <div class="section-divider">
-                    <h3 class="mb-4">📋 我的請假記錄</h3>
+                    <h3 class="mb-4">📋 <span data-i18n="myLeaveHistory">我的請假記錄</span></h3>
                     <div id="leaveHistoryList"><p class="text-center-gray">載入中...</p></div>
                 </div>
             </div>
@@ -108,9 +124,9 @@
 
         <!-- ====== 補打卡申請 ====== -->
         <div id="makeupPunchPage" class="page">
-            <button class="btn btn-secondary btn-auto-mb" onclick="window.location.href='index.html'">← 返回</button>
+            <button class="btn btn-secondary btn-auto-mb" onclick="window.location.href='index.html'" data-i18n="backHome">← 返回</button>
             <div class="checkin-page">
-                <h2>🔧 補打卡申請</h2>
+                <h2>🔧 <span data-i18n="makeupPunchRequest">補打卡申請</span></h2>
                 <p class="desc-hint">只有「人有到但忘記打卡、手機問題、系統問題」才使用補打卡。請填實際到班/離班時間；送出後需主管審核，通過後才會寫入正式考勤。</p>
                 <div style="background:#FFF7ED;border:1px solid #FDBA74;color:#9A3412;border-radius:12px;padding:12px;margin-bottom:14px;font-size:12px;line-height:1.6;">
                     <b>補打卡規則</b><br>
@@ -125,55 +141,55 @@
                 </div>
 
                 <div class="form-group">
-                    <label>補打卡日期</label>
+                    <label data-i18n="makeupDate">補打卡日期</label>
                     <input type="date" id="mpDate">
                 </div>
 
                 <div class="form-group">
-                    <label>補打卡類型</label>
+                    <label data-i18n="makeupType">補打卡類型</label>
                     <div style="display:flex;gap:8px;">
                         <label style="flex:1;display:flex;align-items:center;gap:8px;padding:12px;border:2px solid #E5E7EB;border-radius:10px;cursor:pointer;transition:all 0.2s;" onclick="selectMpType('clock_in',this)">
                             <input type="radio" name="mpType" value="clock_in" id="mpTypeIn" checked style="display:none;">
                             <span style="font-size:20px;">☀️</span>
-                            <span style="font-weight:700;font-size:13px;">上班補打卡</span>
+                            <span style="font-weight:700;font-size:13px;" data-i18n="makeupClockIn">上班補打卡</span>
                         </label>
                         <label style="flex:1;display:flex;align-items:center;gap:8px;padding:12px;border:2px solid #E5E7EB;border-radius:10px;cursor:pointer;transition:all 0.2s;" onclick="selectMpType('clock_out',this)">
                             <input type="radio" name="mpType" value="clock_out" id="mpTypeOut" style="display:none;">
                             <span style="font-size:20px;">🌙</span>
-                            <span style="font-weight:700;font-size:13px;">下班補打卡</span>
+                            <span style="font-weight:700;font-size:13px;" data-i18n="makeupClockOut">下班補打卡</span>
                         </label>
                     </div>
                     <input type="hidden" id="mpType" value="clock_in">
                 </div>
 
                 <div class="form-group">
-                    <label>實際打卡時間</label>
+                    <label data-i18n="actualPunchTime">實際打卡時間</label>
                     <input type="time" id="mpTime">
                     <div style="font-size:11px;color:#94A3B8;margin-top:4px;">請填實際到班/離班時間，不是排班時間。</div>
                 </div>
 
                 <div class="form-group">
-                    <label>原因分類</label>
+                    <label data-i18n="reasonCategory">原因分類</label>
                     <select id="mpReasonType">
-                        <option value="forgot">忘記打卡</option>
-                        <option value="phone_dead">手機問題</option>
-                        <option value="system_error">系統問題</option>
-                        <option value="busy">現場忙碌</option>
-                        <option value="manager_instruction">主管指示</option>
-                        <option value="other">其他</option>
+                        <option value="forgot" data-i18n="reasonForgot">忘記打卡</option>
+                        <option value="phone_dead" data-i18n="reasonPhone">手機問題</option>
+                        <option value="system_error" data-i18n="reasonSystem">系統問題</option>
+                        <option value="busy" data-i18n="reasonBusy">現場忙碌</option>
+                        <option value="manager_instruction" data-i18n="reasonManager">主管指示</option>
+                        <option value="other" data-i18n="reasonOther">其他</option>
                     </select>
                 </div>
 
                 <div class="form-group">
-                    <label>補充說明（必填）</label>
+                    <label data-i18n="detailRequired">補充說明（必填）</label>
                     <textarea id="mpReasonText" placeholder="例：10:30 已到班，但現場忙忘記按上班打卡"></textarea>
                 </div>
 
-                <button class="btn btn-primary" onclick="submitMakeupPunch()">📤 提交補打卡申請</button>
+                <button class="btn btn-primary" onclick="submitMakeupPunch()" data-i18n="submitMakeup">📤 提交補打卡申請</button>
                 <div id="mpStatus" class="status-box"></div>
 
                 <div class="section-divider">
-                    <h3 class="mb-4">📋 補打卡記錄</h3>
+                    <h3 class="mb-4">📋 <span data-i18n="makeupHistory">補打卡記錄</span></h3>
                     <div id="makeupHistoryList"><p class="text-center-gray">載入中...</p></div>
                 </div>
             </div>
@@ -322,6 +338,13 @@
         let attMonth = new Date().getMonth();
         let attData = [], lvData = [];
 
+        function mountRecordsLanguageSwitch() {
+            const host = document.getElementById('recordsLanguageSwitch');
+            if (!host || host.dataset.ready === '1' || !window.EmployeeI18N) return;
+            host.appendChild(EmployeeI18N.createLanguageSwitch({ persist: true }));
+            host.dataset.ready = '1';
+        }
+
         function showPage(id) {
             document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
             document.getElementById(id).classList.add('active');
@@ -350,6 +373,22 @@
             endEl.min = fmtDate(min); endEl.max = fmtDate(max);
             if (!startEl.value) startEl.value = fmtDate(today);
             if (!endEl.value) endEl.value = fmtDate(today);
+            syncLeavePeriodOptions();
+        }
+
+        function syncLeavePeriodOptions() {
+            const start = document.getElementById('leaveStartDate')?.value;
+            const end = document.getElementById('leaveEndDate')?.value;
+            const periodEl = document.getElementById('leavePeriod');
+            const hoursGroup = document.getElementById('leaveHoursGroup');
+            if (!periodEl || !start || !end) return;
+            const isSingleDay = start === end;
+            Array.from(periodEl.options).forEach(opt => {
+                if (opt.value === 'full_day' || opt.value === 'hourly') return;
+                opt.disabled = !isSingleDay;
+            });
+            if (!isSingleDay && (periodEl.value === 'am' || periodEl.value === 'pm')) periodEl.value = 'full_day';
+            if (hoursGroup) hoursGroup.style.display = periodEl.value === 'hourly' ? 'block' : 'none';
         }
 
         function initOtDate() {
@@ -400,7 +439,7 @@
             try {
                 [attResult, lvResult] = await Promise.all([
                     sb.rpc('get_monthly_attendance', { p_line_user_id: currentEmployee?.line_user_id || liffProfile?.userId, p_year: attYear, p_month: attMonth+1 }),
-                    sb.from('leave_requests').select('*').eq('employee_id', currentEmployee.id).eq('status','approved').gte('start_date', ms).lte('start_date', me)
+                    sb.from('leave_requests').select('*').eq('employee_id', currentEmployee.id).eq('status','approved').lte('start_date', me).gte('end_date', ms)
                 ]);
             } catch(e) { console.error('考勤查詢錯誤:', e); attResult = { data: null }; lvResult = { data: null }; }
             if (attResult.error) console.error('[考勤] RPC 錯誤:', attResult.error);
@@ -412,30 +451,41 @@
         }
 
         let _todayStr = ''; // renderAttCal 設定，避免 getStatus 重複呼叫
+        function leavePeriodLabel(period) {
+            const map = { full_day: '全日', am: '上午半天', pm: '下午半天', hourly: '小時請假' };
+            return map[period || 'full_day'] || '全日';
+        }
+
         function getStatus(ds) {
             const att = attData.find(r => String(r.date).substring(0, 10) === ds);
             const lv = lvData.find(r => ds >= r.start_date && ds <= (r.end_date || r.start_date));
             const dow = new Date(ds + 'T12:00:00').getDay();
+            const lvPeriod = lv?.leave_period || 'full_day';
+            const isFullDayLeave = !!lv && lvPeriod === 'full_day';
 
             if (ds > _todayStr) return { s: 'future', l: '' };
             if (dow === 0 || dow === 6) return att ? { s: 'ok', l: '加班', att } : { s: 'off', l: '休' };
-            if (lv) {
+            if (isFullDayLeave && !att) {
                 const m = { annual:'特休', sick:'病假', personal:'事假', compensatory:'補休', maternity:'產假', marriage:'婚假' };
                 return { s: 'leave', l: m[lv.leave_type] || '假', lv };
             }
             if (att) {
                 if (att.is_late && att.is_early_leave) {
-                    return { s: 'late', l: '遲+早', att };
+                    return { s: 'late', l: '遲+早', att, lv };
                 }
                 if (att.is_late) {
                     let min = '';
                     try { const t = new Date(att.check_in_time); const hm = t.toLocaleTimeString('zh-TW',{timeZone:'Asia/Taipei',hour:'2-digit',minute:'2-digit',hour12:false}).split(':'); const df = (parseInt(hm[0])*60+parseInt(hm[1])) - 8*60; if(df>0) min = df+'分'; } catch(e){}
-                    return { s: 'late', l: '遲'+(min||'到'), att };
+                    return { s: 'late', l: '遲'+(min||'到'), att, lv };
                 }
                 if (att.is_early_leave) {
-                    return { s: 'early', l: '早退', att };
+                    return { s: 'early', l: '早退', att, lv };
                 }
-                return { s: 'ok', l: '✓', att };
+                return { s: 'ok', l: lv ? '✓+假' : '✓', att, lv };
+            }
+            if (lv) {
+                const m = { annual:'特休', sick:'病假', personal:'事假', compensatory:'補休', maternity:'產假', marriage:'婚假' };
+                return { s: 'leave', l: `${m[lv.leave_type] || '假'}${lvPeriod === 'full_day' ? '' : '半'}`, lv };
             }
             return { s: 'absent', l: '缺勤' };
         }
@@ -516,7 +566,11 @@
             if (info.lv) {
                 const tm = {annual:'特休假',sick:'病假',personal:'事假',compensatory:'補休',maternity:'產假',marriage:'婚假'};
                 r += `<div class="adr"><span style="color:var(--gray)">假別</span><b style="color:#2563EB">${tm[info.lv.leave_type]||escapeHTML(info.lv.leave_type)}</b></div>`;
-                r += `<div class="adr"><span style="color:var(--gray)">天數</span><b>${info.lv.days||1} 天</b></div>`;
+                const leaveUnitText = info.lv.leave_period === 'hourly' && info.lv.leave_hours
+                    ? `${escapeHTML(String(info.lv.leave_hours))} 小時`
+                    : escapeHTML(leavePeriodLabel(info.lv.leave_period));
+                r += `<div class="adr"><span style="color:var(--gray)">請假時段</span><b>${leaveUnitText}</b></div>`;
+                r += `<div class="adr"><span style="color:var(--gray)">扣薪天數</span><b>${info.lv.days||1} 天</b></div>`;
                 if (info.lv.reason) r += `<div class="adr"><span style="color:var(--gray)">原因</span><b>${escapeHTML(info.lv.reason)}</b></div>`;
             }
             if (info.s==='absent') r += `<div class="adr"><span style="color:#DC2626">說明</span><b style="color:#DC2626">未打卡且無請假紀錄</b></div>`;
@@ -530,9 +584,11 @@
         async function onLeaveDateChange() {
             const start = document.getElementById('leaveStartDate')?.value;
             const end = document.getElementById('leaveEndDate')?.value;
+            const period = document.getElementById('leavePeriod')?.value || 'full_day';
             const warn = document.getElementById('leaveConflictWarn');
             const btn = document.getElementById('leaveSubmitBtn');
             if (!start || !end || !warn) return;
+            syncLeavePeriodOptions();
             if (new Date(end) < new Date(start)) {
                 warn.style.display = 'block';
                 warn.style.background = '#FEF2F2';
@@ -540,6 +596,25 @@
                 warn.innerHTML = '❌ 結束日期不能早於開始日期';
                 if (btn) { btn.disabled = true; btn.style.opacity = '0.5'; }
                 return;
+            }
+            if ((period === 'am' || period === 'pm') && start !== end) {
+                warn.style.display = 'block';
+                warn.style.background = '#FEF2F2';
+                warn.style.color = '#DC2626';
+                warn.innerHTML = '❌ 半天請假只能選同一天；多日請假請改用全日。';
+                if (btn) { btn.disabled = true; btn.style.opacity = '0.5'; }
+                return;
+            }
+            if (period === 'hourly') {
+                const hours = Number(document.getElementById('leaveHours')?.value);
+                if (!Number.isInteger(hours) || hours < 1) {
+                    warn.style.display = 'block';
+                    warn.style.background = '#FEF2F2';
+                    warn.style.color = '#DC2626';
+                    warn.innerHTML = '❌ 小時請假最低 1 小時，請填整數時數。';
+                    if (btn) { btn.disabled = true; btn.style.opacity = '0.5'; }
+                    return;
+                }
             }
 
             warn.style.display = 'block';
@@ -657,6 +732,8 @@
             if (ok) {
                 const li = await checkUserStatus();
                 if (li) {
+                    mountRecordsLanguageSwitch();
+                    window.EmployeeI18N?.applyI18n();
                     populateYearSelect('salaryYear');
                     showPage(pid);
                     // 打卡成功後跳轉來的 → 顯示 banner
@@ -665,6 +742,9 @@
                     window.location.href = 'index.html';
                 }
             }
+        });
+        window.addEventListener('employee-language-change', function() {
+            window.EmployeeI18N?.applyI18n();
         });
     </script>
 

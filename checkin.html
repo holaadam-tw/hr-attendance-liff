@@ -7,6 +7,7 @@
     <title>📍 打卡 - 員工服務中心</title>
     <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="i18n.js?v=20260608-employee-lang"></script>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -17,13 +18,14 @@
 
     <div class="container">
         <div id="checkInPage" class="page active">
+            <div id="checkinLanguageSwitch"></div>
             <div style="display:flex;gap:8px;margin-bottom:10px;">
-                <button class="btn btn-secondary" onclick="goBack()" style="width:auto;margin:0;padding:8px 16px;font-size:13px;font-weight:700;color:#1E293B;border:2px solid #CBD5E1;background:#F8FAFC;">← 返回首頁</button>
-                <button onclick="closeLiff()" style="width:auto;margin:0;padding:8px 16px;font-size:13px;font-weight:700;color:#64748B;border:2px solid #E2E8F0;border-radius:10px;background:#fff;cursor:pointer;font-family:inherit;">✕ 關閉</button>
+                <button class="btn btn-secondary" onclick="goBack()" style="width:auto;margin:0;padding:8px 16px;font-size:13px;font-weight:700;color:#1E293B;border:2px solid #CBD5E1;background:#F8FAFC;" data-i18n="backHome">← 返回首頁</button>
+                <button onclick="closeLiff()" style="width:auto;margin:0;padding:8px 16px;font-size:13px;font-weight:700;color:#64748B;border:2px solid #E2E8F0;border-radius:10px;background:#fff;cursor:pointer;font-family:inherit;" data-i18n="close">✕ 關閉</button>
             </div>
             <div class="checkin-page">
                 <h2 id="checkInTitle" style="text-align:center;font-size:18px;font-weight:800;color:#0F172A;">📍 上班打卡</h2>
-                <div id="checkInStatus" class="status-box show info" style="margin-top:12px;">準備開啟相機...</div>
+                <div id="checkInStatus" class="status-box show info" style="margin-top:12px;" data-i18n="cameraReady">準備開啟相機...</div>
                 
                 <!-- 班別資訊 -->
                 <div id="shiftInfo" style="display:flex;justify-content:space-between;align-items:center;background:#DBEAFE;border-radius:12px;padding:14px;margin-bottom:16px;">
@@ -43,7 +45,7 @@
                     </div>
                 </div>
 
-                <button class="btn btn-primary" id="captureBtn" onclick="captureAndCheckIn()" disabled style="font-size:16px;padding:16px;border-radius:16px;">📸 拍照並打卡</button>
+                <button class="btn btn-primary" id="captureBtn" onclick="captureAndCheckIn()" disabled style="font-size:16px;padding:16px;border-radius:16px;" data-i18n="takePhotoAndPunch">📸 拍照並打卡</button>
                 <input type="file" id="captureInput" accept="image/jpeg,image/png" capture="user" style="display:none" onchange="handleCapturePhoto(this)">
                 <div id="locationDiagnostic" style="display:none;margin:12px 0 0;padding:12px;border-radius:12px;background:#F8FAFC;border:1px solid #CBD5E1;color:#334155;font-size:12px;line-height:1.55;text-align:left;"></div>
             </div>
@@ -54,15 +56,15 @@
     <div id="gpsErrorModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:9999;align-items:center;justify-content:center;padding:20px;">
         <div style="background:#fff;border-radius:20px;padding:28px;max-width:320px;width:100%;text-align:center;">
             <div style="font-size:48px;margin-bottom:16px;">📍</div>
-            <h3 style="margin:0 0 8px;font-size:18px;">請開啟定位服務</h3>
-            <p style="font-size:14px;color:#666;line-height:1.6;margin-bottom:20px;">
+            <h3 style="margin:0 0 8px;font-size:18px;" data-i18n="gpsNeedEnableTitle">請開啟定位服務</h3>
+            <p style="font-size:14px;color:#666;line-height:1.6;margin-bottom:20px;" data-i18n="gpsNeedEnableBody">
                 打卡需要取得您的位置資訊，請依照以下步驟開啟：<br><br>
                 <strong>Android：</strong>下拉通知欄 → 開啟「位置」<br>
                 <strong>iPhone：</strong>設定 → 隱私 → 定位服務 → 開啟
             </p>
             <button onclick="document.getElementById('gpsErrorModal').style.display='none'"
                 style="width:100%;padding:12px;background:linear-gradient(135deg,#667eea,#764ba2);border:none;border-radius:12px;color:#fff;font-size:15px;font-weight:700;cursor:pointer;">
-                我知道了
+                <span data-i18n="iKnow">我知道了</span>
             </button>
         </div>
     </div>
@@ -103,10 +105,22 @@
         };
         let currentCheckInType = 'in';
 
+        function mountCheckinLanguageSwitch() {
+            const host = document.getElementById('checkinLanguageSwitch');
+            if (!host || host.dataset.ready === '1' || !window.EmployeeI18N) return;
+            host.appendChild(EmployeeI18N.createLanguageSwitch({ persist: true }));
+            host.dataset.ready = '1';
+        }
+
+        function updateCheckinTitle() {
+            const titleEl = document.getElementById('checkInTitle');
+            if (titleEl) titleEl.textContent = currentCheckInType === 'in' ? '📍 ' + tEmployee('checkIn') : '👋 ' + tEmployee('checkOut');
+        }
+
         function getPhotoProcessError() {
             return {
-                title: '照片處理失敗',
-                message: '這次拍照沒有成功存成照片，請重新拍一次；若持續發生，請改用系統相機模式重試。'
+                title: tEmployee('photoFailedTitle'),
+                message: tEmployee('photoFailedMessage')
             };
         }
 
@@ -227,21 +241,70 @@
             setTimeout(() => { window.location.href = 'index.html'; }, 2500);
         }
 
-        function getOutsideRangeDistance(rpcData) {
-            const minDistance = Number(rpcData?.min_distance);
-            return Number.isFinite(minDistance) ? minDistance : null;
+        const OUTSIDE_DISTANCE_SENTINEL_M = 999999;
+
+        function getOfficeLocationList() {
+            const locations = [];
+            try {
+                if (typeof officeLocations !== 'undefined' && Array.isArray(officeLocations)) {
+                    locations.push(...officeLocations);
+                }
+            } catch(e) {}
+            try {
+                const cached = typeof getCachedSetting === 'function' ? getCachedSetting('office_locations') : null;
+                if (Array.isArray(cached)) locations.push(...cached);
+            } catch(e) {}
+
+            const seen = new Set();
+            return locations.filter(loc => {
+                const lat = Number(loc?.lat ?? loc?.latitude);
+                const lng = Number(loc?.lng ?? loc?.longitude);
+                if (!Number.isFinite(lat) || !Number.isFinite(lng)) return false;
+                const key = `${lat},${lng}`;
+                if (seen.has(key)) return false;
+                seen.add(key);
+                return true;
+            });
         }
 
-        function canSubmitOutsideRangeReview(rpcData) {
-            const minDistance = getOutsideRangeDistance(rpcData);
+        function getNearestOfficeDistance(loc) {
+            if (!Number.isFinite(loc?.latitude) || !Number.isFinite(loc?.longitude)) return null;
+            const locations = getOfficeLocationList();
+            let nearest = Infinity;
+
+            for (const office of locations) {
+                const lat = Number(office.lat ?? office.latitude);
+                const lng = Number(office.lng ?? office.longitude);
+                const dist = calculateDistance(loc.latitude, loc.longitude, lat, lng);
+                if (Number.isFinite(dist) && dist < nearest) nearest = dist;
+            }
+
+            return Number.isFinite(nearest) ? nearest : null;
+        }
+
+        function normalizeOutsideRangeDistance(rawDistance) {
+            const minDistance = Number(rawDistance);
+            if (!Number.isFinite(minDistance)) return null;
+            if (minDistance >= OUTSIDE_DISTANCE_SENTINEL_M) return null;
+            return minDistance;
+        }
+
+        function getOutsideRangeDistance(rpcData, loc) {
+            const rpcDistance = normalizeOutsideRangeDistance(rpcData?.min_distance);
+            if (rpcDistance !== null) return rpcDistance;
+            return getNearestOfficeDistance(loc);
+        }
+
+        function canSubmitOutsideRangeReview(rpcData, loc) {
+            const minDistance = getOutsideRangeDistance(rpcData, loc);
             return rpcData?.error === 'outside_allowed_location' &&
                 minDistance !== null &&
                 minDistance <= GPS_OUTSIDE_REVIEW_MAX_DISTANCE_M;
         }
 
         async function submitOutsideRangeReviewIfAllowed(rpcData, rpcAction, loc, publicUrl, statusBox) {
-            if (!canSubmitOutsideRangeReview(rpcData)) return false;
-            const minDistance = getOutsideRangeDistance(rpcData);
+            if (!canSubmitOutsideRangeReview(rpcData, loc)) return false;
+            const minDistance = getOutsideRangeDistance(rpcData, loc);
             showStatus(statusBox, 'info', `📍 距離公司約 ${Math.round(minDistance)}m，改送主管審核...`);
             const pending = await submitGpsReviewRequest(rpcAction, loc, publicUrl, {
                 reviewType: 'outside_range_gps',
@@ -920,18 +983,18 @@
             if (canRetry) {
                 btns += '<button onclick="closeCheckinError(); captureAndCheckIn();" ' +
                     'style="width:100%;padding:12px;background:linear-gradient(135deg,#667eea,#764ba2);border:none;border-radius:12px;color:#fff;font-size:15px;font-weight:700;cursor:pointer;">' +
-                    '🔄 重試</button>';
+                    tEmployee('retry') + '</button>';
             }
             btns += '<button onclick="closeCheckinError(); goBack();" ' +
                 'style="width:100%;padding:12px;background:#F1F5F9;border:1px solid #CBD5E1;border-radius:12px;color:#475569;font-size:14px;font-weight:600;cursor:pointer;">' +
-                '← 返回首頁</button>';
+                tEmployee('backHome') + '</button>';
             actionsEl.innerHTML = btns;
 
             // 解除按鈕轉圈狀態
             const btn = document.getElementById('captureBtn');
             if (btn) {
                 btn.disabled = false;
-                btn.textContent = useCaptureInput ? '📸 開啟相機拍照' : '📸 重試';
+                btn.textContent = useCaptureInput ? tEmployee('takePhotoAndPunch') : tEmployee('retry');
             }
             modal.style.display = 'flex';
         }
@@ -943,28 +1006,29 @@
         // 將 RPC 錯誤訊息轉為使用者友善訊息 + 是否可重試
         function mapCheckinError(rpcError, rpcData) {
             const msg = rpcData?.error || rpcError?.message || '未知錯誤';
-            const minDist = rpcData?.min_distance;
+            const minDist = normalizeOutsideRangeDistance(rpcData?.min_distance);
+            const minDistText = minDist !== null ? Math.round(minDist) : null;
 
-            if (msg === 'employee_not_found') return { title: '帳號未綁定', message: '這個 LINE 帳號沒有綁定啟用中的員工資料，請聯繫管理員確認員工綁定。', canRetry: false };
-            if (msg === 'kiosk_employee_must_use_kiosk') return { title: '公務機帳號', message: '公務機帳號不能自己打卡，請回到公務機打卡模式。', canRetry: false };
-            if (msg === 'employee_no_checkin') return { title: '免打卡員工', message: '此員工設定為免打卡，如需打卡請聯繫管理員調整。', canRetry: false };
-            if (msg === 'outside_allowed_location') return { title: '不在範圍內', message: '請移至公司附近再打卡' + (minDist ? `（目前距離約 ${minDist} 公尺）` : ''), canRetry: true };
-            if (msg === 'already_checked_in_today') return { title: '重複打卡', message: '今日已完成上班打卡', canRetry: false };
-            if (msg === 'already_checked_out_today') return { title: '重複打卡', message: '今日已完成上下班打卡', canRetry: false };
-            if (msg === 'no_open_check_in_record') return { title: '尚未上班', message: '今天還沒有上班打卡紀錄。若已到班但忘記上班卡，請先送「上班補打卡」；若上班、下班都忘記，請送兩筆補打卡。', canRetry: false };
-            if (msg === 'checkout_time_expired') return { title: '超過時限', message: '已超過下班打卡時間，請申請補卡', canRetry: false };
+            if (msg === 'employee_not_found') return { title: tEmployee('accountNotBound'), message: tEmployee('accountNotBoundMessage'), canRetry: false };
+            if (msg === 'kiosk_employee_must_use_kiosk') return { title: tEmployee('kioskAccount'), message: tEmployee('kioskAccount'), canRetry: false };
+            if (msg === 'employee_no_checkin') return { title: tEmployee('noCheckinEmployee'), message: tEmployee('noCheckinEmployee'), canRetry: false };
+            if (msg === 'outside_allowed_location') return { title: tEmployee('outsideLocation'), message: tEmployee('outsideLocationMessage') + (minDistText ? `（${minDistText}m）` : ''), canRetry: true };
+            if (msg === 'already_checked_in_today') return { title: tEmployee('duplicatePunch'), message: tEmployee('duplicatePunch'), canRetry: false };
+            if (msg === 'already_checked_out_today') return { title: tEmployee('duplicatePunch'), message: tEmployee('duplicatePunch'), canRetry: false };
+            if (msg === 'no_open_check_in_record') return { title: tEmployee('noOpenCheckIn'), message: tEmployee('noOpenCheckIn'), canRetry: false };
+            if (msg === 'checkout_time_expired') return { title: tEmployee('checkoutExpired'), message: tEmployee('checkoutExpiredMessage'), canRetry: false };
             if (msg === 'overnight_shift_needs_check_out') return { title: '跨日班未完成', message: '請先完成昨日下班打卡', canRetry: true };
 
             if (msg.includes('找不到員工資料')) return { title: '帳號未綁定', message: '帳號未綁定，請聯繫管理員', canRetry: false };
             if (msg.includes('今日已打上班卡')) return { title: '重複打卡', message: '今日已完成上班打卡', canRetry: false };
             if (msg.includes('今日已完成')) return { title: '重複打卡', message: '今日已完成上下班打卡', canRetry: false };
-            if (msg.includes('不在打卡範圍')) return { title: '不在範圍內', message: '請移至公司附近再打卡' + (minDist ? `（目前距離約 ${minDist} 公尺）` : ''), canRetry: true };
+            if (msg.includes('不在打卡範圍')) return { title: '不在範圍內', message: '請移至公司附近再打卡' + (minDistText ? `（目前距離約 ${minDistText} 公尺）` : ''), canRetry: true };
             if (msg.includes('已超過下班打卡時間') || msg.includes('已超過下班')) return { title: '超過時限', message: '已超過下班打卡時間，請申請補卡', canRetry: false };
             if (msg.includes('跨日班尚未下班')) return { title: '跨日班未完成', message: '請先完成昨日下班打卡', canRetry: true };
             if (msg.includes('請先打上班卡')) return { title: '尚未上班', message: '請先完成上班打卡', canRetry: false };
-            if (rpcError && !rpcData) return { title: '網路連線失敗', message: '請檢查網路連線後重試', canRetry: true };
+            if (rpcError && !rpcData) return { title: tEmployee('networkFailed'), message: tEmployee('networkFailed'), canRetry: true };
 
-            return { title: '打卡失敗', message: msg, canRetry: true };
+            return { title: tEmployee('checkinFailed'), message: msg, canRetry: true };
         }
 
         function showCameraError(err) {
@@ -1103,13 +1167,15 @@
             const urlParams = new URLSearchParams(window.location.search);
             currentCheckInType = urlParams.get('type') || 'in';
 
-            const titleEl = document.getElementById('checkInTitle');
-            if (titleEl) titleEl.textContent = currentCheckInType === 'in' ? '📍 上班打卡' : '👋 下班打卡';
+            updateCheckinTitle();
 
             const initialized = await initializeLiff({ requireLineApp: true });
             if (initialized) {
                 const isLoggedIn = await checkUserStatus();
                 if (isLoggedIn) {
+                    mountCheckinLanguageSwitch();
+                    updateCheckinTitle();
+                    window.EmployeeI18N?.applyI18n();
                     // 公務機帳號不能自己打卡 → 跳轉 kiosk 模式
                     if (currentEmployee && currentEmployee.is_kiosk) {
                         window.location.href = 'kiosk.html?v=20260601-kiosk-button';
@@ -1125,6 +1191,7 @@
                 }
             }
         });
+        window.addEventListener('employee-language-change', updateCheckinTitle);
 
         // ===== 預先請求相機權限 =====
         async function preRequestCameraPermission() {
