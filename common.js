@@ -30,6 +30,8 @@ function stopVideoStream() {
     }
 }
 let todayAttendance = null;
+let todayPendingMakeups = [];
+window.todayPendingMakeups = todayPendingMakeups;
 let officeLocations = [];
 let isProcessing = false;
 
@@ -807,6 +809,31 @@ function getGPS() {
     return commonRequestGps({ allowPreciseWatch: true });
 }
 
+async function loadTodayPendingMakeups(today) {
+    todayPendingMakeups = [];
+    window.todayPendingMakeups = todayPendingMakeups;
+
+    if (!liffProfile?.userId || !today) return todayPendingMakeups;
+
+    try {
+        const { data, error } = await sb.rpc('get_my_makeup_requests', {
+            p_line_user_id: liffProfile.userId,
+            p_limit: 50
+        });
+
+        if (error) throw error;
+
+        todayPendingMakeups = (data || []).filter(r =>
+            r.status === 'pending' && String(r.punch_date || '').slice(0, 10) === today
+        );
+        window.todayPendingMakeups = todayPendingMakeups;
+    } catch (e) {
+        console.warn('載入今日待審補打卡失敗:', e);
+    }
+
+    return todayPendingMakeups;
+}
+
 // ===== 考勤功能 =====
 async function checkTodayAttendance() {
     if (!currentEmployee || !currentEmployee.id) return;
@@ -824,6 +851,7 @@ async function checkTodayAttendance() {
         } else {
             todayAttendance = data;
         }
+        await loadTodayPendingMakeups(today);
 
         // 昨日未下班偵測：區分「跨日班」與「一般日班忘打下班」
         window._pendingCheckout = null;

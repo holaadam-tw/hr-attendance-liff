@@ -387,11 +387,23 @@
         function loadTodayStatus() {
             const data = todayAttendance;
             const badgeEl = document.getElementById('userStatusBadge');
+            const pendingMakeups = Array.isArray(window.todayPendingMakeups) ? window.todayPendingMakeups : [];
+            const pendingIn = pendingMakeups.find(r => r.status === 'pending' && r.punch_type === 'clock_in');
+            const pendingOut = pendingMakeups.find(r => r.status === 'pending' && r.punch_type === 'clock_out');
+            const checkinTimeEl = document.getElementById('todayCheckinTime');
+            const checkinStatusEl = document.getElementById('todayCheckinStatus');
+            const checkinCardEl = document.getElementById('todayCheckinCard');
+            const checkoutTimeEl = document.getElementById('todayCheckoutTime');
+            const checkoutStatusEl = document.getElementById('todayCheckoutStatus');
+            const formatPendingTime = function(row) {
+                const raw = String(row?.punch_time || '').slice(0, 5);
+                return /^\d{2}:\d{2}$/.test(raw) ? raw : '--:--';
+            };
 
             if (data?.check_in_time) {
                 const inTime = new Date(data.check_in_time);
                 const timeStr = inTime.toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', hour12: false });
-                document.getElementById('todayCheckinTime').textContent = timeStr;
+                if (checkinTimeEl) checkinTimeEl.textContent = timeStr;
 
                 // is_late 來自 DB（quick_check_in RPC 判定），fallback 用打卡時間 vs 班別開始時間
                 let isLate = data.is_late === true;
@@ -405,16 +417,41 @@
                     const actualMin = inLocal.getHours() * 60 + inLocal.getMinutes();
                     isLate = actualMin > scheduledMin;
                 }
-                document.getElementById('todayCheckinStatus').textContent = isLate ? tEmployee('late') : tEmployee('onTime');
-                document.getElementById('todayCheckinCard').style.background = isLate ? '#FEE2E2' : '#D1FAE5';
-                document.getElementById('todayCheckinTime').style.color = isLate ? '#EF4444' : '#059669';
+                if (checkinStatusEl) checkinStatusEl.textContent = isLate ? tEmployee('late') : tEmployee('onTime');
+                if (checkinCardEl) checkinCardEl.style.background = isLate ? '#FEE2E2' : '#D1FAE5';
+                if (checkinTimeEl) checkinTimeEl.style.color = isLate ? '#EF4444' : '#059669';
+                if (checkinStatusEl) checkinStatusEl.style.color = isLate ? '#B91C1C' : '#065F46';
 
                 if (badgeEl) {
                     badgeEl.textContent = '✅ 已打卡';
                     badgeEl.style.background = '#D1FAE5';
                     badgeEl.style.color = '#065F46';
                 }
+            } else if (pendingIn) {
+                if (checkinTimeEl) {
+                    checkinTimeEl.textContent = formatPendingTime(pendingIn);
+                    checkinTimeEl.style.color = '#D97706';
+                }
+                if (checkinStatusEl) {
+                    checkinStatusEl.textContent = tEmployee('pendingMakeupClockInReview');
+                    checkinStatusEl.style.color = '#92400E';
+                }
+                if (checkinCardEl) checkinCardEl.style.background = '#FEF3C7';
+                if (badgeEl) {
+                    badgeEl.textContent = tEmployee('pendingMakeupClockInShort');
+                    badgeEl.style.background = '#FEF3C7';
+                    badgeEl.style.color = '#92400E';
+                }
             } else {
+                if (checkinTimeEl) {
+                    checkinTimeEl.textContent = '--:--';
+                    checkinTimeEl.style.color = '#059669';
+                }
+                if (checkinStatusEl) {
+                    checkinStatusEl.textContent = tEmployee('notChecked');
+                    checkinStatusEl.style.color = '#065F46';
+                }
+                if (checkinCardEl) checkinCardEl.style.background = '#D1FAE5';
                 if (badgeEl) {
                     badgeEl.textContent = '⏳ 未打卡';
                     badgeEl.style.background = '#FEF3C7';
@@ -425,9 +462,33 @@
             if (data?.check_out_time) {
                 const outTime = new Date(data.check_out_time);
                 const timeStr = outTime.toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', hour12: false });
-                document.getElementById('todayCheckoutTime').textContent = timeStr;
+                if (checkoutTimeEl) {
+                    checkoutTimeEl.textContent = timeStr;
+                    checkoutTimeEl.style.color = '#64748B';
+                }
                 const outLoc = data.check_out_location ? ` 📍 ${escapeHTML(data.check_out_location)}` : '';
-                document.getElementById('todayCheckoutStatus').textContent = tEmployee('checkedOut') + outLoc;
+                if (checkoutStatusEl) {
+                    checkoutStatusEl.textContent = tEmployee('checkedOut') + outLoc;
+                    checkoutStatusEl.style.color = '#64748B';
+                }
+            } else if (pendingOut) {
+                if (checkoutTimeEl) {
+                    checkoutTimeEl.textContent = formatPendingTime(pendingOut);
+                    checkoutTimeEl.style.color = '#D97706';
+                }
+                if (checkoutStatusEl) {
+                    checkoutStatusEl.textContent = tEmployee('pendingMakeupClockOutReview');
+                    checkoutStatusEl.style.color = '#92400E';
+                }
+            } else {
+                if (checkoutTimeEl) {
+                    checkoutTimeEl.textContent = '--:--';
+                    checkoutTimeEl.style.color = '#64748B';
+                }
+                if (checkoutStatusEl) {
+                    checkoutStatusEl.textContent = tEmployee('notChecked');
+                    checkoutStatusEl.style.color = '#64748B';
+                }
             }
         }
 
