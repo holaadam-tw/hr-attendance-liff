@@ -74,6 +74,7 @@
 | B23 | 補打卡每月 3 次上限造成正常補卡被擋 | ✅ 正式 DB 已確認 | `migrations/085_remove_makeup_monthly_limit.sql` 已執行；`submit_makeup_punch` 已移除每月 3 次限制，只阻擋同一天同類型 pending/approved 重複申請 |
 | B24 | GPS 已取得座標但範圍判斷顯示 `999999m` | ✅ 已修前端 | `quick_check_in` 回傳無效距離時，`checkin.html` 改用已載入公司打卡點重新計算最近距離；5000m 內改送主管核認，不再直接擋下 |
 | B38 | 半天 / 小時請假未完整進薪資與報表 | ✅ 已修程式待上線 | `modules/payroll.js` 改用 `leave_requests.days` 計算扣薪，半天=0.5、小時假=時數/8；`modules/audit.js` 匯出請假報表新增「時段」欄；`modules/leave.js` 審核中心補上小時假標籤 |
+| B39 | 大正打卡總覽今日表格載入失敗 `sb.rpc(...).catch is not a function` | ✅ 已修前端待上線 | `attendance_public.html` 將待審補卡 / 請假輔助查詢改用 `try/catch` helper，不再直接對 Supabase query builder 呼叫 `.catch()` |
 
 ## 🔵 2026-04-22 修復的 Bug（薪資連動審查）
 

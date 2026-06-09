@@ -1096,6 +1096,14 @@ function attachDailyMarkers(rows, pendingMap, leaveMap) {
     }));
 }
 
+async function runOptionalDailyQuery(query) {
+    try {
+        return await query;
+    } catch (e) {
+        return { data: [], error: e };
+    }
+}
+
 async function loadDailyData() {
     const dateStr = getDailyDate();
     const dayNames = t('weekdays');
@@ -1106,15 +1114,14 @@ async function loadDailyData() {
     try {
         const [dailyRes, makeupRes, leaveRes] = await Promise.all([
             sb.rpc('get_company_daily_attendance', { p_company_id: companyId, p_date: dateStr }),
-            sb.rpc('get_pending_makeup_requests', { p_company_id: companyId }).catch(e => ({ data: [], error: e })),
-            sb.from('leave_requests')
+            runOptionalDailyQuery(sb.rpc('get_pending_makeup_requests', { p_company_id: companyId })),
+            runOptionalDailyQuery(sb.from('leave_requests')
                 .select('employee_id, leave_type, leave_period, days, start_date, end_date, status, employees!inner(company_id)')
                 .eq('employees.company_id', companyId)
                 .in('status', ['approved', 'pending'])
                 .lte('start_date', dateStr)
                 .gte('end_date', dateStr)
-                .limit(500)
-                .catch(e => ({ data: [], error: e }))
+                .limit(500))
         ]);
         if (dailyRes.error) throw dailyRes.error;
         if (makeupRes.error) console.warn('Load pending makeup warning:', makeupRes.error);
