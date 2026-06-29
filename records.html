@@ -74,11 +74,11 @@
         </div>
 
         <!-- 頁面導航 -->
-        <div class="flex-gap-8" style="padding:10px 16px 0;">
+        <div class="records-tabs flex-gap-8" style="padding:10px 16px 0;">
             <button class="recTab rec-tab active" onclick="showPage('leavePage')">📝 <span data-i18n="leave">請假</span></button>
             <button class="recTab rec-tab" onclick="showPage('makeupPunchPage')">🔧 <span data-i18n="makeupPunch">補卡</span></button>
-            <button class="recTab rec-tab" onclick="showPage('overtimePage')">⏰ 加班</button>
-            <button class="recTab rec-tab" onclick="showPage('attendancePage')">📊 考勤</button>
+            <button class="recTab rec-tab" onclick="showPage('overtimePage')">⏰ <span data-i18n="overtime">加班</span></button>
+            <button class="recTab rec-tab" onclick="showPage('attendancePage')">📊 <span data-i18n="attendance">考勤</span></button>
         </div>
 
         <!-- 請假頁面 -->
@@ -199,45 +199,45 @@
 
         <!-- ====== 加班申請 ====== -->
         <div id="overtimePage" class="page">
-            <button class="btn btn-secondary btn-auto-mb" onclick="window.location.href='index.html'">← 返回</button>
+            <button class="btn btn-secondary btn-auto-mb" onclick="window.location.href='index.html'" data-i18n="backHome">← 返回</button>
             <div class="checkin-page">
-                <h2>⏰ 加班申請</h2>
-                <p class="desc-hint">加班需事前或事後申請，審核通過後依核准時數計算</p>
+                <h2>⏰ <span data-i18n="overtimeRequest">加班申請</span></h2>
+                <p class="desc-hint" data-i18n="overtimeDesc">加班需事前或事後申請，審核通過後依核准時數計算</p>
 
-                <div class="form-group"><label>加班日期</label><input type="date" id="otDate"></div>
+                <div class="form-group"><label data-i18n="overtimeDate">加班日期</label><input type="date" id="otDate"></div>
 
                 <div class="form-group">
-                    <label>預計加班時數</label>
+                    <label data-i18n="plannedOvertimeHours">預計加班時數</label>
                     <div style="display:flex;align-items:center;gap:8px;">
                         <input type="number" id="otHours" min="0.5" max="12" step="0.5" value="2" style="flex:1;">
-                        <span style="font-size:13px;color:#64748B;">小時</span>
+                        <span style="font-size:13px;color:#64748B;" data-i18n="hourUnit">小時</span>
                     </div>
-                    <div style="font-size:11px;color:#94A3B8;margin-top:4px;">
+                    <div style="font-size:11px;color:#94A3B8;margin-top:4px;" data-i18n="overtimeRateHint">
                         💡 前 2h：時薪 ×1.34 · 後 2h：時薪 ×1.67
                     </div>
                 </div>
 
                 <div class="form-group">
-                    <label>加班補償方式</label>
+                    <label data-i18n="overtimeCompensation">加班補償方式</label>
                     <div style="display:flex;gap:8px;">
                         <label onclick="document.getElementById('otCompType').value='pay'" style="flex:1;display:flex;align-items:center;gap:8px;padding:12px;border:2px solid #4F46E5;border-radius:10px;background:#F5F3FF;cursor:pointer;">
                             <span style="font-size:18px;">💰</span>
-                            <span style="font-weight:700;font-size:13px;">領加班費</span>
+                            <span style="font-weight:700;font-size:13px;" data-i18n="overtimePay">領加班費</span>
                         </label>
                         <label onclick="document.getElementById('otCompType').value='comp_leave'" style="flex:1;display:flex;align-items:center;gap:8px;padding:12px;border:2px solid #E5E7EB;border-radius:10px;cursor:pointer;">
                             <span style="font-size:18px;">🏖️</span>
-                            <span style="font-weight:700;font-size:13px;">換補休</span>
+                            <span style="font-weight:700;font-size:13px;" data-i18n="compLeave">換補休</span>
                         </label>
                     </div>
                     <input type="hidden" id="otCompType" value="pay">
                 </div>
 
-                <div class="form-group"><label>加班原因</label><textarea id="otReason" placeholder="例：趕出貨、客戶會議"></textarea></div>
-                <button class="btn btn-primary" onclick="submitOvertime()">📤 提交加班申請</button>
+                <div class="form-group"><label data-i18n="overtimeReason">加班原因</label><textarea id="otReason" data-i18n-placeholder="overtimeReasonPlaceholder" placeholder="例：趕出貨、客戶會議"></textarea></div>
+                <button class="btn btn-primary" onclick="submitOvertime()" data-i18n="submitOvertime">📤 提交加班申請</button>
                 <div id="otStatus" class="status-box"></div>
 
                 <div class="section-divider">
-                    <h3 class="mb-4">📋 加班記錄</h3>
+                    <h3 class="mb-4">📋 <span data-i18n="overtimeHistory">加班記錄</span></h3>
                     <div id="overtimeHistoryList"><p class="text-center-gray">載入中...</p></div>
                 </div>
             </div>
@@ -245,23 +245,23 @@
 
         <!-- ====== 考勤月曆 ====== -->
         <div id="attendancePage" class="page">
-            <button class="btn btn-secondary btn-auto-mb" onclick="window.location.href='index.html'">← 返回</button>
+            <button class="btn btn-secondary btn-auto-mb" onclick="window.location.href='index.html'" data-i18n="backHome">← 返回</button>
 
             <div class="card">
-                <h2 style="text-align:center;font-size:18px;font-weight:800;color:var(--dark);margin-bottom:16px;">📊 考勤記錄</h2>
+                <h2 style="text-align:center;font-size:18px;font-weight:800;color:var(--dark);margin-bottom:16px;">📊 <span data-i18n="attendanceRecords">考勤記錄</span></h2>
                 <div class="att-nav">
                     <button onclick="changeAttMonth(-1)">◀</button>
                     <span id="attMonthLabel">-</span>
                     <button onclick="changeAttMonth(1)">▶</button>
                 </div>
                 <div class="att-summary">
-                    <div class="att-stat" style="background:#ECFDF5;"><div class="as-num" style="color:#059669;" id="stOk">0</div><div class="as-label" style="color:#059669;">出勤</div></div>
-                    <div class="att-stat" style="background:#FFF7ED;"><div class="as-num" style="color:#EA580C;" id="stLate">0</div><div class="as-label" style="color:#EA580C;">遲到</div></div>
-                    <div class="att-stat" style="background:#EFF6FF;"><div class="as-num" style="color:#2563EB;" id="stLeave">0</div><div class="as-label" style="color:#2563EB;">請假</div></div>
-                    <div class="att-stat" style="background:#FEF2F2;"><div class="as-num" style="color:#DC2626;" id="stAbsent">0</div><div class="as-label" style="color:#DC2626;">缺勤</div></div>
+                    <div class="att-stat" style="background:#ECFDF5;"><div class="as-num" style="color:#059669;" id="stOk">0</div><div class="as-label" style="color:#059669;" data-i18n="attendancePresent">出勤</div></div>
+                    <div class="att-stat" style="background:#FFF7ED;"><div class="as-num" style="color:#EA580C;" id="stLate">0</div><div class="as-label" style="color:#EA580C;" data-i18n="attendanceLate">遲到</div></div>
+                    <div class="att-stat" style="background:#EFF6FF;"><div class="as-num" style="color:#2563EB;" id="stLeave">0</div><div class="as-label" style="color:#2563EB;" data-i18n="leave">請假</div></div>
+                    <div class="att-stat" style="background:#FEF2F2;"><div class="as-num" style="color:#DC2626;" id="stAbsent">0</div><div class="as-label" style="color:#DC2626;" data-i18n="attendanceAbsent">缺勤</div></div>
                 </div>
                 <div style="text-align:center;margin-bottom:16px;font-size:13px;color:var(--gray);">
-                    ⏱️ 總工時 <b id="stHours" style="color:var(--dark);">0</b> 小時
+                    ⏱️ <span data-i18n="totalWorkHours">總工時</span> <b id="stHours" style="color:var(--dark);">0</b> <span data-i18n="hourUnit">小時</span>
                 </div>
             </div>
 
@@ -271,11 +271,11 @@
                     <div class="att-weekday">三</div><div class="att-weekday">四</div><div class="att-weekday">五</div><div class="att-weekday">六</div>
                 </div>
                 <div class="att-legend">
-                    <span class="att-legend-item"><span class="att-legend-dot" style="background:#ECFDF5;border:1px solid #059669;"></span>出勤</span>
-                    <span class="att-legend-item"><span class="att-legend-dot" style="background:#FFF7ED;border:1px solid #EA580C;"></span>遲到</span>
-                    <span class="att-legend-item"><span class="att-legend-dot" style="background:#EFF6FF;border:1px solid #2563EB;"></span>請假</span>
-                    <span class="att-legend-item"><span class="att-legend-dot" style="background:#FEF2F2;border:1px solid #DC2626;"></span>缺勤</span>
-                    <span class="att-legend-item"><span class="att-legend-dot" style="background:var(--gray-light);border:1px solid #94A3B8;"></span>休</span>
+                    <span class="att-legend-item"><span class="att-legend-dot" style="background:#ECFDF5;border:1px solid #059669;"></span><span data-i18n="attendancePresent">出勤</span></span>
+                    <span class="att-legend-item"><span class="att-legend-dot" style="background:#FFF7ED;border:1px solid #EA580C;"></span><span data-i18n="attendanceLate">遲到</span></span>
+                    <span class="att-legend-item"><span class="att-legend-dot" style="background:#EFF6FF;border:1px solid #2563EB;"></span><span data-i18n="leave">請假</span></span>
+                    <span class="att-legend-item"><span class="att-legend-dot" style="background:#FEF2F2;border:1px solid #DC2626;"></span><span data-i18n="attendanceAbsent">缺勤</span></span>
+                    <span class="att-legend-item"><span class="att-legend-dot" style="background:var(--gray-light);border:1px solid #94A3B8;"></span><span data-i18n="restDay">休</span></span>
                 </div>
             </div>
 

@@ -2291,15 +2291,16 @@ window.toggleFeatureSwitch = async function(checkbox) {
 
 // ===== 加班申請 =====
 async function submitOvertime() {
-    if (!currentEmployee) return showToast('❌ 請先登入');
+    const tr = (key) => (typeof tEmployee === 'function' ? tEmployee(key) : key);
+    if (!currentEmployee) return showToast('❌ ' + tr('loginFirst'));
     const date = document.getElementById('otDate')?.value;
     const hours = parseFloat(document.getElementById('otHours')?.value);
     const reason = document.getElementById('otReason')?.value;
     const compType = document.getElementById('otCompType')?.value || 'pay';
     const statusEl = document.getElementById('otStatus');
 
-    if (!date || !hours || hours <= 0) return showToast('❌ 請填寫日期與時數');
-    if (hours > 12) return showToast('❌ 加班時數不可超過 12 小時');
+    if (!date || !hours || hours <= 0) return showToast('❌ ' + tr('overtimeMissingFields'));
+    if (hours > 12) return showToast('❌ ' + tr('overtimeMaxHours'));
 
     const otBtn = document.querySelector('[onclick="submitOvertime()"]');
     setBtnLoading(otBtn, true);
@@ -2316,22 +2317,23 @@ async function submitOvertime() {
         if (rpcError) throw rpcError;
         if (rpcResult && !rpcResult.success) throw new Error(rpcResult.error);
 
-        showToast('✅ 加班申請已提交');
-        if (statusEl) { statusEl.className = 'status-box show success'; statusEl.textContent = '✅ 申請已提交，等待審核'; }
+        showToast('✅ ' + tr('overtimeSubmitSuccess'));
+        if (statusEl) { statusEl.className = 'status-box show success'; statusEl.textContent = '✅ ' + tr('overtimeSubmitReview'); }
         loadOvertimeHistory();
 
         const compLabel = compType === 'pay' ? '加班費' : '補休';
         sendAdminNotify(`🔔 ${currentEmployee.name} 申請加班\n📅 ${date} ${hours}小時\n💰 ${compLabel}\n📝 ${reason || '無附原因'}`);
     } catch(e) {
-        showToast('❌ 申請失敗：' + friendlyError(e));
+        showToast('❌ ' + tr('overtimeSubmitFailed') + '：' + friendlyError(e));
     } finally {
-        setBtnLoading(otBtn, false, '📤 提交加班申請');
+        setBtnLoading(otBtn, false, tr('submitOvertime'));
     }
 }
 
 async function loadOvertimeHistory() {
     const list = document.getElementById('overtimeHistoryList');
     if (!currentEmployee || !liffProfile || !list) return;
+    const tr = (key) => (typeof tEmployee === 'function' ? tEmployee(key) : key);
 
     try {
         // 使用 SECURITY DEFINER RPC 繞過 RLS（050 SQL）
@@ -2341,31 +2343,35 @@ async function loadOvertimeHistory() {
         });
         
         if (!data || data.length === 0) {
-            list.innerHTML = '<p class="text-center-muted-sm">尚無加班記錄</p>';
+            list.innerHTML = `<p class="text-center-muted-sm">${escapeHTML(tr('noOvertimeHistory'))}</p>`;
             return;
         }
 
-        const statusMap = { pending: '⏳ 待審', approved: '✅ 通過', rejected: '❌ 拒絕' };
+        const statusMap = {
+            pending: tr('leaveStatusPending'),
+            approved: tr('leaveStatusApproved'),
+            rejected: tr('leaveStatusRejected')
+        };
         const statusColor = { pending: '#F59E0B', approved: '#059669', rejected: '#DC2626' };
 
         list.innerHTML = data.map(r => {
-            const comp = r.compensation_type === 'pay' ? '💰 加班費' : '🏖️ 換補休';
-            const finalH = r.final_hours != null ? ` → 計薪 ${r.final_hours}h` : '';
+            const comp = r.compensation_type === 'pay' ? `💰 ${tr('overtimePayLabel')}` : `🏖️ ${tr('compLeaveLabel')}`;
+            const finalH = r.final_hours != null ? ` → ${tr('overtimeFinalPay')} ${r.final_hours}h` : '';
             return `
             <div class="attendance-item" style="border-left-color:${statusColor[r.status] || '#ccc'};">
                 <div class="date">
-                    <span>📅 ${escapeHTML(r.ot_date)} · ${r.planned_hours}h · ${comp}</span>
+                    <span>📅 ${escapeHTML(r.ot_date)} · ${r.planned_hours}h · ${escapeHTML(comp)}</span>
                     <span class="badge ${r.status === 'approved' ? 'badge-success' : r.status === 'rejected' ? 'badge-danger' : 'badge-warning'}">
-                        ${statusMap[r.status] || escapeHTML(r.status)}${finalH}
+                        ${escapeHTML(statusMap[r.status] || r.status)}${escapeHTML(finalH)}
                     </span>
                 </div>
                 <div class="text-sm-muted">${escapeHTML(r.reason)}</div>
-                ${r.status === 'approved' && r.approved_hours ? `<div class="text-xs-success">核准 ${r.approved_hours}h${r.actual_hours != null ? ` · 實際 ${r.actual_hours}h` : ''}${finalH}</div>` : ''}
+                ${r.status === 'approved' && r.approved_hours ? `<div class="text-xs-success">${escapeHTML(tr('overtimeApprovedHours'))} ${r.approved_hours}h${r.actual_hours != null ? ` · ${escapeHTML(tr('overtimeActualHours'))} ${r.actual_hours}h` : ''}${escapeHTML(finalH)}</div>` : ''}
                 ${r.status === 'rejected' && r.rejection_reason ? `<div class="rejection-box">❌ ${escapeHTML(r.rejection_reason)}</div>` : ''}
             </div>`;
         }).join('');
     } catch(e) {
-        list.innerHTML = '<p class="text-center-error">載入失敗</p>';
+        list.innerHTML = `<p class="text-center-error">${escapeHTML(tr('loadFailed'))}</p>`;
     }
 }
 

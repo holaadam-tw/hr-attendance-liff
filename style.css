@@ -343,6 +343,16 @@ body {
 .photo-link { font-size: 12px; color: #667eea; }
 
 /* Record tabs */
+.records-tabs {
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+.records-tabs::-webkit-scrollbar { display: none; }
+.records-tabs .rec-tab {
+    flex: 0 0 auto;
+    min-width: 92px;
+    white-space: nowrap;
+}
 .rec-tab {
     flex: 1; padding: 10px 6px; border: none; border-radius: 10px 10px 0 0;
     font-weight: 700; font-size: 12px; background: #E5E7EB; color: #94A3B8; cursor: pointer;

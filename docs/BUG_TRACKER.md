@@ -77,6 +77,8 @@
 | B39 | 大正打卡總覽今日表格載入失敗 `sb.rpc(...).catch is not a function` | ✅ 已修前端待上線 | `attendance_public.html` 將待審補卡 / 請假輔助查詢改用 `try/catch` helper，不再直接對 Supabase query builder 呼叫 `.catch()` |
 | B40 | 員工首頁看不到自己的待審補上班狀態 | ✅ 已修前端待上線 | `common.js` 讀取今日自己的 pending 補卡；`index.html` 顯示「上班補打卡待主管審核」與補卡時間，便當入口維持可用 |
 | B41 | 越南文請假頁假別 / 時段選項仍顯示中文 | ✅ 已修前端待上線 | `records.html` 請假表單 option/hint 接上 i18n；`common.js` 與 `records.html` 動態請假記錄、月曆細節改用 `tEmployee()` 顯示越南文 |
+| B42 | 越南文記錄頁分頁 / 加班 / 考勤仍顯示中文 | ✅ 已修前端待上線 | `records.html` 補齊分頁、加班、考勤 `data-i18n`；`i18n.js` 補中越字典；`common.js` 加班動態訊息改用 `tEmployee()`；分頁改橫向滑動避免越南文擠壓 |
+| B43 | 便當訂購統計只顯示總份數，會計看不出葷 / 素與初一十五提醒 | ✅ 已修前端待上線 | `attendance_public.html` 便當卡片新增葷食 / 素食數量，明細同步顯示分類統計；用瀏覽器 Chinese calendar 計算未來 3 天內農曆初一 / 十五並顯示素食提醒 |
 
 ## 🔵 2026-04-22 修復的 Bug（薪資連動審查）
 

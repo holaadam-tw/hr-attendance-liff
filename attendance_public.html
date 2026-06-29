@@ -301,12 +301,15 @@ body{font-family:'Noto Sans TC',-apple-system,sans-serif;background:var(--bg);co
                             <span style="font-size:20px;">🍱</span>
                             <span style="font-weight:700;font-size:14px;color:#92400E;">便當訂購</span>
                         </div>
-                        <div style="display:flex;align-items:center;gap:8px;">
+                        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
                             <span id="lunchOrderCount" style="font-size:22px;font-weight:900;color:#92400E;">0</span>
-                            <span style="font-size:12px;color:#B45309;">份</span>
+                            <span id="lunchOrderUnit" style="font-size:12px;color:#B45309;">份</span>
+                            <span id="lunchRegularCount" style="font-size:12px;font-weight:800;color:#92400E;background:#FEF3C7;border-radius:999px;padding:4px 8px;">葷食 0</span>
+                            <span id="lunchVegetarianCount" style="font-size:12px;font-weight:800;color:#15803D;background:#DCFCE7;border-radius:999px;padding:4px 8px;">素食 0</span>
                             <span id="lunchDetailArrow" style="font-size:12px;color:#B45309;">▼</span>
                         </div>
                     </div>
+                    <div id="lunarVegetarianReminder" style="display:none;margin-top:8px;padding:10px 12px;background:#ECFDF5;border:1px solid #86EFAC;border-radius:12px;color:#166534;font-size:12px;font-weight:800;line-height:1.5;"></div>
                     <div id="lunchDetailPanel" style="display:none;margin-top:8px;background:#FFFEF5;border:1px solid #FDE68A;border-radius:12px;padding:12px;font-size:13px;max-height:300px;overflow-y:auto;">
                         <div id="lunchDetailContent"></div>
                     </div>
@@ -645,7 +648,9 @@ const I18N = {
         fixedShift:'固定班', scheduledShift:'排班制', unset:'未排', defaultShift:'預設班', sharedShift:'共用班別', noPermission:'無權限', edit:'編輯', delete:'刪除', save:'儲存', clear:'清空', seedDefaults:'建立預設',
         humanTitle:'👥 人力管理', humanSubtitle:'電腦版排班工作台。員工模式可直接儲存；排班格子點擊後再按儲存排班。', saveSchedule:'💾 儲存排班', thisWeek:'本週', shiftMaintain:'班別新增 / 編輯', shiftName:'班別名稱', startTime:'開始', endTime:'結束', shiftCode:'代碼（可選）', overnight:'跨日班', currentShifts:'目前班別', noShifts:'尚無班別，請先新增或按「建立預設」。',
         noEmployees:'尚無員工資料', scheduleSynced:'排班已同步', unsavedSchedule:'尚未儲存：{n} 格排班已變更', saveModeOk:'工時模式已儲存', saveFail:'儲存失敗：', scheduleSaved:'排班已儲存', noScheduleChanges:'沒有排班變更', missingManager:'缺少管理者身份',
-        lunchTitle:'便當統計', lunchStatus:'便當', lunchRegular:'葷食', lunchVegetarian:'素食', lunchNone:'不訂購', lunchUnset:'未選', pendingMakeup:'待審補卡', pendingClockIn:'待審補上班', pendingClockOut:'待審補下班', pendingLeave:'待審請假', orders:'份', open:'↗', prev:'◀', next:'▶'
+        lunchTitle:'便當統計', lunchStatus:'便當', lunchRegular:'葷食', lunchVegetarian:'素食', lunchNone:'不訂購', lunchUnset:'未選', lunchOrdered:'已訂購', lunchNotOrdered:'未訂購', lunchNoOrders:'無訂購資料',
+        lunarVegetarianReminder:'素食提醒', lunarFirst:'農曆初一', lunarFifteenth:'農曆十五', lunarToday:'今天', lunarTomorrow:'明天', lunarInDays:'倒數 {n} 天', lunarReminderHint:'初一 / 十五前 3 天，請提醒需要素食的員工。', peopleUnit:'人',
+        pendingMakeup:'待審補卡', pendingClockIn:'待審補上班', pendingClockOut:'待審補下班', pendingLeave:'待審請假', orders:'份', open:'↗', prev:'◀', next:'▶'
     },
     vi: {
         langLabel:'Ngôn ngữ', loading:'Đang tải...', loadFailed:'Tải thất bại', noData:'Không có dữ liệu', employee:'Nhân viên', department:'Bộ phận', shift:'Ca làm', checkIn:'Giờ vào', checkOut:'Giờ ra', hours:'Giờ công', status:'Trạng thái',
@@ -662,7 +667,9 @@ const I18N = {
         fixedShift:'Ca cố định', scheduledShift:'Theo lịch', unset:'Chưa xếp', defaultShift:'Ca mặc định', sharedShift:'Ca dùng chung', noPermission:'Không có quyền', edit:'Sửa', delete:'Xóa', save:'Lưu', clear:'Xóa form', seedDefaults:'Tạo ca mặc định',
         humanTitle:'👥 Quản lý nhân sự', humanSubtitle:'Bảng xếp ca bản máy tính. Có thể lưu chế độ giờ làm; bấm ô lịch rồi bấm lưu lịch.', saveSchedule:'💾 Lưu lịch', thisWeek:'Tuần này', shiftMaintain:'Thêm / sửa ca', shiftName:'Tên ca', startTime:'Bắt đầu', endTime:'Kết thúc', shiftCode:'Mã ca (tùy chọn)', overnight:'Ca qua ngày', currentShifts:'Ca hiện có', noShifts:'Chưa có ca. Hãy thêm ca hoặc bấm tạo ca mặc định.',
         noEmployees:'Chưa có dữ liệu nhân viên', scheduleSynced:'Lịch đã đồng bộ', unsavedSchedule:'Chưa lưu: đã đổi {n} ô lịch', saveModeOk:'Đã lưu chế độ giờ làm', saveFail:'Lưu thất bại: ', scheduleSaved:'Đã lưu lịch', noScheduleChanges:'Không có thay đổi lịch', missingManager:'Thiếu thân phận quản lý',
-        lunchTitle:'Thống kê cơm', lunchStatus:'Cơm', lunchRegular:'Mặn', lunchVegetarian:'Chay', lunchNone:'Không đặt', lunchUnset:'Chưa chọn', pendingMakeup:'Chờ duyệt bổ sung', pendingClockIn:'Chờ duyệt giờ vào', pendingClockOut:'Chờ duyệt giờ ra', pendingLeave:'Chờ duyệt nghỉ phép', orders:'phần', open:'↗', prev:'◀', next:'▶'
+        lunchTitle:'Thống kê cơm', lunchStatus:'Cơm', lunchRegular:'Mặn', lunchVegetarian:'Chay', lunchNone:'Không đặt', lunchUnset:'Chưa chọn', lunchOrdered:'Đã đặt', lunchNotOrdered:'Chưa đặt', lunchNoOrders:'Không có dữ liệu đặt cơm',
+        lunarVegetarianReminder:'Nhắc món chay', lunarFirst:'Mùng 1 âm lịch', lunarFifteenth:'Rằm âm lịch', lunarToday:'Hôm nay', lunarTomorrow:'Ngày mai', lunarInDays:'Còn {n} ngày', lunarReminderHint:'Trước mùng 1 / rằm 3 ngày, nhắc nhân viên cần ăn chay.', peopleUnit:'người',
+        pendingMakeup:'Chờ duyệt bổ sung', pendingClockIn:'Chờ duyệt giờ vào', pendingClockOut:'Chờ duyệt giờ ra', pendingLeave:'Chờ duyệt nghỉ phép', orders:'phần', open:'↗', prev:'◀', next:'▶'
     }
 };
 
@@ -2013,6 +2020,89 @@ function downloadPubRegisterQR() {
 let lunchData = [];
 let lunchFeatureEnabled = false;
 
+function lunchCounts(orders) {
+    const active = (orders || []).filter(o => o.status !== 'cancelled');
+    return {
+        total: active.length,
+        regular: active.filter(o => !o.is_vegetarian).length,
+        vegetarian: active.filter(o => o.is_vegetarian).length
+    };
+}
+
+function parseLocalDate(dateStr) {
+    const parts = String(dateStr || '').split('/').join('-').split('-').map(Number);
+    if (parts.length < 3 || parts.some(n => !Number.isFinite(n))) return new Date();
+    return new Date(parts[0], parts[1] - 1, parts[2], 12, 0, 0);
+}
+
+function addDays(date, days) {
+    const copy = new Date(date.getTime());
+    copy.setDate(copy.getDate() + days);
+    return copy;
+}
+
+function formatYMD(date) {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}/${m}/${d}`;
+}
+
+function parseChineseLunarDay(value) {
+    const numeric = parseInt(value, 10);
+    if (Number.isFinite(numeric)) return numeric;
+    const map = {
+        '初一': 1, '一': 1, '十五': 15, '十伍': 15
+    };
+    return map[String(value || '').trim()] || null;
+}
+
+function getChineseLunarDay(date) {
+    try {
+        const parts = new Intl.DateTimeFormat('zh-TW-u-ca-chinese', {
+            day: 'numeric',
+            timeZone: 'Asia/Taipei'
+        }).formatToParts(date);
+        return parseChineseLunarDay(parts.find(p => p.type === 'day')?.value);
+    } catch(e) {
+        return null;
+    }
+}
+
+function getUpcomingVegetarianReminder(dateStr) {
+    const base = parseLocalDate(dateStr);
+    const items = [];
+    for (let offset = 0; offset <= 3; offset++) {
+        const date = addDays(base, offset);
+        const day = getChineseLunarDay(date);
+        if (day === 1 || day === 15) {
+            const countdown = offset === 0 ? t('lunarToday') : offset === 1 ? t('lunarTomorrow') : t('lunarInDays', { n: offset });
+            items.push({
+                date,
+                label: day === 1 ? t('lunarFirst') : t('lunarFifteenth'),
+                countdown
+            });
+        }
+    }
+    return items;
+}
+
+function renderLunarVegetarianReminder(dateStr) {
+    const el = document.getElementById('lunarVegetarianReminder');
+    if (!el) return '';
+    const reminders = getUpcomingVegetarianReminder(dateStr);
+    if (reminders.length === 0) {
+        el.style.display = 'none';
+        el.innerHTML = '';
+        return '';
+    }
+    const lines = reminders.map(item => `${formatYMD(item.date)} ${item.label}（${item.countdown}）`);
+    const html = `🌱 ${esc(t('lunarVegetarianReminder'))}：${esc(lines.join('、'))}<br><span style="font-weight:700;color:#15803D;">${esc(t('lunarReminderHint'))}</span>`;
+    el.innerHTML = html;
+    el.style.display = 'block';
+    return html;
+}
+
 async function checkLunchFeature() {
     try {
         const { data } = await sb.from('companies').select('features').eq('id', companyId).maybeSingle();
@@ -2042,20 +2132,33 @@ async function loadLunchStats(dateStr) {
             if (o.employee_id) dailyLunchOrders.set(o.employee_id, o);
         });
         lunchData = (data || []).filter(o => o.status !== 'cancelled');
-        document.getElementById('lunchOrderCount').textContent = lunchData.length;
+        const counts = lunchCounts(lunchData);
+        document.getElementById('lunchOrderCount').textContent = counts.total;
+        const orderUnitEl = document.getElementById('lunchOrderUnit');
+        const regularCountEl = document.getElementById('lunchRegularCount');
+        const vegetarianCountEl = document.getElementById('lunchVegetarianCount');
+        if (orderUnitEl) orderUnitEl.textContent = t('orders');
+        if (regularCountEl) regularCountEl.textContent = `${t('lunchRegular')} ${counts.regular}`;
+        if (vegetarianCountEl) vegetarianCountEl.textContent = `${t('lunchVegetarian')} ${counts.vegetarian}`;
         card.style.display = 'block';
+        renderLunarVegetarianReminder(dateStr);
         renderDailyTable();
 
         const contentEl = document.getElementById('lunchDetailContent');
         if (!contentEl) return;
 
         let html = '';
+        html += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;">'
+            + '<span class="lunch-badge lunch-regular">' + esc(t('lunchRegular')) + ' ' + counts.regular + '</span>'
+            + '<span class="lunch-badge lunch-vegetarian">' + esc(t('lunchVegetarian')) + ' ' + counts.vegetarian + '</span>'
+            + '<span class="lunch-badge lunch-unset">' + esc(t('total')) + ' ' + counts.total + ' ' + esc(t('orders')) + '</span>'
+            + '</div>';
         if (lunchData.length > 0) {
-            html += '<div style="font-weight:700;color:#92400E;margin-bottom:8px;">已訂購（' + lunchData.length + ' 份）</div>';
+            html += '<div style="font-weight:700;color:#92400E;margin-bottom:8px;">' + esc(t('lunchOrdered')) + '（' + lunchData.length + ' ' + esc(t('orders')) + '）</div>';
             lunchData.forEach(o => {
-                const type = o.is_vegetarian ? '🥗 素食' : '🍖 葷食';
-                const name = o.employees?.name || '未知';
-                html += '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #FDE68A;"><span>' + esc(name) + '</span><span style="color:#B45309;">' + type + '</span></div>';
+                const type = o.is_vegetarian ? '🥗 ' + t('lunchVegetarian') : '🍖 ' + t('lunchRegular');
+                const name = o.employees?.name || t('unknown');
+                html += '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #FDE68A;"><span>' + esc(name) + '</span><span style="color:#B45309;">' + esc(type) + '</span></div>';
             });
         }
 
@@ -2063,11 +2166,11 @@ async function loadLunchStats(dateStr) {
         (data || []).filter(o => o.status === 'cancelled').forEach(o => orderedIds.add(o.employee_id));
         const notOrdered = dailyData.filter(r => r.status !== 'off_day' && r.status !== 'on_leave' && !orderedIds.has(r.employee_id));
         if (notOrdered.length > 0) {
-            html += '<div style="font-weight:700;color:#DC2626;margin-top:10px;margin-bottom:6px;">未訂購（' + notOrdered.length + ' 人）</div>';
+            html += '<div style="font-weight:700;color:#DC2626;margin-top:10px;margin-bottom:6px;">' + esc(t('lunchNotOrdered')) + '（' + notOrdered.length + ' ' + esc(t('peopleUnit')) + '）</div>';
             notOrdered.forEach(r => { html += '<div style="padding:3px 0;color:#94A3B8;">' + esc(r.employee_name) + '</div>'; });
         }
 
-        contentEl.innerHTML = html || '<div style="color:#94A3B8;text-align:center;">無訂購資料</div>';
+        contentEl.innerHTML = html || '<div style="color:#94A3B8;text-align:center;">' + esc(t('lunchNoOrders')) + '</div>';
     } catch(e) {
         console.error('Load lunch error:', e);
         dailyLunchOrders = new Map();
