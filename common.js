@@ -1023,12 +1023,26 @@ async function checkLeaveAvailability(startDate, endDate) {
 
 function getLeavePeriodLabel(period) {
     const map = {
-        full_day: '全日',
-        am: '上午半天',
-        pm: '下午半天',
-        hourly: '小時請假'
+        full_day: 'leaveFullDay',
+        am: 'leaveAM',
+        pm: 'leavePM',
+        hourly: 'hourlyLeave'
     };
-    return map[period || 'full_day'] || '全日';
+    const key = map[period || 'full_day'] || 'leaveFullDay';
+    return typeof tEmployee === 'function' ? tEmployee(key) : key;
+}
+
+function getLeaveTypeLabel(type, full = false) {
+    const map = {
+        annual: full ? 'leaveAnnualFull' : 'leaveAnnualShort',
+        sick: 'leaveSick',
+        personal: 'leavePersonal',
+        compensatory: 'leaveCompensatory',
+        maternity: 'leaveMaternity',
+        marriage: 'leaveMarriage'
+    };
+    const key = map[type] || 'leaveUnknown';
+    return typeof tEmployee === 'function' ? tEmployee(key) : key;
 }
 
 async function submitLeave() {
@@ -1108,7 +1122,8 @@ async function submitLeave() {
 
         // 通知管理員
         const typeNames = { annual:'特休', sick:'病假', personal:'事假', compensatory:'補休' };
-        const periodNote = period === 'hourly' ? `${leaveHours} 小時` : getLeavePeriodLabel(period);
+        const periodNames = { full_day:'全日', am:'上午半天', pm:'下午半天', hourly:'小時請假' };
+        const periodNote = period === 'hourly' ? `${leaveHours} 小時` : (periodNames[period] || '全日');
         sendAdminNotify(`🔔 ${currentEmployee.name} 申請${typeNames[type]||type}（${periodNote}）\n📅 ${start} ~ ${end}\n📝 ${reason || '無附原因'}`);
     } catch(e) {
         showToast('❌ 申請失敗：' + friendlyError(e));
@@ -1131,21 +1146,26 @@ async function loadLeaveHistory() {
             return;
         }
 
-        const typeMap = { 'annual': '特休', 'sick': '病假', 'personal': '事假', 'compensatory': '補休' };
-        const statusMap = { 'pending': '⏳ 待審', 'approved': '✅ 通過', 'rejected': '❌ 拒絕' };
+        const statusMap = {
+            'pending': typeof tEmployee === 'function' ? tEmployee('leaveStatusPending') : '⏳ 待審',
+            'approved': typeof tEmployee === 'function' ? tEmployee('leaveStatusApproved') : '✅ 通過',
+            'rejected': typeof tEmployee === 'function' ? tEmployee('leaveStatusRejected') : '❌ 拒絕'
+        };
         const statusColor = { 'pending': '#F59E0B', 'approved': '#059669', 'rejected': '#DC2626' };
 
         list.innerHTML = records.map(r => `
             <div class="attendance-item" style="border-left-color:${statusColor[r.status] || '#ccc'};">
                 <div class="date">
-                    <span>${escapeHTML(typeMap[r.leave_type] || r.leave_type)}</span>
+                    <span>${escapeHTML(getLeaveTypeLabel(r.leave_type))}</span>
                     <span class="badge ${r.status === 'approved' ? 'badge-success' : r.status === 'rejected' ? 'badge-danger' : 'badge-warning'}">
                         ${statusMap[r.status] || escapeHTML(r.status)}
                     </span>
                 </div>
                 <div class="details">
                     <span>${escapeHTML(r.start_date)} ~ ${escapeHTML(r.end_date)}</span>
-                    <span>${r.leave_period === 'hourly' && r.leave_hours ? `${escapeHTML(String(r.leave_hours))} 小時 · 扣薪 ${escapeHTML(String(r.days || 0))} 天` : `${r.days || 1} 天 · ${escapeHTML(getLeavePeriodLabel(r.leave_period))}`}</span>
+                    <span>${r.leave_period === 'hourly' && r.leave_hours
+                        ? `${escapeHTML(String(r.leave_hours))} ${escapeHTML(typeof tEmployee === 'function' ? tEmployee('hourUnit') : '小時')} · ${escapeHTML(typeof tEmployee === 'function' ? tEmployee('leaveDeductDays') : '扣薪天數')} ${escapeHTML(String(r.days || 0))} ${escapeHTML(typeof tEmployee === 'function' ? tEmployee('dayUnit') : '天')}`
+                        : `${r.days || 1} ${escapeHTML(typeof tEmployee === 'function' ? tEmployee('dayUnit') : '天')} · ${escapeHTML(getLeavePeriodLabel(r.leave_period))}`}</span>
                 </div>
                 <div class="text-sm-muted">${escapeHTML(r.reason)}</div>
                 ${r.status === 'rejected' && r.rejection_reason ?

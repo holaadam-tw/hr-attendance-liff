@@ -76,6 +76,7 @@
 | B38 | 半天 / 小時請假未完整進薪資與報表 | ✅ 已修程式待上線 | `modules/payroll.js` 改用 `leave_requests.days` 計算扣薪，半天=0.5、小時假=時數/8；`modules/audit.js` 匯出請假報表新增「時段」欄；`modules/leave.js` 審核中心補上小時假標籤 |
 | B39 | 大正打卡總覽今日表格載入失敗 `sb.rpc(...).catch is not a function` | ✅ 已修前端待上線 | `attendance_public.html` 將待審補卡 / 請假輔助查詢改用 `try/catch` helper，不再直接對 Supabase query builder 呼叫 `.catch()` |
 | B40 | 員工首頁看不到自己的待審補上班狀態 | ✅ 已修前端待上線 | `common.js` 讀取今日自己的 pending 補卡；`index.html` 顯示「上班補打卡待主管審核」與補卡時間，便當入口維持可用 |
+| B41 | 越南文請假頁假別 / 時段選項仍顯示中文 | ✅ 已修前端待上線 | `records.html` 請假表單 option/hint 接上 i18n；`common.js` 與 `records.html` 動態請假記錄、月曆細節改用 `tEmployee()` 顯示越南文 |
 
 ## 🔵 2026-04-22 修復的 Bug（薪資連動審查）
 

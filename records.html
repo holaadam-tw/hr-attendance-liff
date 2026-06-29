@@ -88,20 +88,22 @@
                 <h2>📝 <span data-i18n="leaveRequest">請假申請</span></h2>
                 <div class="form-group"><label data-i18n="leaveType">假別</label>
                     <select id="leaveType">
-                        <option value="annual">特休假</option><option value="sick">病假</option>
-                        <option value="personal">事假</option><option value="compensatory">補休</option>
+                        <option value="annual" data-i18n="leaveAnnualFull">特休假</option>
+                        <option value="sick" data-i18n="leaveSick">病假</option>
+                        <option value="personal" data-i18n="leavePersonal">事假</option>
+                        <option value="compensatory" data-i18n="leaveCompensatory">補休</option>
                     </select>
                 </div>
                 <div class="form-group"><label data-i18n="startDate">開始日期</label><input type="date" id="leaveStartDate" onchange="onLeaveDateChange()"></div>
                 <div class="form-group"><label data-i18n="endDate">結束日期</label><input type="date" id="leaveEndDate" onchange="onLeaveDateChange()"></div>
                 <div class="form-group"><label data-i18n="leavePeriod">請假時段</label>
                     <select id="leavePeriod" onchange="onLeaveDateChange()">
-                        <option value="full_day">全日（1 天）</option>
-                        <option value="am">上午半天（0.5 天）</option>
-                        <option value="pm">下午半天（0.5 天）</option>
+                        <option value="full_day" data-i18n="leaveFullDayOption">全日（1 天）</option>
+                        <option value="am" data-i18n="leaveAMOption">上午半天（0.5 天）</option>
+                        <option value="pm" data-i18n="leavePMOption">下午半天（0.5 天）</option>
                         <option value="hourly" data-i18n="hourlyLeave">小時請假</option>
                     </select>
-                    <div style="font-size:11px;color:#94A3B8;margin-top:4px;">半天請假只能選同一天；小時請假最低 1 小時，扣薪按 8 小時 = 1 天計算。</div>
+                    <div style="font-size:11px;color:#94A3B8;margin-top:4px;" data-i18n="leavePeriodHint">半天請假只能選同一天；小時請假最低 1 小時，扣薪按 8 小時 = 1 天計算。</div>
                 </div>
                 <div class="form-group" id="leaveHoursGroup" style="display:none;">
                     <label data-i18n="leaveHours">請假時數</label>
@@ -451,9 +453,21 @@
         }
 
         let _todayStr = ''; // renderAttCal 設定，避免 getStatus 重複呼叫
+        function leaveTypeLabel(type, full) {
+            const map = {
+                annual: full ? 'leaveAnnualFull' : 'leaveAnnualShort',
+                sick: 'leaveSick',
+                personal: 'leavePersonal',
+                compensatory: 'leaveCompensatory',
+                maternity: 'leaveMaternity',
+                marriage: 'leaveMarriage'
+            };
+            const key = map[type];
+            return key ? tEmployee(key) : tEmployee('leaveUnknown');
+        }
         function leavePeriodLabel(period) {
-            const map = { full_day: '全日', am: '上午半天', pm: '下午半天', hourly: '小時請假' };
-            return map[period || 'full_day'] || '全日';
+            const map = { full_day: 'leaveFullDay', am: 'leaveAM', pm: 'leavePM', hourly: 'hourlyLeave' };
+            return tEmployee(map[period || 'full_day'] || 'leaveFullDay');
         }
 
         function getStatus(ds) {
@@ -466,8 +480,7 @@
             if (ds > _todayStr) return { s: 'future', l: '' };
             if (dow === 0 || dow === 6) return att ? { s: 'ok', l: '加班', att } : { s: 'off', l: '休' };
             if (isFullDayLeave && !att) {
-                const m = { annual:'特休', sick:'病假', personal:'事假', compensatory:'補休', maternity:'產假', marriage:'婚假' };
-                return { s: 'leave', l: m[lv.leave_type] || '假', lv };
+                return { s: 'leave', l: leaveTypeLabel(lv.leave_type, false), lv };
             }
             if (att) {
                 if (att.is_late && att.is_early_leave) {
@@ -484,8 +497,7 @@
                 return { s: 'ok', l: lv ? '✓+假' : '✓', att, lv };
             }
             if (lv) {
-                const m = { annual:'特休', sick:'病假', personal:'事假', compensatory:'補休', maternity:'產假', marriage:'婚假' };
-                return { s: 'leave', l: `${m[lv.leave_type] || '假'}${lvPeriod === 'full_day' ? '' : '半'}`, lv };
+                return { s: 'leave', l: lvPeriod === 'full_day' ? leaveTypeLabel(lv.leave_type, false) : leavePeriodLabel(lvPeriod), lv };
             }
             return { s: 'absent', l: '缺勤' };
         }
@@ -564,14 +576,13 @@
                 if (info.att.photo_url) r += `<div class="adr"><span style="color:var(--gray)">打卡照片</span><a href="${escapeHTML(info.att.photo_url)}" target="_blank" rel="noopener" style="color:var(--primary);font-weight:700;">📷 查看</a></div>`;
             }
             if (info.lv) {
-                const tm = {annual:'特休假',sick:'病假',personal:'事假',compensatory:'補休',maternity:'產假',marriage:'婚假'};
-                r += `<div class="adr"><span style="color:var(--gray)">假別</span><b style="color:#2563EB">${tm[info.lv.leave_type]||escapeHTML(info.lv.leave_type)}</b></div>`;
+                r += `<div class="adr"><span style="color:var(--gray)">${escapeHTML(tEmployee('leaveType'))}</span><b style="color:#2563EB">${escapeHTML(leaveTypeLabel(info.lv.leave_type, true))}</b></div>`;
                 const leaveUnitText = info.lv.leave_period === 'hourly' && info.lv.leave_hours
-                    ? `${escapeHTML(String(info.lv.leave_hours))} 小時`
+                    ? `${escapeHTML(String(info.lv.leave_hours))} ${escapeHTML(tEmployee('hourUnit'))}`
                     : escapeHTML(leavePeriodLabel(info.lv.leave_period));
-                r += `<div class="adr"><span style="color:var(--gray)">請假時段</span><b>${leaveUnitText}</b></div>`;
-                r += `<div class="adr"><span style="color:var(--gray)">扣薪天數</span><b>${info.lv.days||1} 天</b></div>`;
-                if (info.lv.reason) r += `<div class="adr"><span style="color:var(--gray)">原因</span><b>${escapeHTML(info.lv.reason)}</b></div>`;
+                r += `<div class="adr"><span style="color:var(--gray)">${escapeHTML(tEmployee('leavePeriod'))}</span><b>${leaveUnitText}</b></div>`;
+                r += `<div class="adr"><span style="color:var(--gray)">${escapeHTML(tEmployee('leaveDeductDays'))}</span><b>${info.lv.days||1} ${escapeHTML(tEmployee('dayUnit'))}</b></div>`;
+                if (info.lv.reason) r += `<div class="adr"><span style="color:var(--gray)">${escapeHTML(tEmployee('leaveReason'))}</span><b>${escapeHTML(info.lv.reason)}</b></div>`;
             }
             if (info.s==='absent') r += `<div class="adr"><span style="color:#DC2626">說明</span><b style="color:#DC2626">未打卡且無請假紀錄</b></div>`;
 
