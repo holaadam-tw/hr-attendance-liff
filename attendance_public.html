@@ -292,6 +292,7 @@ body{font-family:'Noto Sans TC',-apple-system,sans-serif;background:var(--bg);co
                 </div>
                 <div class="stat-grid">
                     <div class="stat-card" style="background:#FFF7ED;"><div class="stat-num" style="color:#C2410C;" id="dPendingMakeup">0</div><div class="stat-label" style="color:#C2410C;">待審補卡</div></div>
+                    <div class="stat-card" style="background:#F5F3FF;"><div class="stat-num" style="color:#6D28D9;" id="dPendingMakeupCorrection">0</div><div class="stat-label" style="color:#6D28D9;">補卡修正待審</div></div>
                 </div>
 
                 <!-- 便當訂購統計 -->
@@ -650,7 +651,7 @@ const I18N = {
         noEmployees:'尚無員工資料', scheduleSynced:'排班已同步', unsavedSchedule:'尚未儲存：{n} 格排班已變更', saveModeOk:'工時模式已儲存', saveFail:'儲存失敗：', scheduleSaved:'排班已儲存', noScheduleChanges:'沒有排班變更', missingManager:'缺少管理者身份',
         lunchTitle:'便當統計', lunchStatus:'便當', lunchRegular:'葷食', lunchVegetarian:'素食', lunchNone:'不訂購', lunchUnset:'未選', lunchOrdered:'已訂購', lunchNotOrdered:'未訂購', lunchNoOrders:'無訂購資料',
         lunarVegetarianReminder:'素食提醒', lunarFirst:'農曆初一', lunarFifteenth:'農曆十五', lunarToday:'今天', lunarTomorrow:'明天', lunarInDays:'倒數 {n} 天', lunarReminderHint:'初一 / 十五前 3 天，請提醒需要素食的員工。', peopleUnit:'人',
-        pendingMakeup:'待審補卡', pendingClockIn:'待審補上班', pendingClockOut:'待審補下班', pendingLeave:'待審請假', orders:'份', open:'↗', prev:'◀', next:'▶'
+        pendingMakeup:'待審補卡', pendingMakeupCorrection:'補卡修正待審', pendingClockIn:'待審補上班', pendingClockOut:'待審補下班', pendingLeave:'待審請假', orders:'份', open:'↗', prev:'◀', next:'▶'
     },
     vi: {
         langLabel:'Ngôn ngữ', loading:'Đang tải...', loadFailed:'Tải thất bại', noData:'Không có dữ liệu', employee:'Nhân viên', department:'Bộ phận', shift:'Ca làm', checkIn:'Giờ vào', checkOut:'Giờ ra', hours:'Giờ công', status:'Trạng thái',
@@ -669,7 +670,7 @@ const I18N = {
         noEmployees:'Chưa có dữ liệu nhân viên', scheduleSynced:'Lịch đã đồng bộ', unsavedSchedule:'Chưa lưu: đã đổi {n} ô lịch', saveModeOk:'Đã lưu chế độ giờ làm', saveFail:'Lưu thất bại: ', scheduleSaved:'Đã lưu lịch', noScheduleChanges:'Không có thay đổi lịch', missingManager:'Thiếu thân phận quản lý',
         lunchTitle:'Thống kê cơm', lunchStatus:'Cơm', lunchRegular:'Mặn', lunchVegetarian:'Chay', lunchNone:'Không đặt', lunchUnset:'Chưa chọn', lunchOrdered:'Đã đặt', lunchNotOrdered:'Chưa đặt', lunchNoOrders:'Không có dữ liệu đặt cơm',
         lunarVegetarianReminder:'Nhắc món chay', lunarFirst:'Mùng 1 âm lịch', lunarFifteenth:'Rằm âm lịch', lunarToday:'Hôm nay', lunarTomorrow:'Ngày mai', lunarInDays:'Còn {n} ngày', lunarReminderHint:'Trước mùng 1 / rằm 3 ngày, nhắc nhân viên cần ăn chay.', peopleUnit:'người',
-        pendingMakeup:'Chờ duyệt bổ sung', pendingClockIn:'Chờ duyệt giờ vào', pendingClockOut:'Chờ duyệt giờ ra', pendingLeave:'Chờ duyệt nghỉ phép', orders:'phần', open:'↗', prev:'◀', next:'▶'
+        pendingMakeup:'Chờ duyệt bổ sung', pendingMakeupCorrection:'Chờ duyệt sửa giờ', pendingClockIn:'Chờ duyệt giờ vào', pendingClockOut:'Chờ duyệt giờ ra', pendingLeave:'Chờ duyệt nghỉ phép', orders:'phần', open:'↗', prev:'◀', next:'▶'
     }
 };
 
@@ -727,6 +728,8 @@ function applyTranslations() {
     const statusOpts = document.querySelectorAll('#filterStatus option');
     const statusLabels = ['', t('working'), t('notChecked'), t('completed'), t('pendingMakeup'), t('late'), t('leave'), t('absent')];
     statusOpts.forEach((opt, i) => { if (statusLabels[i]) opt.textContent = statusLabels[i]; });
+    const correctionLabel = document.querySelector('#dPendingMakeupCorrection + .stat-label');
+    if (correctionLabel) correctionLabel.textContent = t('pendingMakeupCorrection');
     updateDailySortHeaders();
     const monthlyHeads = document.querySelectorAll('#monthlyView .emp-table thead th');
     [t('employee'), t('department'), t('expectedDays'), t('actualDays'), t('late'), t('early'), t('leaveDays'), t('absentDays'), t('totalHours')].forEach((v, i) => { if (monthlyHeads[i]) monthlyHeads[i].textContent = v; });
@@ -1060,6 +1063,18 @@ function hasPendingMakeup(row) {
     return Array.isArray(row?.pending_makeups) && row.pending_makeups.length > 0;
 }
 
+function hasOfficialPunch(row) {
+    return !!(row?.check_in_time || row?.check_out_time);
+}
+
+function hasPurePendingMakeup(row) {
+    return hasPendingMakeup(row) && !hasOfficialPunch(row);
+}
+
+function hasPendingMakeupCorrection(row) {
+    return hasPendingMakeup(row) && hasOfficialPunch(row);
+}
+
 function hasPendingLeave(row) {
     return row?.daily_leave?.status === 'pending';
 }
@@ -1157,7 +1172,9 @@ function updateDailyStats() {
     document.getElementById('dEarly').textContent = d.filter(r => r.is_early_leave).length;
     document.getElementById('dLeave').textContent = d.filter(r => r.status === 'on_leave' || hasPendingLeave(r)).length;
     const pendingEl = document.getElementById('dPendingMakeup');
-    if (pendingEl) pendingEl.textContent = d.filter(hasPendingMakeup).length;
+    if (pendingEl) pendingEl.textContent = d.filter(hasPurePendingMakeup).length;
+    const correctionEl = document.getElementById('dPendingMakeupCorrection');
+    if (correctionEl) correctionEl.textContent = d.filter(hasPendingMakeupCorrection).length;
 }
 
 function updateDeptFilter() {
