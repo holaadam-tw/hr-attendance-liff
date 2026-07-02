@@ -1094,11 +1094,24 @@ function leavePeriodLabel(period) {
 function buildPendingMakeupMap(requests, dateStr) {
     const map = new Map();
     (requests || []).forEach(r => {
-        if (String(r.punch_date || '') !== dateStr) return;
+        const punchDate = String(r.punch_date || '').slice(0, 10);
+        if (punchDate !== dateStr) return;
+        const normalized = {
+            ...r,
+            punch_date: punchDate,
+            punch_type: normalizePendingPunchType(r.punch_type)
+        };
         if (!map.has(r.employee_id)) map.set(r.employee_id, []);
-        map.get(r.employee_id).push(r);
+        map.get(r.employee_id).push(normalized);
     });
     return map;
+}
+
+function normalizePendingPunchType(type) {
+    const value = String(type || '').toLowerCase();
+    if (value === 'check_in' || value === 'clock_in') return 'clock_in';
+    if (value === 'check_out' || value === 'clock_out') return 'clock_out';
+    return value;
 }
 
 function buildDailyLeaveMap(requests, dateStr) {
@@ -1126,6 +1139,19 @@ async function runOptionalDailyQuery(query) {
     }
 }
 
+async function loadDailyPendingMakeupRequests() {
+    const reviewRes = await runOptionalDailyQuery(sb.rpc('get_makeup_review_requests', {
+        p_company_id: companyId,
+        p_status: 'pending',
+        p_review_filter: 'all'
+    }));
+    if (!reviewRes.error) return reviewRes;
+
+    console.warn('Load makeup review RPC warning:', reviewRes.error);
+    const legacyRes = await runOptionalDailyQuery(sb.rpc('get_pending_makeup_requests', { p_company_id: companyId }));
+    return legacyRes.error ? reviewRes : legacyRes;
+}
+
 async function loadDailyData() {
     const dateStr = getDailyDate();
     const dayNames = t('weekdays');
@@ -1136,7 +1162,7 @@ async function loadDailyData() {
     try {
         const [dailyRes, makeupRes, leaveRes] = await Promise.all([
             sb.rpc('get_company_daily_attendance', { p_company_id: companyId, p_date: dateStr }),
-            runOptionalDailyQuery(sb.rpc('get_pending_makeup_requests', { p_company_id: companyId })),
+            loadDailyPendingMakeupRequests(),
             runOptionalDailyQuery(sb.from('leave_requests')
                 .select('employee_id, leave_type, leave_period, days, start_date, end_date, status, employees!inner(company_id)')
                 .eq('employees.company_id', companyId)

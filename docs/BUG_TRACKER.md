@@ -252,3 +252,7 @@
 - **B36**：一般打卡頁已能把 GPS 精度 >500m 改送待審，但「精度正常、座標飄到公司半徑外」仍直接擋下。修法：`checkin.html` 在 `quick_check_in` 回傳 `outside_allowed_location` 且 `min_distance <= 5000m` 時，改送補打卡待審核；超過 5000m 仍直接擋。`modules/schedules.js` 審核卡片新增「GPS 範圍外疑似飄移」標示，顯示距離公司、精度、照片與地圖連結。
 
 - **B37**：審核中心請假清單直接讀 `leave_requests`，遇到 RLS / schema 差異會顯示「載入失敗」；補打卡審核只讀 pending，且 GPS 待核與一般補卡混在一起，主管按通過後若有重複申請仍像沒作用。修法：新增 `migrations/086_approval_center_gps_review.sql`，提供 `get_leave_approval_requests`、`get_makeup_review_requests`，並讓 `approve_makeup_request` 通過一筆後自動關閉同員工同日同類型重複 pending。前端改為「待審核 / GPS 待核 / 一般補卡 / 已通過 / 已拒絕」分頁，通過時顯示處理狀態。2026-06-08 已查正式 DB：三個 RPC 均存在。
+
+## 2026-07-02 Fix Notes
+
+- **B45**: `attendance_public.html` daily overview showed GPS review punches as not checked because it only loaded legacy `get_pending_makeup_requests`. Fixed by reading `get_makeup_review_requests` first, falling back to the legacy RPC, and normalizing `check_in/check_out` to `clock_in/clock_out` for display and stats.
