@@ -949,6 +949,8 @@ export async function openEditEmployeeModal(empId) {
             if (noCheckinEl) noCheckinEl.checked = !!data.no_checkin;
             const isKioskEl = document.getElementById('editIsKiosk');
             if (isKioskEl) isKioskEl.checked = !!data.is_kiosk;
+            const gpsRelaxedEl = document.getElementById('editGpsRelaxed');
+            if (gpsRelaxedEl) gpsRelaxedEl.checked = !!data.gps_relaxed;
             // LINE 綁定狀態
             const lineStatusEl = document.getElementById('editEmpLineStatus');
             const lineInputEl = document.getElementById('editEmpLineUserId');
@@ -1003,7 +1005,8 @@ export async function saveEditEmployee() {
         is_bound: !!lineVal,
         can_schedule: !!document.getElementById('editCanSchedule')?.checked,
         no_checkin: !!document.getElementById('editNoCheckin')?.checked,
-        is_kiosk: !!document.getElementById('editIsKiosk')?.checked
+        is_kiosk: !!document.getElementById('editIsKiosk')?.checked,
+        gps_relaxed: !!document.getElementById('editGpsRelaxed')?.checked
     };
     // 角色欄位：只有 platform_admin 看得到這組 UI 時才寫入 role
     const roleGroup = document.getElementById('editEmpRoleGroup');
