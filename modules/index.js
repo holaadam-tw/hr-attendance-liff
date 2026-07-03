@@ -16,7 +16,7 @@ import {
 
 import {
     showAddEmployeeModal, closeAddEmployeeModal, initEmployeeFormHandler,
-    showJoinQRCode, closeQRModal, loadEmployeeList, updateEmployeeRoleAdmin,
+    showJoinQRCode, closeQRModal, loadEmployeeList, updateEmployeeRoleAdmin, updateEmployeeGpsRelaxed,
     searchEmployees, openSalarySettingModal, closeSalarySettingModal,
     onSalaryTypeChange, saveSalarySetting, openEditEmployeeModal,
     closeEditEmployeeModal, saveEditEmployee, loadDepartmentOptions, addNewDepartment,
@@ -131,6 +131,7 @@ window.showJoinQRCode = showJoinQRCode;
 window.closeQRModal = closeQRModal;
 window.loadEmployeeList = loadEmployeeList;
 window.updateEmployeeRoleAdmin = updateEmployeeRoleAdmin;
+window.updateEmployeeGpsRelaxed = updateEmployeeGpsRelaxed;
 window.searchEmployees = searchEmployees;
 window.openSalarySettingModal = openSalarySettingModal;
 window.closeSalarySettingModal = closeSalarySettingModal;

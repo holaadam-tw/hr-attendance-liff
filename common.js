@@ -305,7 +305,7 @@ async function checkUserStatus() {
             // 先查員工 + 設定（並行），再查考勤（需要 currentEmployee.id）
             const [empResult] = await Promise.all([
                 sb.from('employees')
-                    .select('id, name, role, department, position, employee_number, line_user_id, company_id, is_active, hire_date, is_kiosk, no_checkin, preferred_language')
+                    .select('id, name, role, department, position, employee_number, line_user_id, company_id, is_active, hire_date, is_kiosk, no_checkin, gps_relaxed, preferred_language')
                     .eq('line_user_id', liffProfile.userId)
                     .eq('company_id', currentCompanyId)
                     .maybeSingle(),

@@ -770,7 +770,7 @@
                         btn.disabled = false; btn.textContent = '📸 重試';
                         return;
                     }
-                    if (loc.accuracy > GPS_MAX_ACCURACY_M) {
+                    if (loc.accuracy > GPS_MAX_ACCURACY_M && !currentEmployee?.gps_relaxed) {
                         showStatus(statusBox, 'info', `📍 GPS 精度 ${Math.round(loc.accuracy)}m，改送主管審核...`);
                         const pending = await submitLowAccuracyReviewRequest(currentCheckInType === 'in' ? 'check_in' : 'check_out', loc, publicUrl);
                         clearTimeout(safetyTimer);
@@ -925,7 +925,7 @@
                             showStatus(statusBox, 'warning', '⚠️ GPS 精度異常（過於精確），請關閉模擬定位 App 後重試');
                             btn.disabled = false; btn.textContent = '📸 開啟相機拍照'; return;
                         }
-                        if (loc.accuracy > GPS_MAX_ACCURACY_M) {
+                        if (loc.accuracy > GPS_MAX_ACCURACY_M && !currentEmployee?.gps_relaxed) {
                             showStatus(statusBox, 'info', `📍 GPS 精度 ${Math.round(loc.accuracy)}m，改送主管審核...`);
                             const pending = await submitLowAccuracyReviewRequest(currentCheckInType === 'in' ? 'check_in' : 'check_out', loc, publicUrl);
                             showLowAccuracyPendingSuccess(pending.typeText, pending.nowParts, loc);

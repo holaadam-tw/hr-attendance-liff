@@ -190,6 +190,7 @@ export async function loadEmployeeList() {
                                 ${emp.role === 'admin' ? '取消管理員' : '設為管理員'}
                             </button>
                         ` : ''}
+                        <button data-id="${emp.id}" data-val="${emp.gps_relaxed ? 'false' : 'true'}" data-name="${escapeHTML(emp.name)}" onclick="updateEmployeeGpsRelaxed(this.dataset.id, this.dataset.val, this.dataset.name)" style="padding:7px 12px;border:1px solid ${emp.gps_relaxed ? '#FBBF24' : '#E5E7EB'};border-radius:8px;background:${emp.gps_relaxed ? '#FEF3C7' : '#fff'};font-size:11px;font-weight:700;cursor:pointer;color:#92400E;" title="放寬 GPS 精度要求（僅限手機定位差的問題裝置）">${emp.gps_relaxed ? '🛰️ 寬鬆定位:開' : '🛰️ 寬鬆定位:關'}</button>
                         <button data-id="${emp.id}" data-name="${escapeHTML(emp.name)}" onclick="showResignModal(this.dataset.id, this.dataset.name)" style="padding:7px 12px;border:1px solid #FCA5A5;border-radius:8px;background:#FEF2F2;font-size:11px;font-weight:700;cursor:pointer;color:#DC2626;">📤 離職</button>
                     </div>
                 </div>
@@ -216,6 +217,23 @@ export async function updateEmployeeRoleAdmin(employeeId, newRole, employeeName)
 
         if (error) throw error;
         showToast(`✅ ${employeeName} → ${roleNames[newRole]}`);
+        loadEmployeeList();
+    } catch (err) {
+        console.error(err);
+        showToast('❌ 更新失敗: ' + friendlyError(err));
+    }
+}
+
+// ===== 切換「寬鬆定位」（指定問題裝置員工放寬 GPS 精度要求）=====
+export async function updateEmployeeGpsRelaxed(employeeId, newVal, employeeName) {
+    const on = newVal === 'true' || newVal === true;
+    try {
+        const { error } = await sb.from('employees')
+            .update({ gps_relaxed: on })
+            .eq('id', employeeId)
+            .eq('company_id', window.currentCompanyId);
+        if (error) throw error;
+        showToast(`${on ? '🛰️ 已開啟' : '已關閉'} ${employeeName} 的寬鬆定位`);
         loadEmployeeList();
     } catch (err) {
         console.error(err);
