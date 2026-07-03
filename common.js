@@ -1804,8 +1804,8 @@ const ROLE_PERMISSIONS = {
         payroll_locked: true
     },
     admin: {
-        admin_pages: ['employees', 'leave', 'attendance', 'schedule', 'settings', 'announcements', 'requests', 'restaurant', 'booking', 'members', 'location', 'report', 'staff', 'lunch', 'client', 'fieldwork'],
-        payroll_locked: false
+        admin_pages: ['employees', 'leave', 'attendance', 'schedule', 'payroll', 'settings', 'announcements', 'requests', 'restaurant', 'booking', 'members', 'location', 'report', 'staff', 'lunch', 'client', 'fieldwork'],
+        payroll_locked: true
     },
     manager: {
         admin_pages: ['leave', 'attendance', 'schedule', 'announcements'],
