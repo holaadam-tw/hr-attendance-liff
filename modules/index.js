@@ -8,11 +8,11 @@ import {
     applyRoleVisibility, applyAdminFeatureVisibility,
     switchFieldSalesAdmin,
     renderAdminCompanySwitcher, switchCompanyAdmin
-} from './auth.js';
+} from './auth.js?v=20260704-gps-relaxed';
 
 import {
     loadAuditLogs, exportReport
-} from './audit.js';
+} from './audit.js?v=20260704-gps-relaxed';
 
 import {
     showAddEmployeeModal, closeAddEmployeeModal, initEmployeeFormHandler,
@@ -25,7 +25,7 @@ import {
     loadUnbindEmployees, quickBindLine,
     showResignModal, closeResignModal, confirmResign, restoreEmployee,
     loadResignedEmployees, loadAllEmployees
-} from './employees.js';
+} from './employees.js?v=20260704-gps-relaxed';
 
 import {
     switchApprovalType, switchLeaveTab, loadLeaveApprovals, approveLeave,
@@ -37,7 +37,7 @@ import {
     loadAdminLunchStats, loadStaffOverview, changeLeaveCal,
     resetLeaveCal, loadLeaveCal,
     clearLeaveState
-} from './leave.js';
+} from './leave.js?v=20260704-gps-relaxed';
 
 import {
     changeShiftWeek, resetShiftWeek, loadShiftMgr, cycleShift,
@@ -48,7 +48,7 @@ import {
     loadShiftTypeList, showAddShiftTypeForm, editShiftTypeById, deleteShiftTypeById, saveShiftType, deleteShiftType,
     loadEmployeeShiftModes, toggleShiftModeRow, saveAllShiftModes, smMarkChanged, smClearChanged, smHasUnsavedChanges,
     clearSchedulesState
-} from './schedules.js';
+} from './schedules.js?v=20260704-gps-relaxed';
 
 import {
     BONUS_MATRIX, loadHybridBonusData, renderSelectedBonusCard,
@@ -63,7 +63,7 @@ import {
     loadInsuranceBrackets, showInsModal, closeInsModal,
     editInsBracket, saveInsBracket, deleteInsBracket, updateAllInsRates,
     switchPayTab
-} from './payroll.js';
+} from './payroll.js?v=20260704-gps-relaxed';
 
 import {
     loadRestaurantList, openRestaurantDetail, previewStoreOrder, openKDS,
@@ -90,7 +90,7 @@ import {
     loadTransactions, toggleLoyalty, loadMemberList,
     loadBookingForStore, loadBookingStoreList,
     loadMembersForStore, toggleMemberLoyalty, searchMemberByPhone, loadMemberStoreList
-} from './store.js?v=20260325';
+} from './store.js?v=20260704-gps-relaxed';
 
 import {
     INDUSTRY_TEMPLATES,
@@ -106,7 +106,7 @@ import {
     closeCompanyModal, editCompany, saveCompany,
     initSalesTargetPage, stChangeWeek, saveDefaultTarget,
     switchSysTab
-} from './settings.js';
+} from './settings.js?v=20260704-gps-relaxed';
 
 // ===== 綁定 window（供 HTML onclick 使用）=====
 
