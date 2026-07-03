@@ -496,24 +496,23 @@
         async function loadEmployeeType() {
             if (!currentEmployee?.id) return;
             try {
-                const { data } = await sb.from('salary_settings')
-                    .select('salary_type')
-                    .eq('employee_id', currentEmployee.id)
-                    .eq('is_current', true)
-                    .maybeSingle();
-                
+                const { data: mySalary } = await sb.rpc('get_my_current_salary', {
+                    p_line_user_id: (window.liffProfile && window.liffProfile.userId) || null
+                });
+                const salaryType = mySalary?.salary_type;
+
                 const badge = document.getElementById('userTypeBadge');
-                if (badge && data) {
+                if (badge && salaryType) {
                     badge.style.display = 'inline-block';
-                    if (data.salary_type === 'monthly') {
+                    if (salaryType === 'monthly') {
                         badge.textContent = '正職';
                         badge.style.background = '#DBEAFE';
                         badge.style.color = '#1E40AF';
-                    } else if (data.salary_type === 'hourly') {
+                    } else if (salaryType === 'hourly') {
                         badge.textContent = '時薪';
                         badge.style.background = '#FEF3C7';
                         badge.style.color = '#92400E';
-                    } else if (data.salary_type === 'daily') {
+                    } else if (salaryType === 'daily') {
                         badge.textContent = '日薪';
                         badge.style.background = '#FEF3C7';
                         badge.style.color = '#92400E';

@@ -551,7 +551,11 @@
             try {
                 if (typeof sb !== 'undefined' && currentEmployee) {
                     // 只讀取管理員已發布的薪資（is_published = true）
-                    const { data: p } = await sb.from('payroll').select('*').eq('employee_id', currentEmployee.id).eq('year', salaryYear).eq('month', salaryMonth+1).eq('is_published', true).maybeSingle();
+                    const { data: p } = await sb.rpc('get_my_payslip', {
+                        p_line_user_id: (window.liffProfile && window.liffProfile.userId) || null,
+                        p_year: salaryYear,
+                        p_month: salaryMonth + 1
+                    });
                     if (p) {
                         if (p.calculation_details && typeof p.calculation_details === 'string') {
                             try { p.calculation_details = JSON.parse(p.calculation_details); } catch(e) {}
@@ -828,11 +832,9 @@
                     // 從 salary_settings 自動帶入
                     try {
                         if (currentEmployee?.id) {
-                            const { data } = await sb.from('salary_settings')
-                                .select('salary_type, base_salary, meal_allowance, full_attendance_bonus, pension_self_rate, position_allowance')
-                                .eq('employee_id', currentEmployee.id)
-                                .eq('is_current', true)
-                                .maybeSingle();
+                            const { data } = await sb.rpc('get_my_current_salary', {
+                                p_line_user_id: (window.liffProfile && window.liffProfile.userId) || null
+                            });
 
                             if (data) {
                                 if (data.salary_type === 'hourly') {

@@ -248,11 +248,11 @@ export async function openSalarySettingModal(empId, empName) {
         formatMoneyInput(document.getElementById(id));
     });
     try {
-        const { data } = await sb.from('salary_settings')
-            .select('*')
-            .eq('employee_id', empId)
-            .eq('is_current', true)
-            .maybeSingle();
+        const { data } = await sb.rpc('get_employee_current_salary', {
+            p_company_id: window.currentCompanyId,
+            p_line_user_id: window.currentAdminEmployee?.line_user_id,
+            p_employee_id: empId
+        });
         if (data) {
             document.getElementById('ssSalaryType').value = data.salary_type || 'monthly';
             document.getElementById('ssBaseSalary').value = toMoneyStr(data.base_salary) || '';

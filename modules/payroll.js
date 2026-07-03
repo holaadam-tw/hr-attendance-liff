@@ -105,7 +105,7 @@ export async function loadHybridBonusData() {
     try {
         const [empRes, salaryRes, attRes, leaveRes] = await Promise.all([
             sb.from('employees').select('id, name, employee_number, department, hire_date').eq('company_id', window.currentCompanyId).eq('is_active', true).order('department').order('name'),
-            sb.from('salary_settings').select('employee_id, base_salary, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).eq('is_current', true),
+            sb.rpc('get_company_current_salaries', { p_company_id: window.currentCompanyId, p_line_user_id: window.currentAdminEmployee?.line_user_id }),
             sb.from('attendance').select('employee_id, is_late, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).gte('date', `${year}-01-01`).lte('date', `${year}-12-31`),
             sb.from('leave_requests').select('employee_id, days, start_date, end_date, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).eq('status', 'approved').lte('start_date', `${year}-12-31`).gte('end_date', `${year}-01-01`)
         ]);
@@ -415,7 +415,7 @@ export async function loadSalarySettingList() {
     try {
         const [empRes, ssRes] = await Promise.all([
             sb.from('employees').select('id, name, employee_number, department').eq('company_id', window.currentCompanyId).eq('is_active', true).order('department'),
-            sb.from('salary_settings').select('employee_id, salary_type, base_salary, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).eq('is_current', true)
+            sb.rpc('get_company_current_salaries', { p_company_id: window.currentCompanyId, p_line_user_id: window.currentAdminEmployee?.line_user_id })
         ]);
         const ssMap = {};
         (ssRes.data || []).forEach(s => { ssMap[s.employee_id] = s; });
@@ -531,11 +531,11 @@ export async function loadPayrollData() {
     try {
         const [empRes, salaryRes, attRes, leaveRes, otRes, existRes, bracketRes, schedRes] = await Promise.all([
             sb.from('employees').select('id, name, employee_number, department, is_active, status, resigned_date').eq('company_id', window.currentCompanyId).eq('no_checkin', false).in('status', ['approved', 'resigned']),
-            sb.from('salary_settings').select('*, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).eq('is_current', true),
+            sb.rpc('get_company_current_salaries', { p_company_id: window.currentCompanyId, p_line_user_id: window.currentAdminEmployee?.line_user_id }),
             sb.from('attendance').select('employee_id, date, is_late, total_work_hours, overtime_hours, check_in_time, check_out_time, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).gte('date', startDate).lte('date', endDate),
             sb.from('leave_requests').select('employee_id, days, leave_type, start_date, end_date, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).eq('status', 'approved').lte('start_date', endDate).gte('end_date', startDate),
             sb.from('overtime_requests').select('employee_id, hours, planned_hours, actual_hours, approved_hours, final_hours, source_type, ot_date, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).eq('status', 'approved').gte('ot_date', startDate).lte('ot_date', endDate).then(r => r).catch(() => ({ data: [] })),
-            sb.from('payroll').select('*, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).eq('year', year).eq('month', month),
+            sb.rpc('get_company_payroll', { p_company_id: window.currentCompanyId, p_line_user_id: window.currentAdminEmployee?.line_user_id, p_year: year, p_month: month }),
             sb.from('insurance_brackets').select('*').eq('is_active', true).order('salary_min').then(r => r).catch(() => ({ data: [] })),
             sb.from('schedules').select('employee_id, date, is_off_day, shift_types(start_time,end_time,is_overnight), employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).gte('date', startDate).lte('date', endDate).then(r => r).catch(() => ({ data: [] }))
         ]);
