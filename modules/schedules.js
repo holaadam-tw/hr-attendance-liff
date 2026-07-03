@@ -487,6 +487,47 @@ export function rejectMakeupPunchPrompt(id) {
     rejectMakeupPunch(id, reason);
 }
 
+// 一鍵全批「今日」GPS 待審補卡（管理者主動觸發，仍逐筆寫入正式出勤 + 稽核）
+export async function batchApproveTodayGpsMakeups() {
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' });
+    let data, error;
+    try {
+        const res = await sb.rpc('get_makeup_review_requests', {
+            p_company_id: window.currentCompanyId,
+            p_status: 'pending',
+            p_review_filter: 'gps_review'
+        });
+        data = res.data; error = res.error;
+        if (error) throw error;
+    } catch (e) {
+        showToast('❌ 載入待審失敗：' + friendlyError(e));
+        return;
+    }
+    const todays = (data || []).filter(r => r.punch_date === today);
+    if (todays.length === 0) { showToast('今日沒有 GPS 待審補卡'); return; }
+    if (!confirm(`確定一鍵通過今日 ${todays.length} 筆「GPS 待審」補卡？\n通過後會寫入正式出勤。`)) return;
+
+    const btn = document.getElementById('batchGpsApproveBtn');
+    if (btn) { btn.disabled = true; }
+    const approverId = window.currentAdminEmployee?.id || null;
+    let ok = 0, fail = 0;
+    for (const r of todays) {
+        try {
+            const { data: result, error: e } = await sb.rpc('approve_makeup_request', {
+                p_request_id: r.id, p_approver_id: approverId
+            });
+            if (e || (result && !result.success)) fail++; else ok++;
+        } catch (_) { fail++; }
+        if (btn) btn.textContent = `⏳ ${ok + fail}/${todays.length}`;
+    }
+    if (ok > 0 && typeof writeAuditLog === 'function') {
+        writeAuditLog('batch_approve_gps', 'makeup_punch_requests', null, `一鍵通過今日 GPS 待審 ${ok} 筆`);
+    }
+    if (btn) { btn.disabled = false; btn.textContent = '⚡ 一鍵全批今日 GPS 待審'; }
+    showToast(`✅ 通過 ${ok} 筆${fail ? `，失敗 ${fail} 筆` : ''}`);
+    loadMakeupApprovals(currentMakeupStatus || 'pending', currentMakeupFilter || 'gps_review');
+}
+
 export async function rejectMakeupPunch(id, reason) {
     setMakeupCardBusy(id, '正在拒絕申請...');
     try {

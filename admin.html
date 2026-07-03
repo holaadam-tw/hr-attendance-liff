@@ -759,6 +759,9 @@
                         <button class="tab-btn inactive" onclick="switchMakeupTab('approved', 'all', this)">已通過</button>
                         <button class="tab-btn inactive" onclick="switchMakeupTab('rejected', 'all', this)">已拒絕</button>
                     </div>
+                    <div style="margin:8px 0;text-align:right;">
+                        <button id="batchGpsApproveBtn" onclick="batchApproveTodayGpsMakeups()" style="padding:8px 14px;border:none;border-radius:10px;background:#FEF3C7;color:#92400E;font-weight:700;font-size:12px;cursor:pointer;">⚡ 一鍵全批今日 GPS 待審</button>
+                    </div>
                     <div id="makeupApprovalList"><p style="text-align:center;color:#666;">載入中...</p></div>
                 </div>
 

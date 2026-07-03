@@ -42,7 +42,7 @@ import {
 import {
     changeShiftWeek, resetShiftWeek, loadShiftMgr, cycleShift,
     saveSchedule, copyLastWeek, switchMakeupTab, loadMakeupApprovals,
-    approveMakeupPunch, rejectMakeupPunchPrompt, rejectMakeupPunch,
+    approveMakeupPunch, rejectMakeupPunchPrompt, rejectMakeupPunch, batchApproveTodayGpsMakeups,
     switchOtTab, loadOtApprovals, approveOt, rejectOtPrompt, rejectOt,
     loadSwapApprovals, approveSwap, rejectSwap,
     loadShiftTypeList, showAddShiftTypeForm, editShiftTypeById, deleteShiftTypeById, saveShiftType, deleteShiftType,
@@ -196,6 +196,7 @@ window.copyLastWeek = copyLastWeek;
 window.switchMakeupTab = switchMakeupTab;
 window.loadMakeupApprovals = loadMakeupApprovals;
 window.approveMakeupPunch = approveMakeupPunch;
+window.batchApproveTodayGpsMakeups = batchApproveTodayGpsMakeups;
 window.rejectMakeupPunchPrompt = rejectMakeupPunchPrompt;
 window.rejectMakeupPunch = rejectMakeupPunch;
 window.switchOtTab = switchOtTab;
