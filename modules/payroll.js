@@ -429,21 +429,23 @@ export async function loadSalarySettingList() {
             return '-';
         };
 
-        let html = '<div style="display:grid;grid-template-columns:auto 1fr auto auto auto;gap:6px 8px;align-items:center;font-size:12px;">';
-        html += '<div style="font-weight:700;color:#64748B;">姓名</div><div style="font-weight:700;color:#64748B;">部門</div><div style="font-weight:700;color:#64748B;">制度</div><div style="font-weight:700;color:#64748B;">金額</div><div style="font-weight:700;color:#64748B;">時薪換算</div>';
+        let html = '<div style="display:grid;grid-template-columns:minmax(0,1fr) auto 84px auto;gap:10px 8px;align-items:center;font-size:12px;">';
+        html += '<div style="font-weight:700;color:#64748B;">員工</div><div style="font-weight:700;color:#64748B;">制度</div><div style="font-weight:700;color:#64748B;text-align:right;">金額</div><div style="font-weight:700;color:#64748B;">時薪換算</div>';
         emps.forEach(emp => {
             const ss = ssMap[emp.id];
             const curType = ss?.salary_type || 'hourly';
             const curBase = ss?.base_salary || (curType === 'hourly' ? 196 : '');
-            html += `<div style="font-weight:600;white-space:nowrap;">${escapeHTML(emp.name)}</div>`;
-            html += `<div style="color:#94A3B8;font-size:11px;">${emp.department || '-'}</div>`;
+            html += `<div style="min-width:0;">
+                <div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHTML(emp.name)}</div>
+                <div style="color:#94A3B8;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHTML(emp.department || '-')}</div>
+            </div>`;
             html += `<select data-emp-id="${emp.id}" data-field="type" onchange="onBatchSalaryTypeChange(this)" style="padding:6px;border:1px solid #E2E8F0;border-radius:6px;font-size:12px;font-weight:600;">
                 <option value="hourly"${curType === 'hourly' ? ' selected' : ''}>時薪</option>
                 <option value="monthly"${curType === 'monthly' ? ' selected' : ''}>月薪</option>
                 <option value="daily"${curType === 'daily' ? ' selected' : ''}>日薪</option>
             </select>`;
-            html += `<input type="number" data-emp-id="${emp.id}" data-field="base" value="${curBase}" style="width:80px;padding:6px;border:1px solid #E2E8F0;border-radius:6px;font-size:12px;font-weight:700;text-align:right;" oninput="onBatchSalaryBaseChange(this)">`;
-            html += `<span data-emp-id="${emp.id}" data-field="hourly-display" style="font-size:11px;color:#64748B;">${curBase ? calcHourlyDisplay(curType, curBase) : '-'}</span>`;
+            html += `<input type="number" data-emp-id="${emp.id}" data-field="base" value="${curBase}" style="width:100%;box-sizing:border-box;padding:6px;border:1px solid #E2E8F0;border-radius:6px;font-size:12px;font-weight:700;text-align:right;" oninput="onBatchSalaryBaseChange(this)">`;
+            html += `<span data-emp-id="${emp.id}" data-field="hourly-display" style="font-size:11px;color:#475569;white-space:nowrap;">${curBase ? calcHourlyDisplay(curType, curBase) : '-'}</span>`;
         });
         html += '</div>';
         html += `<button onclick="saveAllSalarySettings()" style="margin-top:12px;width:100%;padding:10px;border:none;border-radius:10px;background:linear-gradient(135deg,#059669,#10B981);color:#fff;font-weight:700;font-size:13px;cursor:pointer;">💾 全部儲存</button>`;
