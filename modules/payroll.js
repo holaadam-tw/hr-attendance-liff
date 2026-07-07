@@ -101,6 +101,40 @@ export function initAuditPage() {
     }
 }
 
+// 上班基準（全員 08:00）→ 遲到分鐘 = 打卡時間 − 08:00，從 08:00 起算不扣寬限。
+const AUDIT_SHIFT_START_MIN = 8 * 60;
+
+// 台北時間的「當日分鐘數」（0~1439），用於算遲到分鐘
+function taipeiMinutes(iso) {
+    const hm = new Date(iso).toLocaleTimeString('en-GB', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit' });
+    return parseInt(hm.slice(0, 2), 10) * 60 + parseInt(hm.slice(3, 5), 10);
+}
+
+// 一筆請假在本月內的時數：時假用 leave_hours、半天 4hr、整天 8hr×當月重疊天數
+function leaveHoursInMonth(l, startStr, endStr) {
+    const period = l.leave_period || 'full_day';
+    if (period === 'hourly') return Number(l.leave_hours) || 0;
+    if (period === 'am' || period === 'pm' || period === 'half_day') return 4;
+    const s = new Date(((l.start_date || startStr)) + 'T00:00:00+08:00');
+    const e = new Date(((l.end_date || l.start_date || endStr)) + 'T00:00:00+08:00');
+    const rs = new Date(startStr + 'T00:00:00+08:00');
+    const re = new Date(endStr + 'T00:00:00+08:00');
+    const os = s > rs ? s : rs;
+    const oe = e < re ? e : re;
+    if (oe < os) return 0;
+    const days = Math.round((oe - os) / 86400000) + 1;
+    return Math.max(0, days) * 8;
+}
+
+// 時數格式：8 → "8hr"，9.87 → "9hr52m"
+function fmtHours(h) {
+    if (!h || h <= 0) return '-';
+    let hh = Math.floor(h + 1e-9);
+    let mm = Math.round((h - hh) * 60);
+    if (mm >= 60) { hh += 1; mm -= 60; }
+    return mm > 0 ? `${hh}hr${mm}m` : `${hh}hr`;
+}
+
 export async function loadAuditData() {
     const year = parseInt(document.getElementById('auditYear').value);
     const month = parseInt(document.getElementById('auditMonth').value);
@@ -122,15 +156,12 @@ export async function loadAuditData() {
     if (btn) { btn.disabled = true; btn.textContent = '⏳ 計算中...'; }
 
     try {
-        const lateDedPerTime = parseInt(getCachedSetting('late_deduction_per_time')) || 100;
-        const lateThreshold = parseInt(getCachedSetting('late_threshold_minutes'));
-        const shiftStart = getCachedSetting('default_work_start') || '08:00';
-
-        const [empRes, salaryRes, attRes, leaveRes, schedRes] = await Promise.all([
+        const [empRes, salaryRes, attRes, leaveRes, otRes, schedRes] = await Promise.all([
             sb.from('employees').select('id, name, employee_number, department, status, salary_type, resigned_date').eq('company_id', window.currentCompanyId).eq('no_checkin', false).in('status', ['approved', 'resigned']),
             sb.rpc('get_company_current_salaries', { p_company_id: window.currentCompanyId, p_line_user_id: window.currentAdminEmployee?.line_user_id }),
-            sb.from('attendance').select('employee_id, date, check_in_time, is_late, is_manual, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).gte('date', startDate).lte('date', endDate),
-            sb.from('leave_requests').select('employee_id, days, leave_type, start_date, end_date, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).eq('status', 'approved').lte('start_date', endDate).gte('end_date', startDate),
+            sb.from('attendance').select('employee_id, date, check_in_time, is_manual, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).gte('date', startDate).lte('date', endDate),
+            sb.from('leave_requests').select('employee_id, days, leave_type, leave_period, leave_hours, start_date, end_date, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).eq('status', 'approved').lte('start_date', endDate).gte('end_date', startDate),
+            sb.from('overtime_requests').select('employee_id, hours, planned_hours, actual_hours, approved_hours, final_hours, source_type, ot_date, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).eq('status', 'approved').gte('ot_date', startDate).lte('ot_date', endDate).then(r => r).catch(() => ({ data: [] })),
             sb.from('schedules').select('employee_id, date, is_off_day, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).gte('date', startDate).lte('date', endDate).then(r => r).catch(() => ({ data: [] }))
         ]);
         if (empRes.error) throw empRes.error;
@@ -141,9 +172,20 @@ export async function loadAuditData() {
         const attMap = {};
         (attRes.data || []).forEach(a => { (attMap[a.employee_id] = attMap[a.employee_id] || []).push(a); });
 
+        // 請假：分成特休（annual）時數 與 其他假時數
         const leaveMap = {};
         (leaveRes.data || []).forEach(l => {
-            leaveMap[l.employee_id] = (leaveMap[l.employee_id] || 0) + calcLeaveOverlapDays(l, startDate, endDate);
+            const h = leaveHoursInMonth(l, startDate, endDate);
+            const m = leaveMap[l.employee_id] = leaveMap[l.employee_id] || { annualH: 0, otherH: 0 };
+            if (l.leave_type === 'annual') m.annualH += h; else m.otherH += h;
+        });
+
+        // 加班：核准時數（來源非自動補班）
+        const otMap = {};
+        (otRes.data || []).forEach(o => {
+            if ((o.source_type || 'manual') === 'late_close_auto') return;
+            const h = o.final_hours ?? o.approved_hours ?? o.actual_hours ?? o.planned_hours ?? o.hours ?? 0;
+            otMap[o.employee_id] = (otMap[o.employee_id] || 0) + Number(h || 0);
         });
 
         const schedMap = {};
@@ -156,32 +198,45 @@ export async function loadAuditData() {
         const rows = (empRes.data || []).map(emp => {
             if (emp.status === 'resigned' && emp.resigned_date && emp.resigned_date < startDate) return null;
             const atts = attMap[emp.id] || [];
-            const lateRows = atts.filter(a => a.is_late === true);
-            const actualDays = atts.filter(a => a.check_in_time).length;
-            const leaveDays = Math.round((leaveMap[emp.id] || 0) * 10) / 10;
+            // 遲到分鐘：每筆打卡 max(0, 打卡−08:00) 累加；中午(12:00)後打卡標記為「疑似漏打上班卡」
+            const lateList = [];
+            let lateMin = 0, afternoonCnt = 0;
+            atts.filter(a => a.check_in_time).forEach(a => {
+                const cm = taipeiMinutes(a.check_in_time);
+                const late = cm - AUDIT_SHIFT_START_MIN;
+                if (late > 0) {
+                    lateMin += late;
+                    const afternoon = cm >= 12 * 60;
+                    if (afternoon) afternoonCnt++;
+                    const hm = new Date(a.check_in_time).toLocaleTimeString('en-GB', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit' });
+                    lateList.push({ date: a.date.slice(5), hm, min: late, afternoon, manual: !!a.is_manual });
+                }
+            });
+            lateList.sort((x, y) => x.date.localeCompare(y.date));
+
+            const distinctDates = new Set(atts.filter(a => a.check_in_time).map(a => a.date));
+            const actualDays = distinctDates.size;
+            const lv = leaveMap[emp.id] || { annualH: 0, otherH: 0 };
+            const annualDays = Math.round(lv.annualH / 8 * 10) / 10;
+            const leaveHours = lv.otherH;
+            const otHours = Math.round((otMap[emp.id] || 0) * 10) / 10;
+            const leaveDaysTotal = (lv.annualH + lv.otherH) / 8;
+
             let effEnd = endDate;
             if (emp.status === 'resigned' && emp.resigned_date && emp.resigned_date < endDate) effEnd = emp.resigned_date;
             const expected = computeEmployeeExpectedDays(emp.id, startDate, effEnd, schedMap);
             const salaryType = (salaryMap[emp.id]?.salary_type) || emp.salary_type || 'monthly';
             const monthly = salaryType === 'monthly';
-            const absent = (monthly && !skipAutoAbsence) ? Math.max(0, expected - actualDays - leaveDays) : null;
-            const lateList = lateRows.map(a => {
-                let hm = '—', suspicious = false;
-                if (a.check_in_time) {
-                    hm = new Date(a.check_in_time).toLocaleTimeString('en-GB', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit' });
-                    suspicious = parseInt(hm.slice(0, 2), 10) >= 11;
-                }
-                return { date: a.date.slice(5), hm, manual: !!a.is_manual, suspicious };
-            }).sort((x, y) => x.date.localeCompare(y.date));
+            const absent = (monthly && !skipAutoAbsence) ? Math.max(0, Math.round((expected - actualDays - leaveDaysTotal) * 10) / 10) : null;
+
             return {
                 no: emp.employee_number, name: emp.name, dept: emp.department || '', monthly,
-                lateCount: lateRows.length, lateDed: lateRows.length * lateDedPerTime,
-                suspLate: lateList.filter(x => x.suspicious).length,
-                actualDays, expected, leave: leaveDays, absent, lateList
+                lateMin, afternoonCnt, annualDays, leaveHours, otHours,
+                actualDays, expected, absent, lateList
             };
         }).filter(Boolean).sort((a, b) => a.no.localeCompare(b.no));
 
-        renderAuditView(rows, { year, month, lateDedPerTime, lateThreshold, shiftStart });
+        renderAuditView(rows, { year, month });
         if (loadEl) loadEl.style.display = 'none';
     } catch (e) {
         if (loadEl) loadEl.style.display = 'none';
@@ -194,73 +249,69 @@ export async function loadAuditData() {
 function renderAuditView(rows, meta) {
     const contentEl = document.getElementById('auditContent');
     const sumEl = document.getElementById('auditSummary');
-    const nt = n => '$' + (n || 0).toLocaleString();
     const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
     const tot = {
         people: rows.length,
-        lateCount: rows.reduce((s, r) => s + r.lateCount, 0),
-        lateDed: rows.reduce((s, r) => s + r.lateDed, 0),
-        susp: rows.reduce((s, r) => s + r.suspLate, 0)
+        lateMin: rows.reduce((s, r) => s + r.lateMin, 0),
+        afternoon: rows.reduce((s, r) => s + r.afternoonCnt, 0),
+        otHours: Math.round(rows.reduce((s, r) => s + r.otHours, 0) * 10) / 10
     };
-    const thrTxt = (Number.isFinite(meta.lateThreshold) && meta.lateThreshold < 999)
-        ? `晚於 ${meta.shiftStart} 起 ${meta.lateThreshold} 分鐘` : '依系統設定';
 
     if (sumEl) {
         sumEl.style.display = 'grid';
         sumEl.innerHTML = `
             <div style="text-align:center;"><div style="font-size:11px;opacity:.85;">核對人數</div><div style="font-size:22px;font-weight:900;">${tot.people}</div></div>
-            <div style="text-align:center;"><div style="font-size:11px;opacity:.85;">遲到總次數</div><div style="font-size:22px;font-weight:900;">${tot.lateCount}</div></div>
-            <div style="text-align:center;"><div style="font-size:11px;opacity:.85;">遲到扣款合計</div><div style="font-size:22px;font-weight:900;">${nt(tot.lateDed)}</div></div>
-            <div style="text-align:center;"><div style="font-size:11px;opacity:.85;">疑似非遲到</div><div style="font-size:22px;font-weight:900;">${tot.susp} 筆</div></div>`;
+            <div style="text-align:center;"><div style="font-size:11px;opacity:.85;">遲到總分鐘</div><div style="font-size:22px;font-weight:900;">${tot.lateMin}</div></div>
+            <div style="text-align:center;"><div style="font-size:11px;opacity:.85;">下午打卡(需剔除)</div><div style="font-size:22px;font-weight:900;">${tot.afternoon} 筆</div></div>
+            <div style="text-align:center;"><div style="font-size:11px;opacity:.85;">加班總時數</div><div style="font-size:22px;font-weight:900;">${tot.otHours}</div></div>`;
     }
 
     const cell = 'padding:9px 8px;border-bottom:1px solid #EEF2F6;white-space:nowrap;text-align:right;font-variant-numeric:tabular-nums;';
     const cellL = cell.replace('text-align:right', 'text-align:left');
     const zero = 'color:#B6BEC8;';
-    let html = `<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;"><table style="border-collapse:collapse;width:100%;min-width:600px;font-size:13px;">
+    let html = `<div style="overflow-x:auto;-webkit-overflow-scrolling:touch;"><table style="border-collapse:collapse;width:100%;min-width:640px;font-size:13px;">
         <thead><tr style="background:#F1F5F9;color:#64748B;font-size:11px;">
             <th style="${cellL}text-align:left;">員工</th>
-            <th style="${cellL}text-align:left;">薪別</th>
-            <th style="${cell}">遲到</th><th style="${cell}">遲到扣款</th>
-            <th style="${cell}">實際出勤</th><th style="${cell}">應出勤</th>
-            <th style="${cell}">請假</th><th style="${cell}">缺勤扣薪</th>
+            <th style="${cell}">遲到(分)</th><th style="${cell}">特休</th>
+            <th style="${cell}">請假</th><th style="${cell}">加班</th>
+            <th style="${cell}">出勤</th><th style="${cell}">缺勤</th>
         </tr></thead><tbody>`;
     rows.forEach(r => {
-        const lateColor = r.lateCount >= 10 ? '#DC2626' : r.lateCount >= 3 ? '#B45309' : '#0F172A';
-        const lateTxt = r.lateCount > 0
-            ? `<span style="font-weight:800;color:${lateColor};">${r.lateCount}</span>${r.suspLate > 0 ? `<span style="color:#B45309;font-weight:800;" title="含 ${r.suspLate} 筆下午打卡">＊</span>` : ''}`
+        const lateColor = r.lateMin >= 120 ? '#DC2626' : r.lateMin >= 30 ? '#B45309' : '#0F172A';
+        const lateTxt = r.lateMin > 0
+            ? `<span style="font-weight:800;color:${lateColor};">${r.lateMin}</span>${r.afternoonCnt > 0 ? `<span style="color:#B45309;font-weight:800;" title="含 ${r.afternoonCnt} 筆下午打卡，分鐘灌大">＊</span>` : ''}`
             : `<span style="${zero}">0</span>`;
-        const dedTxt = r.lateDed > 0 ? `<span style="color:#DC2626;font-weight:800;">-${nt(r.lateDed).slice(1)}</span>` : `<span style="${zero}">0</span>`;
-        const absTxt = r.monthly ? (r.absent > 0 ? `<span style="color:#DC2626;">${r.absent} 天</span>` : `<span style="${zero}">0</span>`) : `<span style="${zero}">—</span>`;
-        const leaveTxt = r.leave > 0 ? `${r.leave} 天` : `<span style="${zero}">0</span>`;
+        const annualTxt = r.annualDays > 0 ? `${r.annualDays}天` : `<span style="${zero}">-</span>`;
+        const leaveTxt = r.leaveHours > 0 ? fmtHours(r.leaveHours) : `<span style="${zero}">-</span>`;
+        const otTxt = r.otHours > 0 ? `${r.otHours}hr` : `<span style="${zero}">-</span>`;
+        const absTxt = r.monthly ? (r.absent > 0 ? `<span style="color:#DC2626;">${r.absent}天</span>` : `<span style="${zero}">0</span>`) : `<span style="${zero}">—</span>`;
         html += `<tr>
-            <td style="${cellL}"><div style="font-weight:700;color:#0F172A;">${esc(r.name)}</div><div style="font-size:10px;color:#94A3B8;">${esc(r.no)}${r.dept ? ' · ' + esc(r.dept) : ''}</div></td>
-            <td style="${cellL}"><span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;${r.monthly ? 'background:#EEF2FF;color:#4F46E5;' : 'background:#F1F5F9;color:#64748B;'}">${r.monthly ? '月薪' : '時薪'}</span></td>
-            <td style="${cell}">${lateTxt}</td><td style="${cell}">${dedTxt}</td>
-            <td style="${cell}">${r.actualDays}</td><td style="${cell}${zero}">${r.expected}</td>
-            <td style="${cell}">${leaveTxt}</td><td style="${cell}">${absTxt}</td>
+            <td style="${cellL}"><div style="font-weight:700;color:#0F172A;">${esc(r.name)}</div><div style="font-size:10px;color:#94A3B8;">${esc(r.no)}${r.dept ? ' · ' + esc(r.dept) : ''}${r.monthly ? ' · 月薪' : ''}</div></td>
+            <td style="${cell}">${lateTxt}</td><td style="${cell}">${annualTxt}</td>
+            <td style="${cell}">${leaveTxt}</td><td style="${cell}">${otTxt}</td>
+            <td style="${cell}">${r.actualDays}</td><td style="${cell}">${absTxt}</td>
         </tr>`;
     });
     html += `<tr style="background:#F8FAFC;font-weight:800;">
-        <td style="${cellL}" colspan="2">合計（${tot.people} 人）</td>
-        <td style="${cell}">${tot.lateCount}</td><td style="${cell}color:#DC2626;">-${nt(tot.lateDed).slice(1)}</td>
-        <td style="${cell}" colspan="4"></td></tr>`;
+        <td style="${cellL}">合計（${tot.people} 人）</td>
+        <td style="${cell}">${tot.lateMin}</td>
+        <td style="${cell}" colspan="5"></td></tr>`;
     html += `</tbody></table></div>`;
 
-    // 遲到明細
-    const lateRows = rows.filter(r => r.lateCount > 0);
+    // 遲到明細（每筆打卡時刻 + 分鐘）
+    const lateRows = rows.filter(r => r.lateMin > 0);
     if (lateRows.length) {
         html += `<div style="margin-top:18px;font-weight:800;font-size:14px;color:#0F172A;">遲到打卡明細</div>
-            <div style="font-size:11px;color:#94A3B8;margin-bottom:8px;">每筆為當日打卡時刻；<span style="color:#B45309;">橘色</span>＝下午才打卡（需人工確認是否真遲到）；補＝補打卡</div>`;
+            <div style="font-size:11px;color:#94A3B8;margin-bottom:8px;">每筆＝當日打卡時刻與距 08:00 的分鐘；<span style="color:#B45309;">橘色</span>＝中午後才打卡（多為漏打上班卡，分鐘會灌很大，請人工剔除）；補＝補打卡</div>`;
         lateRows.forEach(r => {
             const chips = r.lateList.map(p => {
-                const susp = p.suspicious ? 'background:#FEF3C7;color:#B45309;' : 'background:#F1F5F9;color:#475569;';
+                const susp = p.afternoon ? 'background:#FEF3C7;color:#B45309;' : 'background:#F1F5F9;color:#475569;';
                 const dash = p.manual ? 'border:1px dashed #CBD5E1;' : 'border:1px solid transparent;';
-                return `<span style="display:inline-block;font-size:11.5px;padding:3px 7px;border-radius:6px;${susp}${dash}font-variant-numeric:tabular-nums;margin:2px;"><span style="opacity:.6;">${p.date}</span> ${p.hm}${p.manual ? '<sup style="font-size:8px;">補</sup>' : ''}</span>`;
+                return `<span style="display:inline-block;font-size:11.5px;padding:3px 7px;border-radius:6px;${susp}${dash}font-variant-numeric:tabular-nums;margin:2px;"><span style="opacity:.6;">${p.date}</span> ${p.hm} <b>+${p.min}分</b>${p.manual ? '<sup style="font-size:8px;">補</sup>' : ''}</span>`;
             }).join('');
             html += `<div style="padding:8px 0;border-bottom:1px solid #F1F5F9;">
-                <div style="font-size:12px;font-weight:700;color:#0F172A;">${esc(r.name)} <span style="color:#94A3B8;font-weight:400;">${esc(r.no)}</span> <span style="color:#DC2626;">· ${r.lateCount} 次 · 扣 ${nt(r.lateDed)}</span></div>
+                <div style="font-size:12px;font-weight:700;color:#0F172A;">${esc(r.name)} <span style="color:#94A3B8;font-weight:400;">${esc(r.no)}</span> <span style="color:#DC2626;">· 合計 ${r.lateMin} 分</span></div>
                 <div style="margin-top:4px;">${chips}</div></div>`;
         });
     }
@@ -268,10 +319,11 @@ function renderAuditView(rows, meta) {
     // 注意事項
     html += `<div style="margin-top:18px;background:#FFFBEB;border:1px solid #FDE68A;border-radius:12px;padding:14px;font-size:12px;color:#78350F;line-height:1.7;">
         <div style="font-weight:800;margin-bottom:4px;">核對前必看</div>
-        1. 系統只記「遲到次數」<b>不記分鐘數</b>，每次固定扣 ${nt(meta.lateDedPerTime)}（遲到判定：${thrTxt}）。<br>
-        2. 標「＊/橘色」的是下午才打卡卻被判遲到，多為漏打上班卡，<b>請逐筆確認</b>。<br>
-        3. <b>時薪員工</b>薪水＝時薪×工時，「缺勤扣薪」顯示「—」不自動扣；只有月薪制才用「應出勤−出勤−請假」自動扣。<br>
-        4. 若當月無排班資料，「應出勤」以平日數推算，工廠若上週六會偏低，請以實際工時為準。</div>`;
+        1. <b>遲到＝每筆打卡時間 − 08:00 的分鐘總和</b>，一律從 08:00 起算、不扣寬限（全員上班基準 08:00）。<br>
+        2. 標「＊/橘色」＝中午後才打卡（多為漏打上班卡），分鐘會灌成幾百分，<b>請人工剔除</b>再核對。<br>
+        3. <b>特休以天、請假以時數</b>（整天＝8hr、半天＝4hr、時假用實際時數）。App 請假多為整天登記，沒有分鐘級細節。<br>
+        4. <b>加班需員工在系統線上送單</b>核准後才有；目前查無核准加班時多顯示「-」，實際加班請對照現場紀錄。<br>
+        5. 缺勤僅<b>月薪制</b>自動計（應出勤−出勤−請假）；時薪制顯示「—」，薪水以工時計。</div>`;
 
     contentEl.innerHTML = html;
 }

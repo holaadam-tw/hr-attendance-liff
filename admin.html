@@ -1186,7 +1186,7 @@
 
                 <!-- === 📋 遲到/缺勤核對 TAB === -->
                 <div id="payTabAudit" class="payTabContent" style="display:none;">
-                    <p style="color:#6b7280;font-size:12px;margin:0 0 12px;">逐人核對每月遲到次數與缺勤，對照薪資扣款是否正確。資料即時計算。</p>
+                    <p style="color:#6b7280;font-size:12px;margin:0 0 12px;">逐人核對每月遲到分鐘、特休、請假時數、加班與缺勤。遲到＝打卡−08:00 的分鐘總和，即時計算。</p>
                     <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px;">
                         <select id="auditYear" style="flex:1;padding:10px;border:1px solid #E5E7EB;border-radius:10px;font-size:13px;font-weight:700;"></select>
                         <select id="auditMonth" style="flex:1;padding:10px;border:1px solid #E5E7EB;border-radius:10px;font-size:13px;font-weight:700;"></select>
@@ -2226,8 +2226,8 @@
     </div>
 
     <script src="common.js?v=20260704b"></script>
-    <script type="module" src="modules/index.js?v=20260707-audit"></script>
-    <script type="module" src="admin_fixes.js?v=20260707-audit"></script>
+    <script type="module" src="modules/index.js?v=20260708-audit2"></script>
+    <script type="module" src="admin_fixes.js?v=20260708-audit2"></script>
     <script>
     // ===== 公務機打卡 =====
     window.showKioskModal = function() {
