@@ -906,6 +906,7 @@
                     <button class="payTab" onclick="switchPayTab('calc',this)" style="flex:1;min-width:70px;padding:10px 6px;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;background:transparent;color:#94A3B8;font-family:inherit;">🧮 薪資試算</button>
                     <button class="payTab" onclick="switchPayTab('bonus',this)" style="flex:1;min-width:70px;padding:10px 6px;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;background:transparent;color:#94A3B8;font-family:inherit;">🎁 年終獎金</button>
                     <button class="payTab" onclick="switchPayTab('setting',this)" style="flex:1;min-width:70px;padding:10px 6px;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;background:transparent;color:#94A3B8;font-family:inherit;">⚙️ 薪資設定</button>
+                    <button class="payTab" onclick="switchPayTab('audit',this)" style="flex:1;min-width:70px;padding:10px 6px;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;background:transparent;color:#94A3B8;font-family:inherit;">📋 遲到/缺勤核對</button>
                 </div>
 
                 <!-- === 💰 月薪計算 TAB === -->
@@ -1181,6 +1182,22 @@
                         <tbody id="insTableBody"></tbody>
                     </table>
                 </div>
+                </div>
+
+                <!-- === 📋 遲到/缺勤核對 TAB === -->
+                <div id="payTabAudit" class="payTabContent" style="display:none;">
+                    <p style="color:#6b7280;font-size:12px;margin:0 0 12px;">逐人核對每月遲到次數與缺勤，對照薪資扣款是否正確。資料即時計算。</p>
+                    <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px;">
+                        <select id="auditYear" style="flex:1;padding:10px;border:1px solid #E5E7EB;border-radius:10px;font-size:13px;font-weight:700;"></select>
+                        <select id="auditMonth" style="flex:1;padding:10px;border:1px solid #E5E7EB;border-radius:10px;font-size:13px;font-weight:700;"></select>
+                        <button id="calcAuditBtn" onclick="loadAuditData()" style="padding:10px 16px;border:none;border-radius:10px;background:linear-gradient(135deg,#0EA5E9,#38BDF8);color:#fff;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap;">📋 核對</button>
+                    </div>
+                    <div id="auditLoading" style="display:none;text-align:center;padding:40px;color:#94A3B8;">
+                        <div style="font-size:32px;margin-bottom:8px;">⏳</div>
+                        <div style="font-size:14px;">正在計算遲到與缺勤...</div>
+                    </div>
+                    <div id="auditSummary" style="display:none;grid-template-columns:repeat(4,1fr);gap:12px;background:linear-gradient(135deg,#0EA5E9,#0284C7);border-radius:16px;padding:18px;color:#fff;margin-bottom:16px;"></div>
+                    <div id="auditContent"></div>
                 </div>
 
             </div>
@@ -2209,8 +2226,8 @@
     </div>
 
     <script src="common.js?v=20260704b"></script>
-    <script type="module" src="modules/index.js?v=20260704b"></script>
-    <script type="module" src="admin_fixes.js?v=20260704b"></script>
+    <script type="module" src="modules/index.js?v=20260707-audit"></script>
+    <script type="module" src="admin_fixes.js?v=20260707-audit"></script>
     <script>
     // ===== 公務機打卡 =====
     window.showKioskModal = function() {

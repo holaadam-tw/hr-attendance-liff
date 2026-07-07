@@ -62,8 +62,9 @@ import {
     saveAllPayroll, publishPayroll, exportPayrollExcel, exportPayrollCSV,
     loadInsuranceBrackets, showInsModal, closeInsModal,
     editInsBracket, saveInsBracket, deleteInsBracket, updateAllInsRates,
-    switchPayTab
-} from './payroll.js?v=20260704b';
+    switchPayTab,
+    initAuditPage, loadAuditData
+} from './payroll.js?v=20260707-audit';
 
 import {
     loadRestaurantList, openRestaurantDetail, previewStoreOrder, openKDS,
@@ -252,6 +253,8 @@ window.saveInsBracket = saveInsBracket;
 window.deleteInsBracket = deleteInsBracket;
 window.updateAllInsRates = updateAllInsRates;
 window.switchPayTab = switchPayTab;
+window.initAuditPage = initAuditPage;
+window.loadAuditData = loadAuditData;
 window.clearPayrollState = clearPayrollState;
 window.clearSchedulesState = clearSchedulesState;
 window.clearLeaveState = clearLeaveState;
