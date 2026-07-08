@@ -864,9 +864,13 @@ function buildRegisterUrl() { return 'https://liff.line.me/' + LIFF_ID + '?goto=
 function buildAttendancePublicLiffUrl() { return 'https://liff.line.me/' + LIFF_ID + '?goto=attendance_public&company=' + encodeURIComponent(companyId || ''); }
 function getCachedAttendanceProfile() {
     if (!companyId) return null;
-    const userId = sessionStorage.getItem('attendance_public_line_user_id_' + companyId);
+    // localStorage：同一裝置記住登入；相容舊的 sessionStorage（本次改版前已登入者）
+    const userId = localStorage.getItem('attendance_public_line_user_id_' + companyId)
+        || sessionStorage.getItem('attendance_public_line_user_id_' + companyId);
     if (!userId) return null;
-    return { userId, displayName: sessionStorage.getItem('attendance_public_line_name_' + companyId) || '' };
+    const displayName = localStorage.getItem('attendance_public_line_name_' + companyId)
+        || sessionStorage.getItem('attendance_public_line_name_' + companyId) || '';
+    return { userId, displayName };
 }
 function openCheckinEntry(action) { window.location.href = buildCheckinUrl(action); }
 function openRegisterEntry() { window.location.href = buildRegisterUrl(); }

@@ -789,8 +789,9 @@
                 if (_goto === 'attendance_public') {
                     const _pubCompany = _gotoParams.get('company') || '';
                     if (liffProfile && liffProfile.userId && _pubCompany) {
-                        sessionStorage.setItem('attendance_public_line_user_id_' + _pubCompany, liffProfile.userId);
-                        sessionStorage.setItem('attendance_public_line_name_' + _pubCompany, liffProfile.displayName || '');
+                        // localStorage：讓打卡總覽在同一裝置記住登入，關閉分頁後重開不必再跑一次 LINE 驗證
+                        localStorage.setItem('attendance_public_line_user_id_' + _pubCompany, liffProfile.userId);
+                        localStorage.setItem('attendance_public_line_name_' + _pubCompany, liffProfile.displayName || '');
                     }
                     window.location.href = 'attendance_public.html?company=' + encodeURIComponent(_pubCompany);
                     return;
