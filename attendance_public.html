@@ -78,6 +78,10 @@ body{font-family:'Noto Sans TC',-apple-system,sans-serif;background:var(--bg);co
 .month-nav button{background:none;border:none;font-size:20px;cursor:pointer;padding:6px 10px;border-radius:8px;}
 .month-nav span{font-size:16px;font-weight:700;min-width:120px;text-align:center;}
 
+.emp-table tr.month-row-open td{background:#EEF2FF;}
+.emp-table tr.month-row-open:hover td{background:#E0E7FF;}
+.emp-table tr.month-row-open td:first-child{box-shadow:inset 3px 0 0 #4F46E5;}
+
 .leave-cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;}
 .leave-cal-head{font-weight:800;text-align:center;font-size:11px;color:#64748B;padding:4px 0;}
 .leave-cal-day{min-height:66px;border:1px solid #EEF2F7;border-radius:8px;padding:4px;background:#fff;overflow:hidden;}
@@ -651,6 +655,7 @@ let dailyColumnOrder = DAILY_COLUMN_DEFAULT_ORDER.slice();
 let dailyColumnDragKey = null;
 let monthlyData = [];
 let monthLeaveData = [];
+let monthLateMinutes = new Map();
 let trafficReport = null;
 let mYear = new Date().getFullYear();
 let mMonth = new Date().getMonth();
@@ -767,7 +772,8 @@ function applyTranslations() {
     if (correctionLabel) correctionLabel.textContent = t('pendingMakeupCorrection');
     updateDailySortHeaders();
     const monthlyHeads = document.querySelectorAll('#monthlyView .emp-table thead th');
-    [t('employee'), t('department'), t('expectedDays'), t('actualDays'), t('late'), t('early'), t('leaveDays'), t('absentDays'), t('totalHours')].forEach((v, i) => { if (monthlyHeads[i]) monthlyHeads[i].textContent = v; });
+    const lateHead = t('late') + (monthlyLateApplies() ? '(h)' : '');
+    [t('employee'), t('department'), t('expectedDays'), t('actualDays'), lateHead, t('early'), t('leaveDays') + '(h)', t('absentDays'), t('totalHours')].forEach((v, i) => { if (monthlyHeads[i]) monthlyHeads[i].textContent = v; });
     setText('#humanView .hr-toolbar div div:first-child', t('humanTitle'));
     const humanSubtitle = document.querySelector('#humanView .hr-toolbar div div:nth-child(2)');
     if (humanSubtitle) humanSubtitle.textContent = t('humanSubtitle');
@@ -1830,7 +1836,7 @@ function getMonthRange() {
 async function loadMonthLeaveRequests() {
     const { startDate, endDate } = getMonthRange();
     return runOptionalDailyQuery(sb.from('leave_requests')
-        .select('employee_id, leave_type, leave_period, days, start_date, end_date, status, employees!leave_requests_employee_id_fkey!inner(name, company_id)')
+        .select('employee_id, leave_type, leave_period, days, leave_hours, start_date, end_date, status, employees!leave_requests_employee_id_fkey!inner(name, company_id)')
         .eq('employees.company_id', companyId)
         .in('status', ['approved', 'pending'])
         .lte('start_date', endDate)
@@ -1838,16 +1844,42 @@ async function loadMonthLeaveRequests() {
         .limit(1000));
 }
 
+// 遲到分鐘口徑與薪酬「遲到/缺勤核對」一致：大正全員 08:00 起算，不扣寬限
+const MONTHLY_LATE_BASELINE_MIN = 8 * 60;
+function monthlyLateApplies() { return companyId === DACHENG_COMPANY_ID; }
+function taipeiMinutesOfDay(iso) {
+    const hm = new Date(iso).toLocaleTimeString('en-GB', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit' });
+    return parseInt(hm.slice(0, 2), 10) * 60 + parseInt(hm.slice(3, 5), 10);
+}
+
+async function loadMonthLateAttendance() {
+    if (!monthlyLateApplies()) return { data: [] };
+    const { startDate, endDate } = getMonthRange();
+    return runOptionalDailyQuery(sb.from('attendance')
+        .select('employee_id, check_in_time, employees!inner(company_id)')
+        .eq('employees.company_id', companyId)
+        .gte('date', startDate).lte('date', endDate)
+        .not('check_in_time', 'is', null)
+        .limit(3000));
+}
+
 async function loadMonthlyData() {
     document.getElementById('monthLabel').textContent = mYear + '年' + (mMonth + 1) + '月';
-    // 政策/假日/請假為非核心查詢，與主表 RPC 並行載入，失敗不擋主表
-    const [, monthlyRes, leaveRes] = await Promise.all([
+    // 政策/假日/請假/遲到為非核心查詢，與主表 RPC 並行載入，失敗不擋主表
+    const [, monthlyRes, leaveRes, lateRes] = await Promise.all([
         loadCompanyPolicyAndHolidays(),
         sb.rpc('get_company_monthly_attendance', { p_company_id: companyId, p_year: mYear, p_month: mMonth + 1 }),
-        loadMonthLeaveRequests()
+        loadMonthLeaveRequests(),
+        loadMonthLateAttendance()
     ]);
     if (leaveRes.error) console.warn('Load month leave warning:', leaveRes.error);
     monthLeaveData = leaveRes.data || [];
+    if (lateRes.error) console.warn('Load month late warning:', lateRes.error);
+    monthLateMinutes = new Map();
+    (lateRes.data || []).forEach(a => {
+        const late = taipeiMinutesOfDay(a.check_in_time) - MONTHLY_LATE_BASELINE_MIN;
+        if (late > 0) monthLateMinutes.set(a.employee_id, (monthLateMinutes.get(a.employee_id) || 0) + late);
+    });
     renderLeaveCalendar();
     try {
         if (monthlyRes.error) throw monthlyRes.error;
@@ -1943,30 +1975,65 @@ function renderLeaveCalendar() {
     grid.innerHTML = html;
 }
 
+// 一筆請假在本月內的時數（與 payroll.js leaveHoursInMonth 同口徑）：時假=leave_hours、半天=4hr、整天=8hr×當月重疊天數
+function monthLeaveHoursOf(l) {
+    const { startDate, endDate } = getMonthRange();
+    const period = l.leave_period || 'full_day';
+    if (period === 'hourly') return Number(l.leave_hours) || 0;
+    if (period === 'am' || period === 'pm' || period === 'half_day') return 4;
+    const s = parseLocalDate(l.start_date || startDate);
+    const e = parseLocalDate(l.end_date || l.start_date || endDate);
+    const rs = parseLocalDate(startDate);
+    const re = parseLocalDate(endDate);
+    const os = s > rs ? s : rs;
+    const oe = e < re ? e : re;
+    if (oe < os) return 0;
+    return Math.max(0, Math.round((oe - os) / 86400000) + 1) * 8;
+}
+
+function buildMonthLeaveHoursMap() {
+    const map = new Map();
+    (monthLeaveData || []).filter(r => r.status === 'approved').forEach(r => {
+        map.set(r.employee_id, (map.get(r.employee_id) || 0) + monthLeaveHoursOf(r));
+    });
+    return map;
+}
+
+function fmtHourUnit(h) {
+    if (!h || h <= 0) return '0';
+    return (Math.round(h * 10) / 10) + 'h';
+}
+
+function monthLateHoursOf(empId) { return (monthLateMinutes.get(empId) || 0) / 60; }
+
 function renderMonthlyTable() {
     const tbody = document.getElementById('monthlyTableBody');
     if (monthlyData.length === 0) { tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#999;padding:40px;">' + t('noData') + '</td></tr>'; return; }
 
-    let totE=0, totA=0, totL=0, totEl=0, totLv=0, totAb=0, totH=0;
+    const leaveHoursMap = buildMonthLeaveHoursMap();
+    const lateInHours = monthlyLateApplies();
+    let totA=0, totL=0, totEl=0, totLv=0, totH=0;
     let html = '';
     monthlyData.forEach(r => {
-        totA += r.actual_days; totL += r.late_days; totEl += r.early_leave_days; totLv += r.leave_days; totH += parseFloat(r.total_work_hours) || 0;
-        html += '<tr style="cursor:pointer;" onclick="toggleMonthDetail(\'' + r.employee_id + '\')">' +
-            '<td style="font-weight:700;white-space:nowrap;">' + esc(r.employee_name) + ' <span style="font-size:10px;color:#94A3B8;">▾</span></td>' +
+        const lateVal = lateInHours ? monthLateHoursOf(r.employee_id) : r.late_days;
+        const leaveHrs = leaveHoursMap.get(r.employee_id) || 0;
+        totA += r.actual_days; totL += lateVal; totEl += r.early_leave_days; totLv += leaveHrs; totH += parseFloat(r.total_work_hours) || 0;
+        html += '<tr style="cursor:pointer;" id="mrow_' + r.employee_id + '" onclick="toggleMonthDetail(\'' + r.employee_id + '\')">' +
+            '<td style="font-weight:700;white-space:nowrap;">' + esc(r.employee_name) + ' <span id="marrow_' + r.employee_id + '" style="font-size:10px;color:#94A3B8;">▾</span></td>' +
             '<td style="color:#64748B;font-size:11px;">' + esc(r.department || '-') + '</td>' +
             '<td style="text-align:center;color:#94A3B8;">' + fmtOptionalCount(r.expected_days) + '</td>' +
             '<td style="text-align:center;color:#059669;font-weight:700;">' + r.actual_days + '</td>' +
-            '<td style="text-align:center;' + (r.late_days > 0 ? 'color:#EA580C;font-weight:700;' : '') + '">' + r.late_days + '</td>' +
+            '<td style="text-align:center;' + (lateVal > 0 ? 'color:#EA580C;font-weight:700;' : 'color:#94A3B8;') + '">' + (lateInHours ? fmtHourUnit(lateVal) : lateVal) + '</td>' +
             '<td style="text-align:center;' + (r.early_leave_days > 0 ? 'color:#DC2626;font-weight:700;' : '') + '">' + r.early_leave_days + '</td>' +
-            '<td style="text-align:center;' + (r.leave_days > 0 ? 'color:#2563EB;font-weight:700;' : '') + '">' + r.leave_days + '</td>' +
+            '<td style="text-align:center;' + (leaveHrs > 0 ? 'color:#2563EB;font-weight:700;' : 'color:#94A3B8;') + '">' + fmtHourUnit(leaveHrs) + '</td>' +
             '<td style="text-align:center;color:#94A3B8;">' + fmtOptionalCount(r.absent_days) + '</td>' +
             '<td style="text-align:right;font-weight:700;">' + fmtHours(r.total_work_hours) + '</td>' +
         '</tr><tr class="expand-row" id="detail_' + r.employee_id + '"><td colspan="9" class="expand-cell"><div id="detailContent_' + r.employee_id + '">' + t('loading') + '</div></td></tr>';
     });
     html += '<tr style="background:#F0F9FF;font-weight:800;"><td>' + t('total') + '</td><td></td>' +
         '<td style="text-align:center;color:#94A3B8;">--</td><td style="text-align:center;color:#059669;">' + totA + '</td>' +
-        '<td style="text-align:center;color:#EA580C;">' + totL + '</td><td style="text-align:center;color:#DC2626;">' + totEl + '</td>' +
-        '<td style="text-align:center;color:#2563EB;">' + totLv + '</td><td style="text-align:center;color:#94A3B8;">--</td>' +
+        '<td style="text-align:center;color:#EA580C;">' + (lateInHours ? fmtHourUnit(totL) : totL) + '</td><td style="text-align:center;color:#DC2626;">' + totEl + '</td>' +
+        '<td style="text-align:center;color:#2563EB;">' + fmtHourUnit(totLv) + '</td><td style="text-align:center;color:#94A3B8;">--</td>' +
         '<td style="text-align:right;">' + fmtHours(totH) + '</td></tr>';
     tbody.innerHTML = html;
 }
@@ -1975,8 +2042,17 @@ function renderMonthlyTable() {
 async function toggleMonthDetail(empId) {
     const row = document.getElementById('detail_' + empId);
     if (!row) return;
-    if (row.classList.contains('show')) { row.classList.remove('show'); return; }
+    const mainRow = document.getElementById('mrow_' + empId);
+    const arrow = document.getElementById('marrow_' + empId);
+    if (row.classList.contains('show')) {
+        row.classList.remove('show');
+        if (mainRow) mainRow.classList.remove('month-row-open');
+        if (arrow) arrow.textContent = '▾';
+        return;
+    }
     row.classList.add('show');
+    if (mainRow) mainRow.classList.add('month-row-open');
+    if (arrow) arrow.textContent = '▴';
     const contentEl = document.getElementById('detailContent_' + empId);
     try {
         const startDate = mYear + '-' + String(mMonth + 1).padStart(2, '0') + '-01';
@@ -2094,10 +2170,15 @@ function exportExcel() {
         XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(dailyRows), '每日摘要');
         XLSX.writeFile(wb, companyName + '_來客流量_' + getDailyDate() + '.xlsx');
     } else {
+        const leaveHoursMap = buildMonthLeaveHoursMap();
+        const lateInHours = monthlyLateApplies();
         const rows = monthlyData.map(r => ({
             '員工': r.employee_name, '部門': r.department || '',
-            '應出勤': r.expected_days ?? '', '實到': r.actual_days, '遲到': r.late_days,
-            '早退': r.early_leave_days, '請假': r.leave_days, '缺勤': r.absent_days ?? '',
+            '應出勤': r.expected_days ?? '', '實到': r.actual_days,
+            [lateInHours ? '遲到(小時)' : '遲到']: lateInHours ? Math.round(monthLateHoursOf(r.employee_id) * 10) / 10 : r.late_days,
+            '早退': r.early_leave_days,
+            '請假(小時)': Math.round((leaveHoursMap.get(r.employee_id) || 0) * 10) / 10,
+            '缺勤': r.absent_days ?? '',
             '總工時': Math.round((parseFloat(r.total_work_hours) || 0) * 10) / 10
         }));
         XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), '月度統計');
