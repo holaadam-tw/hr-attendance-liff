@@ -78,6 +78,26 @@ body{font-family:'Noto Sans TC',-apple-system,sans-serif;background:var(--bg);co
 .month-nav button{background:none;border:none;font-size:20px;cursor:pointer;padding:6px 10px;border-radius:8px;}
 .month-nav span{font-size:16px;font-weight:700;min-width:120px;text-align:center;}
 
+.leave-cal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;}
+.leave-cal-head{font-weight:800;text-align:center;font-size:11px;color:#64748B;padding:4px 0;}
+.leave-cal-day{min-height:66px;border:1px solid #EEF2F7;border-radius:8px;padding:4px;background:#fff;overflow:hidden;}
+.leave-cal-day.is-empty{border:none;background:transparent;}
+.leave-cal-day.is-weekend{background:#F8FAFC;}
+.leave-cal-day.is-holiday{background:#FFF1F2;}
+.leave-cal-day.is-today{box-shadow:inset 0 0 0 2px #4F46E5;}
+.leave-cal-daynum{font-size:11px;font-weight:800;color:#64748B;}
+.leave-cal-holiday-name{font-size:9px;color:#BE123C;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.leave-chip{display:block;margin-top:3px;padding:2px 5px;border-radius:6px;font-size:10px;font-weight:800;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-left:3px solid transparent;}
+.leave-chip.pending{opacity:.72;outline:1px dashed currentColor;outline-offset:-1px;}
+.leave-legend{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;max-width:60%;}
+.leave-legend-chip{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:999px;font-size:11px;font-weight:800;border-left:3px solid transparent;}
+@media (max-width:640px){
+  .leave-cal-grid{gap:2px;}
+  .leave-cal-day{min-height:52px;padding:2px;border-radius:5px;}
+  .leave-chip{font-size:9px;padding:1px 3px;margin-top:2px;border-left-width:2px;}
+  .leave-legend{max-width:100%;justify-content:flex-start;}
+}
+
 .expand-row{display:none;}
 .expand-row.show{display:table-row;}
 .expand-cell{padding:8px 16px !important;background:#FAFBFC;}
@@ -357,6 +377,18 @@ body{font-family:'Noto Sans TC',-apple-system,sans-serif;background:var(--bg);co
                     <button onclick="changeMonth(1)">▶</button>
                 </div>
 
+                <!-- 請假月曆 -->
+                <div class="card" id="leaveCalCard">
+                    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:10px;">
+                        <div>
+                            <div id="leaveCalTitle" style="font-size:15px;font-weight:900;color:#0F172A;">🏖️ 請假月曆</div>
+                            <div id="leaveCalSummary" style="font-size:11px;color:#94A3B8;margin-top:2px;"></div>
+                        </div>
+                        <div id="leaveCalLegend" class="leave-legend"></div>
+                    </div>
+                    <div id="leaveCalGrid" class="leave-cal-grid"></div>
+                </div>
+
                 <div class="table-wrap">
                     <table class="emp-table">
                         <thead>
@@ -618,6 +650,7 @@ const DAILY_COLUMN_DEFAULT_ORDER = ['employee', 'lunch', 'department', 'shift', 
 let dailyColumnOrder = DAILY_COLUMN_DEFAULT_ORDER.slice();
 let dailyColumnDragKey = null;
 let monthlyData = [];
+let monthLeaveData = [];
 let trafficReport = null;
 let mYear = new Date().getFullYear();
 let mMonth = new Date().getMonth();
@@ -651,7 +684,8 @@ const I18N = {
         noEmployees:'尚無員工資料', scheduleSynced:'排班已同步', unsavedSchedule:'尚未儲存：{n} 格排班已變更', saveModeOk:'工時模式已儲存', saveFail:'儲存失敗：', scheduleSaved:'排班已儲存', noScheduleChanges:'沒有排班變更', missingManager:'缺少管理者身份',
         lunchTitle:'便當統計', lunchStatus:'便當', lunchRegular:'葷食', lunchVegetarian:'素食', lunchNone:'不訂購', lunchUnset:'未選', lunchOrdered:'已訂購', lunchNotOrdered:'未訂購', lunchNoOrders:'無訂購資料',
         lunarVegetarianReminder:'素食提醒', lunarFirst:'農曆初一', lunarFifteenth:'農曆十五', lunarToday:'今天', lunarTomorrow:'明天', lunarInDays:'倒數 {n} 天', lunarReminderHint:'初一 / 十五前 3 天，請提醒需要素食的員工。', peopleUnit:'人',
-        pendingMakeup:'待審補卡', pendingMakeupCorrection:'補卡修正待審', pendingClockIn:'待審補上班', pendingClockOut:'待審補下班', pendingLeave:'待審請假', orders:'份', open:'↗', prev:'◀', next:'▶'
+        pendingMakeup:'待審補卡', pendingMakeupCorrection:'補卡修正待審', pendingClockIn:'待審補上班', pendingClockOut:'待審補下班', pendingLeave:'待審請假', orders:'份', open:'↗', prev:'◀', next:'▶',
+        leaveCalTitle:'🏖️ 請假月曆', leaveCalEmpty:'本月無請假紀錄', leaveCalHint:'每人一個顏色，直接標在請假日期上；虛線＝待審核', leaveCalCount:'本月 {n} 人請假', halfAmShort:'上', halfPmShort:'下', pendingShort:'待審核', approvedShort:'已核准', dayUnit:'天'
     },
     vi: {
         langLabel:'Ngôn ngữ', loading:'Đang tải...', loadFailed:'Tải thất bại', noData:'Không có dữ liệu', employee:'Nhân viên', department:'Bộ phận', shift:'Ca làm', checkIn:'Giờ vào', checkOut:'Giờ ra', hours:'Giờ công', status:'Trạng thái',
@@ -670,7 +704,8 @@ const I18N = {
         noEmployees:'Chưa có dữ liệu nhân viên', scheduleSynced:'Lịch đã đồng bộ', unsavedSchedule:'Chưa lưu: đã đổi {n} ô lịch', saveModeOk:'Đã lưu chế độ giờ làm', saveFail:'Lưu thất bại: ', scheduleSaved:'Đã lưu lịch', noScheduleChanges:'Không có thay đổi lịch', missingManager:'Thiếu thân phận quản lý',
         lunchTitle:'Thống kê cơm', lunchStatus:'Cơm', lunchRegular:'Mặn', lunchVegetarian:'Chay', lunchNone:'Không đặt', lunchUnset:'Chưa chọn', lunchOrdered:'Đã đặt', lunchNotOrdered:'Chưa đặt', lunchNoOrders:'Không có dữ liệu đặt cơm',
         lunarVegetarianReminder:'Nhắc món chay', lunarFirst:'Mùng 1 âm lịch', lunarFifteenth:'Rằm âm lịch', lunarToday:'Hôm nay', lunarTomorrow:'Ngày mai', lunarInDays:'Còn {n} ngày', lunarReminderHint:'Trước mùng 1 / rằm 3 ngày, nhắc nhân viên cần ăn chay.', peopleUnit:'người',
-        pendingMakeup:'Chờ duyệt bổ sung', pendingMakeupCorrection:'Chờ duyệt sửa giờ', pendingClockIn:'Chờ duyệt giờ vào', pendingClockOut:'Chờ duyệt giờ ra', pendingLeave:'Chờ duyệt nghỉ phép', orders:'phần', open:'↗', prev:'◀', next:'▶'
+        pendingMakeup:'Chờ duyệt bổ sung', pendingMakeupCorrection:'Chờ duyệt sửa giờ', pendingClockIn:'Chờ duyệt giờ vào', pendingClockOut:'Chờ duyệt giờ ra', pendingLeave:'Chờ duyệt nghỉ phép', orders:'phần', open:'↗', prev:'◀', next:'▶',
+        leaveCalTitle:'🏖️ Lịch nghỉ phép tháng', leaveCalEmpty:'Tháng này không có nghỉ phép', leaveCalHint:'Mỗi người một màu, hiện ngay trên ngày nghỉ; viền đứt = chờ duyệt', leaveCalCount:'Tháng này {n} người nghỉ', halfAmShort:'S', halfPmShort:'C', pendingShort:'chờ duyệt', approvedShort:'đã duyệt', dayUnit:'ngày'
     }
 };
 
@@ -697,7 +732,7 @@ function setLanguage(lang) {
     localStorage.setItem('attendance_public_lang', currentLang);
     applyTranslations();
     if (currentTab === 'daily') { updateDeptFilter(); renderDailyTable(); updateDailyStats(); }
-    if (currentTab === 'monthly') renderMonthlyTable();
+    if (currentTab === 'monthly') { renderMonthlyTable(); renderLeaveCalendar(); }
     if (currentTab === 'schedule') loadScheduleData();
     if (currentTab === 'human') renderHumanManagement(getHumanDates());
 }
@@ -1218,10 +1253,14 @@ function updateDeptFilter() {
 
 function applyDailyFilter() { renderDailyTable(); }
 
-function shouldHideDailyEmployee(row) {
+function isHiddenEmployeeName(name) {
     const hiddenNames = DAILY_HIDDEN_EMPLOYEES_BY_COMPANY[companyId];
     if (!hiddenNames) return false;
-    return hiddenNames.has(String(row.employee_name || '').trim());
+    return hiddenNames.has(String(name || '').trim());
+}
+
+function shouldHideDailyEmployee(row) {
+    return isHiddenEmployeeName(row.employee_name);
 }
 
 function setDailySort(key) {
@@ -1781,19 +1820,127 @@ async function loadCompanyPolicyAndHolidays() {
     }
 }
 
+function getMonthRange() {
+    const startDate = mYear + '-' + String(mMonth + 1).padStart(2, '0') + '-01';
+    const lastDay = new Date(mYear, mMonth + 1, 0).getDate();
+    const endDate = mYear + '-' + String(mMonth + 1).padStart(2, '0') + '-' + String(lastDay).padStart(2, '0');
+    return { startDate, endDate, lastDay };
+}
+
+async function loadMonthLeaveRequests() {
+    const { startDate, endDate } = getMonthRange();
+    return runOptionalDailyQuery(sb.from('leave_requests')
+        .select('employee_id, leave_type, leave_period, days, start_date, end_date, status, employees!inner(name, company_id)')
+        .eq('employees.company_id', companyId)
+        .in('status', ['approved', 'pending'])
+        .lte('start_date', endDate)
+        .gte('end_date', startDate)
+        .limit(1000));
+}
+
 async function loadMonthlyData() {
     document.getElementById('monthLabel').textContent = mYear + '年' + (mMonth + 1) + '月';
-    // 非核心查詢：失敗不擋主表
-    await loadCompanyPolicyAndHolidays();
+    // 政策/假日/請假為非核心查詢，與主表 RPC 並行載入，失敗不擋主表
+    const [, monthlyRes, leaveRes] = await Promise.all([
+        loadCompanyPolicyAndHolidays(),
+        sb.rpc('get_company_monthly_attendance', { p_company_id: companyId, p_year: mYear, p_month: mMonth + 1 }),
+        loadMonthLeaveRequests()
+    ]);
+    if (leaveRes.error) console.warn('Load month leave warning:', leaveRes.error);
+    monthLeaveData = leaveRes.data || [];
+    renderLeaveCalendar();
     try {
-        const { data, error } = await sb.rpc('get_company_monthly_attendance', { p_company_id: companyId, p_year: mYear, p_month: mMonth + 1 });
-        if (error) throw error;
-        monthlyData = data || [];
+        if (monthlyRes.error) throw monthlyRes.error;
+        monthlyData = monthlyRes.data || [];
         renderMonthlyTable();
     } catch (e) {
         console.error('Load monthly error:', e);
         document.getElementById('monthlyTableBody').innerHTML = '<tr><td colspan="9" style="text-align:center;color:#ef4444;padding:20px;">載入失敗：' + esc(e.message || '') + '</td></tr>';
     }
+}
+
+// === 請假月曆 ===
+const LEAVE_COLOR_PALETTE = [
+    ['#FEF3C7', '#92400E'], ['#DBEAFE', '#1D4ED8'], ['#DCFCE7', '#15803D'], ['#FCE7F3', '#BE185D'],
+    ['#EDE9FE', '#6D28D9'], ['#FFEDD5', '#C2410C'], ['#CCFBF1', '#0F766E'], ['#FEE2E2', '#B91C1C'],
+    ['#E0E7FF', '#4338CA'], ['#ECFCCB', '#4D7C0F'], ['#CFFAFE', '#0E7490'], ['#F5D0FE', '#A21CAF'],
+    ['#FEF9C3', '#A16207'], ['#E7E5E4', '#57534E']
+];
+
+function leaveEmployeeName(r) { return String(r?.employees?.name || '').trim(); }
+
+function leaveChipTitle(r) {
+    const name = leaveEmployeeName(r);
+    const range = r.start_date === (r.end_date || r.start_date) ? r.start_date : r.start_date + ' ~ ' + (r.end_date || r.start_date);
+    const statusLabel = r.status === 'pending' ? t('pendingShort') : t('approvedShort');
+    const daysLabel = (r.days || r.days === 0) ? ' ' + r.days + t('dayUnit') : '';
+    return name + ' ' + leaveTypeLabel(r.leave_type) + ' ' + leavePeriodLabel(r.leave_period) + daysLabel + ' ' + range + '（' + statusLabel + '）';
+}
+
+function renderLeaveCalendar() {
+    const grid = document.getElementById('leaveCalGrid');
+    if (!grid) return;
+    document.getElementById('leaveCalTitle').textContent = t('leaveCalTitle');
+
+    const { startDate, endDate, lastDay } = getMonthRange();
+    const rows = (monthLeaveData || []).filter(r => leaveEmployeeName(r) && !isHiddenEmployeeName(leaveEmployeeName(r)));
+
+    // 每位員工分配專屬顏色（依姓名排序後固定，同月內顏色一致）
+    const names = [...new Set(rows.map(leaveEmployeeName))].sort((a, b) => a.localeCompare(b, 'zh-Hant'));
+    const colorOf = new Map(names.map((n, i) => [n, LEAVE_COLOR_PALETTE[i % LEAVE_COLOR_PALETTE.length]]));
+
+    // 日期 → 請假清單（跨日假鋪滿整個區間，超出本月的部分裁掉）
+    const dayMap = {};
+    const leaveDayCount = new Map();
+    rows.forEach(r => {
+        const clipStart = r.start_date < startDate ? startDate : r.start_date;
+        const rawEnd = r.end_date || r.start_date;
+        const clipEnd = rawEnd > endDate ? endDate : rawEnd;
+        let d = parseLocalDate(clipStart);
+        const end = parseLocalDate(clipEnd);
+        while (d <= end) {
+            const ds = fmtDate(d); // YYYY-MM-DD（formatYMD 是斜線格式，勿混用）
+            (dayMap[ds] = dayMap[ds] || []).push(r);
+            const name = leaveEmployeeName(r);
+            leaveDayCount.set(name, (leaveDayCount.get(name) || 0) + 1);
+            d = addDays(d, 1);
+        }
+    });
+
+    // 圖例：員工 → 顏色（附本月請假天數）
+    document.getElementById('leaveCalLegend').innerHTML = names.map(n => {
+        const [bg, fg] = colorOf.get(n);
+        return '<span class="leave-legend-chip" style="background:' + bg + ';color:' + fg + ';border-left-color:' + fg + ';">' + esc(n) + ' · ' + (leaveDayCount.get(n) || 0) + t('dayUnit') + '</span>';
+    }).join('');
+    document.getElementById('leaveCalSummary').textContent = names.length === 0
+        ? t('leaveCalEmpty')
+        : t('leaveCalCount', { n: names.length }) + '｜' + t('leaveCalHint');
+
+    // 月曆格（週一起始，與出勤明細月曆一致）
+    const todayStr = getTaiwanDate();
+    const firstDow = new Date(mYear, mMonth, 1).getDay();
+    const leadingEmpty = (firstDow + 6) % 7;
+    let html = t('calendarHeaders').map(n => '<div class="leave-cal-head">' + n + '</div>').join('');
+    for (let i = 0; i < leadingEmpty; i++) html += '<div class="leave-cal-day is-empty"></div>';
+    for (let day = 1; day <= lastDay; day++) {
+        const ds = mYear + '-' + String(mMonth + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+        const dow = new Date(ds + 'T00:00:00+08:00').getDay();
+        const holidayName = monthHolidayMap[ds];
+        const cls = ['leave-cal-day'];
+        if (dow === 0 || dow === 6) cls.push('is-weekend');
+        if (holidayName) cls.push('is-holiday');
+        if (ds === todayStr) cls.push('is-today');
+        html += '<div class="' + cls.join(' ') + '"><div class="leave-cal-daynum">' + day + '</div>' +
+            (holidayName ? '<div class="leave-cal-holiday-name">' + esc(holidayName) + '</div>' : '');
+        (dayMap[ds] || []).sort((a, b) => leaveEmployeeName(a).localeCompare(leaveEmployeeName(b), 'zh-Hant')).forEach(r => {
+            const name = leaveEmployeeName(r);
+            const [bg, fg] = colorOf.get(name);
+            const period = r.leave_period === 'am' ? '·' + t('halfAmShort') : (r.leave_period === 'pm' ? '·' + t('halfPmShort') : '');
+            html += '<span class="leave-chip' + (r.status === 'pending' ? ' pending' : '') + '" style="background:' + bg + ';color:' + fg + ';border-left-color:' + fg + ';" title="' + esc(leaveChipTitle(r)) + '">' + esc(name) + period + '</span>';
+        });
+        html += '</div>';
+    }
+    grid.innerHTML = html;
 }
 
 function renderMonthlyTable() {
@@ -1805,7 +1952,7 @@ function renderMonthlyTable() {
     monthlyData.forEach(r => {
         totA += r.actual_days; totL += r.late_days; totEl += r.early_leave_days; totLv += r.leave_days; totH += parseFloat(r.total_work_hours) || 0;
         html += '<tr style="cursor:pointer;" onclick="toggleMonthDetail(\'' + r.employee_id + '\')">' +
-            '<td style="font-weight:700;white-space:nowrap;">' + esc(r.employee_name) + ' <span style="font-size:10px;color:#94A3B8;">?</span></td>' +
+            '<td style="font-weight:700;white-space:nowrap;">' + esc(r.employee_name) + ' <span style="font-size:10px;color:#94A3B8;">▾</span></td>' +
             '<td style="color:#64748B;font-size:11px;">' + esc(r.department || '-') + '</td>' +
             '<td style="text-align:center;color:#94A3B8;">' + fmtOptionalCount(r.expected_days) + '</td>' +
             '<td style="text-align:center;color:#059669;font-weight:700;">' + r.actual_days + '</td>' +
@@ -1954,6 +2101,12 @@ function exportExcel() {
             '總工時': Math.round((parseFloat(r.total_work_hours) || 0) * 10) / 10
         }));
         XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), '月度統計');
+        const leaveRows = (monthLeaveData || []).filter(r => leaveEmployeeName(r) && !isHiddenEmployeeName(leaveEmployeeName(r))).map(r => ({
+            '員工': leaveEmployeeName(r), '假別': leaveTypeLabel(r.leave_type), '期間': leavePeriodLabel(r.leave_period),
+            '開始': r.start_date, '結束': r.end_date || r.start_date, '天數': r.days ?? '',
+            '狀態': r.status === 'pending' ? '待審核' : '已核准'
+        }));
+        if (leaveRows.length > 0) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(leaveRows), '請假明細');
         XLSX.writeFile(wb, companyName + '_打卡統計_' + mYear + '年' + (mMonth + 1) + '月.xlsx');
     }
     showToast('✅ 已匯出 Excel');
@@ -2507,6 +2660,12 @@ async function saveHumanSchedule() { if (!canSaveHumanSchedule()) return showToa
 
 // === end ===
 window.addEventListener('beforeunload', stopAutoRefresh);
+// 分頁切到背景時暫停 30 秒自動刷新，回前景立即刷新一次（省流量與查詢）
+document.addEventListener('visibilitychange', () => {
+    if (document.hidden) { stopAutoRefresh(); return; }
+    const mainView = document.getElementById('mainView');
+    if (currentTab === 'daily' && mainView && mainView.style.display !== 'none') { loadDailyData(); startAutoRefresh(); }
+});
 init();
 </script>
 </body>

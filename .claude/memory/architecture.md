@@ -136,3 +136,4 @@ async function saveSetting(key, value, description) {
 - 2026-04-05: 036_fix_overnight_checkout.sql — 跨日打卡修正：RPC 查 2 天內未下班記錄（今天→昨天）；跨日下班不判定早退；前端 _pendingCheckout 顯示下班按鈕+🌙提示；checkin.html 用 rpcData.type 判斷顯示
 - 2026-04-05: index.html 打卡狀態返回刷新：加 visibilitychange + pageshow 事件自動重查 checkTodayAttendance + loadTodayStatus
 
+- 2026-07-12: attendance_public.html 月度分頁新增「請假月曆」：leave_requests 以 employees!inner(company_id) 關聯隔離查整月（approved+pending），每位員工固定專屬色（14 色盤，姓名排序取色）名字直接標在日期格；半天假標「·上/·下」、待審虛線、假日/週末/今日底色；月度 Excel 匯出加「請假明細」sheet。注意：formatYMD() 回傳斜線格式（農曆用），日期 key 一律用 fmtDate()（dash）。另：月度三查詢改 Promise.all 並行、visibilitychange 背景暫停 30s 自動刷新。
