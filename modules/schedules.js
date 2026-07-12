@@ -74,7 +74,7 @@ export async function loadShiftMgr() {
 
         const { data: emps } = await sb.from('employees').select('id, name, department, shift_mode').eq('company_id', window.currentCompanyId).eq('is_active', true).eq('shift_mode', 'scheduled').order('name');
         smEmployees = emps || [];
-        const { data: scheds } = await sb.from('schedules').select('employee_id, date, shift_type_id, shift_types(name, code), employees!inner(company_id)')
+        const { data: scheds } = await sb.from('schedules').select('employee_id, date, shift_type_id, shift_types(name, code), employees!schedules_employee_id_fkey!inner(company_id)')
             .eq('employees.company_id', window.currentCompanyId)
             .gte('date', startStr).lte('date', endStr);
         smScheduleData = {};
@@ -82,7 +82,7 @@ export async function loadShiftMgr() {
             const code = s.shift_types?.code || s.shift_types?.name || 'morning';
             smScheduleData[`${s.employee_id}_${s.date}`] = code;
         });
-        const { data: lvs } = await sb.from('leave_requests').select('employee_id, start_date, end_date, status, employees!inner(company_id)')
+        const { data: lvs } = await sb.from('leave_requests').select('employee_id, start_date, end_date, status, employees!leave_requests_employee_id_fkey!inner(company_id)')
             .eq('employees.company_id', window.currentCompanyId)
             .in('status', ['approved']).or(`and(start_date.lte.${endStr},end_date.gte.${startStr})`);
         smLeaveData = {};
@@ -264,7 +264,7 @@ export async function copyLastWeek() {
     try {
         const lwStart = new Date(dates[0]); lwStart.setDate(lwStart.getDate() - 7);
         const lwEnd = new Date(dates[6]); lwEnd.setDate(lwEnd.getDate() - 7);
-        const { data: lastScheds } = await sb.from('schedules').select('employee_id, date, shift_type_id, shift_types(code, name), employees!inner(company_id)')
+        const { data: lastScheds } = await sb.from('schedules').select('employee_id, date, shift_type_id, shift_types(code, name), employees!schedules_employee_id_fkey!inner(company_id)')
             .eq('employees.company_id', window.currentCompanyId)
             .gte('date', fmtDate(lwStart)).lte('date', fmtDate(lwEnd));
         let copied = 0;

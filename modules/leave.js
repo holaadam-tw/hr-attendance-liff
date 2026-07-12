@@ -358,7 +358,7 @@ export async function loadStaffOverview() {
             return;
         }
         const todayStr = getTaiwanDate();
-        const { data: todayLeaves } = await sb.from('leave_requests').select('id, employees!inner(company_id)')
+        const { data: todayLeaves } = await sb.from('leave_requests').select('id, employees!leave_requests_employee_id_fkey!inner(company_id)')
             .eq('employees.company_id', window.currentCompanyId)
             .in('status', ['approved', 'pending'])
             .lte('start_date', todayStr).gte('end_date', todayStr);
@@ -407,7 +407,7 @@ export async function loadLeaveCal() {
     try {
         const { data: emps } = await sb.from('employees').select('id, name, department').eq('company_id', window.currentCompanyId).eq('is_active', true).order('department').order('name');
         employees = emps || [];
-        const { data: lvs } = await sb.from('leave_requests').select('employee_id, start_date, end_date, days, leave_type, leave_period, status, employees!inner(company_id)')
+        const { data: lvs } = await sb.from('leave_requests').select('employee_id, start_date, end_date, days, leave_type, leave_period, status, employees!leave_requests_employee_id_fkey!inner(company_id)')
             .eq('employees.company_id', window.currentCompanyId)
             .in('status', ['approved', 'pending']).or(`and(start_date.lte.${me},end_date.gte.${ms})`);
         leaves = lvs || [];

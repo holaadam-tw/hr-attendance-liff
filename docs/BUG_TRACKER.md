@@ -256,3 +256,8 @@
 ## 2026-07-02 Fix Notes
 
 - **B45**: `attendance_public.html` daily overview showed GPS review punches as not checked because it only loaded legacy `get_pending_makeup_requests`. Fixed by reading `get_makeup_review_requests` first, falling back to the legacy RPC, and normalizing `check_in/check_out` to `clock_in/clock_out` for display and stats.
+
+## 2026-07-12 Fix Notes
+
+- **B46**（已修復）：正式庫的 leave_requests / overtime_requests（approver_id）與 schedules（created_by）各有第二條指向 employees 的外鍵，導致所有 `employees!inner(...)` 內嵌查詢回 PGRST201「關聯不明確」錯誤；因各處都是解構 `{ data }` 或 catch 吞錯，全部**靜默失效**（回空陣列）。受災範圍：請假月曆/今日請假標記（attendance_public.html）、同時請假上限檢查（common.js，上限從未生效）、薪資計算的請假時數/加班時數/排班應出勤（payroll.js ×5）、審計報表請假/加班匯出（audit.js）、排班管理請假顯示與上週複製（schedules.js）。修法：16 處查詢全部指定 FK 名稱（`employees!<table>_employee_id_fkey!inner`），已逐表用 anon key 對正式庫實測回傳正常。單 FK 表（attendance/lunch_orders/field_work_logs/sales_activities）不受影響，維持原寫法。
+- **B47**（已知未修）：annual_bonus 表在正式庫沒有到 employees 的外鍵，audit.js 年終獎金匯出的內嵌查詢回 PGRST200 靜默失效；表目前為空、功能未使用。待啟用年終功能時補 migration 加 FK 再改查詢。

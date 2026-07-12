@@ -963,7 +963,7 @@ async function checkLeaveAvailability(startDate, endDate) {
 
         // 2. 查詢日期範圍內所有已核准/待審假單（排除自己）
         const { data: leaves } = await sb.from('leave_requests')
-            .select('employee_id, start_date, end_date, status, employees!inner(name, company_id)')
+            .select('employee_id, start_date, end_date, status, employees!leave_requests_employee_id_fkey!inner(name, company_id)')
             .eq('employees.company_id', window.currentCompanyId)
             .neq('employee_id', currentEmployee.id)
             .in('status', ['approved', 'pending'])

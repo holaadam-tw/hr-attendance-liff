@@ -137,3 +137,4 @@ async function saveSetting(key, value, description) {
 - 2026-04-05: index.html 打卡狀態返回刷新：加 visibilitychange + pageshow 事件自動重查 checkTodayAttendance + loadTodayStatus
 
 - 2026-07-12: attendance_public.html 月度分頁新增「請假月曆」：leave_requests 以 employees!inner(company_id) 關聯隔離查整月（approved+pending），每位員工固定專屬色（14 色盤，姓名排序取色）名字直接標在日期格；半天假標「·上/·下」、待審虛線、假日/週末/今日底色；月度 Excel 匯出加「請假明細」sheet。注意：formatYMD() 回傳斜線格式（農曆用），日期 key 一律用 fmtDate()（dash）。另：月度三查詢改 Promise.all 並行、visibilitychange 背景暫停 30s 自動刷新。
+- 2026-07-12: B46 系統性修復 — leave_requests/overtime_requests/schedules 對 employees 有雙外鍵（approver_id/created_by），`employees!inner` 內嵌一律 PGRST201 靜默失效；16 處改指定 `employees!<table>_employee_id_fkey!inner`。鐵則：對這三張表做 PostgREST 內嵌必須指定 FK 名稱；新表若加 approver/reviewer 欄位也會觸發同問題。annual_bonus 無 FK（B47 待補 migration）。JS 快取版本升 20260712-leavefk。

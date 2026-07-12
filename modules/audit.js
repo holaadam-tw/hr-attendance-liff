@@ -41,7 +41,7 @@ export async function exportReport(type) {
             (data || []).forEach(r => rows.push([r.date, r.employees?.employee_number, r.employees?.name, r.employees?.department, r.check_in_time ? new Date(r.check_in_time).toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', hour12: false }) : '', r.check_out_time ? new Date(r.check_out_time).toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', hour12: false }) : '', r.status, r.late_minutes || 0, r.is_manual ? '是' : '', r.notes || '']));
             fn = `出勤報表_${ms}.csv`;
         } else if (type === 'leave') {
-            const { data } = await sb.from('leave_requests').select('*, employees!inner(name, employee_number, department, company_id)').eq('employees.company_id', window.currentCompanyId).order('created_at', { ascending: false }).limit(200);
+            const { data } = await sb.from('leave_requests').select('*, employees!leave_requests_employee_id_fkey!inner(name, employee_number, department, company_id)').eq('employees.company_id', window.currentCompanyId).order('created_at', { ascending: false }).limit(200);
             const tm = { annual: '特休', sick: '病假', personal: '事假', compensatory: '補休' };
             const periodLabel = (r) => {
                 if (r.leave_period === 'hourly') return `${r.leave_hours || 0} 小時`;
@@ -52,7 +52,7 @@ export async function exportReport(type) {
             (data || []).forEach(r => rows.push([r.employees?.employee_number, r.employees?.name, r.employees?.department, tm[r.leave_type] || r.leave_type, periodLabel(r), r.start_date, r.end_date, r.days || 1, r.reason || '', r.status, r.rejection_reason || '']));
             fn = `請假報表_${ms}.csv`;
         } else if (type === 'overtime') {
-            const { data } = await sb.from('overtime_requests').select('*, employees!inner(name, employee_number, department, company_id)').eq('employees.company_id', window.currentCompanyId).order('ot_date', { ascending: false }).limit(200);
+            const { data } = await sb.from('overtime_requests').select('*, employees!overtime_requests_employee_id_fkey!inner(name, employee_number, department, company_id)').eq('employees.company_id', window.currentCompanyId).order('ot_date', { ascending: false }).limit(200);
             rows.push(['工號', '姓名', '部門', '日期', '申請h', '核准h', '實際h', '計薪h', '補償', '狀態']);
             (data || []).forEach(r => rows.push([r.employees?.employee_number, r.employees?.name, r.employees?.department, r.ot_date, r.planned_hours, r.approved_hours || '', r.actual_hours || '', r.final_hours || '', r.compensation_type === 'pay' ? '加班費' : '補休', r.status]));
             fn = `加班報表_${ms}.csv`;

@@ -1203,7 +1203,7 @@ async function loadDailyData() {
             sb.rpc('get_company_daily_attendance', { p_company_id: companyId, p_date: dateStr }),
             loadDailyPendingMakeupRequests(),
             runOptionalDailyQuery(sb.from('leave_requests')
-                .select('employee_id, leave_type, leave_period, days, start_date, end_date, status, employees!inner(company_id)')
+                .select('employee_id, leave_type, leave_period, days, start_date, end_date, status, employees!leave_requests_employee_id_fkey!inner(company_id)')
                 .eq('employees.company_id', companyId)
                 .in('status', ['approved', 'pending'])
                 .lte('start_date', dateStr)
@@ -1830,7 +1830,7 @@ function getMonthRange() {
 async function loadMonthLeaveRequests() {
     const { startDate, endDate } = getMonthRange();
     return runOptionalDailyQuery(sb.from('leave_requests')
-        .select('employee_id, leave_type, leave_period, days, start_date, end_date, status, employees!inner(name, company_id)')
+        .select('employee_id, leave_type, leave_period, days, start_date, end_date, status, employees!leave_requests_employee_id_fkey!inner(name, company_id)')
         .eq('employees.company_id', companyId)
         .in('status', ['approved', 'pending'])
         .lte('start_date', endDate)
