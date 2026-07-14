@@ -319,6 +319,18 @@ body{font-family:'Noto Sans TC',-apple-system,sans-serif;background:var(--bg);co
                     <div class="stat-card" style="background:#F5F3FF;"><div class="stat-num" style="color:#6D28D9;" id="dPendingMakeupCorrection">0</div><div class="stat-label" style="color:#6D28D9;">補卡修正待審</div></div>
                 </div>
 
+                <!-- 缺卡追蹤（下班未打卡） -->
+                <div id="anomalyCard" style="display:none;margin-bottom:16px;">
+                    <div style="padding:14px 18px;background:#FFF7ED;border:2px solid #FDBA74;border-radius:14px;">
+                        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                            <span style="font-size:20px;">⏰</span>
+                            <span id="anomalyTitle" style="font-weight:700;font-size:14px;color:#9A3412;">缺卡追蹤</span>
+                            <span id="anomalyPendingBadge" style="font-size:12px;font-weight:800;color:#C2410C;background:#FFEDD5;border-radius:999px;padding:4px 8px;"></span>
+                        </div>
+                        <div id="anomalyList" style="margin-top:10px;"></div>
+                    </div>
+                </div>
+
                 <!-- 便當訂購統計 -->
                 <div id="lunchStatCard" style="display:none;margin-bottom:16px;cursor:pointer;" onclick="toggleLunchDetail()">
                     <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;background:#FFFBEB;border:2px solid #FCD34D;border-radius:14px;">
@@ -688,7 +700,13 @@ const I18N = {
         humanTitle:'👥 人力管理', humanSubtitle:'電腦版排班工作台。員工模式可直接儲存；排班格子點擊後再按儲存排班。', saveSchedule:'💾 儲存排班', thisWeek:'本週', shiftMaintain:'班別新增 / 編輯', shiftName:'班別名稱', startTime:'開始', endTime:'結束', shiftCode:'代碼（可選）', overnight:'跨日班', currentShifts:'目前班別', noShifts:'尚無班別，請先新增或按「建立預設」。',
         noEmployees:'尚無員工資料', scheduleSynced:'排班已同步', unsavedSchedule:'尚未儲存：{n} 格排班已變更', saveModeOk:'工時模式已儲存', saveFail:'儲存失敗：', scheduleSaved:'排班已儲存', noScheduleChanges:'沒有排班變更', missingManager:'缺少管理者身份',
         lunchTitle:'便當統計', lunchStatus:'便當', lunchRegular:'葷食', lunchVegetarian:'素食', lunchNone:'不訂購', lunchUnset:'未選', lunchOrdered:'已訂購', lunchNotOrdered:'未訂購', lunchNoOrders:'無訂購資料',
-        lunarVegetarianReminder:'素食提醒', lunarFirst:'農曆初一', lunarFifteenth:'農曆十五', lunarToday:'今天', lunarTomorrow:'明天', lunarInDays:'倒數 {n} 天', lunarReminderHint:'初一 / 十五前 3 天，請提醒需要素食的員工。', peopleUnit:'人',
+        lunarVegetarianReminder:'素食提醒', lunarFirst:'農曆初一', lunarFifteenth:'農曆十五', lunarToday:'今天', lunarTomorrow:'明天', lunarInDays:'倒數 {n} 天', peopleUnit:'人',
+        lunarLineToday:'今天（{date}，{weekday}）是{label}', lunarLineTomorrow:'明天（{date}，{weekday}）是{label}', lunarLineUpcoming:'{n} 天後（{date}，{weekday}）是{label}',
+        lunarHintToday:'今日訂便當請確認：吃素的員工要改訂素食便當。', lunarHintUpcoming:'請提前提醒吃素的員工，當天記得改訂素食便當。',
+        anomalyTitle:'⏰ 缺卡追蹤', anomalyPending:'待處理 {n} 筆', anomalyNoPending:'目前沒有待處理的缺卡', anomalyMissingCheckout:'下班未打卡', anomalyDaysOut:'第 {n} 天', anomalyNotified:'已提醒 {n} 次', anomalyNotNotified:'尚未通知',
+        anomalyAwaitEmployee:'待員工處理', anomalyMakeupPending:'補卡待審', anomalyLeavePending:'請假待審',
+        anomalyResolve:'結案', anomalyResolveConfirm:'確定手動結案？只會從追蹤清單移除，不會寫入出勤記錄。', anomalyResolveOk:'✅ 已結案', anomalyResolveFail:'結案失敗：',
+        anomalyResolvedRecent:'近 7 天已結案', anomalyResolutionMakeup:'補卡結案', anomalyResolutionLeave:'請假結案', anomalyResolutionManual:'手動結案',
         pendingMakeup:'待審補卡', pendingMakeupCorrection:'補卡修正待審', pendingClockIn:'待審補上班', pendingClockOut:'待審補下班', pendingLeave:'待審請假', orders:'份', open:'↗', prev:'◀', next:'▶',
         leaveCalTitle:'🏖️ 請假月曆', leaveCalEmpty:'本月無請假紀錄', leaveCalHint:'每人一個顏色，直接標在請假日期上；虛線＝待審核', leaveCalCount:'本月 {n} 人請假', halfAmShort:'上', halfPmShort:'下', pendingShort:'待審核', approvedShort:'已核准', dayUnit:'天'
     },
@@ -708,7 +726,13 @@ const I18N = {
         humanTitle:'👥 Quản lý nhân sự', humanSubtitle:'Bảng xếp ca bản máy tính. Có thể lưu chế độ giờ làm; bấm ô lịch rồi bấm lưu lịch.', saveSchedule:'💾 Lưu lịch', thisWeek:'Tuần này', shiftMaintain:'Thêm / sửa ca', shiftName:'Tên ca', startTime:'Bắt đầu', endTime:'Kết thúc', shiftCode:'Mã ca (tùy chọn)', overnight:'Ca qua ngày', currentShifts:'Ca hiện có', noShifts:'Chưa có ca. Hãy thêm ca hoặc bấm tạo ca mặc định.',
         noEmployees:'Chưa có dữ liệu nhân viên', scheduleSynced:'Lịch đã đồng bộ', unsavedSchedule:'Chưa lưu: đã đổi {n} ô lịch', saveModeOk:'Đã lưu chế độ giờ làm', saveFail:'Lưu thất bại: ', scheduleSaved:'Đã lưu lịch', noScheduleChanges:'Không có thay đổi lịch', missingManager:'Thiếu thân phận quản lý',
         lunchTitle:'Thống kê cơm', lunchStatus:'Cơm', lunchRegular:'Mặn', lunchVegetarian:'Chay', lunchNone:'Không đặt', lunchUnset:'Chưa chọn', lunchOrdered:'Đã đặt', lunchNotOrdered:'Chưa đặt', lunchNoOrders:'Không có dữ liệu đặt cơm',
-        lunarVegetarianReminder:'Nhắc món chay', lunarFirst:'Mùng 1 âm lịch', lunarFifteenth:'Rằm âm lịch', lunarToday:'Hôm nay', lunarTomorrow:'Ngày mai', lunarInDays:'Còn {n} ngày', lunarReminderHint:'Trước mùng 1 / rằm 3 ngày, nhắc nhân viên cần ăn chay.', peopleUnit:'người',
+        lunarVegetarianReminder:'Nhắc món chay', lunarFirst:'Mùng 1 âm lịch', lunarFifteenth:'Rằm âm lịch', lunarToday:'Hôm nay', lunarTomorrow:'Ngày mai', lunarInDays:'Còn {n} ngày', peopleUnit:'người',
+        lunarLineToday:'Hôm nay ({date}, {weekday}) là {label}', lunarLineTomorrow:'Ngày mai ({date}, {weekday}) là {label}', lunarLineUpcoming:'Còn {n} ngày ({date}, {weekday}) là {label}',
+        lunarHintToday:'Hôm nay đặt cơm hãy kiểm tra: nhân viên ăn chay phải đổi sang cơm chay.', lunarHintUpcoming:'Hãy nhắc trước nhân viên ăn chay, đến ngày đó nhớ đổi sang cơm chay.',
+        anomalyTitle:'⏰ Theo dõi thiếu chấm công', anomalyPending:'Chưa xử lý {n}', anomalyNoPending:'Hiện không có thiếu chấm công chờ xử lý', anomalyMissingCheckout:'Chưa chấm công ra', anomalyDaysOut:'Ngày thứ {n}', anomalyNotified:'Đã nhắc {n} lần', anomalyNotNotified:'Chưa thông báo',
+        anomalyAwaitEmployee:'Chờ nhân viên xử lý', anomalyMakeupPending:'Chờ duyệt bổ sung', anomalyLeavePending:'Chờ duyệt nghỉ phép',
+        anomalyResolve:'Đóng', anomalyResolveConfirm:'Xác nhận đóng thủ công? Chỉ xóa khỏi danh sách theo dõi, không ghi vào chấm công.', anomalyResolveOk:'✅ Đã đóng', anomalyResolveFail:'Đóng thất bại: ',
+        anomalyResolvedRecent:'Đã đóng trong 7 ngày qua', anomalyResolutionMakeup:'Đóng do bổ sung giờ', anomalyResolutionLeave:'Đóng do nghỉ phép', anomalyResolutionManual:'Đóng thủ công',
         pendingMakeup:'Chờ duyệt bổ sung', pendingMakeupCorrection:'Chờ duyệt sửa giờ', pendingClockIn:'Chờ duyệt giờ vào', pendingClockOut:'Chờ duyệt giờ ra', pendingLeave:'Chờ duyệt nghỉ phép', orders:'phần', open:'↗', prev:'◀', next:'▶',
         leaveCalTitle:'🏖️ Lịch nghỉ phép tháng', leaveCalEmpty:'Tháng này không có nghỉ phép', leaveCalHint:'Mỗi người một màu, hiện ngay trên ngày nghỉ; viền đứt = chờ duyệt', leaveCalCount:'Tháng này {n} người nghỉ', halfAmShort:'S', halfPmShort:'C', pendingShort:'chờ duyệt', approvedShort:'đã duyệt', dayUnit:'ngày'
     }
@@ -736,7 +760,7 @@ function setLanguage(lang) {
     currentLang = lang === 'vi' ? 'vi' : 'zh';
     localStorage.setItem('attendance_public_lang', currentLang);
     applyTranslations();
-    if (currentTab === 'daily') { updateDeptFilter(); renderDailyTable(); updateDailyStats(); }
+    if (currentTab === 'daily') { updateDeptFilter(); renderDailyTable(); updateDailyStats(); renderAnomalyCard(); }
     if (currentTab === 'monthly') { renderMonthlyTable(); renderLeaveCalendar(); }
     if (currentTab === 'schedule') loadScheduleData();
     if (currentTab === 'human') renderHumanManagement(getHumanDates());
@@ -1197,6 +1221,101 @@ async function loadDailyPendingMakeupRequests() {
     return legacyRes.error ? reviewRes : legacyRes;
 }
 
+// === 缺卡追蹤（下班未打卡，僅大正科技 + 管理員模式） ===
+let anomalyData = [];
+
+function canViewAnomalies() {
+    return companyId === DACHENG_COMPANY_ID && isManagerRole(currentUserRole) && !viewingAsEmployee;
+}
+
+async function loadAnomalyData() {
+    const card = document.getElementById('anomalyCard');
+    if (!card) return;
+    if (!canViewAnomalies()) { card.style.display = 'none'; return; }
+    const res = await runOptionalDailyQuery(sb.rpc('get_attendance_anomalies', {
+        p_company_id: companyId,
+        p_line_user_id: currentLineUserId
+    }));
+    if (res.error) {
+        console.warn('Load anomalies warning:', res.error);
+        card.style.display = 'none';
+        return;
+    }
+    anomalyData = (res.data || []).filter(r => !isHiddenEmployeeName(r.employee_name));
+    renderAnomalyCard();
+}
+
+function anomalyActionChip(r) {
+    if (r.pending_action === 'makeup_pending') {
+        return '<span style="font-size:11px;font-weight:800;color:#6D28D9;background:#F5F3FF;border-radius:999px;padding:3px 8px;">' + esc(t('anomalyMakeupPending')) + '</span>';
+    }
+    if (r.pending_action === 'leave_pending') {
+        return '<span style="font-size:11px;font-weight:800;color:#0369A1;background:#E0F2FE;border-radius:999px;padding:3px 8px;">' + esc(t('anomalyLeavePending')) + '</span>';
+    }
+    return '<span style="font-size:11px;font-weight:800;color:#B91C1C;background:#FEE2E2;border-radius:999px;padding:3px 8px;">' + esc(t('anomalyAwaitEmployee')) + '</span>';
+}
+
+function anomalyResolutionLabel(resolution) {
+    if (resolution === 'makeup') return t('anomalyResolutionMakeup');
+    if (resolution === 'leave') return t('anomalyResolutionLeave');
+    return t('anomalyResolutionManual');
+}
+
+function renderAnomalyCard() {
+    const card = document.getElementById('anomalyCard');
+    if (!card) return;
+    if (!canViewAnomalies() || anomalyData.length === 0) { card.style.display = 'none'; return; }
+    const pending = anomalyData.filter(r => r.status === 'pending');
+    const resolved = anomalyData.filter(r => r.status === 'resolved');
+    document.getElementById('anomalyTitle').textContent = t('anomalyTitle');
+    document.getElementById('anomalyPendingBadge').textContent = t('anomalyPending', { n: pending.length });
+
+    let html = '';
+    if (pending.length === 0) {
+        html += '<div style="font-size:12px;color:#92400E;">' + esc(t('anomalyNoPending')) + '</div>';
+    }
+    pending.forEach(r => {
+        const notifyText = r.notify_count > 0 ? t('anomalyNotified', { n: r.notify_count }) : t('anomalyNotNotified');
+        html += '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:8px 0;border-top:1px dashed #FED7AA;">'
+            + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
+            + '<span style="font-size:13px;font-weight:800;color:#9A3412;">' + esc((r.date || '').slice(5).replace('-', '/')) + '</span>'
+            + '<span style="font-size:13px;font-weight:700;color:#0F172A;">' + esc(r.employee_name) + (r.employee_number ? '（' + esc(r.employee_number) + '）' : '') + '</span>'
+            + '<span style="font-size:11px;color:#B45309;">' + esc(t('anomalyMissingCheckout')) + ' · ' + esc(t('anomalyDaysOut', { n: r.days_outstanding })) + ' · ' + esc(notifyText) + '</span>'
+            + anomalyActionChip(r)
+            + '</div>'
+            + '<button onclick="resolveAnomaly(\'' + esc(r.id) + '\')" style="border:1px solid #FDBA74;background:#fff;color:#C2410C;font-size:12px;font-weight:700;border-radius:8px;padding:4px 10px;cursor:pointer;">' + esc(t('anomalyResolve')) + '</button>'
+            + '</div>';
+    });
+    if (resolved.length > 0) {
+        html += '<div style="margin-top:8px;padding-top:8px;border-top:1px solid #FED7AA;font-size:11px;color:#A16207;">'
+            + '<div style="font-weight:800;margin-bottom:4px;">' + esc(t('anomalyResolvedRecent')) + '</div>'
+            + resolved.map(r => esc((r.date || '').slice(5).replace('-', '/')) + ' ' + esc(r.employee_name) + ' → ' + esc(anomalyResolutionLabel(r.resolution))).join('<br>')
+            + '</div>';
+    }
+    document.getElementById('anomalyList').innerHTML = html;
+    card.style.display = 'block';
+}
+
+async function resolveAnomaly(id) {
+    if (!confirm(t('anomalyResolveConfirm'))) return;
+    try {
+        const { data, error } = await sb.rpc('resolve_attendance_anomaly', {
+            p_anomaly_id: id,
+            p_company_id: companyId,
+            p_line_user_id: currentLineUserId
+        });
+        if (error || !data || !data.success) {
+            showToast(t('anomalyResolveFail') + ((data && data.error) || (error && error.message) || ''));
+            return;
+        }
+        showToast(t('anomalyResolveOk'));
+        loadAnomalyData();
+    } catch (e) {
+        console.error('Resolve anomaly error:', e);
+        showToast(t('anomalyResolveFail') + (e.message || ''));
+    }
+}
+
 async function loadDailyData() {
     const dateStr = getDailyDate();
     const dayNames = t('weekdays');
@@ -1228,6 +1347,7 @@ async function loadDailyData() {
         renderDailyTable();
         document.getElementById('lastRefresh').textContent = t('lastUpdated') + new Date().toLocaleTimeString(currentLang === 'vi' ? 'vi-VN' : 'zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
         loadLunchStats(dateStr);
+        loadAnomalyData();
     } catch (e) {
         console.error('Load daily error:', e);
         document.getElementById('dailyTableBody').innerHTML = '<tr><td colspan="8" style="text-align:center;color:#ef4444;padding:20px;">載入失敗：' + esc(e.message || '') + '</td></tr>';
@@ -2357,11 +2477,10 @@ function getUpcomingVegetarianReminder(dateStr) {
         const date = addDays(base, offset);
         const day = getChineseLunarDay(date);
         if (day === 1 || day === 15) {
-            const countdown = offset === 0 ? t('lunarToday') : offset === 1 ? t('lunarTomorrow') : t('lunarInDays', { n: offset });
             items.push({
                 date,
-                label: day === 1 ? t('lunarFirst') : t('lunarFifteenth'),
-                countdown
+                offset,
+                label: day === 1 ? t('lunarFirst') : t('lunarFifteenth')
             });
         }
     }
@@ -2377,8 +2496,17 @@ function renderLunarVegetarianReminder(dateStr) {
         el.innerHTML = '';
         return '';
     }
-    const lines = reminders.map(item => `${formatYMD(item.date)} ${item.label}（${item.countdown}）`);
-    const html = `🌱 ${esc(t('lunarVegetarianReminder'))}：${esc(lines.join('、'))}<br><span style="font-weight:700;color:#15803D;">${esc(t('lunarReminderHint'))}</span>`;
+    // 初一與十五相隔約 14 天，3 天窗口內最多只會有一筆
+    const item = reminders[0];
+    const vars = {
+        date: formatYMD(item.date).slice(5),
+        weekday: t('weekdays')[item.date.getDay()],
+        label: item.label,
+        n: item.offset
+    };
+    const lineKey = item.offset === 0 ? 'lunarLineToday' : item.offset === 1 ? 'lunarLineTomorrow' : 'lunarLineUpcoming';
+    const hint = item.offset === 0 ? t('lunarHintToday') : t('lunarHintUpcoming');
+    const html = `🌱 ${esc(t('lunarVegetarianReminder'))}：${esc(t(lineKey, vars))}<br><span style="font-weight:700;color:#15803D;">${esc(hint)}</span>`;
     el.innerHTML = html;
     el.style.display = 'block';
     return html;

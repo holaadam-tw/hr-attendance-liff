@@ -1,9 +1,19 @@
 # RunPiston Bug 追蹤 & 測試清單
 
-> 更新日期：2026-04-23
+> 更新日期：2026-07-14
 > 每次修改後更新此檔案
 
 ---
+
+## 🟢 2026-07-14 新功能：缺卡稽核系統（missing-checkout-audit）
+
+| 項目 | 狀態 | 說明 |
+|------|------|------|
+| migration 092 缺卡稽核 | ⏳ 程式完成，**正式庫未套用** | `attendance_anomalies` 追蹤表 + 自動結案 trigger + `scan_missing_checkouts()` + `run_daily_attendance_audit()`（pg_net 推 LINE）+ pg_cron 01:10 UTC + 大正啟用旗標。詳見 `openspec/changes/missing-checkout-audit/` |
+| 打卡總覽缺卡追蹤卡片 | ✅ 前端完成待上線 | `attendance_public.html` 今日分頁「⏰ 缺卡追蹤」，僅大正科技+管理員模式；狀態膠囊（待員工處理/補卡待審/請假待審）+ 手動結案；zh/vi |
+| 素食提醒文案不清 | ✅ 已修前端待上線 | `renderLunarVegetarianReminder` 改情境化完整句：當天→「今日訂便當請確認：吃素的員工要改訂素食便當」；未來→「請提前提醒吃素的員工，當天記得改訂素食便當」 |
+
+套用後驗證清單：手動 `SELECT run_daily_attendance_audit();` 確認回傳統計、anon 呼叫 `get_attendance_anomalies` 應被擋、`SELECT * FROM cron.job WHERE jobname='daily-attendance-audit';` 確認排程存在。
 
 ## 🔴 未修復 Bug（優先修）
 
