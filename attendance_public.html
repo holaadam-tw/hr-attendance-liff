@@ -304,6 +304,9 @@ body{font-family:'Noto Sans TC',-apple-system,sans-serif;background:var(--bg);co
                     </div>
                 </div>
 
+                <!-- 素食提醒（農曆初一/十五，獨立於便當卡片） -->
+                <div id="lunarVegetarianReminder" style="display:none;margin-bottom:14px;padding:14px 16px;background:#ECFDF5;border:2px solid #4ADE80;border-radius:14px;color:#166534;line-height:1.6;"></div>
+
                 <div class="stat-grid">
                     <div class="stat-card" style="background:#ECFDF5;"><div class="stat-num" style="color:#059669;" id="dExpected">0</div><div class="stat-label" style="color:#059669;">應出勤</div></div>
                     <div class="stat-card" style="background:#DBEAFE;"><div class="stat-num" style="color:#1D4ED8;" id="dChecked">0</div><div class="stat-label" style="color:#1D4ED8;">已打卡</div></div>
@@ -346,7 +349,6 @@ body{font-family:'Noto Sans TC',-apple-system,sans-serif;background:var(--bg);co
                             <span id="lunchDetailArrow" style="font-size:12px;color:#B45309;">▼</span>
                         </div>
                     </div>
-                    <div id="lunarVegetarianReminder" style="display:none;margin-top:8px;padding:10px 12px;background:#ECFDF5;border:1px solid #86EFAC;border-radius:12px;color:#166534;font-size:12px;font-weight:800;line-height:1.5;"></div>
                     <div id="lunchDetailPanel" style="display:none;margin-top:8px;background:#FFFEF5;border:1px solid #FDE68A;border-radius:12px;padding:12px;font-size:13px;max-height:300px;overflow-y:auto;">
                         <div id="lunchDetailContent"></div>
                     </div>
@@ -702,7 +704,7 @@ const I18N = {
         lunchTitle:'便當統計', lunchStatus:'便當', lunchRegular:'葷食', lunchVegetarian:'素食', lunchNone:'不訂購', lunchUnset:'未選', lunchOrdered:'已訂購', lunchNotOrdered:'未訂購', lunchNoOrders:'無訂購資料',
         lunarVegetarianReminder:'素食提醒', lunarFirst:'農曆初一', lunarFifteenth:'農曆十五', lunarToday:'今天', lunarTomorrow:'明天', lunarInDays:'倒數 {n} 天', peopleUnit:'人',
         lunarLineToday:'今天（{date}，{weekday}）是{label}', lunarLineTomorrow:'明天（{date}，{weekday}）是{label}', lunarLineUpcoming:'{n} 天後（{date}，{weekday}）是{label}',
-        lunarHintToday:'今日訂便當請確認：吃素的員工要改訂素食便當。', lunarHintUpcoming:'請提前提醒吃素的員工，當天記得改訂素食便當。',
+        lunarHintToday:'今日訂便當請確認：吃素的員工要改訂素食便當。', lunarHintUpcoming:'請提前提醒吃素的員工，當天記得改訂素食便當。', lunarAlwaysNote:'初一／十五前 3 天起，每天都會在這裡提醒。',
         anomalyTitle:'⏰ 缺卡追蹤', anomalyPending:'待處理 {n} 筆', anomalyNoPending:'目前沒有待處理的缺卡', anomalyMissingCheckout:'下班未打卡', anomalyDaysOut:'第 {n} 天', anomalyNotified:'已提醒 {n} 次', anomalyNotNotified:'尚未通知',
         anomalyAwaitEmployee:'待員工處理', anomalyMakeupPending:'補卡待審', anomalyLeavePending:'請假待審',
         anomalyResolve:'結案', anomalyResolveConfirm:'確定手動結案？只會從追蹤清單移除，不會寫入出勤記錄。', anomalyResolveOk:'✅ 已結案', anomalyResolveFail:'結案失敗：',
@@ -728,7 +730,7 @@ const I18N = {
         lunchTitle:'Thống kê cơm', lunchStatus:'Cơm', lunchRegular:'Mặn', lunchVegetarian:'Chay', lunchNone:'Không đặt', lunchUnset:'Chưa chọn', lunchOrdered:'Đã đặt', lunchNotOrdered:'Chưa đặt', lunchNoOrders:'Không có dữ liệu đặt cơm',
         lunarVegetarianReminder:'Nhắc món chay', lunarFirst:'Mùng 1 âm lịch', lunarFifteenth:'Rằm âm lịch', lunarToday:'Hôm nay', lunarTomorrow:'Ngày mai', lunarInDays:'Còn {n} ngày', peopleUnit:'người',
         lunarLineToday:'Hôm nay ({date}, {weekday}) là {label}', lunarLineTomorrow:'Ngày mai ({date}, {weekday}) là {label}', lunarLineUpcoming:'Còn {n} ngày ({date}, {weekday}) là {label}',
-        lunarHintToday:'Hôm nay đặt cơm hãy kiểm tra: nhân viên ăn chay phải đổi sang cơm chay.', lunarHintUpcoming:'Hãy nhắc trước nhân viên ăn chay, đến ngày đó nhớ đổi sang cơm chay.',
+        lunarHintToday:'Hôm nay đặt cơm hãy kiểm tra: nhân viên ăn chay phải đổi sang cơm chay.', lunarHintUpcoming:'Hãy nhắc trước nhân viên ăn chay, đến ngày đó nhớ đổi sang cơm chay.', lunarAlwaysNote:'Từ 3 ngày trước mùng 1 / rằm, mỗi ngày đều nhắc tại đây.',
         anomalyTitle:'⏰ Theo dõi thiếu chấm công', anomalyPending:'Chưa xử lý {n}', anomalyNoPending:'Hiện không có thiếu chấm công chờ xử lý', anomalyMissingCheckout:'Chưa chấm công ra', anomalyDaysOut:'Ngày thứ {n}', anomalyNotified:'Đã nhắc {n} lần', anomalyNotNotified:'Chưa thông báo',
         anomalyAwaitEmployee:'Chờ nhân viên xử lý', anomalyMakeupPending:'Chờ duyệt bổ sung', anomalyLeavePending:'Chờ duyệt nghỉ phép',
         anomalyResolve:'Đóng', anomalyResolveConfirm:'Xác nhận đóng thủ công? Chỉ xóa khỏi danh sách theo dõi, không ghi vào chấm công.', anomalyResolveOk:'✅ Đã đóng', anomalyResolveFail:'Đóng thất bại: ',
@@ -760,7 +762,7 @@ function setLanguage(lang) {
     currentLang = lang === 'vi' ? 'vi' : 'zh';
     localStorage.setItem('attendance_public_lang', currentLang);
     applyTranslations();
-    if (currentTab === 'daily') { updateDeptFilter(); renderDailyTable(); updateDailyStats(); renderAnomalyCard(); }
+    if (currentTab === 'daily') { updateDeptFilter(); renderDailyTable(); updateDailyStats(); renderAnomalyCard(); renderLunarVegetarianReminder(getDailyDate()); }
     if (currentTab === 'monthly') { renderMonthlyTable(); renderLeaveCalendar(); }
     if (currentTab === 'schedule') loadScheduleData();
     if (currentTab === 'human') renderHumanManagement(getHumanDates());
@@ -1322,6 +1324,7 @@ async function loadDailyData() {
     const d = new Date(dateStr + 'T00:00:00+08:00');
     document.getElementById('dailyDateLabel').textContent = t('todayPrefix') + dateStr;
     document.getElementById('dailyDayLabel').textContent = dayNames[d.getDay()];
+    renderLunarVegetarianReminder(dateStr);
 
     try {
         const [dailyRes, makeupRes, leaveRes] = await Promise.all([
@@ -2506,7 +2509,9 @@ function renderLunarVegetarianReminder(dateStr) {
     };
     const lineKey = item.offset === 0 ? 'lunarLineToday' : item.offset === 1 ? 'lunarLineTomorrow' : 'lunarLineUpcoming';
     const hint = item.offset === 0 ? t('lunarHintToday') : t('lunarHintUpcoming');
-    const html = `🌱 ${esc(t('lunarVegetarianReminder'))}：${esc(t(lineKey, vars))}<br><span style="font-weight:700;color:#15803D;">${esc(hint)}</span>`;
+    const html = `<div style="font-size:17px;font-weight:900;">🌱 ${esc(t('lunarVegetarianReminder'))}：${esc(t(lineKey, vars))}</div>`
+        + `<div style="font-size:15px;font-weight:800;color:#15803D;margin-top:4px;">${esc(hint)}</div>`
+        + `<div style="font-size:12px;color:#4D7C0F;margin-top:4px;">${esc(t('lunarAlwaysNote'))}</div>`;
     el.innerHTML = html;
     el.style.display = 'block';
     return html;
@@ -2550,7 +2555,6 @@ async function loadLunchStats(dateStr) {
         if (regularCountEl) regularCountEl.textContent = `${t('lunchRegular')} ${counts.regular}`;
         if (vegetarianCountEl) vegetarianCountEl.textContent = `${t('lunchVegetarian')} ${counts.vegetarian}`;
         card.style.display = 'block';
-        renderLunarVegetarianReminder(dateStr);
         renderDailyTable();
 
         const contentEl = document.getElementById('lunchDetailContent');
