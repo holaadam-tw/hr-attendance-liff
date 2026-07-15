@@ -103,11 +103,12 @@ import {
     addServiceItem, deleteServiceItem, initFieldWorkApproval,
     loadFieldWorkApprovals, showFwaDetail, closeFwaDetailModal,
     approveFieldWork, rejectFieldWork, exportFieldWorkCSV,
+    showTripMap, closeFwaMapModal,
     loadCompanyList, filterCompanies, showCompanyModal,
     closeCompanyModal, editCompany, saveCompany,
     initSalesTargetPage, stChangeWeek, saveDefaultTarget,
     switchSysTab
-} from './settings.js?v=20260712-leavefk';
+} from './settings.js?v=20260716-tripmap';
 
 // ===== 綁定 window（供 HTML onclick 使用）=====
 
@@ -378,6 +379,8 @@ window.closeFwaDetailModal = closeFwaDetailModal;
 window.approveFieldWork = approveFieldWork;
 window.rejectFieldWork = rejectFieldWork;
 window.exportFieldWorkCSV = exportFieldWorkCSV;
+window.showTripMap = showTripMap;
+window.closeFwaMapModal = closeFwaMapModal;
 window.loadCompanyList = loadCompanyList;
 window.filterCompanies = filterCompanies;
 window.showCompanyModal = showCompanyModal;

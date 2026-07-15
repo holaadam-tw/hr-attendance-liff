@@ -523,6 +523,7 @@ export function showFwaDetail(logId) {
                 ${trip && trip.status === 'closed' ? `<div><b>當日總公里：</b>${trip.total_km != null ? trip.total_km + ' km' : '未登錄結束讀數'}${trip.end_odometer_photo_url ? ` <a href="${trip.end_odometer_photo_url}" target="_blank">📷</a>` : ''}</div>` : ''}
                 ${warns.length > 0 ? `<div style="color:#D97706;margin-top:2px;">${warns.join('<br>')}</div>` : ''}
                 ${log.odometer_photo_url ? `<div style="margin-top:4px;"><img src="${log.odometer_photo_url}" style="width:100px;height:100px;object-fit:cover;border-radius:8px;border:1px solid #E2E8F0;cursor:pointer;" onclick="window.open('${log.odometer_photo_url}','_blank')"></div>` : ''}
+                ${trip ? `<button class="btn btn-secondary" onclick="showTripMap('${log.trip_id}')" style="font-size:12px;padding:8px 12px;margin-top:6px;">🗺️ 行程地圖</button>` : ''}
             </div>`;
     }
 
@@ -630,6 +631,145 @@ export function exportFieldWorkCSV() {
     a.download = fn; a.click();
     writeAuditLog('export','field_work_logs',null,fn,{rows:rows.length-1});
     showToast(`✅ 已匯出 ${fn}（${rows.length-1} 筆）`);
+}
+
+// ===== 行程地圖（Leaflet lazy load） =====
+let leafletPromise = null;
+let fwaMap = null; // Leaflet 地圖實例（重開時銷毀重建）
+
+function ensureLeaflet() {
+    if (window.L) return Promise.resolve();
+    if (leafletPromise) return leafletPromise;
+    leafletPromise = new Promise((resolve, reject) => {
+        const css = document.createElement('link');
+        css.rel = 'stylesheet';
+        css.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+        document.head.appendChild(css);
+        const js = document.createElement('script');
+        js.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+        js.onload = () => resolve();
+        js.onerror = () => { leafletPromise = null; reject(new Error('Leaflet 載入失敗')); };
+        document.head.appendChild(js);
+    });
+    return leafletPromise;
+}
+
+// 組出當日時間序列點：出發 → (軌跡/到站/離開)... → 收工
+function buildTripTimeline(trip, logs, trackpoints) {
+    const pts = [];
+    if (trip?.start_lat != null) pts.push({ t: new Date(trip.start_time).getTime(), lat: trip.start_lat, lng: trip.start_lng, kind: 'start', label: `🚗 出發 ${fmtT(trip.start_time)} · 讀數 ${trip.start_odometer} km` });
+    (logs || []).forEach(l => {
+        const client = l.clients?.company_name || '未選擇客戶';
+        if (l.arrive_lat != null) pts.push({ t: new Date(l.arrive_time).getTime(), lat: l.arrive_lat, lng: l.arrive_lng, kind: 'station',
+            label: `📍 ${client}<br>到達 ${fmtT(l.arrive_time)}${l.segment_km != null ? '<br>區間 ' + l.segment_km + ' km（直線 ' + (l.gps_distance_km ?? '-') + ' km）' : ''}` });
+        if (l.leave_lat != null && l.leave_time) pts.push({ t: new Date(l.leave_time).getTime(), lat: l.leave_lat, lng: l.leave_lng, kind: 'leave', label: `離開 ${client} ${fmtT(l.leave_time)}` });
+    });
+    // 軌跡點：同分鐘只取第一點（多分頁防護）
+    const seenMin = new Set();
+    (trackpoints || []).forEach(p => {
+        const minKey = p.recorded_at.substring(0, 16);
+        if (seenMin.has(minKey)) return;
+        seenMin.add(minKey);
+        pts.push({ t: new Date(p.recorded_at).getTime(), lat: p.lat, lng: p.lng, kind: 'track' });
+    });
+    if (trip?.end_lat != null && trip.end_time) pts.push({ t: new Date(trip.end_time).getTime(), lat: trip.end_lat, lng: trip.end_lng, kind: 'end', label: `🏁 收工 ${fmtT(trip.end_time)}${trip.total_km != null ? ' · 當日 ' + trip.total_km + ' km' : ''}` });
+    pts.sort((a, b) => a.t - b.t);
+    return pts;
+}
+
+// 相鄰點時間差 ≤5 分鐘 → 實線段；>5 分鐘 → 虛線段。回傳連續同型線段組
+function buildTripSegments(pts) {
+    const GAP_MS = 5 * 60 * 1000;
+    const segs = [];
+    for (let i = 1; i < pts.length; i++) {
+        const solid = (pts[i].t - pts[i-1].t) <= GAP_MS;
+        const last = segs[segs.length - 1];
+        if (last && last.solid === solid) {
+            last.coords.push([pts[i].lat, pts[i].lng]);
+        } else {
+            segs.push({ solid, coords: [[pts[i-1].lat, pts[i-1].lng], [pts[i].lat, pts[i].lng]] });
+        }
+    }
+    return segs;
+}
+
+function fmtT(iso) {
+    return iso ? new Date(iso).toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', hour12: false }) : '--:--';
+}
+
+export async function showTripMap(tripId) {
+    const trip = fwaTrips[tripId];
+    if (!trip) return showToast('找不到行程資料');
+    const logs = fwaLogs.filter(l => l.trip_id === tripId)
+        .sort((a, b) => new Date(a.arrive_time) - new Date(b.arrive_time));
+    const modal = document.getElementById('fwaMapModal');
+    const container = document.getElementById('fwaMapContainer');
+    if (!modal || !container) return;
+    modal.style.display = 'block';
+    container.innerHTML = '<p style="text-align:center;padding:40px;color:#94A3B8;">🗺️ 載入中...</p>';
+
+    let trackpoints = [];
+    try {
+        // RLS deny-all：走 SECURITY DEFINER RPC（本人 / 同公司 admin/manager / platform_admin）
+        const { data, error } = await sb.rpc('get_fw_trackpoints', {
+            p_line_user_id: window.currentAdminEmployee?.line_user_id,
+            p_trip_id: tripId
+        });
+        if (error) throw error;
+        trackpoints = data || [];
+    } catch(e) { console.warn('軌跡點載入失敗', e); }
+
+    const pts = buildTripTimeline(trip, logs, trackpoints);
+    if (pts.length === 0) {
+        container.innerHTML = '<p style="text-align:center;padding:40px;color:#94A3B8;">此行程沒有任何 GPS 點</p>';
+        return;
+    }
+
+    try {
+        await ensureLeaflet();
+    } catch(e) {
+        // CDN 失敗 → 文字版時間軸 fallback
+        container.innerHTML = '<div style="padding:12px;font-size:13px;"><b>地圖元件載入失敗，顯示文字版行程：</b>' +
+            pts.filter(p => p.kind !== 'track').map(p =>
+                `<div style="padding:6px 0;border-bottom:1px solid #F1F5F9;">${p.label || ''}<span style="color:#94A3B8;font-size:11px;"> (${p.lat.toFixed(5)}, ${p.lng.toFixed(5)})</span></div>`
+            ).join('') + '</div>';
+        return;
+    }
+
+    container.innerHTML = '<div id="fwaMapCanvas" style="width:100%;height:100%;"></div>';
+    if (fwaMap) { fwaMap.remove(); fwaMap = null; }
+    fwaMap = L.map('fwaMapCanvas');
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors', maxZoom: 19
+    }).addTo(fwaMap);
+
+    buildTripSegments(pts).forEach(seg => {
+        L.polyline(seg.coords, {
+            color: seg.solid ? '#4F46E5' : '#94A3B8',
+            weight: seg.solid ? 4 : 2,
+            dashArray: seg.solid ? null : '6 8'
+        }).addTo(fwaMap);
+    });
+
+    const markerStyle = {
+        start:   { color: '#059669', r: 9 },
+        station: { color: '#2563EB', r: 8 },
+        leave:   { color: '#93C5FD', r: 5 },
+        end:     { color: '#334155', r: 9 }
+    };
+    pts.filter(p => p.kind !== 'track').forEach(p => {
+        const s = markerStyle[p.kind] || markerStyle.station;
+        const m = L.circleMarker([p.lat, p.lng], { radius: s.r, color: '#fff', weight: 2, fillColor: s.color, fillOpacity: 1 }).addTo(fwaMap);
+        if (p.label) m.bindPopup(p.label);
+    });
+
+    fwaMap.fitBounds(pts.map(p => [p.lat, p.lng]), { padding: [30, 30] });
+}
+
+export function closeFwaMapModal() {
+    const modal = document.getElementById('fwaMapModal');
+    if (modal) modal.style.display = 'none';
+    if (fwaMap) { fwaMap.remove(); fwaMap = null; }
 }
 
 // ===== 公司管理 =====

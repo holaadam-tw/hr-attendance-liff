@@ -5,6 +5,16 @@
 
 ---
 
+## 🟢 2026-07-16 新功能：外勤行程地圖＋追蹤模式（fieldwork-tracking）
+
+| 項目 | 狀態 | 說明 |
+|------|------|------|
+| migration 094 | ✅ 已套正式庫（2026-07-16，user 授權） | `field_work_trackpoints` **RLS deny-all（連續 GPS 軌跡屬敏感個資，rls-checker 建議比照 092）**：ENABLE RLS 無 policy＋REVOKE ALL，讀寫走 3 支 SECURITY DEFINER RPC——insert_fw_trackpoints（僅行程本人＋行程須 open＋employee/company 由 DB 認定防偽造＋單次≤50點）、get_fw_trackpoints / count_fw_trackpoints（本人或同公司 admin/manager 或 platform_admin）。另：pg_cron `purge-fw-trackpoints` 台灣 02:30 清 90 天前＋補收回 field_work_trips 的 DELETE。**教訓：Supabase default privileges 會自動給新表 anon 全權限，收權限必須明確 REVOKE** |
+| fieldwork.html 追蹤模式 | ✅ 前端完成待上線 | open 行程＋前景每 60s 記點（accuracy>1000m 丟）、批次上傳（滿3點或3分鐘）、失敗保留重試、buffer 上限 30、visibilitychange 停/續、收工 flush、GPS 拒絕靜默停用；行程卡片顯示「📡 軌跡記錄中（N 點）」＋出發表單知情告知 |
+| 管理端行程地圖 | ✅ 前端完成待上線 | settings.js：Leaflet 1.9.4 lazy load（unpkg，失敗→文字版時間軸）；明細 modal「🗺️ 行程地圖」；實線=軌跡段/虛線=僅起訖（相鄰 >5 分鐘）；出發🟢/到站🔵(popup 時間+客戶+區間)/收工⚫ circleMarker；JS 快取版本升 20260716-tripmap |
+
+驗證：qa_check 0 FAIL、npm test 52/52、buffer 節流 4 案例 PASS、地圖分段 4 案例 PASS、E826 實測（批次 insert 3 點→管理端查詢→PATCH 42501 拒竄改→清除 0 殘留）。
+
 ## 🟢 2026-07-15 新功能：外勤里程表起訖登錄（fieldwork-odometer）
 
 | 項目 | 狀態 | 說明 |

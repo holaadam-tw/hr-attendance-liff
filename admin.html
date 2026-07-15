@@ -1640,6 +1640,18 @@
                     <button class="btn btn-secondary" onclick="closeFwaDetailModal()" style="width:100%;margin-top:8px;font-size:13px;">關閉</button>
                 </div>
             </div>
+
+            <!-- 行程地圖 Modal -->
+            <div id="fwaMapModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:1000;">
+                <div style="background:#fff;margin:20px auto;width:90vw;max-width:900px;border-radius:16px;padding:16px;display:flex;flex-direction:column;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                        <span style="font-weight:800;font-size:15px;">🗺️ 行程地圖</span>
+                        <button onclick="closeFwaMapModal()" style="border:none;background:none;font-size:20px;cursor:pointer;color:#64748B;">✕</button>
+                    </div>
+                    <div id="fwaMapContainer" style="width:100%;height:70vh;border-radius:12px;overflow:hidden;background:#F8FAFC;"></div>
+                    <div style="font-size:11px;color:#94A3B8;margin-top:6px;">— 實線＝有軌跡路段（頁面開啟期間）　- - 虛線＝僅起訖點路段　🟢出發 🔵到站 ⚫收工</div>
+                </div>
+            </div>
         </div>
 
         <!-- ====== 餐飲業管理 ====== -->
@@ -2226,7 +2238,7 @@
     </div>
 
     <script src="common.js?v=20260712-leavefk"></script>
-    <script type="module" src="modules/index.js?v=20260712-leavefk"></script>
+    <script type="module" src="modules/index.js?v=20260716-tripmap"></script>
     <script type="module" src="admin_fixes.js?v=20260708-audit2"></script>
     <script>
     // ===== 公務機打卡 =====

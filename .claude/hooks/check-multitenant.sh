@@ -2,7 +2,7 @@
 # 多租戶隔離檢查 — 每次編輯 common.js / modules 後自動跑
 # 不阻擋 commit，只警告
 
-MULTI_TENANT_TABLES="employees attendance leave_requests overtime_requests makeup_punch_requests schedules system_settings hr_audit_logs shift_swap_requests payroll lunch_orders annual_bonus announcements sales_targets sales_activities field_work_logs field_work_trips clients salary_settings"
+MULTI_TENANT_TABLES="employees attendance leave_requests overtime_requests makeup_punch_requests schedules system_settings hr_audit_logs shift_swap_requests payroll lunch_orders annual_bonus announcements sales_targets sales_activities field_work_logs field_work_trips field_work_trackpoints clients salary_settings"
 
 FOUND=0
 

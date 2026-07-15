@@ -362,6 +362,12 @@
         let fwOdoPhotoUrl = null;     // 到站里程表照片（本次表單）
         let fwTripPhotoUrl = null;    // 出發/收工里程表照片（暫存）
         let fwTripPhotoTarget = 'start'; // fwTripFileInput 目標：start / end
+        // ---- 追蹤模式狀態 ----
+        let fwTrackTimer = null;      // 60s interval
+        let fwTrackBuffer = [];       // 待上傳軌跡點
+        let fwTrackLastFlush = 0;     // 上次上傳時間（ms）
+        let fwTrackCount = 0;         // 今日已記點數（含 DB 既有）
+        let fwTrackDenied = false;    // GPS 權限被拒 → 靜默停用
 
         async function initFieldWorkPage() {
             const dateEl = document.getElementById('fwSummaryDate');
@@ -405,6 +411,12 @@
                     .limit(1);
                 fwTrip = (data && data[0]) || null;
                 renderTripCard();
+                if (fwTrip && fwTrip.status === 'open') {
+                    loadTrackCount();
+                    startTracking();
+                } else {
+                    stopTracking(false);
+                }
             } catch(e) { console.error('載入行程失敗', e); }
         }
 
@@ -448,6 +460,7 @@
                             <button class="btn btn-secondary" onclick="fwCaptureTripPhoto('start')" style="flex:1;font-size:13px;padding:10px;">📷 拍里程表</button>
                             <button class="btn btn-primary" onclick="fwStartTrip()" id="fwStartTripBtn" style="flex:1;font-size:13px;padding:10px;">🚗 出發</button>
                         </div>
+                        <div style="font-size:11px;color:#94A3B8;margin-top:8px;">出發後，此頁面開啟期間會自動記錄位置軌跡，供公司核算外勤補貼</div>
                     </div>
                     <button class="btn btn-primary" id="fwTripShowBtn" onclick="document.getElementById('fwTripForm').style.display='block';this.style.display='none';" style="font-size:14px;padding:12px;margin-top:10px;">🚗 出發登錄</button>
                 </div>`;
@@ -466,6 +479,7 @@
                         出發讀數 <b>${fwTrip.start_odometer}</b> km${fwTrip.start_odometer_photo_url ? ' 📷' : ''}
                         ${driven > 0 ? ` · 已行駛 <b>${driven}</b> km` : ''}
                     </div>
+                    <div id="fwTrackStatus" style="font-size:12px;margin-top:4px;"></div>
                     <div id="fwTripEndForm" style="display:none;margin-top:10px;">
                         <label style="font-size:13px;font-weight:600;">收工里程表讀數（km）*</label>
                         <input type="number" id="fwTripEndOdo" placeholder="≥ ${lastPoint}" min="0" step="0.1" style="width:100%;padding:12px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;box-sizing:border-box;margin-top:4px;">
@@ -477,6 +491,7 @@
                     </div>
                     <button class="btn btn-secondary" id="fwTripEndShowBtn" onclick="document.getElementById('fwTripEndForm').style.display='block';this.style.display='none';" style="font-size:13px;padding:10px;margin-top:10px;">🏁 收工登錄</button>
                 </div>`;
+                updateTrackStatus(); // innerHTML 重建後補渲染追蹤狀態
                 return;
             }
             // closed
@@ -489,6 +504,102 @@
                 <div style="font-size:12px;color:#94A3B8;margin-top:4px;">出發 ${fwTrip.start_odometer} km${fwTrip.end_odometer != null ? ' → 收工 ' + fwTrip.end_odometer + ' km' : ''}</div>
             </div>`;
         }
+
+        // ===== 追蹤模式（前景期間每 60s 記軌跡點，批次上傳） =====
+        const FW_TRACK_INTERVAL_MS = 60000;   // 記錄間隔
+        const FW_TRACK_FLUSH_MS = 180000;     // 最久 3 分鐘上傳一次
+        const FW_TRACK_BATCH = 3;             // 滿 3 點上傳
+        const FW_TRACK_BUFFER_MAX = 30;       // buffer 上限（超過丟最舊）
+        const FW_TRACK_MAX_ACCURACY = 1000;   // 精度 >1000m 丟棄
+
+        function startTracking() {
+            if (!fwTrip || fwTrip.status !== 'open') return;
+            if (fwTrackDenied || !navigator.geolocation) return;
+            if (fwTrackTimer) return; // 已在追蹤
+            fwTrackTimer = setInterval(fwRecordTrackpoint, FW_TRACK_INTERVAL_MS);
+            updateTrackStatus();
+        }
+
+        function stopTracking(flush) {
+            if (fwTrackTimer) { clearInterval(fwTrackTimer); fwTrackTimer = null; }
+            if (flush) fwFlushTrackpoints(true);
+            updateTrackStatus();
+        }
+
+        function fwRecordTrackpoint() {
+            if (!fwTrip || fwTrip.status !== 'open') { stopTracking(true); return; }
+            navigator.geolocation.getCurrentPosition(function(pos) {
+                if (pos.coords.accuracy > FW_TRACK_MAX_ACCURACY) return; // 垃圾點丟棄
+                fwTrackBuffer.push({
+                    recorded_at: new Date().toISOString(),
+                    lat: pos.coords.latitude,
+                    lng: pos.coords.longitude,
+                    accuracy: pos.coords.accuracy != null ? Math.round(pos.coords.accuracy) : null
+                });
+                while (fwTrackBuffer.length > FW_TRACK_BUFFER_MAX) fwTrackBuffer.shift();
+                fwFlushTrackpoints(false);
+            }, function(err) {
+                if (err && err.code === 1) { // PERMISSION_DENIED → 靜默停用
+                    fwTrackDenied = true;
+                    stopTracking(false);
+                    console.warn('追蹤模式：GPS 權限被拒，已停用');
+                }
+            }, { enableHighAccuracy: false, timeout: 15000, maximumAge: 30000 });
+        }
+
+        async function fwFlushTrackpoints(force) {
+            if (fwTrackBuffer.length === 0 || !fwTrip) return;
+            const due = force || fwTrackBuffer.length >= FW_TRACK_BATCH ||
+                (Date.now() - fwTrackLastFlush) > FW_TRACK_FLUSH_MS;
+            if (!due) return;
+            const batch = fwTrackBuffer.slice();
+            try {
+                // RLS deny-all：走 SECURITY DEFINER RPC，employee/company 由 DB 依行程認定（防偽造）
+                const { data, error } = await sb.rpc('insert_fw_trackpoints', {
+                    p_line_user_id: liffProfile?.userId || currentEmployee.line_user_id,
+                    p_trip_id: fwTrip.id,
+                    p_points: batch
+                });
+                if (error) throw error;
+                fwTrackBuffer = fwTrackBuffer.slice(batch.length); // 只清掉已送出的
+                fwTrackLastFlush = Date.now();
+                fwTrackCount = (typeof data === 'number') ? data : fwTrackCount + batch.length;
+                updateTrackStatus();
+            } catch(e) {
+                console.warn('軌跡上傳失敗，下輪重試', e); // buffer 保留，不影響打卡主流程
+            }
+        }
+
+        function updateTrackStatus() {
+            const el = document.getElementById('fwTrackStatus');
+            if (!el) return;
+            if (fwTrackTimer) {
+                el.textContent = `📡 軌跡記錄中（今日已記 ${fwTrackCount} 點）`;
+                el.style.color = '#059669';
+            } else if (fwTrip && fwTrip.status === 'open') {
+                el.textContent = `⏸ 軌跡暫停（頁面開啟時自動記錄，今日已記 ${fwTrackCount} 點）`;
+                el.style.color = '#94A3B8';
+            } else {
+                el.textContent = '';
+            }
+        }
+
+        async function loadTrackCount() {
+            if (!fwTrip) return;
+            try {
+                const { data, error } = await sb.rpc('count_fw_trackpoints', {
+                    p_line_user_id: liffProfile?.userId || currentEmployee.line_user_id,
+                    p_trip_id: fwTrip.id
+                });
+                if (!error && typeof data === 'number') fwTrackCount = data;
+                updateTrackStatus();
+            } catch(e) { console.warn('載入軌跡點數失敗', e); }
+        }
+
+        document.addEventListener('visibilitychange', function() {
+            if (document.hidden) stopTracking(true);
+            else startTracking();
+        });
 
         function fwCaptureTripPhoto(target) {
             fwTripPhotoTarget = target;
@@ -542,6 +653,7 @@
                 fwTrip = data;
                 fwTripPhotoUrl = null;
                 renderTripCard();
+                startTracking();
                 showToast('🚗 出發登錄完成');
             } catch(e) {
                 console.error(e);
@@ -562,6 +674,9 @@
             const btn = document.getElementById('fwEndTripBtn');
             btn.disabled = true; btn.textContent = '送出中...';
             try {
+                // 收工前先停止追蹤並 flush 剩餘軌跡點（行程 closed 後 RPC 拒收）
+                if (fwTrackTimer) { clearInterval(fwTrackTimer); fwTrackTimer = null; }
+                await fwFlushTrackpoints(true);
                 let loc = null;
                 try { loc = await getGPS(); } catch(e) { console.warn('GPS 取得失敗，收工登錄不含定位', e); }
                 const now = new Date().toISOString();
