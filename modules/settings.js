@@ -381,6 +381,21 @@ export async function deleteServiceItem(id, name) {
 
 // ===== 外勤審核 =====
 let fwaLogs = [];
+let fwaTrips = {}; // trip_id → field_work_trips 資料（明細顯示出發/收工讀數用）
+
+// 里程表交叉比對警示（列表與明細共用）
+// segment_km 低於 GPS 直線距離 ×0.8 → 不合理（路程必 ≥ 直線）
+// segment_km 高於 GPS 直線距離 ×3 + 5km → 顯著繞路或誤填
+function fwOdoWarnings(log) {
+    const warns = [];
+    if (log.segment_km == null) return warns;
+    if (log.gps_distance_km != null && log.gps_distance_km > 0) {
+        if (log.segment_km < log.gps_distance_km * 0.8) warns.push('⚠️ 申報里程低於 GPS 直線距離');
+        else if (log.segment_km > log.gps_distance_km * 3 + 5) warns.push('⚠️ 申報里程顯著高於直線距離');
+    }
+    if (!log.odometer_photo_url) warns.push('📷 缺里程表照片佐證');
+    return warns;
+}
 
 export function initFieldWorkApproval() {
     const today = getTaiwanDate();
@@ -408,6 +423,17 @@ export async function loadFieldWorkApprovals() {
         const { data, error } = await query;
         if (error) throw error;
         fwaLogs = data || [];
+
+        // 撈本批紀錄關聯的行程（出發/收工讀數，明細顯示用）
+        fwaTrips = {};
+        const tripIds = [...new Set(fwaLogs.map(l => l.trip_id).filter(Boolean))];
+        if (tripIds.length > 0) {
+            const { data: trips } = await sb.from('field_work_trips')
+                .select('*')
+                .in('id', tripIds)
+                .eq('company_id', window.currentCompanyId);
+            (trips || []).forEach(t => { fwaTrips[t.id] = t; });
+        }
 
         document.getElementById('fwaTotal').textContent = fwaLogs.length;
         document.getElementById('fwaPending').textContent = fwaLogs.filter(l => l.status === 'submitted').length;
@@ -449,8 +475,9 @@ function renderFieldWorkApprovals() {
             </div>
             <div style="font-size:11px;color:#94A3B8;">
                 ${log.work_date} ${arriveT} → ${leaveT} ${hours ? '(' + hours + ')' : ''}
-                ${log.mileage ? ' · ' + log.mileage + 'km' : ''}
+                ${log.segment_km != null ? ' · ' + log.segment_km + 'km' : (log.mileage ? ' · ' + log.mileage + 'km' : '')}
             </div>
+            ${fwOdoWarnings(log).length > 0 ? '<div style="font-size:11px;color:#D97706;margin-top:2px;">' + fwOdoWarnings(log).join(' · ') + '</div>' : ''}
         </div>`;
     }).join('');
 }
@@ -481,6 +508,24 @@ export function showFwaDetail(logId) {
         signatureHtml = `<div style="margin-top:8px;"><b style="font-size:12px;">客戶簽名：</b><br><img src="${log.signature_url}" style="max-width:200px;border:1px solid #E2E8F0;border-radius:8px;margin-top:4px;"></div>`;
     }
 
+    // 里程表區塊（僅新流程紀錄有）
+    let odoHtml = '';
+    if (log.odometer_reading != null || log.trip_id) {
+        const trip = log.trip_id ? fwaTrips[log.trip_id] : null;
+        const warns = fwOdoWarnings(log);
+        odoHtml = `
+            <div style="background:#FFFBEB;border:1px solid #FDE68A;border-radius:8px;padding:8px 10px;margin-top:4px;">
+                <div style="font-size:12px;font-weight:700;color:#92400E;margin-bottom:2px;">🚗 里程表登錄</div>
+                ${trip ? `<div><b>行程出發讀數：</b>${trip.start_odometer} km${trip.start_odometer_photo_url ? ` <a href="${trip.start_odometer_photo_url}" target="_blank">📷</a>` : ''}</div>` : ''}
+                <div><b>本站讀數：</b>${log.odometer_reading != null ? log.odometer_reading + ' km' : '-'}</div>
+                <div><b>區間公里：</b>${log.segment_km != null ? log.segment_km + ' km' : '-'}</div>
+                <div><b>GPS 直線距離：</b>${log.gps_distance_km != null ? log.gps_distance_km + ' km' : '-'}</div>
+                ${trip && trip.status === 'closed' ? `<div><b>當日總公里：</b>${trip.total_km != null ? trip.total_km + ' km' : '未登錄結束讀數'}${trip.end_odometer_photo_url ? ` <a href="${trip.end_odometer_photo_url}" target="_blank">📷</a>` : ''}</div>` : ''}
+                ${warns.length > 0 ? `<div style="color:#D97706;margin-top:2px;">${warns.join('<br>')}</div>` : ''}
+                ${log.odometer_photo_url ? `<div style="margin-top:4px;"><img src="${log.odometer_photo_url}" style="width:100px;height:100px;object-fit:cover;border-radius:8px;border:1px solid #E2E8F0;cursor:pointer;" onclick="window.open('${log.odometer_photo_url}','_blank')"></div>` : ''}
+            </div>`;
+    }
+
     content.innerHTML = `
         <h3 style="margin-bottom:12px;">外勤明細</h3>
         <div style="font-size:13px;line-height:2;">
@@ -491,7 +536,8 @@ export function showFwaDetail(logId) {
             <div><b>到達：</b>${arriveT}</div>
             <div><b>離開：</b>${leaveT}</div>
             <div><b>工時：</b>${log.work_hours ? log.work_hours.toFixed(1) + ' 小時' : '-'}</div>
-            <div><b>里程：</b>${log.mileage || 0} km</div>
+            <div><b>里程：</b>${log.segment_km != null ? log.segment_km + ' km（自動計算）' : (log.mileage || 0) + ' km'}</div>
+            ${odoHtml}
             ${log.arrive_lat ? `<div><b>到達GPS：</b>${log.arrive_lat.toFixed(5)}, ${log.arrive_lng.toFixed(5)}</div>` : ''}
             ${log.leave_lat ? `<div><b>離開GPS：</b>${log.leave_lat.toFixed(5)}, ${log.leave_lng.toFixed(5)}</div>` : ''}
             ${log.work_content ? `<div style="margin-top:6px;"><b>工作內容：</b><div style="background:#F8FAFC;padding:8px;border-radius:8px;margin-top:4px;white-space:pre-wrap;">${escapeHTML(log.work_content)}</div></div>` : ''}
@@ -551,8 +597,9 @@ export async function rejectFieldWork(logId) {
 
 export function exportFieldWorkCSV() {
     if (fwaLogs.length === 0) return showToast('無資料可匯出');
-    const rows = [['日期','工號','姓名','客戶','服務項目','到達時間','離開時間','工時','里程(km)','工作內容','狀態','備註']];
+    const rows = [['日期','工號','姓名','客戶','服務項目','到達時間','離開時間','工時','里程(km)','出發讀數','到站讀數','區間公里','GPS直線距離','警示','當日總公里','工作內容','狀態','備註']];
     fwaLogs.forEach(l => {
+        const trip = l.trip_id ? fwaTrips[l.trip_id] : null;
         rows.push([
             l.work_date,
             l.employees?.employee_number || '',
@@ -562,7 +609,13 @@ export function exportFieldWorkCSV() {
             l.arrive_time ? new Date(l.arrive_time).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' }) : '',
             l.leave_time ? new Date(l.leave_time).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei' }) : '',
             l.work_hours || 0,
-            l.mileage || 0,
+            l.segment_km != null ? l.segment_km : (l.mileage || 0),
+            trip ? trip.start_odometer : '',
+            l.odometer_reading != null ? l.odometer_reading : '',
+            l.segment_km != null ? l.segment_km : '',
+            l.gps_distance_km != null ? l.gps_distance_km : '',
+            fwOdoWarnings(l).join('；'),
+            trip && trip.total_km != null ? trip.total_km : '',
             l.work_content || '',
             l.status,
             l.notes || ''

@@ -1,9 +1,21 @@
 # RunPiston Bug 追蹤 & 測試清單
 
-> 更新日期：2026-07-14
+> 更新日期：2026-07-15
 > 每次修改後更新此檔案
 
 ---
+
+## 🟢 2026-07-15 新功能：外勤里程表起訖登錄（fieldwork-odometer）
+
+| 項目 | 狀態 | 說明 |
+|------|------|------|
+| migration 093 | ⏳ SQL 完成，**正式庫未套用（待 user 授權）** | 新表 `field_work_trips`（出發/收工里程表登錄，含 company_id、同員工同日僅一筆 open 的 partial unique index）；`field_work_logs` 加 5 欄（trip_id/odometer_reading/odometer_photo_url/segment_km/gps_distance_km） |
+| fieldwork.html 行程卡片 | ✅ 前端完成待上線 | 🚗 出發登錄（讀數+拍里程表+GPS，GPS 失敗不擋）→ 行程進行中（已行駛）→ 🏁 收工登錄（total_km=end−start，>500km confirm）；昨日 open trip 隔天自動 closed |
+| 到達打卡整合讀數 | ✅ 前端完成待上線 | 有 open 行程：讀數必填、須 ≥ 上一讀數點、區間 >200km confirm；自動算 segment_km＋gps_distance_km（haversine，前站 leave→arrive→出發 GPS）；無行程走舊流程（手填 mileage）不受影響 |
+| 管理端審核＋CSV | ✅ 前端完成待上線 | settings.js：列表/明細顯示 segment_km、里程表區塊（出發/到站讀數、GPS 直線距離、照片）、警示（低於直線×0.8／高於直線×3+5／缺照片）；CSV 加 6 欄 |
+| resumeFieldWork 斷鏈 bug | ✅ 順手修復 | 原本先設 fwCurrentLogId 再呼叫 showFieldWorkForm()（會重設為 null），草稿續填後離開打卡會失敗；已改為先 show 再回填 |
+
+驗證：qa_check 0 FAIL、npm test 52/52、haversine 台北101→台北車站 5.03km PASS、警示函數 6 案例 PASS、Hook 無新警告。套用 093 後驗證清單：anon select field_work_trips 回 `[]`；`field_work_logs?select=trip_id,segment_km` 不回 42703；同員工同日兩筆 open → 23505。
 
 ## 🟢 2026-07-14 新功能：缺卡稽核系統（missing-checkout-audit）
 

@@ -30,6 +30,8 @@
 
                 <!-- ====== Tab 1: 外勤打卡 ====== -->
                 <div id="fwTabFieldwork">
+                    <div id="fwTripCard" style="margin-bottom:12px;"></div>
+                    <input type="file" id="fwTripFileInput" accept="image/*" capture="environment" style="display:none;" onchange="fwTripHandleFileSelect(event)">
                     <div class="lunch-summary" id="fwSummaryCard">
                         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
                             <span style="font-weight:700;font-size:14px;">今日外勤</span>
@@ -71,6 +73,15 @@
                                 <label>服務項目</label>
                                 <div id="fwServiceHierarchy"></div>
                             </div>
+                            <div class="form-group" id="fwOdoGroup" style="display:none;">
+                                <label>當下里程表讀數（km）*</label>
+                                <input type="number" id="fwOdoReading" placeholder="例：45230" min="0" step="0.1" style="width:100%;padding:12px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;box-sizing:border-box;">
+                                <div id="fwOdoHint" style="font-size:12px;color:#94A3B8;margin-top:4px;"></div>
+                                <div id="fwOdoPhotoPreview" style="display:flex;gap:8px;margin-top:8px;"></div>
+                                <button type="button" class="btn btn-secondary" onclick="fwCaptureOdoPhoto()" id="fwOdoPhotoBtn" style="font-size:13px;padding:10px;margin-top:6px;">📷 拍里程表</button>
+                                <input type="file" id="fwOdoFileInput" accept="image/*" capture="environment" style="display:none;" onchange="fwOdoHandleFileSelect(event)">
+                            </div>
+                            <div id="fwNoTripHint" style="display:none;padding:8px 10px;background:#F8FAFC;border-radius:8px;margin-bottom:8px;font-size:12px;color:#94A3B8;">尚未出發登錄，本站不會自動計算區間公里</div>
                             <div id="fwArriveSection">
                                 <button class="btn btn-success" onclick="fwArriveCheckin()" id="fwArriveBtn" style="font-size:14px;padding:14px;">📍 到達打卡</button>
                                 <div id="fwArriveInfo" style="display:none;padding:10px;background:#D1FAE5;border-radius:10px;margin-top:8px;font-size:13px;color:#065F46;"></div>
@@ -86,7 +97,7 @@
                                     <button class="btn btn-secondary" onclick="fwCapturePhoto()" id="fwPhotoBtn" style="font-size:13px;padding:10px;">📷 拍照</button>
                                     <input type="file" id="fwFileInput" accept="image/*" capture="environment" style="display:none;" onchange="fwHandleFileSelect(event)">
                                 </div>
-                                <div class="form-group">
+                                <div class="form-group" id="fwMileageGroup">
                                     <label>里程（公里）</label>
                                     <input type="number" id="fwMileage" placeholder="0" min="0" step="0.1" style="width:100%;padding:12px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;box-sizing:border-box;">
                                 </div>
@@ -347,6 +358,10 @@
         let fwPhotoUrls = [];
         let fwSignatureCtx = null;
         let fwSigning = false;
+        let fwTrip = null;            // 今日行程（field_work_trips）
+        let fwOdoPhotoUrl = null;     // 到站里程表照片（本次表單）
+        let fwTripPhotoUrl = null;    // 出發/收工里程表照片（暫存）
+        let fwTripPhotoTarget = 'start'; // fwTripFileInput 目標：start / end
 
         async function initFieldWorkPage() {
             const dateEl = document.getElementById('fwSummaryDate');
@@ -354,10 +369,225 @@
             fwPhotoUrls = [];
             fwCurrentLogId = null;
             try {
-                await Promise.all([loadClients(), loadServiceItems(), loadFieldWorkLogs()]);
+                await Promise.all([loadClients(), loadServiceItems(), loadFieldWorkLogs(), loadTodayTrip()]);
+                updateFieldWorkSummary();
             } catch(e) {
                 console.error('外勤頁面初始化失敗', e);
                 showToast('⚠️ 部分資料載入失敗，請重新整理');
+            }
+        }
+
+        // ===== 里程表行程（出發/收工登錄） =====
+        function haversineKm(lat1, lng1, lat2, lng2) {
+            const R = 6371;
+            const toRad = d => d * Math.PI / 180;
+            const dLat = toRad(lat2 - lat1);
+            const dLng = toRad(lng2 - lng1);
+            const a = Math.sin(dLat/2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng/2) ** 2;
+            return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        }
+
+        async function loadTodayTrip() {
+            if (!currentEmployee) return;
+            try {
+                const todayStr = getTaiwanDate();
+                // 昨日（含更早）未收工的 open 行程 → 自動關閉（不補結束讀數）
+                await sb.from('field_work_trips')
+                    .update({ status: 'closed', updated_at: new Date().toISOString() })
+                    .eq('employee_id', currentEmployee.id)
+                    .eq('status', 'open')
+                    .lt('trip_date', todayStr);
+                const { data } = await sb.from('field_work_trips')
+                    .select('*')
+                    .eq('employee_id', currentEmployee.id)
+                    .eq('trip_date', todayStr)
+                    .order('created_at', { ascending: false })
+                    .limit(1);
+                fwTrip = (data && data[0]) || null;
+                renderTripCard();
+            } catch(e) { console.error('載入行程失敗', e); }
+        }
+
+        // 最後一個讀數點：今日 trip 內最後一站的讀數，否則出發讀數
+        function fwLastOdoPoint() {
+            if (!fwTrip) return null;
+            const tripLogs = fwLogs.filter(l => l.trip_id === fwTrip.id && l.odometer_reading != null)
+                .sort((a, b) => new Date(a.arrive_time) - new Date(b.arrive_time));
+            if (tripLogs.length > 0) return tripLogs[tripLogs.length - 1].odometer_reading;
+            return fwTrip.start_odometer;
+        }
+
+        // 前一個 GPS 點：前站 leave → 前站 arrive → 出發 GPS
+        function fwPrevGpsPoint() {
+            if (!fwTrip) return null;
+            const tripLogs = fwLogs.filter(l => l.trip_id === fwTrip.id && (l.arrive_lat != null || l.leave_lat != null))
+                .sort((a, b) => new Date(a.arrive_time) - new Date(b.arrive_time));
+            if (tripLogs.length > 0) {
+                const prev = tripLogs[tripLogs.length - 1];
+                if (prev.leave_lat != null) return { lat: prev.leave_lat, lng: prev.leave_lng };
+                return { lat: prev.arrive_lat, lng: prev.arrive_lng };
+            }
+            if (fwTrip.start_lat != null) return { lat: fwTrip.start_lat, lng: fwTrip.start_lng };
+            return null;
+        }
+
+        function renderTripCard() {
+            const el = document.getElementById('fwTripCard');
+            if (!el) return;
+            if (!fwTrip) {
+                el.innerHTML = `<div class="lunch-summary">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <span style="font-weight:700;font-size:14px;">🚗 今日行程</span>
+                        <span style="font-size:12px;color:#94A3B8;">尚未出發</span>
+                    </div>
+                    <div id="fwTripForm" style="display:none;margin-top:10px;">
+                        <label style="font-size:13px;font-weight:600;">出發里程表讀數（km）*</label>
+                        <input type="number" id="fwTripStartOdo" placeholder="例：45230" min="0" step="0.1" style="width:100%;padding:12px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;box-sizing:border-box;margin-top:4px;">
+                        <div id="fwTripPhotoPreview" style="display:flex;gap:8px;margin-top:8px;"></div>
+                        <div style="display:flex;gap:8px;margin-top:8px;">
+                            <button class="btn btn-secondary" onclick="fwCaptureTripPhoto('start')" style="flex:1;font-size:13px;padding:10px;">📷 拍里程表</button>
+                            <button class="btn btn-primary" onclick="fwStartTrip()" id="fwStartTripBtn" style="flex:1;font-size:13px;padding:10px;">🚗 出發</button>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" id="fwTripShowBtn" onclick="document.getElementById('fwTripForm').style.display='block';this.style.display='none';" style="font-size:14px;padding:12px;margin-top:10px;">🚗 出發登錄</button>
+                </div>`;
+                return;
+            }
+            const startT = fwTrip.start_time ? new Date(fwTrip.start_time).toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour:'2-digit', minute:'2-digit', hour12: false }) : '--:--';
+            if (fwTrip.status === 'open') {
+                const lastPoint = fwLastOdoPoint();
+                const driven = Math.round((lastPoint - fwTrip.start_odometer) * 10) / 10;
+                el.innerHTML = `<div class="lunch-summary">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <span style="font-weight:700;font-size:14px;">🚗 行程進行中</span>
+                        <span style="font-size:12px;color:#64748B;">出發 ${startT}</span>
+                    </div>
+                    <div style="font-size:13px;color:#475569;margin-top:6px;">
+                        出發讀數 <b>${fwTrip.start_odometer}</b> km${fwTrip.start_odometer_photo_url ? ' 📷' : ''}
+                        ${driven > 0 ? ` · 已行駛 <b>${driven}</b> km` : ''}
+                    </div>
+                    <div id="fwTripEndForm" style="display:none;margin-top:10px;">
+                        <label style="font-size:13px;font-weight:600;">收工里程表讀數（km）*</label>
+                        <input type="number" id="fwTripEndOdo" placeholder="≥ ${lastPoint}" min="0" step="0.1" style="width:100%;padding:12px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;box-sizing:border-box;margin-top:4px;">
+                        <div id="fwTripPhotoPreview" style="display:flex;gap:8px;margin-top:8px;"></div>
+                        <div style="display:flex;gap:8px;margin-top:8px;">
+                            <button class="btn btn-secondary" onclick="fwCaptureTripPhoto('end')" style="flex:1;font-size:13px;padding:10px;">📷 拍里程表</button>
+                            <button class="btn btn-primary" onclick="fwEndTrip()" id="fwEndTripBtn" style="flex:1;font-size:13px;padding:10px;">🏁 收工</button>
+                        </div>
+                    </div>
+                    <button class="btn btn-secondary" id="fwTripEndShowBtn" onclick="document.getElementById('fwTripEndForm').style.display='block';this.style.display='none';" style="font-size:13px;padding:10px;margin-top:10px;">🏁 收工登錄</button>
+                </div>`;
+                return;
+            }
+            // closed
+            const totalTxt = fwTrip.total_km != null ? `${fwTrip.total_km} km` : '未登錄結束讀數';
+            el.innerHTML = `<div class="lunch-summary">
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <span style="font-weight:700;font-size:14px;">🏁 今日行程已收工</span>
+                    <span style="font-size:13px;font-weight:700;color:#059669;">${totalTxt}</span>
+                </div>
+                <div style="font-size:12px;color:#94A3B8;margin-top:4px;">出發 ${fwTrip.start_odometer} km${fwTrip.end_odometer != null ? ' → 收工 ' + fwTrip.end_odometer + ' km' : ''}</div>
+            </div>`;
+        }
+
+        function fwCaptureTripPhoto(target) {
+            fwTripPhotoTarget = target;
+            document.getElementById('fwTripFileInput').click();
+        }
+
+        async function fwTripHandleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            if (file.size > 20 * 1024 * 1024) {
+                showToast('⚠️ 檔案過大（上限 20MB）');
+                event.target.value = '';
+                return;
+            }
+            try {
+                showToast('☁️ 上傳中...');
+                const url = await fwUploadCompressed(file, `fieldwork/odo_trip_${currentEmployee.employee_number}_${Date.now()}.jpg`);
+                fwTripPhotoUrl = url;
+                const prev = document.getElementById('fwTripPhotoPreview');
+                if (prev) prev.innerHTML = `<img src="${escapeHTML(url)}" style="width:80px;height:80px;object-fit:cover;border-radius:8px;border:1px solid #E2E8F0;">`;
+                showToast('✅ 里程表照片已上傳');
+            } catch(e) {
+                console.error(e);
+                showToast('❌ 上傳失敗：' + friendlyError(e));
+            }
+            event.target.value = '';
+        }
+
+        async function fwStartTrip() {
+            const odoEl = document.getElementById('fwTripStartOdo');
+            const odo = parseFloat(odoEl?.value);
+            if (isNaN(odo) || odo < 0) return showToast('請填出發里程表讀數');
+            const btn = document.getElementById('fwStartTripBtn');
+            btn.disabled = true; btn.textContent = '送出中...';
+            try {
+                let loc = null;
+                try { loc = await getGPS(); } catch(e) { console.warn('GPS 取得失敗，出發登錄不含定位', e); }
+                const record = {
+                    employee_id: currentEmployee.id,
+                    company_id: window.currentCompanyId,
+                    trip_date: getTaiwanDate(),
+                    start_odometer: odo,
+                    start_odometer_photo_url: fwTripPhotoUrl,
+                    start_time: new Date().toISOString(),
+                    start_lat: loc ? loc.latitude : null,
+                    start_lng: loc ? loc.longitude : null,
+                    status: 'open'
+                };
+                const { data, error } = await sb.from('field_work_trips').insert(record).select().single();
+                if (error) throw error;
+                fwTrip = data;
+                fwTripPhotoUrl = null;
+                renderTripCard();
+                showToast('🚗 出發登錄完成');
+            } catch(e) {
+                console.error(e);
+                showToast('❌ 出發登錄失敗：' + friendlyError(e));
+                btn.disabled = false; btn.textContent = '🚗 出發';
+            }
+        }
+
+        async function fwEndTrip() {
+            if (!fwTrip) return;
+            const odoEl = document.getElementById('fwTripEndOdo');
+            const odo = parseFloat(odoEl?.value);
+            if (isNaN(odo)) return showToast('請填收工里程表讀數');
+            const lastPoint = fwLastOdoPoint();
+            if (odo < lastPoint) return showToast(`讀數不可小於上一筆 ${lastPoint}`);
+            const totalKm = Math.round((odo - fwTrip.start_odometer) * 10) / 10;
+            if (totalKm > 500 && !confirm(`當日總里程 ${totalKm} km，確認無誤？`)) return;
+            const btn = document.getElementById('fwEndTripBtn');
+            btn.disabled = true; btn.textContent = '送出中...';
+            try {
+                let loc = null;
+                try { loc = await getGPS(); } catch(e) { console.warn('GPS 取得失敗，收工登錄不含定位', e); }
+                const now = new Date().toISOString();
+                const updateData = {
+                    end_odometer: odo,
+                    end_odometer_photo_url: fwTripPhotoUrl,
+                    end_time: now,
+                    end_lat: loc ? loc.latitude : null,
+                    end_lng: loc ? loc.longitude : null,
+                    total_km: totalKm,
+                    status: 'closed',
+                    updated_at: now
+                };
+                const { error } = await sb.from('field_work_trips').update(updateData)
+                    .eq('id', fwTrip.id)
+                    .eq('employee_id', currentEmployee.id);
+                if (error) throw error;
+                fwTrip = Object.assign({}, fwTrip, updateData);
+                fwTripPhotoUrl = null;
+                renderTripCard();
+                updateFieldWorkSummary();
+                showToast(`🏁 收工登錄完成，當日 ${totalKm} km`);
+            } catch(e) {
+                console.error(e);
+                showToast('❌ 收工登錄失敗：' + friendlyError(e));
+                btn.disabled = false; btn.textContent = '🏁 收工';
             }
         }
 
@@ -695,6 +925,7 @@
                 fwLogs = data || [];
                 renderFieldWorkLogs();
                 updateFieldWorkSummary();
+                renderTripCard();
             } catch(e) { console.error('載入報工紀錄失敗', e); }
         }
 
@@ -702,7 +933,15 @@
             document.getElementById('fwStationCount').textContent = fwLogs.length;
             const totalH = fwLogs.reduce((s, l) => s + (l.work_hours || 0), 0);
             document.getElementById('fwTotalHours').textContent = totalH.toFixed(1);
-            const totalKm = fwLogs.reduce((s, l) => s + (l.mileage || 0), 0);
+            // 有行程：收工後用 total_km，否則加總自動計算的區間公里；無行程：沿用手填 mileage
+            let totalKm;
+            if (fwTrip && fwTrip.status === 'closed' && fwTrip.total_km != null) {
+                totalKm = fwTrip.total_km;
+            } else if (fwTrip) {
+                totalKm = fwLogs.reduce((s, l) => s + (l.segment_km != null ? l.segment_km : 0), 0);
+            } else {
+                totalKm = fwLogs.reduce((s, l) => s + (l.segment_km != null ? l.segment_km : (l.mileage || 0)), 0);
+            }
             document.getElementById('fwTotalKm').textContent = Math.round(totalKm);
         }
 
@@ -729,7 +968,8 @@
                     <div style="font-size:12px;color:#64748B;">
                         ${serviceName ? '<span style="background:#EFF6FF;color:#2563EB;padding:2px 8px;border-radius:6px;font-size:11px;font-weight:600;">' + escapeHTML(serviceName) + '</span> ' : ''}
                         ${arriveT} → ${leaveT} ${hours ? '(' + hours + ')' : ''}
-                        ${log.mileage ? ' · ' + log.mileage + 'km' : ''}
+                        ${log.segment_km != null ? ' · ' + log.segment_km + 'km' : (log.mileage ? ' · ' + log.mileage + 'km' : '')}
+                        ${log.odometer_reading != null ? ' · 錶 ' + log.odometer_reading : ''}
                     </div>
                     ${log.work_content ? '<div style="font-size:12px;color:#475569;margin-top:6px;white-space:pre-wrap;">' + escapeHTML(log.work_content).substring(0, 80) + '</div>' : ''}
                     ${log.status === 'draft' ? '<button class="btn btn-primary" onclick="resumeFieldWork(\'' + log.id + '\')" style="font-size:12px;padding:8px;margin-top:8px;">繼續填寫</button>' : ''}
@@ -740,6 +980,7 @@
         function showFieldWorkForm() {
             fwCurrentLogId = null;
             fwPhotoUrls = [];
+            fwOdoPhotoUrl = null;
             document.getElementById('fwFormArea').style.display = 'block';
             document.getElementById('fwAddBtn').style.display = 'none';
             document.getElementById('fwFormTitle').textContent = '新增外勤打卡';
@@ -749,6 +990,20 @@
             document.getElementById('fwArriveInfo').style.display = 'none';
             document.getElementById('fwContentSection').style.display = 'none';
             document.getElementById('fwPhotoPreview').innerHTML = '';
+            // 里程表模式：有進行中行程 → 顯示讀數欄、隱藏手填里程；否則走舊流程
+            const hasOpenTrip = fwTrip && fwTrip.status === 'open';
+            const odoGroup = document.getElementById('fwOdoGroup');
+            if (odoGroup) odoGroup.style.display = hasOpenTrip ? 'block' : 'none';
+            const noTripHint = document.getElementById('fwNoTripHint');
+            if (noTripHint) noTripHint.style.display = hasOpenTrip ? 'none' : 'block';
+            const mileageGroup = document.getElementById('fwMileageGroup');
+            if (mileageGroup) mileageGroup.style.display = hasOpenTrip ? 'none' : 'block';
+            const odoEl = document.getElementById('fwOdoReading');
+            if (odoEl) { odoEl.value = ''; odoEl.disabled = false; }
+            const odoPrev = document.getElementById('fwOdoPhotoPreview');
+            if (odoPrev) odoPrev.innerHTML = '';
+            const odoHint = document.getElementById('fwOdoHint');
+            if (odoHint && hasOpenTrip) odoHint.textContent = `上一個讀數點：${fwLastOdoPoint()} km`;
             const mileageEl = document.getElementById('fwMileage');
             if (mileageEl) mileageEl.value = '';
             const contentEl = document.getElementById('fwWorkContent');
@@ -767,12 +1022,20 @@
         async function resumeFieldWork(logId) {
             const log = fwLogs.find(l => l.id === logId);
             if (!log) return;
+            // 注意：showFieldWorkForm() 會重設狀態，必須先呼叫再回填
+            showFieldWorkForm();
             fwCurrentLogId = logId;
             fwPhotoUrls = log.photo_urls || [];
-            showFieldWorkForm();
+            fwOdoPhotoUrl = log.odometer_photo_url || null;
             document.getElementById('fwFormTitle').textContent = '繼續外勤打卡';
             document.getElementById('fwClientSelect').value = log.client_id || '';
             renderFwServiceHierarchy(log.service_item_id ? [log.service_item_id] : []);
+            if (log.odometer_reading != null) {
+                const odoEl = document.getElementById('fwOdoReading');
+                if (odoEl) { odoEl.value = log.odometer_reading; odoEl.disabled = !!log.arrive_time; }
+                const odoPrev = document.getElementById('fwOdoPhotoPreview');
+                if (odoPrev && fwOdoPhotoUrl) odoPrev.innerHTML = `<img src="${escapeHTML(fwOdoPhotoUrl)}" style="width:80px;height:80px;object-fit:cover;border-radius:8px;border:1px solid #E2E8F0;">`;
+            }
             if (log.arrive_time) {
                 document.getElementById('fwArriveBtn').style.display = 'none';
                 const t = new Date(log.arrive_time).toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour:'2-digit', minute:'2-digit', hour12: false });
@@ -793,6 +1056,17 @@
         async function fwArriveCheckin() {
             const clientId = document.getElementById('fwClientSelect').value;
             if (!clientId) return showToast('請先選擇客戶');
+            // 里程表模式：讀數必填且須遞增
+            const hasOpenTrip = fwTrip && fwTrip.status === 'open';
+            let odoReading = null, lastPoint = null;
+            if (hasOpenTrip) {
+                odoReading = parseFloat(document.getElementById('fwOdoReading')?.value);
+                if (isNaN(odoReading)) return showToast('請填當下里程表讀數');
+                lastPoint = fwLastOdoPoint();
+                if (odoReading < lastPoint) return showToast(`讀數不可小於上一筆 ${lastPoint}`);
+                const seg = Math.round((odoReading - lastPoint) * 10) / 10;
+                if (seg > 200 && !confirm(`本段區間 ${seg} km，確認無誤？`)) return;
+            }
             const btn = document.getElementById('fwArriveBtn');
             btn.disabled = true; btn.textContent = '📍 定位中...';
             try {
@@ -810,6 +1084,16 @@
                     arrive_lng: loc.longitude,
                     status: 'draft'
                 };
+                if (hasOpenTrip) {
+                    record.trip_id = fwTrip.id;
+                    record.odometer_reading = odoReading;
+                    record.odometer_photo_url = fwOdoPhotoUrl;
+                    record.segment_km = Math.round((odoReading - lastPoint) * 10) / 10;
+                    const prevGps = fwPrevGpsPoint();
+                    record.gps_distance_km = prevGps
+                        ? Math.round(haversineKm(prevGps.lat, prevGps.lng, loc.latitude, loc.longitude) * 10) / 10
+                        : null;
+                }
                 const { data, error } = await sb.from('field_work_logs').insert(record).select().single();
                 if (error) throw error;
                 fwCurrentLogId = data.id;
@@ -829,6 +1113,24 @@
         }
 
         // ---- 拍照 ----
+        // 共用：壓縮並上傳到 storage，回傳公開 URL
+        async function fwUploadCompressed(file, fileName) {
+            const bitmap = await createImageBitmap(file);
+            const MAX_W = 800, MAX_H = 600;
+            let cw = bitmap.width, ch = bitmap.height;
+            if (cw > MAX_W) { ch = Math.round(ch * MAX_W / cw); cw = MAX_W; }
+            if (ch > MAX_H) { cw = Math.round(cw * MAX_H / ch); ch = MAX_H; }
+            const canvas = document.createElement('canvas');
+            canvas.width = cw; canvas.height = ch;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(bitmap, 0, 0, cw, ch);
+            const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.6));
+            const { error } = await sb.storage.from(CONFIG.BUCKET).upload(fileName, blob);
+            if (error) throw error;
+            const { data: urlData } = sb.storage.from(CONFIG.BUCKET).getPublicUrl(fileName);
+            return urlData?.publicUrl || urlData?.publicURL;
+        }
+
         async function fwCapturePhoto() {
             if (fwPhotoUrls.length >= 3) return showToast('最多 3 張照片');
             document.getElementById('fwFileInput').click();
@@ -844,27 +1146,43 @@
             }
             try {
                 showToast('☁️ 上傳中...');
-                const bitmap = await createImageBitmap(file);
-                const MAX_W = 800, MAX_H = 600;
-                let cw = bitmap.width, ch = bitmap.height;
-                if (cw > MAX_W) { ch = Math.round(ch * MAX_W / cw); cw = MAX_W; }
-                if (ch > MAX_H) { cw = Math.round(cw * MAX_H / ch); ch = MAX_H; }
-                const canvas = document.createElement('canvas');
-                canvas.width = cw; canvas.height = ch;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(bitmap, 0, 0, cw, ch);
-                const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.6));
-                const fileName = `fieldwork/${currentEmployee.employee_number}_${Date.now()}.jpg`;
-                const { error } = await sb.storage.from(CONFIG.BUCKET).upload(fileName, blob);
-                if (error) throw error;
-                const { data: urlData } = sb.storage.from(CONFIG.BUCKET).getPublicUrl(fileName);
-                const url = urlData?.publicUrl || urlData?.publicURL;
+                const url = await fwUploadCompressed(file, `fieldwork/${currentEmployee.employee_number}_${Date.now()}.jpg`);
                 fwPhotoUrls.push(url);
                 renderPhotoPreview();
                 if (fwCurrentLogId) {
                     await sb.from('field_work_logs').update({ photo_urls: fwPhotoUrls }).eq('id', fwCurrentLogId);
                 }
                 showToast('✅ 照片已上傳');
+            } catch(e) {
+                console.error(e);
+                showToast('❌ 上傳失敗：' + friendlyError(e));
+            }
+            event.target.value = '';
+        }
+
+        // ---- 到站里程表照片 ----
+        function fwCaptureOdoPhoto() {
+            document.getElementById('fwOdoFileInput').click();
+        }
+
+        async function fwOdoHandleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            if (file.size > 20 * 1024 * 1024) {
+                showToast('⚠️ 檔案過大（上限 20MB）');
+                event.target.value = '';
+                return;
+            }
+            try {
+                showToast('☁️ 上傳中...');
+                const url = await fwUploadCompressed(file, `fieldwork/odo_${currentEmployee.employee_number}_${Date.now()}.jpg`);
+                fwOdoPhotoUrl = url;
+                const prev = document.getElementById('fwOdoPhotoPreview');
+                if (prev) prev.innerHTML = `<img src="${escapeHTML(url)}" style="width:80px;height:80px;object-fit:cover;border-radius:8px;border:1px solid #E2E8F0;">`;
+                if (fwCurrentLogId) {
+                    await sb.from('field_work_logs').update({ odometer_photo_url: url }).eq('id', fwCurrentLogId);
+                }
+                showToast('✅ 里程表照片已上傳');
             } catch(e) {
                 console.error(e);
                 showToast('❌ 上傳失敗：' + friendlyError(e));
