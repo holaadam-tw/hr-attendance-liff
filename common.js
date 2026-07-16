@@ -1112,8 +1112,14 @@ async function submitLeave() {
         showToast('✅ 申請成功');
         loadLeaveHistory();
         if (statusEl) {
+            const rpcDays = Number(rpcResult?.days);
+            const excludedOffDays = Number(rpcResult?.excluded_off_days || 0);
+            let daysNote = '';
+            if (Number.isFinite(rpcDays) && rpcDays > 0) {
+                daysNote = `（計 ${rpcDays} 天${excludedOffDays > 0 ? `，已排除 ${excludedOffDays} 天休假日` : ''}）`;
+            }
             statusEl.className = 'status-box show success';
-            statusEl.innerHTML = '✅ 申請已提交' + (check.conflicts.length > 0 ? `<br><span style="font-size:12px;color:#F59E0B;">💡 提醒：期間已有 ${check.maxDayConflict} 人請假</span>` : '');
+            statusEl.innerHTML = `✅ 申請已提交${daysNote}` + (check.conflicts.length > 0 ? `<br><span style="font-size:12px;color:#F59E0B;">💡 提醒：期間已有 ${check.maxDayConflict} 人請假</span>` : '');
         }
         if (document.getElementById('leaveReason')) document.getElementById('leaveReason').value = '';
         // 清除衝突提示

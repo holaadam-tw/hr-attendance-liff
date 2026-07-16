@@ -939,6 +939,25 @@ function buildTaipeiDateTime(dateStr, timeStr, addDay = false) {
     return d;
 }
 
+// 午休重疊毫秒數：公司有設定 lunch_break_start/end 才扣（096 規則，與 DB trigger 一致）。
+// 檢查當日與翌日（跨日班）兩個午休視窗，只扣與工作區間重疊的部分。
+function calcLunchOverlapMs(effectiveStart, effectiveEnd, workDate) {
+    const lunchStart = getCachedSetting('lunch_break_start');
+    const lunchEnd = getCachedSetting('lunch_break_end');
+    if (!lunchStart || !lunchEnd) return 0;
+
+    let overlapMs = 0;
+    for (const addDay of [false, true]) {
+        const winStart = buildTaipeiDateTime(workDate, lunchStart, addDay);
+        const winEnd = buildTaipeiDateTime(workDate, lunchEnd, addDay);
+        if (!winStart || !winEnd || winEnd <= winStart) continue;
+        const s = Math.max(effectiveStart.getTime(), winStart.getTime());
+        const e = Math.min(effectiveEnd.getTime(), winEnd.getTime());
+        if (e > s) overlapMs += e - s;
+    }
+    return overlapMs;
+}
+
 function calcCappedWorkHours(attendance, schedMap) {
     const rawHours = Number(attendance?.total_work_hours || 0);
     if (!attendance?.check_in_time || !attendance?.check_out_time) return rawHours;
@@ -962,7 +981,8 @@ function calcCappedWorkHours(attendance, schedMap) {
     const effectiveEnd = checkOut < payableEnd ? checkOut : payableEnd;
     if (effectiveEnd <= effectiveStart) return 0;
 
-    const cappedHours = (effectiveEnd.getTime() - effectiveStart.getTime()) / 3600000;
+    const lunchMs = calcLunchOverlapMs(effectiveStart, effectiveEnd, workDate);
+    const cappedHours = (effectiveEnd.getTime() - effectiveStart.getTime() - lunchMs) / 3600000;
     return Math.max(0, Math.round(cappedHours * 100) / 100);
 }
 

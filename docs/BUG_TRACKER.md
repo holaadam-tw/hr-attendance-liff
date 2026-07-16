@@ -1,9 +1,24 @@
 # RunPiston Bug 追蹤 & 測試清單
 
-> 更新日期：2026-07-15
+> 更新日期：2026-07-16
 > 每次修改後更新此檔案
 
 ---
+
+## 🟢 2026-07-16 請假天數排除休假日（095）＋午休不計工時（096）
+
+| 項目 | 狀態 | 說明 |
+|------|------|------|
+| migration 095 請假排除休假日 | ✅ 已套正式庫（2026-07-16，user 結構化授權） | 根因：`submit_leave_request` 天數＝純日曆天，簡杏如假單跨 7/4(六)/7/5(日) 被多算 2 天。修正：新增 `count_employee_workdays()`（REVOKE anon）；天數只計工作日（認定規則沿用 083：排班優先→無排班平日＝工作日、週末看公司週末班設定）；全休假日擋下；`get_company_daily_attendance` 週末休假日不再列 on_leave；`get_company_monthly_attendance` leave_days 只計工作日 |
+| 簡杏如既有假單 days 修正 | ✅ 已修正（9.0→7.0，user 授權） | 假單 03bb7a83 特休 7/2~7/10；修正後月度統計對帳：應出勤 12＝實出勤 5＋請假 7、缺勤 0 |
+| common.js 請假成功訊息 | ✅ 前端完成待上線 | 顯示「計 N 天，已排除 N 天休假日」 |
+| migration 096 午休不計工時 | ✅ 已套正式庫（2026-07-16，user 結構化授權） | 業主確認：08:00–17:00 班午休 12:00–13:00 不計工時（9h→8h）。公司層級設定 `lunch_break_start/end`（僅大正啟用；本米餐飲 12–13 是尖峰不啟用）。單一計算點＝`calc_work_hours()` trigger（010），quick_check_in/kiosk/補卡全路徑生效；`calc_payable_work_hours` 同步扣；大正歷史工時已回溯重算 |
+| payroll.js 薪資工時扣午休 | ✅ 前端完成待上線 | `calcLunchOverlapMs()` 只扣與工作區間重疊部分（半天班不扣、12:30 下班只扣 0.5h、跨日班檢查翌日視窗）；JS 版本升 20260716-lunch |
+
+驗證：qa_check 0 FAIL、npm test 52/52、rls-checker 兩輪全 PASS（095 五項、096 六項）、午休邏輯 node 實跑 10 案例 PASS。正式庫實測：095——count_employee_workdays 7/2~7/10=7、純週末=0、anon 42501、7/4 簡杏如 off_day、7/3 on_leave、本米週六仍工作日；096——大正 8 筆整日班全部精準 −1h（9.13→8.13 等）、邊界筆只扣重疊（12:39 下班扣 39 分、12:56 上班扣 4 分）、本米 41 筆總和 244.38 完全不變、anon 呼叫 lunch_overlap_hours 42501、月度 total_work_hours 40.00=5天×8h。
+
+### 📌 技術債（rls-checker 2026-07-16 標記）
+- `calc_payable_work_hours(UUID)` 自 077 起 GRANT anon 且內部無 company 過濾，可被任意 attendance_id 呼叫。011 RLS 未部署現況下非新增風險；011 部署時應收回此 GRANT，只留給上層已隔離的 RPC 呼叫。
 
 ## 🟢 2026-07-16 新功能：外勤行程地圖＋追蹤模式（fieldwork-tracking）
 
