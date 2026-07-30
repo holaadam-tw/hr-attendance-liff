@@ -132,6 +132,18 @@
                 <div class="stat-card" style="background:#F3F4F6;"><div class="stat-num" style="color:#6B7280;" id="dLeave">0</div><div class="stat-label" style="color:#6B7280;">請假</div></div>
             </div>
 
+            <!-- 缺卡追蹤（下班未打卡，僅大正科技） -->
+            <div id="anomalyCard" style="display:none;margin-bottom:16px;">
+                <div style="padding:14px 18px;background:#FFF7ED;border:2px solid #FDBA74;border-radius:14px;">
+                    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                        <span style="font-size:20px;">⏰</span>
+                        <span style="font-weight:700;font-size:14px;color:#9A3412;">缺卡追蹤</span>
+                        <span id="anomalyPendingBadge" style="font-size:12px;font-weight:800;color:#C2410C;background:#FFEDD5;border-radius:999px;padding:4px 8px;"></span>
+                    </div>
+                    <div id="anomalyList" style="margin-top:10px;"></div>
+                </div>
+            </div>
+
             <!-- 便當訂購統計 -->
             <div id="lunchStatCard" style="display:none;margin-bottom:16px;cursor:pointer;" onclick="toggleLunchDetail()">
                 <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;background:#FFFBEB;border:2px solid #FCD34D;border-radius:14px;">
@@ -385,9 +397,104 @@
                 renderDailyTable();
                 document.getElementById('lastRefresh').textContent = '更新：' + new Date().toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
                 loadLunchStats(dateStr);
+                loadAnomalyData();
             } catch (e) {
                 console.error('Load daily data error:', e);
                 document.getElementById('dailyTableBody').innerHTML = '<tr><td colspan="7" style="text-align:center;color:#ef4444;padding:20px;">載入失敗：' + escapeHTML(e.message || '') + '</td></tr>';
+            }
+        }
+
+        // ===== 缺卡追蹤（下班未打卡，僅大正科技，DB 端 RPC 另驗 admin/manager）=====
+        const ANOMALY_AUDIT_COMPANY_ID = '8a669e2c-7521-43e9-9300-5c004c57e9db';
+        let anomalyData = [];
+
+        async function loadAnomalyData() {
+            const card = document.getElementById('anomalyCard');
+            if (!card) return;
+            if (window.currentCompanyId !== ANOMALY_AUDIT_COMPANY_ID || !liffProfile?.userId) {
+                card.style.display = 'none';
+                return;
+            }
+            const { data, error } = await sb.rpc('get_attendance_anomalies', {
+                p_company_id: window.currentCompanyId,
+                p_line_user_id: liffProfile.userId
+            });
+            if (error) {
+                console.warn('Load anomalies warning:', error);
+                card.style.display = 'none';
+                return;
+            }
+            anomalyData = data || [];
+            renderAnomalyCard();
+        }
+
+        function anomalyActionChip(r) {
+            if (r.pending_action === 'makeup_pending') {
+                return '<span style="font-size:11px;font-weight:800;color:#6D28D9;background:#F5F3FF;border-radius:999px;padding:3px 8px;">補卡待審</span>';
+            }
+            if (r.pending_action === 'leave_pending') {
+                return '<span style="font-size:11px;font-weight:800;color:#0369A1;background:#E0F2FE;border-radius:999px;padding:3px 8px;">請假待審</span>';
+            }
+            return '<span style="font-size:11px;font-weight:800;color:#B91C1C;background:#FEE2E2;border-radius:999px;padding:3px 8px;">待員工處理</span>';
+        }
+
+        function anomalyResolutionLabel(resolution) {
+            if (resolution === 'makeup') return '補卡結案';
+            if (resolution === 'leave') return '請假結案';
+            return '手動結案';
+        }
+
+        function renderAnomalyCard() {
+            const card = document.getElementById('anomalyCard');
+            if (!card) return;
+            if (anomalyData.length === 0) { card.style.display = 'none'; return; }
+            const pending = anomalyData.filter(r => r.status === 'pending');
+            const resolved = anomalyData.filter(r => r.status === 'resolved');
+            document.getElementById('anomalyPendingBadge').textContent = '待處理 ' + pending.length + ' 筆';
+
+            let html = '';
+            if (pending.length === 0) {
+                html += '<div style="font-size:12px;color:#92400E;">目前沒有待處理的缺卡</div>';
+            }
+            pending.forEach(r => {
+                const notifyText = r.notify_count > 0 ? '已提醒 ' + r.notify_count + ' 次' : '尚未通知';
+                html += '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:8px 0;border-top:1px dashed #FED7AA;">'
+                    + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
+                    + '<span style="font-size:13px;font-weight:800;color:#9A3412;">' + escapeHTML((r.date || '').slice(5).replace('-', '/')) + '</span>'
+                    + '<span style="font-size:13px;font-weight:700;color:#0F172A;">' + escapeHTML(r.employee_name) + (r.employee_number ? '（' + escapeHTML(r.employee_number) + '）' : '') + '</span>'
+                    + '<span style="font-size:11px;color:#B45309;">下班未打卡 · 第 ' + escapeHTML(String(r.days_outstanding)) + ' 天 · ' + escapeHTML(notifyText) + '</span>'
+                    + anomalyActionChip(r)
+                    + '</div>'
+                    + '<button onclick="resolveAnomaly(\'' + escapeHTML(r.id) + '\')" style="border:1px solid #FDBA74;background:#fff;color:#C2410C;font-size:12px;font-weight:700;border-radius:8px;padding:4px 10px;cursor:pointer;">結案</button>'
+                    + '</div>';
+            });
+            if (resolved.length > 0) {
+                html += '<div style="margin-top:8px;padding-top:8px;border-top:1px solid #FED7AA;font-size:11px;color:#A16207;">'
+                    + '<div style="font-weight:800;margin-bottom:4px;">近 7 天已結案</div>'
+                    + resolved.map(r => escapeHTML((r.date || '').slice(5).replace('-', '/')) + ' ' + escapeHTML(r.employee_name) + ' → ' + escapeHTML(anomalyResolutionLabel(r.resolution))).join('<br>')
+                    + '</div>';
+            }
+            document.getElementById('anomalyList').innerHTML = html;
+            card.style.display = 'block';
+        }
+
+        async function resolveAnomaly(id) {
+            if (!confirm('確定手動結案？只會從追蹤清單移除，不會寫入出勤記錄。')) return;
+            try {
+                const { data, error } = await sb.rpc('resolve_attendance_anomaly', {
+                    p_anomaly_id: id,
+                    p_company_id: window.currentCompanyId,
+                    p_line_user_id: liffProfile.userId
+                });
+                if (error || !data || !data.success) {
+                    showToast('結案失敗：' + ((data && data.error) || (error && error.message) || ''));
+                    return;
+                }
+                showToast('✅ 已結案');
+                loadAnomalyData();
+            } catch (e) {
+                console.error('Resolve anomaly error:', e);
+                showToast('結案失敗：' + (e.message || ''));
             }
         }
 
