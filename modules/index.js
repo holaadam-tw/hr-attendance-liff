@@ -37,7 +37,7 @@ import {
     loadAdminLunchStats, loadStaffOverview, changeLeaveCal,
     resetLeaveCal, loadLeaveCal,
     clearLeaveState
-} from './leave.js?v=20260712-leavefk';
+} from './leave.js?v=20260803-rpcauth';
 
 import {
     changeShiftWeek, resetShiftWeek, loadShiftMgr, cycleShift,
@@ -48,7 +48,7 @@ import {
     loadShiftTypeList, showAddShiftTypeForm, editShiftTypeById, deleteShiftTypeById, saveShiftType, deleteShiftType,
     loadEmployeeShiftModes, toggleShiftModeRow, saveAllShiftModes, smMarkChanged, smClearChanged, smHasUnsavedChanges,
     clearSchedulesState
-} from './schedules.js?v=20260712-leavefk';
+} from './schedules.js?v=20260803-rpcauth';
 
 import {
     BONUS_MATRIX, loadHybridBonusData, renderSelectedBonusCard,

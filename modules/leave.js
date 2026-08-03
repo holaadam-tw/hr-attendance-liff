@@ -51,7 +51,8 @@ export async function loadLeaveApprovals(status) {
     try {
         const { data, error } = await sb.rpc('get_leave_approval_requests', {
             p_company_id: window.currentCompanyId,
-            p_status: status
+            p_status: status,
+            p_line_user_id: liffProfile?.userId || null   // 101 呼叫者身分驗證
         });
         if (error) throw error;
         const typeMap = { 'annual': '特休', 'sick': '病假', 'personal': '事假', 'compensatory': '補休' };

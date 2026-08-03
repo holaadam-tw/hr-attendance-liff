@@ -1214,12 +1214,13 @@ async function loadDailyPendingMakeupRequests() {
     const reviewRes = await runOptionalDailyQuery(sb.rpc('get_makeup_review_requests', {
         p_company_id: companyId,
         p_status: 'pending',
-        p_review_filter: 'all'
+        p_review_filter: 'all',
+        p_line_user_id: currentLineUserId || null   // 101 呼叫者身分驗證
     }));
     if (!reviewRes.error) return reviewRes;
 
     console.warn('Load makeup review RPC warning:', reviewRes.error);
-    const legacyRes = await runOptionalDailyQuery(sb.rpc('get_pending_makeup_requests', { p_company_id: companyId }));
+    const legacyRes = await runOptionalDailyQuery(sb.rpc('get_pending_makeup_requests', { p_company_id: companyId, p_line_user_id: currentLineUserId || null }));
     return legacyRes.error ? reviewRes : legacyRes;
 }
 

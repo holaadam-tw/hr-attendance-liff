@@ -5,6 +5,23 @@
 
 ---
 
+## 🔴→🟢 2026-08-03 公司層級 RPC 無呼叫者驗證（跨公司資料外洩，已修）
+
+**這是目前找到最嚴重的一個洞，比 anon 可直讀資料表更嚴重**——`SECURITY DEFINER` 本來就繞過所有表層保護。
+
+| 項目 | 狀態 | 說明 |
+|------|------|------|
+| 問題 | 🔴 已確認（實測） | `get_company_daily_attendance`(095)、`get_company_monthly_attendance`(095)、`get_weekly_schedules`(063) 皆 SECURITY DEFINER 且 GRANT anon，但參數只有 `p_company_id`，**完全不驗呼叫者是誰**。任何人拿公開 anon key（就寫在 common.js 裡）加上任一 company_id（CLAUDE.md 就寫著兩家的 id），即可用 owner 權限 dump 對方公司整月出勤與班表。實測以 anon key 帶本米 company_id 呼叫，成功取回本米員工姓名、部門與逐日打卡時間 |
+| migration 099 | ✅ 已套正式庫 | 新增 `has_company_access(line_user_id, company_id, require_manager)` helper（已 REVOKE anon，避免變成身分探測管道）；三支 RPC 加 `p_line_user_id TEXT DEFAULT NULL` 與前置驗證。出勤兩支要求管理身分（admin/manager/公務機，對齊前端 `canReadAttendanceOverview`）；週班表只要求同公司在職員工（沿用公司內公開查看設計）。**函式本體除插入驗證區塊外完全沿用現行版本** |
+| 前端傳身分 | ✅ 已上線（eb8aca5） | attendance_overview.html 2 處用 `liffProfile.userId`、attendance_public.html 4 處用 `currentLineUserId` |
+| migration 100 | ✅ 已套正式庫 | 驗證改為必填（`IF NOT has_company_access(...)`），未帶身分一律 access_denied。**洞到這一步才真正關閉** |
+
+**三步部署順序（不可顛倒）**：099 加參數但可選 → 前端上線傳參數 → 100 改必填。理由：前端要傳新參數，函式必須先具備該參數，否則 PostgREST 找不到對應函式會讓打卡總覽整頁壞掉；反之若先改必填，舊前端會全部被擋。100 套用前已等過 GitHub Pages 的 HTML 快取窗口（`Cache-Control: max-age=600`）。
+
+正式庫實測（全唯讀）：業主查大正 22 筆／查本米 11 筆（兩家都是 admin）→ 允許；大正一般員工查大正日出勤 → access_denied（要求管理身分）；大正公務機 → 允許（kiosk 例外，符合前端既有邏輯）；大正員工查本米、亂編身分查本米 → 全擋；週班表大正員工查大正 → 允許、查本米 → 擋；anon 直呼 `has_company_access` → 42501。
+
+> 📌 同類型風險未全面清查：其他「只收 `p_company_id`／`p_store_id` 就回資料」的 SECURITY DEFINER RPC 需要一次總體檢，做法比照 071／088 已有的 `p_line_user_id` 驗證模式。
+
 ## 🟢 2026-08-03 切換公司入口（跨公司員工／管理員）
 
 | 項目 | 狀態 | 說明 |

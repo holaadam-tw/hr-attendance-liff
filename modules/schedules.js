@@ -402,7 +402,8 @@ export async function loadMakeupApprovals(status = 'pending', filter = 'all') {
         const reviewResult = await sb.rpc('get_makeup_review_requests', {
             p_company_id: window.currentCompanyId,
             p_status: status,
-            p_review_filter: filter
+            p_review_filter: filter,
+            p_line_user_id: liffProfile?.userId || null   // 101 呼叫者身分驗證
         });
         data = reviewResult.data;
         error = reviewResult.error;
@@ -414,7 +415,8 @@ export async function loadMakeupApprovals(status = 'pending', filter = 'all') {
 
         if (missingReviewRpc && status === 'pending' && filter === 'all') {
             const fallback = await sb.rpc('get_pending_makeup_requests', {
-                p_company_id: window.currentCompanyId
+                p_company_id: window.currentCompanyId,
+                p_line_user_id: liffProfile?.userId || null   // 101 呼叫者身分驗證
             });
             data = fallback.data;
             error = fallback.error;
@@ -495,7 +497,8 @@ export async function batchApproveTodayGpsMakeups() {
         const res = await sb.rpc('get_makeup_review_requests', {
             p_company_id: window.currentCompanyId,
             p_status: 'pending',
-            p_review_filter: 'gps_review'
+            p_review_filter: 'gps_review',
+            p_line_user_id: liffProfile?.userId || null   // 101 呼叫者身分驗證
         });
         data = res.data; error = res.error;
         if (error) throw error;
@@ -563,7 +566,8 @@ export async function loadOtApprovals(status) {
         // 使用 SECURITY DEFINER RPC 繞過 RLS（050 SQL）
         const { data, error } = await sb.rpc('get_pending_overtime_requests', {
             p_company_id: window.currentCompanyId,
-            p_status: status || 'pending'
+            p_status: status || 'pending',
+            p_line_user_id: liffProfile?.userId || null   // 101 呼叫者身分驗證
         });
         if (error) throw error;
 
