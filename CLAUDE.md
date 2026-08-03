@@ -67,7 +67,7 @@
 2. 找出至少 3 個受影響的情境
 3. 對每個情境做 logic walkthrough
 4. 跑 `bash scripts/qa_check.sh`（必須 0 FAIL）
-5. 跑 `npm test`（必須 53 通過）
+5. 跑 `npm test`（必須 52 通過）
 
 **如果任一情境走不通 → 不可 commit**
 
@@ -139,7 +139,7 @@
 
 ## 自動執行
 
-**測試通過後**（`qa_check.sh` 0 FAIL + `npm test` 53 通過 + Hook 無新警告），再執行 `git add`, `commit`, `push origin dev`。不動 main branch。
+**測試通過後**（`qa_check.sh` 0 FAIL + `npm test` 52 通過 + Hook 無新警告），再執行 `git add`, `commit`, `push origin dev`。不動 main branch。
 合併到 main **必須 user 明確、結構化授權**（僅一句「可以」不算授權，對齊 Guardrails §1/§3）；觸發 GitHub Pages 自動部署。
 
 ---

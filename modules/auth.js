@@ -176,7 +176,8 @@ export async function checkAdminPermission() {
         // （不然這裡會隨機取第一家，子頁面又會因為沒有選擇記錄而把人踢回首頁）
         if (!savedAdminCompanyId && activeAdminRows.length > 1) {
             const backTo = 'admin.html' + window.location.search + window.location.hash;
-            window.location.href = 'index.html?next=' + encodeURIComponent(backTo);
+            // scope=admin：讓首頁的公司選單只列出有管理權限的公司
+            window.location.href = 'index.html?scope=admin&next=' + encodeURIComponent(backTo);
             return;
         }
 

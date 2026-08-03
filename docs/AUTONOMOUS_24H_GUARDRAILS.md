@@ -4,7 +4,7 @@ Version: v2
 Updated: 2026-04-24
 Scope: 本 repo（hr-attendance-liff-git）之 Claude Code 自動 / 長時間執行模式
 
-> 專案背景：本 repo 為純前端靜態站，部署於 GitHub Pages，後端為 Supabase（PostgreSQL + RLS），認證走 LINE LIFF。所有 user-visible 頁面都是 HTML/CSS/JS，模組化於 `modules/*.js`，共用邏輯在 `common.js`。測試門檻為 `bash scripts/qa_check.sh`（0 FAIL）+ `npm test`（53 通過）。
+> 專案背景：本 repo 為純前端靜態站，部署於 GitHub Pages，後端為 Supabase（PostgreSQL + RLS），認證走 LINE LIFF。所有 user-visible 頁面都是 HTML/CSS/JS，模組化於 `modules/*.js`，共用邏輯在 `common.js`。測試門檻為 `bash scripts/qa_check.sh`（0 FAIL）+ `npm test`（52 通過）。
 
 ---
 
@@ -204,7 +204,7 @@ ROLLBACK: <一句話>
 
 ```bash
 QA_CMD="bash scripts/qa_check.sh"   # 必須 0 FAIL
-UNIT_CMD="npm test"                 # 必須 53 通過
+UNIT_CMD="npm test"                 # 必須 52 通過
 ```
 
 ### Hook 自動檢查（Edit / Write 後自動跑）
@@ -255,7 +255,7 @@ GIT_SHOW:
 
 TESTS_RUN:
 - bash scripts/qa_check.sh => PASS/FAIL (X FAIL / Y WARN)
-- npm test => PASS/FAIL (X/53 passed)
+- npm test => PASS/FAIL (X/52 passed)
 - <其他命令> => PASS/FAIL
 
 DB_TOUCHED: <yes/no>
@@ -490,7 +490,7 @@ artifacts/
 | 命令 | 用途 | 通過標準 |
 |---|---|---|
 | `bash scripts/qa_check.sh` | QA 自動檢查（全域變數、多租戶、時區、RLS） | 0 FAIL |
-| `npm test` | 單元測試 | 53 通過 |
+| `npm test` | 單元測試 | 52 通過 |
 | `@rls-checker` | RLS 處理完整性審查（subagent） | 無漏洞回報 |
 | `.claude/hooks/check-rls-bypass.sh` | Edit/Write 後自動跑 | 無新警告 |
 | `.claude/hooks/check-multitenant.sh` | Edit/Write 後自動跑 | 無新警告 |

@@ -1,10 +1,14 @@
 {
   "scripts": {
     "test": "node tests/smoke-test.js",
-    "test:payroll": "node tests/payroll-simulation.js"
+    "test:payroll": "node tests/payroll-simulation.js",
+    "test:ui": "node tests/ui-company-switcher.test.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.101.1",
     "puppeteer": "^24.37.5"
+  },
+  "devDependencies": {
+    "jsdom": "^29.1.1"
   }
 }

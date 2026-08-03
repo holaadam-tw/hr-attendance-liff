@@ -787,7 +787,16 @@
         };
 
         window.showCompanySelector = function(employeeRecords) {
-            var options = employeeRecords.map(function(emp) {
+            // scope=admin（由 admin.html 導回時帶）→ 只列出有管理權限的公司，
+            // 避免選了「只有一般員工身份」的公司、進後台卻被退回別家
+            var records = employeeRecords;
+            if (getEffectiveUrlParams().get('scope') === 'admin') {
+                var adminOnly = employeeRecords.filter(function(emp) {
+                    return emp.role === 'admin' || emp.role === 'manager';
+                });
+                if (adminOnly.length > 0) records = adminOnly;
+            }
+            var options = records.map(function(emp) {
                 return {
                     id: emp.company_id,
                     name: (emp.companies && emp.companies.name) ? emp.companies.name : '未命名公司',
@@ -795,7 +804,7 @@
                 };
             });
             return window.pickCompanyFromOverlay(options, false).then(function(sel) {
-                return employeeRecords.find(function(r) { return r.company_id === sel.id; }) || employeeRecords[0];
+                return records.find(function(r) { return r.company_id === sel.id; }) || records[0];
             });
         };
 
