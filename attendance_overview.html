@@ -386,7 +386,8 @@
             try {
                 const { data, error } = await sb.rpc('get_company_daily_attendance', {
                     p_company_id: window.currentCompanyId,
-                    p_date: dateStr
+                    p_date: dateStr,
+                    p_line_user_id: liffProfile?.userId || null   // 099 呼叫者身分驗證
                 });
 
                 if (error) throw error;
@@ -651,7 +652,8 @@
                 const { data, error } = await sb.rpc('get_company_monthly_attendance', {
                     p_company_id: window.currentCompanyId,
                     p_year: mYear,
-                    p_month: mMonth + 1
+                    p_month: mMonth + 1,
+                    p_line_user_id: liffProfile?.userId || null   // 099 呼叫者身分驗證
                 });
 
                 if (error) throw error;

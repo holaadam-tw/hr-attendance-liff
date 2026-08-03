@@ -1328,7 +1328,7 @@ async function loadDailyData() {
 
     try {
         const [dailyRes, makeupRes, leaveRes] = await Promise.all([
-            sb.rpc('get_company_daily_attendance', { p_company_id: companyId, p_date: dateStr }),
+            sb.rpc('get_company_daily_attendance', { p_company_id: companyId, p_date: dateStr, p_line_user_id: currentLineUserId || null }),
             loadDailyPendingMakeupRequests(),
             runOptionalDailyQuery(sb.from('leave_requests')
                 .select('employee_id, leave_type, leave_period, days, start_date, end_date, status, employees!leave_requests_employee_id_fkey!inner(company_id)')
@@ -1991,7 +1991,7 @@ async function loadMonthlyData() {
     // 政策/假日/請假/遲到為非核心查詢，與主表 RPC 並行載入，失敗不擋主表
     const [, monthlyRes, leaveRes, lateRes] = await Promise.all([
         loadCompanyPolicyAndHolidays(),
-        sb.rpc('get_company_monthly_attendance', { p_company_id: companyId, p_year: mYear, p_month: mMonth + 1 }),
+        sb.rpc('get_company_monthly_attendance', { p_company_id: companyId, p_year: mYear, p_month: mMonth + 1, p_line_user_id: currentLineUserId || null }),
         loadMonthLeaveRequests(),
         loadMonthLateAttendance()
     ]);
@@ -2639,7 +2639,8 @@ async function loadScheduleData() {
     try {
         const { data, error } = await sb.rpc('get_weekly_schedules', {
             p_company_id: companyId,
-            p_start_date: startStr
+            p_start_date: startStr,
+            p_line_user_id: currentLineUserId || null   // 099 呼叫者身分驗證
         });
         if (error) throw error;
         renderScheduleView(data, dates);
@@ -2736,7 +2737,7 @@ async function loadHumanManagement() {
     document.getElementById('humanBody').innerHTML = '<tr><td style="padding:36px;text-align:center;color:#94A3B8;">\u8f09\u5165\u4e2d...</td></tr>'; document.getElementById('humanStatus').textContent = '';
     try {
         const [weekRes, shiftRes] = await Promise.all([
-            sb.rpc('get_weekly_schedules', { p_company_id: companyId, p_start_date: startStr }),
+            sb.rpc('get_weekly_schedules', { p_company_id: companyId, p_start_date: startStr, p_line_user_id: currentLineUserId || null }),
             sb.rpc('get_company_shift_types', { p_company_id: companyId, p_line_user_id: currentLineUserId })
         ]);
         if (weekRes.error) throw weekRes.error;
