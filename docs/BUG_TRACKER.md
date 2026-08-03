@@ -5,6 +5,23 @@
 
 ---
 
+## 🟢 2026-08-03 切換公司入口（跨公司員工／管理員）
+
+| 項目 | 狀態 | 說明 |
+|------|------|------|
+| 首頁「切換公司」鈕 | ✅ 前端完成待上線 | index.html：原 `showCompanySelector` 重構為共用的 `pickCompanyFromOverlay(options, cancelable)`（cancelable 時多一顆取消鈕，關閉時移除不殘留）；新增 `mountCompanySwitchEntry()` 在公司名稱旁掛鈕，只在身份 ≥2 家公司時出現。平台管理員取 `managedCompanies`、一般員工取新的 `window.myCompanyOptions` |
+| 切換方式 | ✅ 寫 sessionStorage + 整頁重載 | 不做即時換資料：選定後寫 `selectedCompanyId` 再 `location.reload()`，確保 currentEmployee／功能開關／子頁面全部一致，不會殘留前一家公司的畫面。選同一家或按取消則完全不動作 |
+| admin.html 後台下拉 | ✅ 前端完成待上線 | `renderAdminCompanySwitcher` 從「僅平台管理員」擴充：一般跨公司管理員改用 `window.myAdminCompanies`（checkAdminPermission 以 `companies.select('id,name').in('id', 自己的 company_id 清單)` 帶名稱），change 時寫 sessionStorage + reload；平台管理員維持原本 `switchCompanyAdmin` 即時切換路徑不變。role=manager 的標註平台端仍是 (代管)、一般端顯示 (主管) |
+| i18n | ✅ | 新增 `switchCompany`（中文「切換公司」／越南文「Đổi công ty」），按鈕用 data-i18n 掛載後呼叫 applyI18n |
+| JS 快取版本 | ✅ 升至 `20260803-companyswitch` | common.js / i18n.js / modules/index.js 的 `?v=` 全部更新（admin、checkin、index、records、services、kiosk、employee_register）。**前一個 commit 1f5cdf2 漏升，本次一併補上** |
+
+驗證：qa_check 0 FAIL、npm test 52/52、hook 無新警告、`node --check` 全過。真實 DOM 互動測試（jsdom 載入真實 index.html 的 inline script 與真實 modules/auth.js，非副本）：
+- 首頁切換器 17/17 — 單一公司不掛鈕、多公司掛鈕且公司名稱不被蓋掉、重複 mount 不重覆掛、overlay 列出兩家公司與正確角色標籤、取消不寫入不重載且取消鈕不殘留、選同一家不動作、選另一家寫入正確 id 並觸發重載、首次登入的選單不可取消且回傳正確員工記錄。
+- 後台下拉 9/9 — 單一公司不顯示、跨公司顯示兩項、(主管) 標註正確、原公司名稱隱藏、重複呼叫不重覆插入、選同一家不動作、切換寫入正確 id 並重載。
+- 未涵蓋：平台管理員的即時切換分支（`switchCompanyAdmin` 需要 Supabase 連線，該路徑本次未改動）。
+
+---
+
 ## 🟢 2026-08-03 補打卡期限延長 7 天＋跨公司管理員被踢回首頁修復
 
 | 項目 | 狀態 | 說明 |
@@ -18,7 +35,7 @@
 
 rls-checker 審查結論：多租戶隔離未受影響（`currentCompanyId` 一律取自 `.eq('line_user_id', ...)` 查回的自身列表，`sessionStorage.selectedCompanyId` 只當作 `.find()` 的比對值，竄改成別家公司 id 只會找不到並退回自己有權限的公司）；`next` 白名單正則不允許 `/` 與 `:`，可擋 `//evil.com`、`../`、`javascript:`，且只在 `checkUserStatus()` 成功後才處理，無先跳轉後驗證的競態。
 
-> 📌 已知限制 1：跨公司管理員一個 session 內選定公司後，沒有切換公司的 UI（平台管理員才有 `renderAdminCompanySwitcher`），需重開 LIFF 才能換。屬既有缺口，未在本次處理。
+> 📌 已知限制 1：~~跨公司管理員 session 內無法切換公司~~ → 已於同日補上切換入口（見下方區塊）。
 > 📌 已知限制 2（rls-checker 標記，非資安）：`auth.js` 導回首頁選公司時，index.html 的選單會列出所有身份的公司，但 admin.html 只認 admin/manager 的公司。若某人同時是 A/B 公司管理員又是 C 公司一般員工，選了 C 會退回 A 的後台。目前大正／本米兩位管理員在兩家都是 admin，不會觸發。
 
 ### ✅ migration 097 補打卡日期窗口後端驗證（rls-checker 標記，已於 2026-08-03 完成）

@@ -7,7 +7,7 @@
     <title>🏢 員工服務中心</title>
     <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="i18n.js?v=20260608-employee-lang"></script>
+    <script src="i18n.js?v=20260803-companyswitch"></script>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -264,7 +264,7 @@
         </div>
     </div>
 
-    <script src="common.js?v=20260712-leavefk"></script>
+    <script src="common.js?v=20260803-companyswitch"></script>
     <script>
         // === 全域錯誤監控 ===
         window._errLogCount = 0; window._errLogResetTs = 0;
@@ -711,24 +711,27 @@
         // ===== 多公司選擇 overlay =====
         // 由 common.js checkUserStatus 在員工綁定多家公司且 sessionStorage 無選擇時呼叫
         // 回傳 Promise，使用者點擊卡片後 resolve 該員工記錄
-        window.showCompanySelector = function(employeeRecords) {
+        // 共用的公司選擇 overlay
+        // options: [{ id, name, role }]；cancelable=true 時可按取消回傳 null
+        // resolve 該 option（或 null）
+        window.pickCompanyFromOverlay = function(options, cancelable) {
             return new Promise((resolve) => {
                 // 顯示前先把 loading/skeleton 藏起來
                 var _loading = document.getElementById('loadingPage');
                 if (_loading) _loading.style.display = 'none';
                 var _skel = document.getElementById('skeletonScreen');
-                if (_skel) _skel.style.display = 'none';
+                if (_skel && !cancelable) _skel.style.display = 'none';
 
                 var overlay = document.getElementById('company-selector-overlay');
                 var list = document.getElementById('company-selector-list');
+                var card = overlay && overlay.querySelector('.cs-card');
                 if (!overlay || !list) {
                     // 防禦：DOM 不存在就回傳第一筆避免卡住
                     console.error('company-selector-overlay DOM 不存在');
-                    resolve(employeeRecords[0]);
+                    resolve(cancelable ? null : options[0]);
                     return;
                 }
 
-                list.innerHTML = '';
                 var roleLabel = function(r) {
                     if (r === 'admin') return '管理員';
                     if (r === 'manager') return '主管';
@@ -736,32 +739,99 @@
                     return '一般員工';
                 };
 
-                employeeRecords.forEach(function(emp) {
+                var close = function(result) {
+                    overlay.style.display = 'none';
+                    var oldCancel = document.getElementById('cs-cancel');
+                    if (oldCancel) oldCancel.remove();
+                    if (!cancelable) {
+                        // 隱藏後重顯骨架屏，避免 loadSettings/checkTodayAttendance 期間空白
+                        var _skel2 = document.getElementById('skeletonScreen');
+                        if (_skel2) _skel2.style.display = '';
+                    }
+                    resolve(result);
+                };
+
+                list.innerHTML = '';
+                options.forEach(function(opt) {
                     var btn = document.createElement('button');
                     btn.type = 'button';
                     btn.className = 'cs-item';
-                    var cname = (emp.companies && emp.companies.name) ? emp.companies.name : '未命名公司';
                     btn.innerHTML =
                         '<div>' +
                             '<div class="cs-name"></div>' +
                             '<div class="cs-role"></div>' +
                         '</div>' +
                         '<div class="cs-arrow">›</div>';
-                    btn.querySelector('.cs-name').textContent = cname;
-                    btn.querySelector('.cs-role').textContent = roleLabel(emp.role);
-                    btn.addEventListener('click', function() {
-                        overlay.style.display = 'none';
-                        // 隱藏後重顯骨架屏，避免 loadSettings/checkTodayAttendance 期間空白
-                        var _skel2 = document.getElementById('skeletonScreen');
-                        if (_skel2) _skel2.style.display = '';
-                        resolve(emp);
-                    });
+                    btn.querySelector('.cs-name').textContent = opt.name || '未命名公司';
+                    btn.querySelector('.cs-role').textContent = roleLabel(opt.role);
+                    btn.addEventListener('click', function() { close(opt); });
                     list.appendChild(btn);
                 });
+
+                var oldCancel = document.getElementById('cs-cancel');
+                if (oldCancel) oldCancel.remove();
+                if (cancelable && card) {
+                    var cancelBtn = document.createElement('button');
+                    cancelBtn.type = 'button';
+                    cancelBtn.id = 'cs-cancel';
+                    cancelBtn.setAttribute('data-i18n', 'cancel');
+                    cancelBtn.textContent = '取消';
+                    cancelBtn.style.cssText = 'width:100%;margin-top:12px;padding:12px;border:1px solid #E2E8F0;border-radius:12px;background:#fff;color:#64748B;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer;';
+                    cancelBtn.addEventListener('click', function() { close(null); });
+                    card.appendChild(cancelBtn);
+                    window.EmployeeI18N?.applyI18n(card);
+                }
 
                 overlay.style.display = 'flex';
             });
         };
+
+        window.showCompanySelector = function(employeeRecords) {
+            var options = employeeRecords.map(function(emp) {
+                return {
+                    id: emp.company_id,
+                    name: (emp.companies && emp.companies.name) ? emp.companies.name : '未命名公司',
+                    role: emp.role
+                };
+            });
+            return window.pickCompanyFromOverlay(options, false).then(function(sel) {
+                return employeeRecords.find(function(r) { return r.company_id === sel.id; }) || employeeRecords[0];
+            });
+        };
+
+        // ===== 首頁「切換公司」入口 =====
+        // 平台管理員用 managedCompanies，一般跨公司員工用 myCompanyOptions；
+        // 選定後寫回 sessionStorage 並整頁重載，讓所有頁面吃到同一家公司
+        function mountCompanySwitchEntry() {
+            const host = document.getElementById('homeCompanyName');
+            if (!host || host.dataset.switcher === '1') return;
+            const options = (window.isPlatformAdmin ? window.managedCompanies : window.myCompanyOptions) || [];
+            if (options.length <= 1) return;
+
+            host.textContent = '';
+            host.style.display = 'flex';
+            host.style.alignItems = 'center';
+            host.style.gap = '8px';
+
+            const nameEl = document.createElement('span');
+            nameEl.textContent = currentCompanyName || '';
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.setAttribute('data-i18n', 'switchCompany');
+            btn.textContent = '切換公司';
+            btn.style.cssText = 'border:1px solid #C7D2FE;background:#EEF2FF;color:#4F46E5;border-radius:999px;padding:3px 10px;font-size:11px;font-weight:800;font-family:inherit;cursor:pointer;';
+            btn.addEventListener('click', async () => {
+                const picked = await window.pickCompanyFromOverlay(options, true);
+                if (!picked || picked.id === window.currentCompanyId) return;
+                sessionStorage.setItem('selectedCompanyId', picked.id);
+                window.location.reload();
+            });
+
+            host.appendChild(nameEl);
+            host.appendChild(btn);
+            host.dataset.switcher = '1';
+            window.EmployeeI18N?.applyI18n(host);
+        }
 
         window.addEventListener('load', async () => {
             if (typeof initializeLiff === 'undefined') {
@@ -835,6 +905,8 @@
                         const el = document.getElementById('homeCompanyName');
                         if (el) { el.textContent = currentCompanyName; el.style.display = 'block'; }
                     }
+                    // 多公司身份 → 公司名稱旁加「切換公司」
+                    mountCompanySwitchEntry();
 
                     // admin 和 manager 都可進管理後台
                     if (currentEmployee && (currentEmployee.role === 'admin' || currentEmployee.role === 'manager')) {

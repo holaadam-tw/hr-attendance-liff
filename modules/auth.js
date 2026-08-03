@@ -255,6 +255,23 @@ export async function checkAdminPermission() {
             } catch (e) { console.log('載入公司功能設定失敗', e); }
         }
 
+        // 跨公司管理員：帶出所有可管理公司名稱，供後台切換器使用
+        window.myAdminCompanies = [];
+        if (activeAdminRows.length > 1) {
+            try {
+                const ids = [...new Set(activeAdminRows.map(row => row.company_id).filter(Boolean))];
+                const { data: compRows } = await sb.from('companies').select('id, name').in('id', ids);
+                const nameMap = new Map((compRows || []).map(c => [c.id, c.name]));
+                window.myAdminCompanies = activeAdminRows
+                    .filter(row => row.company_id)
+                    .map(row => ({
+                        id: row.company_id,
+                        name: nameMap.get(row.company_id) || '未命名公司',
+                        role: row.role
+                    }));
+            } catch (e) { console.log('載入可管理公司清單失敗', e); }
+        }
+
         showStatus(statusEl, 'success', '✅ 權限驗證通過');
         populateYearSelect('bonusYear');
         setTimeout(() => {
@@ -263,6 +280,7 @@ export async function checkAdminPermission() {
             applyRoleVisibility();
             applyAdminFeatureVisibility();
             if (typeof applyAdminPermissions === 'function') applyAdminPermissions();
+            renderAdminCompanySwitcher();
         }, 800);
 
     } catch (err) {
@@ -291,8 +309,11 @@ export function updateAdminInfo(data) {
 
 // ===== admin.html 公司切換器 =====
 export function renderAdminCompanySwitcher() {
-    const companies = window.managedCompanies;
-    if (!window.isPlatformAdmin || !companies || companies.length <= 1) return;
+    // 平台管理員用 managedCompanies（可即時切換）；
+    // 一般跨公司管理員用 myAdminCompanies（改 sessionStorage 後整頁重載）
+    const isPlatform = !!window.isPlatformAdmin;
+    const companies = isPlatform ? window.managedCompanies : window.myAdminCompanies;
+    if (!companies || companies.length <= 1) return;
     if (document.getElementById('adminCompanySwitcher')) return;
 
     const target = document.getElementById('adminCompanyName');
@@ -307,11 +328,19 @@ export function renderAdminCompanySwitcher() {
     companies.forEach(c => {
         const opt = document.createElement('option');
         opt.value = c.id;
-        opt.textContent = c.name + (c.role === 'manager' ? ' (代管)' : '');
+        const suffix = c.role === 'manager' ? (isPlatform ? ' (代管)' : ' (主管)') : '';
+        opt.textContent = c.name + suffix;
         if (c.id === currentCompanyId) opt.selected = true;
         select.appendChild(opt);
     });
-    select.addEventListener('change', () => switchCompanyAdmin(select.value));
+    select.addEventListener('change', () => {
+        if (isPlatform) return switchCompanyAdmin(select.value);
+        // 一般管理員沒有 managedCompanies 那套即時換資料的路徑，
+        // 直接寫回選擇並重載，確保 currentAdminEmployee / 功能開關 / 子頁面全部一致
+        if (select.value === window.currentCompanyId) return;
+        sessionStorage.setItem('selectedCompanyId', select.value);
+        window.location.reload();
+    });
 
     target.parentNode.insertBefore(select, target);
 }

@@ -361,6 +361,14 @@ async function checkUserStatus() {
 
         // 僅保留已啟用的員工記錄
         const activeRows = rows.filter(r => r.is_active && r.status !== 'pending');
+
+        // 供首頁「切換公司」入口使用（只有一家時前端不會顯示切換鈕）
+        window.myCompanyOptions = activeRows.map(r => ({
+            id: r.company_id,
+            name: r.companies?.name || '未命名公司',
+            role: r.role
+        }));
+
         if (activeRows.length === 0) {
             // 有記錄但都是 pending / inactive → 顯示等待審核畫面
             window._pendingEmployeeStatus = rows[0].status || 'pending';
