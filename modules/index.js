@@ -8,7 +8,7 @@ import {
     applyRoleVisibility, applyAdminFeatureVisibility,
     switchFieldSalesAdmin,
     renderAdminCompanySwitcher, switchCompanyAdmin
-} from './auth.js?v=20260712-leavefk';
+} from './auth.js?v=20260803-companyswitch';
 
 import {
     loadAuditLogs, exportReport
