@@ -20,7 +20,22 @@
 
 正式庫實測（全唯讀）：業主查大正 22 筆／查本米 11 筆（兩家都是 admin）→ 允許；大正一般員工查大正日出勤 → access_denied（要求管理身分）；大正公務機 → 允許（kiosk 例外，符合前端既有邏輯）；大正員工查本米、亂編身分查本米 → 全擋；週班表大正員工查大正 → 允許、查本米 → 擋；anon 直呼 `has_company_access` → 42501。
 
-> 📌 同類型風險未全面清查：其他「只收 `p_company_id`／`p_store_id` 就回資料」的 SECURITY DEFINER RPC 需要一次總體檢，做法比照 071／088 已有的 `p_line_user_id` 驗證模式。
+### 同型排查結果（2026-08-03 全庫掃描，條件：SECURITY DEFINER + GRANT anon + 參數含租戶選擇欄位但無 line_user_id）
+
+| 批次 | 函式 | 處置 | 狀態 |
+|---|---|---|---|
+| 099/100 | get_company_daily_attendance、get_company_monthly_attendance、get_weekly_schedules | 加 `p_line_user_id` 驗證 | ✅ 已必填 |
+| 101/102 | get_leave_approval_requests、get_makeup_review_requests、get_pending_makeup_requests、get_pending_overtime_requests | 加 `p_line_user_id` 驗證 | 101 已套；102（必填）待前端上線後 |
+| 103 | `calculate_monthly_payroll(p_employee_id, ...)` | **REVOKE anon** | ✅ 已收回。實測 anon 帶真實 employee_id 可直接取得該員工 net_salary／gross_salary／扣除額；全庫 grep 前端沒有呼叫，屬歷史遺留 |
+| 103 | `generate_binding_code(p_employee_id)` | **REVOKE anon** | ✅ 已收回。任何人都能為任一員工編號取得 6 位數綁定碼（函式直接回傳 code），是帳號綁定被冒用的破口；前端未使用、verification_codes 0 筆，舊設計殘留 |
+| 待處理 | `upsert_schedule` / `delete_schedule(p_scheduler_id, ...)` | 需加 `p_line_user_id` 對應驗證 | ⏳ 未修。函式**有**檢查 p_scheduler_id 是否具排班權限且同公司，但 scheduler_id 由前端傳、且 employees 表 anon 可全讀 → 冒用管理員 id 即可增刪他人排班（寫入操作） |
+
+掃描後複查：以 `company_id/store_id` 為條件已無剩餘同型函式。
+
+> ### ⚠️ 這道防線的實際強度（務必理解）
+> `p_line_user_id` 驗證**提高了門檻但尚未完全封死**：目前 `employees` 表 anon 可全讀（37/37），**連 `line_user_id` 都讀得到**（實測可撈出 role=admin 者的 LINE ID）。攻擊者先撈管理員身分再帶進 RPC 仍可通過。
+>
+> 它確實擋掉的是：①只知道 company_id（公開文件裡就有）就能 dump 的情況；②A 公司使用者存取 B 公司資料。**真正封死必須連同 employees 表一起鎖**，而那受制於「前端無 auth session、身分自舉靠直讀 employees」的雞生蛋問題，需要 bootstrap RPC，屬另案工程。
 
 ## 🟢 2026-08-03 切換公司入口（跨公司員工／管理員）
 
