@@ -50,8 +50,20 @@ rls-checker 審查結論：多租戶隔離未受影響（`currentCompanyId` 一�
 正式庫實測（anon key REST，皆無寫入）：當天／6 天前（窗口內邊界）→ 進到員工查詢回 `employee_not_found`；7 天前／30 天前／2 年前 → `punch_date_out_of_window`（最早 2026-07-28）；明天 → `punch_date_in_future`。
 交易內 rollback 實測（真實員工 E007）：窗口內邊界 `success: true`（確認正常送出未被誤擋）、同日同類型重複 → `duplicate_makeup_request`（防呆仍有效）、窗口外 → 擋下；ROLLBACK 後正式庫殘留 0 筆。
 
-### 📌 新發現待辦（2026-08-03，未修）
-- `submit_makeup_punch` / `get_my_makeup_requests` 都用 `WHERE line_user_id = ? AND is_active LIMIT 1` 認定員工，**沒有 company_id 條件**。跨公司員工（目前只有大正／本米兩位管理員）送補打卡時，會隨機落在其中一家公司的員工記錄上，記錄查詢也一樣。影響低（受影響者皆為管理員、極少走補打卡），但屬多租戶正確性問題。修法需 RPC 加 `p_company_id` 參數並由前端傳 `window.currentCompanyId`，前後端要一起改，另案處理。
+### ✅ migration 098 補打卡 RPC 加入公司範圍（2026-08-03 完成，user 授權）
+
+| 項目 | 狀態 | 說明 |
+|------|------|------|
+| migration 098 | ✅ 已套正式庫（2026-08-03，user 授權） | `submit_makeup_punch` / `get_my_makeup_requests` 原本用 `WHERE line_user_id = ? AND is_active LIMIT 1` 認定員工、無 company_id，跨公司員工會隨機落在其中一家。兩支都新增 `p_company_id UUID DEFAULT NULL`：有帶就限定該公司、沒帶維持原行為（向後相容）；`LIMIT 1` 補上 `ORDER BY created_at` 避免結果不固定 |
+| 前端傳入公司 | ✅ 已上線 | common.js `submitMakeupPunch` / `loadMakeupHistory`、checkin.html GPS 待審打卡都改傳 `p_company_id: window.currentCompanyId \|\| null` |
+| 安全性 | ✅ 只能縮小不能放大 | 查詢條件是「line_user_id = 自己 AND company_id = 傳入值」，傳別家公司 id 只會查不到員工（實測 employee_not_found），不會取得未授權資料 |
+| 參數數量改變的陷阱 | ✅ 已處理 | 必須 DROP 舊版再建，否則新舊 overload 並存會讓 PostgREST 報 `Could not choose the best candidate function`。套用後實際查 pg_proc 確認各只剩一個簽章 |
+
+正式庫實測（交易內 rollback，殘留 0 筆）：業主帳號帶大正 company_id → 申請落在大正的員工記錄；帶本米 → 落在本米（跨公司正確性修復）；大正員工 E007 帶本米 company_id → `employee_not_found`（隔離有效）；不帶 company_id → 仍可送出（舊前端相容）；E818 讀取帶大正 → 53 筆、帶本米 → 0 筆。
+PostgREST（anon key，無寫入）另測兩種呼叫形狀都能正確解析：舊前端 6 參數與新前端帶 `p_company_id` 皆回 `employee_not_found` 而非找不到函式，確認部署順序（DB 先、前端後）不會讓線上打卡中斷。
+
+### 📌 既有未修（非本次引入）
+- `submit_makeup_punch` 的 `p_line_user_id` 由前端傳入且無 auth session 驗證，理論上任何人拿 anon key ＋ 他人 LINE id 就能代送補打卡申請（仍需主管核准才生效）。這是全系統「前端無 auth session」的架構問題，見 memory `rls_011_not_deployed`，不在單一 RPC 層能解。
 
 ## 🟢 2026-07-16 請假天數排除休假日（095）＋午休不計工時（096）
 

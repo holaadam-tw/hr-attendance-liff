@@ -79,7 +79,7 @@
         </div>
     </div>
 
-    <script src="common.js?v=20260803-companyswitch"></script>
+    <script src="common.js?v=20260803-makeupscope"></script>
     <script>
         // === 全域錯誤監控 ===
         window._errLogCount = 0; window._errLogResetTs = 0;
@@ -212,7 +212,9 @@
                 p_reason: reason,
                 p_note: buildGpsReviewNote(rpcAction, loc, publicUrl, nowParts, options.reviewType || 'low_accuracy_gps', {
                     minDistance
-                })
+                }),
+                // 跨公司員工必須指定公司（098）
+                p_company_id: window.currentCompanyId || null
             });
 
             if (error || !data?.success) {

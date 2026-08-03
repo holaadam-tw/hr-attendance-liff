@@ -1240,7 +1240,9 @@ async function submitMakeupPunch() {
             p_punch_type: type,
             p_punch_time: time,
             p_reason: reason,
-            p_note: reasonText || null
+            p_note: reasonText || null,
+            // 跨公司員工必須指定公司，否則 RPC 只能用 line_user_id 猜（098）
+            p_company_id: window.currentCompanyId || null
         });
 
         if (rpcError) throw rpcError;
@@ -1271,7 +1273,8 @@ async function loadMakeupHistory() {
         // 使用 RPC 繞過 RLS
         const { data } = await sb.rpc('get_my_makeup_requests', {
             p_line_user_id: liffProfile.userId,
-            p_limit: 10
+            p_limit: 10,
+            p_company_id: window.currentCompanyId || null
         });
         
         if (!data || data.length === 0) {
