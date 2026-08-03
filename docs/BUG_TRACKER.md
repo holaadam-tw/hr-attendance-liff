@@ -21,8 +21,20 @@ rls-checker 審查結論：多租戶隔離未受影響（`currentCompanyId` 一�
 > 📌 已知限制 1：跨公司管理員一個 session 內選定公司後，沒有切換公司的 UI（平台管理員才有 `renderAdminCompanySwitcher`），需重開 LIFF 才能換。屬既有缺口，未在本次處理。
 > 📌 已知限制 2（rls-checker 標記，非資安）：`auth.js` 導回首頁選公司時，index.html 的選單會列出所有身份的公司，但 admin.html 只認 admin/manager 的公司。若某人同時是 A/B 公司管理員又是 C 公司一般員工，選了 C 會退回 A 的後台。目前大正／本米兩位管理員在兩家都是 admin，不會觸發。
 
-### 📌 待辦（rls-checker 2026-08-03 標記）
-- `submit_makeup_punch`（085 為現行版本）**沒有任何 punch_date 範圍檢查**，未來日期與遠期日期都收。「7 天內」與「不可未來」目前純前端擋，anon key 可直接呼叫 RPC 繞過（此為既有狀況，非本次引入；申請仍需管理端人工核准才生效，風險中低）。補強做法：新增 migration 在 RPC 內加 `p_punch_date BETWEEN (台灣今日 - 6) AND 台灣今日`，時區須用 `Asia/Taipei` 對齊 `getTaiwanDate`，避免 UTC 邊界差一天。需 user 授權套正式庫，列為後續排程。
+### ✅ migration 097 補打卡日期窗口後端驗證（rls-checker 標記，已於 2026-08-03 完成）
+
+| 項目 | 狀態 | 說明 |
+|------|------|------|
+| migration 097 | ✅ 已套正式庫（2026-08-03，user 明確授權） | `submit_makeup_punch`（085 為前一版）原本**完全沒有 punch_date 檢查**，未來日期與任意久遠日期都收，「7 天內／不可未來」只在前端擋、anon key 可直接呼叫繞過。097 在 RPC 內補上窗口驗證：`v_today = (now() AT TIME ZONE 'Asia/Taipei')::date`、`v_earliest = v_today - 6`，超出回 `punch_date_out_of_window`（附 earliest_allowed / window_days）、未來回 `punch_date_in_future`。天數常數 `v_window_days = 7` 必須與前端 `MAKEUP_PUNCH_WINDOW_DAYS` 同步 |
+| 日期檢查位置 | ✅ 刻意放在員工查詢之前 | 便宜、且驗證測試不會產生任何寫入 |
+| 只擋送出不擋審核 | ✅ 確認 | `approve_makeup_request`（086）未動，既有超過 7 天的 pending 申請仍可正常核准（E818/E815 積欠缺卡需要） |
+| 套用方式 | ✅ `CREATE OR REPLACE` 而非 DROP+CREATE | 避免正式站在套用瞬間打不到卡 |
+
+正式庫實測（anon key REST，皆無寫入）：當天／6 天前（窗口內邊界）→ 進到員工查詢回 `employee_not_found`；7 天前／30 天前／2 年前 → `punch_date_out_of_window`（最早 2026-07-28）；明天 → `punch_date_in_future`。
+交易內 rollback 實測（真實員工 E007）：窗口內邊界 `success: true`（確認正常送出未被誤擋）、同日同類型重複 → `duplicate_makeup_request`（防呆仍有效）、窗口外 → 擋下；ROLLBACK 後正式庫殘留 0 筆。
+
+### 📌 新發現待辦（2026-08-03，未修）
+- `submit_makeup_punch` / `get_my_makeup_requests` 都用 `WHERE line_user_id = ? AND is_active LIMIT 1` 認定員工，**沒有 company_id 條件**。跨公司員工（目前只有大正／本米兩位管理員）送補打卡時，會隨機落在其中一家公司的員工記錄上，記錄查詢也一樣。影響低（受影響者皆為管理員、極少走補打卡），但屬多租戶正確性問題。修法需 RPC 加 `p_company_id` 參數並由前端傳 `window.currentCompanyId`，前後端要一起改，另案處理。
 
 ## 🟢 2026-07-16 請假天數排除休假日（095）＋午休不計工時（096）
 
