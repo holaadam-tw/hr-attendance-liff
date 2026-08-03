@@ -25,7 +25,7 @@
 | 批次 | 函式 | 處置 | 狀態 |
 |---|---|---|---|
 | 099/100 | get_company_daily_attendance、get_company_monthly_attendance、get_weekly_schedules | 加 `p_line_user_id` 驗證 | ✅ 已必填 |
-| 101/102 | get_leave_approval_requests、get_makeup_review_requests、get_pending_makeup_requests、get_pending_overtime_requests | 加 `p_line_user_id` 驗證 | 101 已套；102（必填）待前端上線後 |
+| 101/102 | get_leave_approval_requests、get_makeup_review_requests、get_pending_makeup_requests、get_pending_overtime_requests | 加 `p_line_user_id` 驗證 | ✅ 已必填（102 已套） |
 | 103 | `calculate_monthly_payroll(p_employee_id, ...)` | **REVOKE anon** | ✅ 已收回。實測 anon 帶真實 employee_id 可直接取得該員工 net_salary／gross_salary／扣除額；全庫 grep 前端沒有呼叫，屬歷史遺留 |
 | 103 | `generate_binding_code(p_employee_id)` | **REVOKE anon** | ✅ 已收回。任何人都能為任一員工編號取得 6 位數綁定碼（函式直接回傳 code），是帳號綁定被冒用的破口；前端未使用、verification_codes 0 筆，舊設計殘留 |
 | 待處理 | `upsert_schedule` / `delete_schedule(p_scheduler_id, ...)` | 需加 `p_line_user_id` 對應驗證 | ⏳ 未修。函式**有**檢查 p_scheduler_id 是否具排班權限且同公司，但 scheduler_id 由前端傳、且 employees 表 anon 可全讀 → 冒用管理員 id 即可增刪他人排班（寫入操作） |
