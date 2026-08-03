@@ -1,9 +1,28 @@
 # RunPiston Bug 追蹤 & 測試清單
 
-> 更新日期：2026-07-16
+> 更新日期：2026-08-03
 > 每次修改後更新此檔案
 
 ---
+
+## 🟢 2026-08-03 補打卡期限延長 7 天＋跨公司管理員被踢回首頁修復
+
+| 項目 | 狀態 | 說明 |
+|------|------|------|
+| 補打卡期限 2 天 → 7 天 | ✅ 前端完成待上線 | 原本 `initMpDate` min＝昨天、`submitMakeupPunch` 擋 `date < 昨天`，等於只能補當天＋昨天。改為 `MAKEUP_PUNCH_WINDOW_DAYS = 7`（common.js 單一常數，含當天回溯 7 天＝最早 today−6），records.html 日期選擇器與規則文字同步。DB 端 `submit_makeup_punch`（085）本來就沒有日期限制，不需 migration |
+| initMpDate 時區 | ✅ 順手修正 | 原本用裝置本地 `new Date()`＋fmtDate，與送出時的台灣時間驗證可能差一天；改用 `getTaiwanDate()` 與驗證同源 |
+| 管理員進打卡總覽被踢回首頁 | ✅ 前端完成待上線 | 根因：業主在大正＋本米各有一筆 admin 員工記錄（非平台管理員）。attendance_overview.html 等子頁沒有公司選擇 UI，common.js `checkUserStatus` 遇到多公司又無 `sessionStorage.selectedCompanyId` 時直接 `location.href='index.html'`，選完公司就停在首頁回不去。修法：導向改帶 `?next=<原頁>`，index.html 選完公司後 `location.replace(next)` 送回原頁（白名單只允許站內 `xxx.html` 相對路徑，防開放轉址） |
+| admin.html 未寫入公司選擇 | ✅ 前端完成待上線 | `modules/auth.js` 一般管理員路徑只讀 `selectedCompanyId` 不寫，導致從 admin.html 進子頁必被踢回。改為驗證通過後寫入；且跨公司管理員在本次尚未選過公司時，先導回 `index.html?next=admin.html` 明確選擇，不再隨機取第一家 |
+
+驗證：qa_check 0 FAIL、npm test 52/52、hook 無新警告（僅既有 6 筆行號位移）、common.js/auth.js `node --check` PASS、index.html/records.html inline script 語法 PASS、補打卡日期邊界 5 案例 node 實跑 PASS、導向狀態機 12 情境模擬（4 種身份 × 3 個進入點）全部收斂無迴圈。
+
+rls-checker 審查結論：多租戶隔離未受影響（`currentCompanyId` 一律取自 `.eq('line_user_id', ...)` 查回的自身列表，`sessionStorage.selectedCompanyId` 只當作 `.find()` 的比對值，竄改成別家公司 id 只會找不到並退回自己有權限的公司）；`next` 白名單正則不允許 `/` 與 `:`，可擋 `//evil.com`、`../`、`javascript:`，且只在 `checkUserStatus()` 成功後才處理，無先跳轉後驗證的競態。
+
+> 📌 已知限制 1：跨公司管理員一個 session 內選定公司後，沒有切換公司的 UI（平台管理員才有 `renderAdminCompanySwitcher`），需重開 LIFF 才能換。屬既有缺口，未在本次處理。
+> 📌 已知限制 2（rls-checker 標記，非資安）：`auth.js` 導回首頁選公司時，index.html 的選單會列出所有身份的公司，但 admin.html 只認 admin/manager 的公司。若某人同時是 A/B 公司管理員又是 C 公司一般員工，選了 C 會退回 A 的後台。目前大正／本米兩位管理員在兩家都是 admin，不會觸發。
+
+### 📌 待辦（rls-checker 2026-08-03 標記）
+- `submit_makeup_punch`（085 為現行版本）**沒有任何 punch_date 範圍檢查**，未來日期與遠期日期都收。「7 天內」與「不可未來」目前純前端擋，anon key 可直接呼叫 RPC 繞過（此為既有狀況，非本次引入；申請仍需管理端人工核准才生效，風險中低）。補強做法：新增 migration 在 RPC 內加 `p_punch_date BETWEEN (台灣今日 - 6) AND 台灣今日`，時區須用 `Asia/Taipei` 對齊 `getTaiwanDate`，避免 UTC 邊界差一天。需 user 授權套正式庫，列為後續排程。
 
 ## 🟢 2026-07-16 請假天數排除休假日（095）＋午休不計工時（096）
 

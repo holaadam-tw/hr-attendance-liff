@@ -814,6 +814,14 @@
                     // URL 參數跳轉（Rich Menu 用）
                     if (handleGotoParam()) return;
 
+                    // 子頁面（如打卡總覽）因需選公司被導回首頁 → 選好公司後自動送回原頁
+                    const _next = _gotoParams.get('next') || '';
+                    // 只允許站內相對路徑，避免被當成開放轉址
+                    if (/^[A-Za-z0-9_-]+\.html(?:[?#][^\s]*)?$/.test(_next)) {
+                        window.location.replace(_next);
+                        return;
+                    }
+
                     // 立即顯示首頁（不等次要資料）
                     if (skeleton) skeleton.style.display = 'none';
                     showPage('homePage');

@@ -115,6 +115,10 @@ async function initializeLiff(options) {
 
 // ===== 核心工具函數 =====
 
+// 補打卡可回溯期間（含當天）：7 = 今天 + 前 6 天
+const MAKEUP_PUNCH_WINDOW_DAYS = 7;
+window.MAKEUP_PUNCH_WINDOW_DAYS = MAKEUP_PUNCH_WINDOW_DAYS;
+
 // 取得台灣時間 YYYY-MM-DD
 function getTaiwanDate(offsetDays = 0) {
     const date = new Date();
@@ -377,9 +381,12 @@ async function checkUserStatus() {
                     // 顯示公司選擇 overlay（index.html 有這支函數），等使用者點擊
                     selected = await window.showCompanySelector(activeRows);
                 } else {
-                    // 子頁面沒有 selector UI → 導回 index.html 重新選擇
+                    // 子頁面沒有 selector UI → 導回 index.html 選公司，選完自動回到原頁
                     if (loadingEl) loadingEl.style.display = 'none';
-                    window.location.href = 'index.html';
+                    const backTo = window.location.pathname.split('/').pop() + window.location.search + window.location.hash;
+                    window.location.href = /^index\.html/.test(backTo) || !backTo
+                        ? 'index.html'
+                        : 'index.html?next=' + encodeURIComponent(backTo);
                     return false;
                 }
             }
@@ -1199,9 +1206,9 @@ async function submitMakeupPunch() {
     if (!reasonText) return showToast('❌ 請填寫補充說明');
 
     const today = getTaiwanDate(0);
-    const yesterday = getTaiwanDate(-1);
+    const earliest = getTaiwanDate(-(MAKEUP_PUNCH_WINDOW_DAYS - 1));
     if (date > today) return showToast('❌ 補打卡日期不能是未來日期');
-    if (date < yesterday) return showToast('❌ 補打卡請於當天或隔日提出');
+    if (date < earliest) return showToast(`❌ 補打卡限 ${MAKEUP_PUNCH_WINDOW_DAYS} 天內（最早 ${earliest}），逾期請找主管處理`);
 
     const reasonLabel = {
         'forgot': '忘記打卡',

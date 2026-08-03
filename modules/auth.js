@@ -171,6 +171,15 @@ export async function checkAdminPermission() {
 
         const activeAdminRows = (adminRows || []).filter(row => row.is_active && row.status !== 'pending');
         const savedAdminCompanyId = sessionStorage.getItem('selectedCompanyId');
+
+        // 跨公司管理員且本次尚未選過公司 → 先回首頁選，選完自動回到 admin.html
+        // （不然這裡會隨機取第一家，子頁面又會因為沒有選擇記錄而把人踢回首頁）
+        if (!savedAdminCompanyId && activeAdminRows.length > 1) {
+            const backTo = 'admin.html' + window.location.search + window.location.hash;
+            window.location.href = 'index.html?next=' + encodeURIComponent(backTo);
+            return;
+        }
+
         const data = savedAdminCompanyId
             ? (activeAdminRows.find(row => row.company_id === savedAdminCompanyId) || activeAdminRows[0] || null)
             : (activeAdminRows[0] || null);
@@ -225,6 +234,8 @@ export async function checkAdminPermission() {
         currentCompanyId = data.company_id || null;
         window.currentAdminEmployee = data;
         window.currentCompanyId = currentCompanyId;
+        // 記住本次身份所屬公司，子頁面（打卡總覽等）才不會因為沒有選擇記錄而被導回首頁
+        if (currentCompanyId) sessionStorage.setItem('selectedCompanyId', currentCompanyId);
         updateAdminInfo(data);
 
         await loadSettings();

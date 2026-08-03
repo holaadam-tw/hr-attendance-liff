@@ -134,7 +134,7 @@
                     <b>補打卡規則</b><br>
                     1. 遲到請照實打卡，不可用補打卡改成準時。<br>
                     2. 補打卡只能填實際時間，原因與說明必填。<br>
-                    3. 原則上當天提出，最晚隔日提出。
+                    3. 原則上當天提出，最多可補當天起算 7 天內（含當天）的紀錄，逾期請找主管處理。
                 </div>
                 <div style="background:#EFF6FF;border:1px solid #BFDBFE;color:#1E40AF;border-radius:12px;padding:12px;margin-bottom:14px;font-size:12px;line-height:1.6;">
                     <b>忘記整天打卡時怎麼做</b><br>
@@ -414,11 +414,11 @@
         function initMpDate() {
             const mpDate = document.getElementById('mpDate');
             if (mpDate) {
-                const today = new Date();
-                const min = new Date(); min.setDate(min.getDate() - 1);
-                if (!mpDate.value) mpDate.value = fmtDate(today);
-                mpDate.min = fmtDate(min);
-                mpDate.max = fmtDate(today);
+                const days = window.MAKEUP_PUNCH_WINDOW_DAYS || 7;
+                const today = getTaiwanDate(0);
+                if (!mpDate.value) mpDate.value = today;
+                mpDate.min = getTaiwanDate(-(days - 1));
+                mpDate.max = today;
             }
         }
 
