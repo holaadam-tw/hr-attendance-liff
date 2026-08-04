@@ -18,14 +18,44 @@
 
 | 修正 | 狀態 | 說明 |
 |------|------|------|
-| migration 104 `admin_makeup_punch` | ⏳ 待套正式庫 | SECURITY DEFINER，GRANT anon/authenticated。呼叫者須為 `p_company_id` 底下 is_active 的 admin/manager（092 驗證模式）；目標員工須屬同一家公司（二次隔離）；**無回溯下限**但擋未來日期；寫入 attendance（比照 086）＋ 留一筆 `status='approved'` 的 makeup_punch_requests 軌跡（reason=管理員補登、approver_id=操作者）＋ 關掉同員工同日同類型的 pending 申請（避免之後又被核准重寫一次）＋ 結案 attendance_anomalies |
+| migration 104 `admin_makeup_punch` | ✅ 已套正式庫（2026-08-04） | SECURITY DEFINER，GRANT anon/authenticated。呼叫者須為 `p_company_id` 底下 is_active 的 admin/manager（092 驗證模式）；目標員工須屬同一家公司（二次隔離）；**無回溯下限**但擋未來日期；寫入 attendance（比照 086）＋ 留一筆 `status='approved'` 的 makeup_punch_requests 軌跡（reason=管理員補登、approver_id=操作者）＋ 關掉同員工同日同類型的 pending 申請（避免之後又被核准重寫一次）＋ 結案 attendance_anomalies |
 | 工時計算 | ✅ 刻意不自算 | `total_work_hours` 交給 `trg_calc_work_hours`（010，096 改為含午休扣除）這個單一事實來源；RPC 內自算只會被 trigger 覆蓋，還可能與午休規則不一致 |
 | 缺卡結案 resolved_by | ✅ 已處理 edge case | 補下班卡時 092 的 `trg_resolve_anomaly_on_checkout` 會**先**自動結案，`resolved_by` 留空（trigger 不知道操作者）。104 的結案條件因此改為 `status='pending' OR (resolved AND resolution='makeup' AND resolved_by IS NULL)`，兩種情況都涵蓋且冪等；靠 `UNIQUE(employee_id, date, anomaly_type)` 保證只命中一筆 |
 | 前端入口 | ✅ 完成待上線 | `attendance_overview.html`：①頁頭「✏️ 代補打卡」通用表單（員工／任意日期／上班或下班／時間／備註）；②缺卡追蹤每筆待處理加「補登下班」快捷鍵，帶入該員工與日期。日期欄只設 `max`（不能補未來）**不設 min**，與員工端刻意不同 |
 | 放哪一頁 | ✅ 業主指定只放舊版後台頁 | 兩個打卡總覽頁並存（見 2026-07-31 條目）；本次只做 `attendance_overview.html`（admin.html 入口），`attendance_public.html` 未動 |
 | rls-checker | ✅ 通過 | 兩層租戶隔離（操作者驗證綁 company_id、目標員工再驗一次）皆確認無法跨公司寫入；RECORD 判斷全用欄位級；與既有 trigger 無重複計算。唯一標記為既有技術債：`employees` 表 RLS Phase 3 未完成，前端 `sb.from('employees')` 的 company_id 隔離目前僅客戶端強制（非本次引入） |
 
-**部署順序**：migration 104 必須**先**套正式庫，再合併 main。反過來會讓上線的按鈕打到不存在的函式。
+**部署順序**：migration 104 必須**先**套正式庫，再合併 main。反過來會讓上線的按鈕打到不存在的函式。已依此順序執行完畢（104 套用 → 合併 main `71376c0` → curl 線上驗證新元素已上線）。
+
+### 正式庫實測（2026-08-04，測試資料事後全清、四項計數歸零）
+
+| # | 測試 | 結果 |
+|---|------|------|
+| 1 | 無 `p_line_user_id` | ✅ `未提供身份驗證資訊` |
+| 2 | 一般員工 line_user_id 冒用 | ✅ `需要管理員權限` |
+| 3 | 大正 company_id ＋ 本米員工 id | ✅ `找不到員工（或不屬於本公司）` ← 真正的跨租戶防線 |
+| 4 | 未來日期（2026-08-05） | ✅ `punch_date_in_future` |
+| 5 | 無效 punch_type | ✅ `invalid_punch_type` |
+| 6 | 補 **2025-01-05** 上班卡（1 年半前，遠超 7 天窗口） | ✅ 成功。DB 存 `00:00+00` = 台灣 08:00，時區換算正確 |
+| 7 | 補下班卡（同日已有 pending 待審申請） | ✅ 成功，`closed_pending: 1`，該 pending 被改 rejected、`rejection_reason=管理員已直接補登，無需再審核` |
+| 8 | 工時 trigger（大正午休 12:00–13:00） | ✅ 08:00→17:00 = **8.00**（9h 扣 1h 午休），096 規則生效 |
+| 9 | 覆蓋既有下班時間（改 18:00） | ✅ `overwrote: true`，工時重算為 **9.00** |
+| 10 | 軌跡 | ✅ 3 筆 `approved`（reason=管理員補登（Adam）、有 approver_id）＋ 1 筆被關掉的 pending |
+
+⚠️ **測試設計陷阱（記錄備查）**：原本想測「大正 admin 帶本米 company_id」應被擋，結果回傳成功。查證後是**測試設計錯誤不是漏洞**——業主的 LINE 帳號在兩家公司都有 admin 身分（大正 `admin` / 本米 `admin-benmi`），驗證邏輯「操作者必須是所帶 company_id 的 admin」本來就該通過。跨租戶的真正防線是第 3 項（company_id 與目標員工不同家）。日後做跨公司隔離測試時，操作者不能挑跨公司帳號。
+
+小觀察（非 bug，與 086 行為一致）：同一天重複補登時 `attendance.notes` 會逐次附加，出現重複字串。
+
+### 2026-08-04 兩筆手動結案缺卡恢復為待處理（業主要求）
+
+業主要用新的管理員補打卡功能處理，故把 08/03 手動結案的兩筆改回 `status='pending'`（`resolution` / `resolved_at` / `resolved_by` 一併清空）：
+
+| 日期 | 員工 | 上班卡（台灣時間） | 下班卡 |
+|------|------|-----------------|--------|
+| 2026-07-13 | Hoàng Thái Hoà（E818） | 07:46 | 無 |
+| 2026-07-16 | 邱順麟（E815） | 08:18 | 無 |
+
+⚠️ 恢復為 pending 後，092 的每日稽核排程（台灣 09:10）會**重新對這兩位員工發 LINE 缺卡提醒**（notify_count 已達 20 / 18）。補登下班卡後會自動結案、提醒停止。
 
 ## 🔴→🟢 2026-08-03 公司層級 RPC 無呼叫者驗證（跨公司資料外洩，已修）
 
