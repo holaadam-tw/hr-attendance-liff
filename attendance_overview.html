@@ -145,6 +145,22 @@
                 </div>
             </div>
 
+            <!-- 打卡失敗記錄（migration 105，近 7 天） -->
+            <div id="failureCard" style="display:none;margin-bottom:16px;">
+                <div style="padding:14px 18px;background:#FEF2F2;border:2px solid #FCA5A5;border-radius:14px;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;cursor:pointer;" onclick="toggleFailureDetail()">
+                        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                            <span style="font-size:20px;">🚫</span>
+                            <span style="font-weight:700;font-size:14px;color:#991B1B;">打卡失敗記錄（近 7 天）</span>
+                            <span id="failureBadge" style="font-size:12px;font-weight:800;color:#B91C1C;background:#FEE2E2;border-radius:999px;padding:4px 8px;"></span>
+                        </div>
+                        <span id="failureArrow" style="font-size:12px;color:#B91C1C;">▼</span>
+                    </div>
+                    <div id="failureSummary" style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;"></div>
+                    <div id="failureDetail" style="display:none;margin-top:10px;max-height:320px;overflow-y:auto;"></div>
+                </div>
+            </div>
+
             <!-- 便當訂購統計 -->
             <div id="lunchStatCard" style="display:none;margin-bottom:16px;cursor:pointer;" onclick="toggleLunchDetail()">
                 <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;background:#FFFBEB;border:2px solid #FCD34D;border-radius:14px;">
@@ -438,6 +454,7 @@
                 document.getElementById('lastRefresh').textContent = '更新：' + new Date().toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
                 loadLunchStats(dateStr);
                 loadAnomalyData();
+                loadCheckinFailures();
             } catch (e) {
                 console.error('Load daily data error:', e);
                 document.getElementById('dailyTableBody').innerHTML = '<tr><td colspan="7" style="text-align:center;color:#ef4444;padding:20px;">載入失敗：' + escapeHTML(e.message || '') + '</td></tr>';
@@ -539,6 +556,103 @@
                 console.error('Resolve anomaly error:', e);
                 showToast('結案失敗：' + (e.message || ''));
             }
+        }
+
+        // ===== 打卡失敗記錄（migration 105）=====
+        let failureData = [];
+
+        const FAILURE_LABELS = {
+            gps_permission_denied: '定位權限被拒絕',
+            gps_timeout: '定位逾時',
+            gps_position_unavailable: '抓不到定位',
+            gps_unavailable: '定位失敗',
+            gps_too_precise: '疑似模擬定位 App',
+            gps_low_accuracy: 'GPS 精度不足 → 轉待審',
+            outside_range: '超出打卡範圍 → 轉待審',
+            outside_allowed_location: '超出打卡範圍',
+            checkout_time_expired: '超過下班打卡截止時間',
+            no_open_check_in_record: '沒有未完成的上班記錄',
+            already_checked_in_today: '今日已打過上班卡',
+            already_checked_out_today: '今日已打過下班卡',
+            overnight_shift_needs_check_out: '跨日班未完成下班',
+            employee_no_checkin: '該員工設定為免打卡',
+            kiosk_employee_must_use_kiosk: '公務機帳號須用公務機打卡',
+            employee_not_found: '帳號未綁定',
+            review_submit_failed: '待審核送出失敗',
+            rpc_failed: '系統回應失敗',
+            unknown_error: '未知錯誤'
+        };
+
+        function failureLabel(code) {
+            return FAILURE_LABELS[code] || code || '未知';
+        }
+
+        async function loadCheckinFailures() {
+            const card = document.getElementById('failureCard');
+            if (!card) return;
+            if (!liffProfile?.userId) { card.style.display = 'none'; return; }
+
+            const { data, error } = await sb.rpc('get_checkin_failures', {
+                p_company_id: window.currentCompanyId,
+                p_line_user_id: liffProfile.userId,
+                p_days: 7
+            });
+            if (error) {
+                console.warn('Load checkin failures warning:', error);
+                card.style.display = 'none';
+                return;
+            }
+            failureData = data || [];
+            renderFailureCard();
+        }
+
+        function renderFailureCard() {
+            const card = document.getElementById('failureCard');
+            if (!card) return;
+            if (failureData.length === 0) { card.style.display = 'none'; return; }
+
+            const blocked = failureData.filter(r => r.outcome !== 'pending_review');
+            document.getElementById('failureBadge').textContent =
+                '打不進去 ' + blocked.length + ' 次 · 轉待審 ' + (failureData.length - blocked.length) + ' 次';
+
+            // 依原因分組計數
+            const byCode = {};
+            failureData.forEach(r => { byCode[r.failure_code] = (byCode[r.failure_code] || 0) + 1; });
+            document.getElementById('failureSummary').innerHTML = Object.entries(byCode)
+                .sort((a, b) => b[1] - a[1])
+                .map(([code, cnt]) => '<span style="font-size:11px;font-weight:700;color:#7F1D1D;background:#FEE2E2;border:1px solid #FCA5A5;border-radius:8px;padding:3px 8px;">'
+                    + escapeHTML(failureLabel(code)) + ' × ' + cnt + '</span>')
+                .join('');
+
+            document.getElementById('failureDetail').innerHTML = failureData.slice(0, 60).map(r => {
+                const t = new Date(r.occurred_at).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
+                const typeText = r.punch_type === 'check_out' ? '下班' : (r.punch_type === 'check_in' ? '上班' : '-');
+                const d = r.detail || {};
+                const extras = [];
+                if (d.accuracy_m != null) extras.push('精度 ' + d.accuracy_m + 'm');
+                if (d.min_distance_m != null) extras.push('距離 ' + d.min_distance_m + 'm');
+                if (d.checkout_deadline) extras.push('截止 ' + String(d.checkout_deadline).slice(11, 16));
+                const pendingTag = r.outcome === 'pending_review'
+                    ? '<span style="font-size:10px;font-weight:800;color:#6D28D9;background:#F5F3FF;border-radius:999px;padding:2px 6px;margin-left:4px;">轉待審</span>'
+                    : '';
+                return '<div style="padding:6px 0;border-top:1px dashed #FCA5A5;font-size:12px;color:#7F1D1D;">'
+                    + '<span style="font-weight:700;">' + escapeHTML(t) + '</span> · '
+                    + escapeHTML(r.employee_name) + (r.employee_number ? '（' + escapeHTML(r.employee_number) + '）' : '')
+                    + ' · ' + typeText + ' · ' + escapeHTML(failureLabel(r.failure_code)) + pendingTag
+                    + (extras.length ? '<span style="color:#B91C1C;"> — ' + escapeHTML(extras.join('、')) + '</span>' : '')
+                    + '</div>';
+            }).join('');
+
+            card.style.display = 'block';
+        }
+
+        function toggleFailureDetail() {
+            const panel = document.getElementById('failureDetail');
+            const arrow = document.getElementById('failureArrow');
+            if (!panel) return;
+            const show = panel.style.display === 'none';
+            panel.style.display = show ? 'block' : 'none';
+            if (arrow) arrow.textContent = show ? '▲' : '▼';
         }
 
         // ===== 管理員代補打卡（不限日期；員工自助限 7 天）=====

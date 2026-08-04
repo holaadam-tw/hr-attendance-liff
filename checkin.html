@@ -128,6 +128,37 @@
             return rpcData?.error || rpcError?.message || '';
         }
 
+        // ===== 打卡失敗記錄（migration 105）=====
+        // fire-and-forget：任何情況都不可以影響打卡本身，所以整段包 try/catch，
+        // 也不 await 在關鍵路徑上以外的地方阻塞流程。
+        // outcome: 'blocked' = 完全打不進去；'pending_review' = 有送出但變成待審
+        async function logCheckinFailure(options) {
+            try {
+                if (!liffProfile?.userId) return;
+                const opts = options || {};
+                const punchType = opts.punchType
+                    || (currentCheckInType === 'in' ? 'check_in' : 'check_out');
+                await sb.rpc('log_checkin_failure', {
+                    p_line_user_id: liffProfile.userId,
+                    p_punch_type: punchType,
+                    p_stage: opts.stage || 'unknown',
+                    p_failure_code: String(opts.code || 'unknown'),
+                    p_outcome: opts.outcome || 'blocked',
+                    p_detail: Object.assign({ device: navigator.userAgent }, opts.detail || {}),
+                    p_company_id: window.currentCompanyId || null
+                });
+            } catch (e) {
+                console.warn('打卡失敗記錄未寫入（不影響打卡）:', e);
+            }
+        }
+
+        function describeGpsError(gpsErr) {
+            if (gpsErr?.code === 1) return 'gps_permission_denied';
+            if (gpsErr?.code === 3) return 'gps_timeout';
+            if (gpsErr?.code === 2) return 'gps_position_unavailable';
+            return 'gps_unavailable';
+        }
+
         async function submitCheckInRpc(rpcAction, loc, publicUrl) {
             const payload = {
                 p_line_user_id: liffProfile.userId,
@@ -217,11 +248,39 @@
                 p_company_id: window.currentCompanyId || null
             });
 
+            const reviewType = options.reviewType || 'low_accuracy_gps';
+            const punchType = rpcAction === 'check_out' ? 'check_out' : 'check_in';
+            const reviewDetail = {
+                accuracy_m: Number.isFinite(loc?.accuracy) ? Math.round(loc.accuracy) : null,
+                min_distance_m: Number.isFinite(minDistance) ? Math.round(minDistance) : null
+            };
+
             if (error || !data?.success) {
-                throw new Error(data?.error || error?.message || '送出待審核打卡失敗');
+                // 連待審都送不出去：完全打不進系統（不 await，不拖慢錯誤畫面）
+                logCheckinFailure({
+                    stage: 'gps_review',
+                    code: data?.error || error?.message || 'review_submit_failed',
+                    detail: Object.assign({ review_type: reviewType }, reviewDetail),
+                    outcome: 'blocked',
+                    punchType
+                });
+                // 標記已記錄，避免外層 catch 再記一次
+                const reviewErr = new Error(data?.error || error?.message || '送出待審核打卡失敗');
+                reviewErr._logged = true;
+                throw reviewErr;
             }
 
-            return { typeText, nowParts, reviewType: options.reviewType || 'low_accuracy_gps', minDistance };
+            // 有送出但沒進出勤表——員工會看到成功畫面，主管核准前系統仍算他沒打卡
+            // 不 await：後續有 2.5 秒才跳頁，時間足夠，且不拖慢成功畫面
+            logCheckinFailure({
+                stage: 'gps_review',
+                code: reviewType === 'outside_range_gps' ? 'outside_range' : 'gps_low_accuracy',
+                detail: reviewDetail,
+                outcome: 'pending_review',
+                punchType
+            });
+
+            return { typeText, nowParts, reviewType, minDistance };
         }
 
         async function submitLowAccuracyReviewRequest(rpcAction, loc, publicUrl) {
@@ -755,6 +814,11 @@
                     loc = await resolveGpsLocation();
                 } catch(gpsErr) {
                     clearTimeout(safetyTimer);
+                    logCheckinFailure({
+                        stage: 'gps',
+                        code: describeGpsError(gpsErr),
+                        detail: { gps_error_code: gpsErr?.code ?? null, message: gpsErr?.message || '' }
+                    });
                     if (gpsErr.code === 1) {
                         showGPSWarning(statusBox);
                     } else {
@@ -768,6 +832,11 @@
                 if (loc.accuracy !== undefined) {
                     if (loc.accuracy < GPS_MIN_ACCURACY_M) {
                         clearTimeout(safetyTimer);
+                        logCheckinFailure({
+                            stage: 'gps',
+                            code: 'gps_too_precise',
+                            detail: { accuracy_m: Math.round(loc.accuracy) }
+                        });
                         showStatus(statusBox, 'warning', '⚠️ GPS 精度異常（過於精確），請關閉模擬定位 App 後重試');
                         btn.disabled = false; btn.textContent = '📸 重試';
                         return;
@@ -790,6 +859,16 @@
                     if (!rpcError && await submitOutsideRangeReviewIfAllowed(rpcData, rpcAction, loc, publicUrl, statusBox)) {
                         return;
                     }
+                    logCheckinFailure({
+                        stage: 'rpc',
+                        code: getRpcFailureCode(rpcError, rpcData) || 'rpc_failed',
+                        detail: {
+                            accuracy_m: Number.isFinite(loc?.accuracy) ? Math.round(loc.accuracy) : null,
+                            min_distance_m: Number.isFinite(rpcData?.min_distance) ? Math.round(rpcData.min_distance) : null,
+                            checkout_deadline: rpcData?.checkout_deadline || null
+                        },
+                        punchType: rpcAction
+                    });
                     stopCamera();
                     const mapped = mapCheckinError(rpcError, rpcData);
                     showCheckinError(mapped.title, mapped.message, mapped.canRetry);
@@ -811,6 +890,12 @@
                 console.error(err);
                 const photoErr = getPhotoProcessError();
                 const isPhotoError = (err.message || '').includes(photoErr.message) || (err.message || '').includes('blob.size');
+                if (!err?._logged) {
+                    logCheckinFailure({
+                        stage: isPhotoError ? 'photo' : 'system',
+                        code: (err?.message || 'unknown_error').slice(0, 80)
+                    });
+                }
                 const mapped = mapCheckinError(null, null);
                 showCheckinError(
                     isPhotoError ? photoErr.title : '系統錯誤',
@@ -913,6 +998,11 @@
                     try {
                         loc = await resolveGpsLocation();
                     } catch(gpsErr) {
+                        logCheckinFailure({
+                            stage: 'gps',
+                            code: describeGpsError(gpsErr),
+                            detail: { gps_error_code: gpsErr?.code ?? null, message: gpsErr?.message || '' }
+                        });
                         if (gpsErr.code === 1) {
                             showGPSWarning(statusBox);
                         } else {
@@ -924,6 +1014,11 @@
                     loc = await refineGpsIfNeeded(loc, statusBox);
                     if (loc.accuracy !== undefined) {
                         if (loc.accuracy < GPS_MIN_ACCURACY_M) {
+                            logCheckinFailure({
+                                stage: 'gps',
+                                code: 'gps_too_precise',
+                                detail: { accuracy_m: Math.round(loc.accuracy) }
+                            });
                             showStatus(statusBox, 'warning', '⚠️ GPS 精度異常（過於精確），請關閉模擬定位 App 後重試');
                             btn.disabled = false; btn.textContent = '📸 開啟相機拍照'; return;
                         }
@@ -942,6 +1037,16 @@
                         if (!rpcError && await submitOutsideRangeReviewIfAllowed(rpcData, rpcAction2, loc, publicUrl, statusBox)) {
                             return;
                         }
+                        logCheckinFailure({
+                            stage: 'rpc',
+                            code: getRpcFailureCode(rpcError, rpcData) || 'rpc_failed',
+                            detail: {
+                                accuracy_m: Number.isFinite(loc?.accuracy) ? Math.round(loc.accuracy) : null,
+                                min_distance_m: Number.isFinite(rpcData?.min_distance) ? Math.round(rpcData.min_distance) : null,
+                                checkout_deadline: rpcData?.checkout_deadline || null
+                            },
+                            punchType: rpcAction2
+                        });
                         const mapped = mapCheckinError(rpcError, rpcData);
                         showCheckinError(mapped.title, mapped.message, mapped.canRetry);
                         return;
@@ -958,6 +1063,12 @@
                     console.error(err);
                     const photoErr = getPhotoProcessError();
                     const isPhotoError = (err.message || '').includes(photoErr.message) || (err.message || '').includes('blob.size');
+                    if (!err?._logged) {
+                        logCheckinFailure({
+                            stage: isPhotoError ? 'photo' : 'system',
+                            code: (err?.message || 'unknown_error').slice(0, 80)
+                        });
+                    }
                     showCheckinError(
                         isPhotoError ? photoErr.title : '系統錯誤',
                         isPhotoError ? photoErr.message : (err.message || '打卡失敗，請重試'),
