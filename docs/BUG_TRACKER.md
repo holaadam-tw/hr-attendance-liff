@@ -1,9 +1,31 @@
 # RunPiston Bug 追蹤 & 測試清單
 
-> 更新日期：2026-08-03
+> 更新日期：2026-08-04
 > 每次修改後更新此檔案
 
 ---
+
+## 🟢 2026-08-04 管理員代補打卡（不限日期）— 補上「員工 7 天／管理員不限時間」政策的缺口
+
+**業主政策**：員工限 7 天內自助補打卡，管理員不限時間都可以補。
+
+盤點發現前半已成立、後半根本做不到：
+
+| 項目 | 盤點結果 |
+|------|---------|
+| 員工端 7 天 | ✅ 本來就有。`common.js:119 MAKEUP_PUNCH_WINDOW_DAYS = 7`（含當天，最早 today−6）＋ `records.html` 日期選擇器 min/max ＋ DB 端 097/098 `submit_makeup_punch` 同窗口驗證，繞前端也送不進來 |
+| 管理員不限時間 | 🔴 **原本不存在**。管理員只有三種操作，沒有一種等於「補」：①`approve_makeup_request`(086) 不看日期但前提是員工當初有送出；②缺卡追蹤「手動結案」(092) 只停追蹤不寫 attendance，該日下班時間仍空、工時算不出；③直接改 DB。全庫 grep `admin_*_attendance` / `update_attendance` 無任何管理端補登 RPC |
+
+| 修正 | 狀態 | 說明 |
+|------|------|------|
+| migration 104 `admin_makeup_punch` | ⏳ 待套正式庫 | SECURITY DEFINER，GRANT anon/authenticated。呼叫者須為 `p_company_id` 底下 is_active 的 admin/manager（092 驗證模式）；目標員工須屬同一家公司（二次隔離）；**無回溯下限**但擋未來日期；寫入 attendance（比照 086）＋ 留一筆 `status='approved'` 的 makeup_punch_requests 軌跡（reason=管理員補登、approver_id=操作者）＋ 關掉同員工同日同類型的 pending 申請（避免之後又被核准重寫一次）＋ 結案 attendance_anomalies |
+| 工時計算 | ✅ 刻意不自算 | `total_work_hours` 交給 `trg_calc_work_hours`（010，096 改為含午休扣除）這個單一事實來源；RPC 內自算只會被 trigger 覆蓋，還可能與午休規則不一致 |
+| 缺卡結案 resolved_by | ✅ 已處理 edge case | 補下班卡時 092 的 `trg_resolve_anomaly_on_checkout` 會**先**自動結案，`resolved_by` 留空（trigger 不知道操作者）。104 的結案條件因此改為 `status='pending' OR (resolved AND resolution='makeup' AND resolved_by IS NULL)`，兩種情況都涵蓋且冪等；靠 `UNIQUE(employee_id, date, anomaly_type)` 保證只命中一筆 |
+| 前端入口 | ✅ 完成待上線 | `attendance_overview.html`：①頁頭「✏️ 代補打卡」通用表單（員工／任意日期／上班或下班／時間／備註）；②缺卡追蹤每筆待處理加「補登下班」快捷鍵，帶入該員工與日期。日期欄只設 `max`（不能補未來）**不設 min**，與員工端刻意不同 |
+| 放哪一頁 | ✅ 業主指定只放舊版後台頁 | 兩個打卡總覽頁並存（見 2026-07-31 條目）；本次只做 `attendance_overview.html`（admin.html 入口），`attendance_public.html` 未動 |
+| rls-checker | ✅ 通過 | 兩層租戶隔離（操作者驗證綁 company_id、目標員工再驗一次）皆確認無法跨公司寫入；RECORD 判斷全用欄位級；與既有 trigger 無重複計算。唯一標記為既有技術債：`employees` 表 RLS Phase 3 未完成，前端 `sb.from('employees')` 的 company_id 隔離目前僅客戶端強制（非本次引入） |
+
+**部署順序**：migration 104 必須**先**套正式庫，再合併 main。反過來會讓上線的按鈕打到不存在的函式。
 
 ## 🔴→🟢 2026-08-03 公司層級 RPC 無呼叫者驗證（跨公司資料外洩，已修）
 
