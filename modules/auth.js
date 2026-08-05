@@ -58,6 +58,7 @@ function _doShowPage(id) {
     if (id === 'bookingMgrPage') { window.loadBookingStoreList?.(); }
     if (id === 'memberMgrPage') { window.loadMemberStoreList?.(); }
     if (id === 'requestsMgrPage') { window.loadAllRequests?.(); }
+    if (id === 'reportPage') { window.initReportMonth?.(); }
 }
 
 // ===== 檢查管理員權限 =====

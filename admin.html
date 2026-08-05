@@ -1223,8 +1223,15 @@
             <button class="btn btn-secondary" onclick="showPage('adminHomePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
             <div class="checkin-page">
                 <h2>📊 報表匯出</h2>
-                <p style="color:#6b7280;font-size:13px;margin-bottom:16px;">選擇要匯出的報表類型</p>
+                <p style="color:#6b7280;font-size:13px;margin-bottom:10px;">選擇要匯出的報表類型</p>
+                <div style="display:flex;align-items:center;gap:8px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;padding:10px 12px;margin-bottom:16px;">
+                    <label for="reportMonth" style="font-size:13px;font-weight:800;color:#475569;white-space:nowrap;">報表月份</label>
+                    <input type="month" id="reportMonth" style="flex:1;padding:8px;border:2px solid #E2E8F0;border-radius:8px;font-size:14px;font-family:inherit;">
+                </div>
                 <div class="menu-grid">
+                    <button class="report-action-btn" onclick="exportReport('payroll_summary')">
+                        <div class="icon">🧮</div><div class="label">薪資計算彙總</div>
+                    </button>
                     <button class="report-action-btn" onclick="exportReport('attendance')">
                         <div class="icon">📈</div><div class="label">出勤報表</div>
                     </button>
@@ -2238,7 +2245,7 @@
     </div>
 
     <script src="common.js?v=20260803-makeupscope"></script>
-    <script type="module" src="modules/index.js?v=20260803-rpcauth"></script>
+    <script type="module" src="modules/index.js?v=20260805-payrollsummary"></script>
     <script type="module" src="admin_fixes.js?v=20260708-audit2"></script>
     <script>
     // ===== 公務機打卡 =====

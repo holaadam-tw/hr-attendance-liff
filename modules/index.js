@@ -8,11 +8,11 @@ import {
     applyRoleVisibility, applyAdminFeatureVisibility,
     switchFieldSalesAdmin,
     renderAdminCompanySwitcher, switchCompanyAdmin
-} from './auth.js?v=20260803-companyswitch';
+} from './auth.js?v=20260805-payrollsummary';
 
 import {
-    loadAuditLogs, exportReport
-} from './audit.js?v=20260712-leavefk';
+    loadAuditLogs, exportReport, initReportMonth
+} from './audit.js?v=20260805-payrollsummary';
 
 import {
     showAddEmployeeModal, closeAddEmployeeModal, initEmployeeFormHandler,
@@ -125,6 +125,7 @@ window.switchCompanyAdmin = switchCompanyAdmin;
 // audit
 window.loadAuditLogs = loadAuditLogs;
 window.exportReport = exportReport;
+window.initReportMonth = initReportMonth;
 
 // employees
 window.showAddEmployeeModal = showAddEmployeeModal;
