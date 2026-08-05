@@ -1,6 +1,9 @@
 {
   "scripts": {
-    "test": "node tests/smoke-test.js",
+    "test": "node tests/run-all.js",
+    "test:smoke": "node tests/smoke-test.js",
+    "test:overview": "node tests/attendance-overview.test.js",
+    "test:payroll-ot": "node tests/payroll-overtime.test.js",
     "test:payroll": "node tests/payroll-simulation.js",
     "test:ui": "node tests/ui-company-switcher.test.js"
   },

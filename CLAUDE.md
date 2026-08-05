@@ -67,7 +67,7 @@
 2. 找出至少 3 個受影響的情境
 3. 對每個情境做 logic walkthrough
 4. 跑 `bash scripts/qa_check.sh`（必須 0 FAIL）
-5. 跑 `npm test`（必須 52 通過）
+5. 跑 `npm test`（3 個套件必須全數通過：冒煙測試 52、打卡總覽 88、薪資頁加班來源 15）
 
 **如果任一情境走不通 → 不可 commit**
 
@@ -139,7 +139,18 @@
 
 ## 自動執行
 
-**測試通過後**（`qa_check.sh` 0 FAIL + `npm test` 52 通過 + Hook 無新警告），再執行 `git add`, `commit`, `push origin dev`。不動 main branch。
+**測試通過後**（`qa_check.sh` 0 FAIL + `npm test` 3 套件全過 + Hook 無新警告），再執行 `git add`, `commit`, `push origin dev`。不動 main branch。
+
+### 測試套件（`npm test` 一次跑完，任一失敗即整體失敗）
+
+| 套件 | 檔案 | 測什麼 |
+|------|------|--------|
+| 冒煙測試 | `tests/smoke-test.js` | Supabase 連線、HTML 語法、設定一致性、common.js 函式 |
+| 打卡總覽 | `tests/attendance-overview.test.js` | `attendance_overview.html` 的 inline script 原樣載入 vm 執行：定位距離／分群／90 天窗期／代補打卡預設時間／加班確認清單與防呆 |
+| 薪資頁加班來源 | `tests/payroll-overtime.test.js` | `modules/payroll.js` 兩處 otMap 區塊原樣抽出執行，防止 `late_close_auto` 排除被改回去 |
+
+新增前端功能時**必須一併補測試並加進 `tests/run-all.js` 的 SUITES**，否則等於沒接上。
+兩支新套件都支援環境變數指向改壞的副本（`AO_FILE` / `PAYROLL_FILE`），可做反向對照確認測試真的擋得住回歸。
 合併到 main **必須 user 明確、結構化授權**（僅一句「可以」不算授權，對齊 Guardrails §1/§3）；觸發 GitHub Pages 自動部署。
 
 ---
