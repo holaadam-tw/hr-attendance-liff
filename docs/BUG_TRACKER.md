@@ -91,7 +91,7 @@ qa_check ALL PASS、npm test 52/52、inline script `node --check` 兩段皆通�
 
 ---
 
-## 🟡 2026-08-05 隔天主管確認加班（migration 108，**尚未套用正式庫**）
+## 🟢 2026-08-05 隔天主管確認加班（migration 108，**已套用正式庫**）
 
 業主 2026-08-05 決定：加班改為**隔天由主管逐筆確認**，只有確認過的才計薪。原本薪資彙總的加班完全由打卡時間推估，沒有任何人把關。
 
@@ -140,11 +140,46 @@ qa_check ALL PASS、npm test 52/52、inline script `node --check` 兩段皆通�
 1. **索引錯位會對錯人下確認**：原本按鈕帶的是陣列索引，但確認完會非同步重載清單、該列消失、後面的索引整個往前移——這時按第二列會送出**別人**的確認。已改為以 `employeeId|date` 為識別，找不到該列時明確提示「清單已更新，請重新確認一次」而不是靜靜沒反應
 2. **重載空窗**：原本一進 `loadOvertimeConfirm()` 就把清單清空，主管確認完第一列馬上按第二列會撲空。改為先收在區域變數、資料到齊才換掉畫面上那份
 
+### 正式庫實測（2026-08-05，migration 108 已套用）
+
+前置確認：072 的 12 個欄位全部存在（`information_schema.columns` count = 12），確認 072 已部署。
+函式建立後查 `pg_proc`：`prosecdef = true`，`proacl` 含 `anon=X` 與 `authenticated=X`，GRANT 未掉。
+
+**防護路徑 8 項全過，且跑完 `overtime_requests` 仍為 2 筆（零意外寫入）**：
+
+| # | 情境 | 回傳 |
+|---|------|------|
+| 1 | 一般員工（role=user）呼叫 | 需要管理員權限 |
+| 2 | 空 line_user_id | 未提供身份驗證資訊 |
+| 3 | decision 傳 'maybe' | invalid_decision |
+| 4 | 未來日期 2099-01-01 | ot_date_in_future |
+| 5 | confirm 但 0 分鐘 | minutes_not_positive |
+| 6 | confirm 但 800 分鐘 | minutes_too_large |
+| 7 | 用本米的 employee_id（跨公司） | 找不到員工（或不屬於本公司） |
+| 8 | 2020-01-01（該日無下班卡） | no_checkout_record |
+
+**寫入路徑 3 項全過**（對象：鄭世福 E824 2026-08-04，下班 20:39）：
+
+- **建立**：confirm 189 分 → success、hours 3.15；DB 實際欄位 status=approved、source_type=late_close_auto、hours/approved_hours/final_hours 皆 3.15、late_close_minutes=189、scheduled_end_time=17:00、approval_reason_category=daily_confirm、reason「主管確認加班（Adam）」、approver_id 有值、attendance_id 正確連到那筆出勤
+- **冪等**：同一筆再 confirm 180 分 → `updated_existing: true`，late_close_auto 仍只有 **1 列**、時數更新為 3.00（沒有長出第二筆）
+- **改判**：同一筆 reject → status=rejected、final_hours=0、rejection_reason 記錄備註
+
+**測試資料已清除**：DELETE 該列後 `overtime_requests` 回到 2 筆、late_close_auto 0 筆、該筆 attendance 完好未受影響。
+
+⚠️ 未在正式庫實測的分支：`manual_request_exists`（員工自送 pending/approved 申請時跳過）。現有 2 筆 manual 都是 rejected，觸發不到；該段是 072 同款寫法，且前端測試已涵蓋排除邏輯。
+
+### 一併處理：薪資計算頁也吃確認過的加班
+
+業主指示「要一併吃」。`modules/payroll.js` 兩處 otMap（L184、L828）的 `late_close_auto` 排除已拿掉，改為不分來源加總。
+
+- 安全性：查詢本來就 filter `status='approved'`，pending 與 rejected 不會進來；otMap 是 `calcEmployeePayroll` 加班時數的**唯一**來源，本頁沒有另一條從 attendance 推估的路，不會重複計算
+- 追溯影響：查證正式庫 `overtime_requests` 全庫只有 2 筆、皆為 manual + rejected，**沒有任何 late_close_auto 資料**，所以這次改動對歷史薪資數字**零影響**
+- 驗證：把兩處 otMap 區塊原樣抽出在 node 跑，餵四種來源資料，兩處各 3 項共 6 項全通
+
 ### 未完成 / 待決定
 
-- ⚠️ **migration 108 尚未套用正式庫**，需 L2 授權；套用前必須先確認 072 已部署（108 依賴 `source_type`／`attendance_id`／`late_close_minutes` 等欄位）
-- `modules/payroll.js:186` 與 `:830` **明確把 `late_close_auto` 排除**在加班時數之外，與 072「薪資只吃核認後時數」的目標相反。目前沒有 late_close_auto 資料所以是 no-op，但 108 上線後薪資頁與薪資彙總報表的加班數字會不一致，需業主決定薪資頁要不要一併吃。本次刻意不動——那會直接改變薪資頁數字
 - 確認動作沒有 LINE 通知，主管需自己進打卡總覽看
+- 072 的 `sync_late_close_overtime_request()` 仍是孤兒（沒人呼叫），維持原樣。日後若要恢復「員工打卡即產生待審」，必須先補上 18:00 門檻與 17:00–17:30 休息時間，否則會湧入大量假加班
 
 ---
 
