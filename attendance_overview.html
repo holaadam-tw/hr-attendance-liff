@@ -398,13 +398,14 @@
             <input type="date" id="amDate" style="width:100%;padding:10px;border:2px solid #E2E8F0;border-radius:10px;font-size:14px;font-family:inherit;margin-bottom:12px;">
 
             <label style="display:block;font-size:12px;font-weight:800;color:#475569;margin-bottom:4px;">類型</label>
-            <select id="amType" style="width:100%;padding:10px;border:2px solid #E2E8F0;border-radius:10px;font-size:14px;font-family:inherit;margin-bottom:12px;">
+            <select id="amType" onchange="applyAmDefaultTime()" style="width:100%;padding:10px;border:2px solid #E2E8F0;border-radius:10px;font-size:14px;font-family:inherit;margin-bottom:12px;">
                 <option value="clock_out">🌙 下班</option>
                 <option value="clock_in">☀️ 上班</option>
             </select>
 
-            <label style="display:block;font-size:12px;font-weight:800;color:#475569;margin-bottom:4px;">時間</label>
-            <input type="time" id="amTime" style="width:100%;padding:10px;border:2px solid #E2E8F0;border-radius:10px;font-size:14px;font-family:inherit;margin-bottom:12px;">
+            <label style="display:block;font-size:12px;font-weight:800;color:#475569;margin-bottom:4px;">時間（24 小時制）</label>
+            <input type="time" id="amTime" style="width:100%;padding:10px;border:2px solid #E2E8F0;border-radius:10px;font-size:14px;font-family:inherit;margin-bottom:4px;">
+            <div id="amTimeHint" style="font-size:11px;color:#64748B;margin-bottom:12px;line-height:1.5;"></div>
 
             <label style="display:block;font-size:12px;font-weight:800;color:#475569;margin-bottom:4px;">備註（選填）</label>
             <input type="text" id="amNote" maxlength="100" placeholder="例：現場確認實際下班時間" style="width:100%;padding:10px;border:2px solid #E2E8F0;border-radius:10px;font-size:14px;font-family:inherit;margin-bottom:16px;">
@@ -1016,8 +1017,34 @@
             sel.value = p.employeeId || '';
             document.getElementById('amDate').value = p.date || getDailyDate();
             document.getElementById('amType').value = p.type || 'clock_out';
-            document.getElementById('amTime').value = '';
             document.getElementById('amNote').value = '';
+            applyAmDefaultTime(p.time);
+        }
+
+        // 補登時間預設值：下班 17:00、上班 08:00。
+        // 業主規則：沒有加班的話薪資就算到 17:00，所以補下班卡的常態值就是 17:00，
+        // 讓管理員不必每次自己敲（也避開 <input type="time"> 在部分裝置上要選 AM/PM 的困擾）。
+        // 不寫死——與 modules/audit.js 薪資彙總同源，讀 system_settings 的班表設定。
+        function getAmDefaultTime(type) {
+            const key = type === 'clock_in' ? 'default_work_start' : 'default_work_end';
+            const fallback = type === 'clock_in' ? '08:00' : '17:00';
+            const raw = (typeof getCachedSetting === 'function' ? getCachedSetting(key) : null);
+            const hhmm = String(raw || '').slice(0, 5);
+            return /^([01]\d|2[0-3]):[0-5]\d$/.test(hhmm) ? hhmm : fallback;
+        }
+
+        // 換類型時一律重設為該類型的預設值——上班的時間留在下班欄位本來就是錯的，
+        // 保留反而更容易誤送。explicitTime 供呼叫端指定（目前無人使用，保留給日後帶值開窗）。
+        function applyAmDefaultTime(explicitTime) {
+            const type = document.getElementById('amType').value;
+            const def = getAmDefaultTime(type);
+            document.getElementById('amTime').value = explicitTime || def;
+            const hint = document.getElementById('amTimeHint');
+            if (hint) {
+                hint.textContent = type === 'clock_in'
+                    ? '已帶入上班預設 ' + def + '，需要時可自行修改。'
+                    : '已帶入下班預設 ' + def + '（沒有加班就算到這個時間），需要時可自行修改。';
+            }
         }
 
         function closeAdminMakeup() {
