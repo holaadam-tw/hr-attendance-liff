@@ -162,18 +162,22 @@
                 </div>
             </div>
 
-            <!-- 下班定位範圍外（前端現算，不擋人只呈現） -->
+            <!-- 下班定位查核（前端現算，不擋人只呈現） -->
             <div id="checkoutRangeCard" style="display:none;margin-bottom:16px;">
-                <div style="padding:14px 18px;background:#FFF1F2;border:2px solid #FDA4AF;border-radius:14px;">
+                <div id="checkoutRangeBox" style="padding:14px 18px;background:#FFF1F2;border:2px solid #FDA4AF;border-radius:14px;">
                     <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;cursor:pointer;" onclick="toggleCheckoutRangeDetail()">
                         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
                             <span style="font-size:20px;">📍</span>
-                            <span style="font-weight:700;font-size:14px;color:#9F1239;">下班定位範圍外</span>
+                            <span id="checkoutRangeTitle" style="font-weight:700;font-size:14px;color:#9F1239;">下班定位範圍外</span>
                             <span id="checkoutRangeBadge" style="font-size:12px;font-weight:800;color:#BE123C;background:#FFE4E6;border-radius:999px;padding:4px 8px;"></span>
                         </div>
                         <span id="checkoutRangeArrow" style="font-size:12px;color:#BE123C;">▼</span>
                     </div>
                     <div id="checkoutRangeDetail" style="display:none;margin-top:10px;max-height:320px;overflow-y:auto;"></div>
+                    <div style="margin-top:10px;padding-top:10px;border-top:1px solid #FECDD3;">
+                        <button id="clusterBtn" onclick="toggleCheckoutClusters()" style="border:1px solid #FDA4AF;background:#fff;color:#BE123C;font-size:12px;font-weight:800;border-radius:8px;padding:6px 12px;cursor:pointer;font-family:inherit;">📊 定位點統計（近 90 天）</button>
+                        <div id="clusterPanel" style="display:none;margin-top:10px;max-height:360px;overflow-y:auto;"></div>
+                    </div>
                 </div>
             </div>
 
@@ -444,6 +448,12 @@
         }
 
         function onDailyDateChange() {
+            // 90 天統計是以「選定日期」往回推的，換日期等於換窗期，快取必須失效。
+            // 只掛在這裡不掛 loadDailyData()——後者每 30 秒自動刷新會呼叫，
+            // 若一併重設會變成每 30 秒重抓 90 天資料，正是刻意要避免的。
+            clusterLoaded = false;
+            const clusterPanel = document.getElementById('clusterPanel');
+            if (clusterPanel && clusterPanel.style.display !== 'none') loadCheckoutClusters();
             loadDailyData();
         }
 
@@ -593,7 +603,33 @@
         function renderCheckoutRangeCard() {
             const card = document.getElementById('checkoutRangeCard');
             if (!card) return;
-            if (checkoutRangeHistory.length === 0) { card.style.display = 'none'; return; }
+
+            // 公司沒設定打卡地點就整張卡片不顯示（無從判斷距離）
+            const hasOffice = typeof officeLocations !== 'undefined' && Array.isArray(officeLocations) && officeLocations.length > 0;
+            if (!hasOffice) { card.style.display = 'none'; return; }
+
+            // 近 30 天沒有異常時仍然保留卡片（灰色），否則 90 天統計的按鈕會沒地方按——
+            // 範圍外事件很稀疏（實測 4 個月 6 筆），常常 30 天內剛好是空的。
+            if (checkoutRangeHistory.length === 0) {
+                document.getElementById('checkoutRangeBox').style.cssText = 'padding:14px 18px;background:#F8FAFC;border:2px solid #E2E8F0;border-radius:14px;';
+                document.getElementById('checkoutRangeTitle').textContent = '下班定位查核';
+                document.getElementById('checkoutRangeTitle').style.color = '#475569';
+                document.getElementById('checkoutRangeBadge').textContent = '近 ' + CHECKOUT_RANGE_WINDOW_DAYS + ' 天無異常';
+                document.getElementById('checkoutRangeBadge').style.cssText = 'font-size:12px;font-weight:800;color:#64748B;background:#F1F5F9;border-radius:999px;padding:4px 8px;';
+                document.getElementById('checkoutRangeArrow').style.display = 'none';
+                document.getElementById('checkoutRangeDetail').style.display = 'none';
+                // 必須清空：標題列仍可點（toggleCheckoutRangeDetail 沒被停用），
+                // 若只藏不清，從有異常的日期切到無異常的日期後點開，會看到上一個窗期的舊清單。
+                document.getElementById('checkoutRangeDetail').innerHTML = '';
+                card.style.display = 'block';
+                return;
+            }
+
+            document.getElementById('checkoutRangeBox').style.cssText = 'padding:14px 18px;background:#FFF1F2;border:2px solid #FDA4AF;border-radius:14px;';
+            document.getElementById('checkoutRangeTitle').textContent = '下班定位範圍外';
+            document.getElementById('checkoutRangeTitle').style.color = '#9F1239';
+            document.getElementById('checkoutRangeBadge').style.cssText = 'font-size:12px;font-weight:800;color:#BE123C;background:#FFE4E6;border-radius:999px;padding:4px 8px;';
+            document.getElementById('checkoutRangeArrow').style.display = '';
 
             const selectedDate = getDailyDate();
             const todayCount = checkoutRangeHistory.filter(o => o.date === selectedDate).length;
@@ -612,6 +648,128 @@
                 + '</div>'
             ).join('') + '<div style="margin-top:8px;padding-top:8px;border-top:1px solid #FECDD3;font-size:11px;color:#9F1239;">下班打卡不驗範圍，這裡只呈現距離供查核，員工不會被擋。沒有座標的下班卡（管理員代補、公務機打卡）無從計算，不會列入。</div>';
             card.style.display = 'block';
+        }
+
+        // ===== 定位點統計（近 90 天，按鈕觸發才查）=====
+        // 目的：看同一個「範圍外」地點是不是重複出現——重複出現代表有固定模式
+        // （例如每次都在同一個地方打下班卡），單次出現比較可能是臨時狀況。
+        // 刻意不放進自動刷新：90 天資料量是 30 天的三倍，每 30 秒抓一次太浪費。
+        const CLUSTER_WINDOW_DAYS = 90;
+        const CLUSTER_RADIUS_M = 100;   // 兩點相距 100m 內視為同一個地點
+        let clusterLoaded = false;
+
+        // 貪婪分群：逐點找距離最近且在門檻內的既有群，否則自成一群。
+        // 群心用累進平均，先加入的點權重不會被後加入的洗掉。
+        function clusterPoints(points) {
+            const clusters = [];
+            points.forEach(p => {
+                let best = null, bestDist = Infinity;
+                clusters.forEach(c => {
+                    const d = calculateDistance(p.lat, p.lng, c.lat, c.lng);
+                    if (d <= CLUSTER_RADIUS_M && d < bestDist) { bestDist = d; best = c; }
+                });
+                if (!best) {
+                    clusters.push({ lat: p.lat, lng: p.lng, items: [p], spread: 0 });
+                    return;
+                }
+                best.items.push(p);
+                best.lat += (p.lat - best.lat) / best.items.length;
+                best.lng += (p.lng - best.lng) / best.items.length;
+            });
+            // 群心在加入過程中會移動，所以 spread 必須等分群結束、群心定案後才算，
+            // 否則標示的「群內最大偏移」會是加入當下對舊群心的距離，與最終畫面上的座標對不起來。
+            clusters.forEach(c => {
+                c.spread = c.items.reduce((mx, p) => Math.max(mx, calculateDistance(p.lat, p.lng, c.lat, c.lng)), 0);
+            });
+            return clusters;
+        }
+
+        async function loadCheckoutClusters() {
+            const panel = document.getElementById('clusterPanel');
+            if (!window.currentCompanyId) return;   // 與 loadCheckoutDistances 一致，避免送出 company_id 為 null 的查詢
+            panel.innerHTML = '<div style="font-size:12px;color:#64748B;padding:8px 0;">載入中...</div>';
+            try {
+                const dateStr = getDailyDate();
+                const fromMs = Date.parse(dateStr + 'T00:00:00+08:00') - (CLUSTER_WINDOW_DAYS - 1) * 86400000;
+                const fromStr = new Date(fromMs).toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' });
+
+                const { data, error } = await sb.from('attendance')
+                    .select('employee_id, date, check_out_time, checkout_latitude, checkout_longitude, employees!inner(company_id, name, employee_number)')
+                    .gte('date', fromStr)
+                    .lte('date', dateStr)
+                    .eq('employees.company_id', window.currentCompanyId)
+                    .not('checkout_latitude', 'is', null)
+                    .not('checkout_longitude', 'is', null)
+                    .limit(3000);
+                if (error) throw error;
+
+                const outside = [];
+                (data || []).forEach(a => {
+                    const info = evaluateCheckoutDistance(a.checkout_latitude, a.checkout_longitude);
+                    if (!info || !info.isOutside) return;
+                    outside.push({
+                        lat: Number(a.checkout_latitude), lng: Number(a.checkout_longitude),
+                        date: a.date, name: a.employees?.name || '未知員工',
+                        employeeNumber: a.employees?.employee_number || '',
+                        checkOutTime: a.check_out_time, info: info
+                    });
+                });
+                outside.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+
+                renderCheckoutClusters(clusterPoints(outside), fromStr, dateStr, (data || []).length);
+                clusterLoaded = true;
+            } catch (e) {
+                console.warn('Load checkout clusters warning:', e);
+                panel.innerHTML = '<div style="font-size:12px;color:#B91C1C;padding:8px 0;">載入失敗：' + escapeHTML(e.message || '') + '</div>';
+            }
+        }
+
+        function renderCheckoutClusters(clusters, fromStr, toStr, scanned) {
+            const panel = document.getElementById('clusterPanel');
+            const head = '<div style="font-size:11px;color:#64748B;margin-bottom:8px;">'
+                + escapeHTML(fromStr) + ' ~ ' + escapeHTML(toStr) + '，掃描 ' + scanned + ' 筆有座標的下班卡，'
+                + CLUSTER_RADIUS_M + ' 公尺內視為同一地點</div>';
+
+            if (clusters.length === 0) {
+                panel.innerHTML = head + '<div style="font-size:12px;color:#64748B;">近 ' + CLUSTER_WINDOW_DAYS + ' 天沒有範圍外的下班卡。</div>';
+                return;
+            }
+
+            // 重複出現的排前面，其次距離遠的排前面
+            clusters.sort((a, b) => (b.items.length - a.items.length) || (b.items[0].info.distance - a.items[0].info.distance));
+
+            panel.innerHTML = head + clusters.map((c, i) => {
+                const n = c.items.length;
+                const people = [...new Set(c.items.map(it => it.name + (it.employeeNumber ? '（' + it.employeeNumber + '）' : '')))];
+                const avgDist = c.items.reduce((s, it) => s + it.info.distance, 0) / n;
+                const repeat = n > 1;
+                return '<div style="padding:8px 10px;margin-bottom:6px;border-radius:10px;background:' + (repeat ? '#FFF1F2' : '#F8FAFC') + ';border:1px solid ' + (repeat ? '#FDA4AF' : '#E2E8F0') + ';">'
+                    + '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">'
+                    + '<span style="font-size:13px;font-weight:800;color:' + (repeat ? '#BE123C' : '#475569') + ';">地點 ' + String.fromCharCode(65 + (i % 26))
+                    + (repeat ? ' · 重複 ' + n + ' 次' : ' · 1 次') + '</span>'
+                    + '<span style="font-size:12px;font-weight:700;color:#9F1239;">距「' + escapeHTML(c.items[0].info.name) + '」' + escapeHTML(fmtDistance(avgDist)) + '</span>'
+                    + '</div>'
+                    + '<div style="font-size:11px;color:#475569;margin-top:4px;">' + escapeHTML(people.join('、')) + '</div>'
+                    + '<div style="font-size:11px;color:#64748B;margin-top:2px;">'
+                    + c.items.map(it => escapeHTML((it.date || '').slice(5).replace('-', '/') + ' ' + fmtTime(it.checkOutTime))).join('　·　')
+                    + '</div>'
+                    + '<div style="font-size:10px;color:#94A3B8;margin-top:4px;">座標 ' + c.lat.toFixed(6) + ', ' + c.lng.toFixed(6)
+                    + (n > 1 ? '（群內最大偏移 ' + Math.round(c.spread) + ' 公尺）' : '') + '</div>'
+                    + '</div>';
+            }).join('');
+        }
+
+        function toggleCheckoutClusters() {
+            const panel = document.getElementById('clusterPanel');
+            const btn = document.getElementById('clusterBtn');
+            if (panel.style.display === 'none') {
+                panel.style.display = 'block';
+                btn.textContent = '📊 收起定位點統計';
+                if (!clusterLoaded) loadCheckoutClusters();
+            } else {
+                panel.style.display = 'none';
+                btn.textContent = '📊 定位點統計（近 ' + CLUSTER_WINDOW_DAYS + ' 天）';
+            }
         }
 
         function toggleCheckoutRangeDetail() {
