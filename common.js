@@ -126,6 +126,13 @@ function getTaiwanDate(offsetDays = 0) {
     return date.toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' });
 }
 
+// 取得台灣時間 HH:MM（24 小時制，供 <input type="time"> 字串比對）
+// hourCycle h23：部分 WebKit 用 hour12:false 會把午夜輸出成 24:xx，字串比大小會失效
+function getTaiwanTimeHM() {
+    const hm = new Date().toLocaleTimeString('en-GB', { timeZone: 'Asia/Taipei', hourCycle: 'h23', hour: '2-digit', minute: '2-digit' });
+    return hm.replace(/^24:/, '00:');
+}
+
 // 任意 Date 物件 → YYYY-MM-DD（本地時區，避免 toISOString UTC 偏移）
 function fmtDate(d) {
     return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
@@ -1217,6 +1224,11 @@ async function submitMakeupPunch() {
     const earliest = getTaiwanDate(-(MAKEUP_PUNCH_WINDOW_DAYS - 1));
     if (date > today) return showToast('❌ 補打卡日期不能是未來日期');
     if (date < earliest) return showToast(`❌ 補打卡限 ${MAKEUP_PUNCH_WINDOW_DAYS} 天內（最早 ${earliest}），逾期請找主管處理`);
+    // 106：當天補卡不得填未來時間（否則會在上班中就記完整天工時）
+    if (date === today) {
+        const nowHM = getTaiwanTimeHM();
+        if (time > nowHM) return showToast(`❌ 補打卡時間不能是未來時間（現在 ${nowHM}）`);
+    }
 
     const reasonLabel = {
         'forgot': '忘記打卡',
