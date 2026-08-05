@@ -117,6 +117,48 @@ else
 fi
 echo ""
 
+# === 8. RLS 政策靜態檢查 ===
+# 2026-08-05 盤點正式庫發現：employees / attendance / payroll_records 上存在
+# USING (true) 且角色為 anon 的 permissive 政策，等於 RLS 全開——公開的 anon key
+# 就能讀寫所有公司的資料。permissive 政策是 OR 起來的，同表另有一條
+# USING (false) 的「Block direct access」完全擋不住。
+# 這裡只做「新加入的 migration 有沒有又寫出這種政策」的靜態把關；
+# 正式庫實際狀態要跑 bash scripts/rls_audit.sh（需連線）。
+echo "--- 8. RLS 政策靜態檢查 ---"
+RLS_ISSUES=""
+
+# 8a. 新政策不得使用 USING (true) / WITH CHECK (true)
+PERMISSIVE_CNT=$(grep -rn "CREATE POLICY" -A 6 migrations/*.sql 2>/dev/null \
+    | grep -icE "USING *\( *true *\)|WITH CHECK *\( *true *\)")
+if [ "$PERMISSIVE_CNT" -gt 0 ]; then
+    RLS_ISSUES="${RLS_ISSUES}  · ${PERMISSIVE_CNT} 條 USING(true)／WITH CHECK(true) 政策（等於不設限）\n"
+fi
+
+# 8b. 新表建立後必須 ENABLE ROW LEVEL SECURITY（略過底線開頭的內部表，如 _migrations）
+for f in $(ls migrations/*.sql 2>/dev/null); do
+    for t in $(grep -oE "CREATE TABLE IF NOT EXISTS [a-z_]+|CREATE TABLE [a-z_]+" "$f" 2>/dev/null | awk '{print $NF}'); do
+        case "$t" in _*) continue ;; esac
+        if ! grep -rq "ALTER TABLE $t ENABLE ROW LEVEL SECURITY" migrations/*.sql 2>/dev/null; then
+            RLS_ISSUES="${RLS_ISSUES}  · $t（$(basename $f)）建立後從未 ENABLE ROW LEVEL SECURITY\n"
+        fi
+    done
+done
+
+# 8c. 前端不得直接寫入 RLS 表（既有 hook 已檢查，這裡只確認 hook 還在）
+if [ ! -f ".claude/hooks/check-rls-bypass.sh" ]; then
+    RLS_ISSUES="${RLS_ISSUES}  · check-rls-bypass.sh hook 不存在（RLS 寫入把關失效）\n"
+fi
+
+if [ -n "$RLS_ISSUES" ]; then
+    echo "WARN: RLS 政策有疑慮："
+    echo -e "$RLS_ISSUES"
+    echo "  詳見 docs/BUG_TRACKER.md「RLS 形同虛設」，正式庫實況跑 bash scripts/rls_audit.sh"
+    WARN=$((WARN+1))
+else
+    echo "PASS"
+fi
+echo ""
+
 # === 結果 ===
 echo "========================================"
 if [ $FAIL -gt 0 ]; then

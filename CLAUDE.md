@@ -190,6 +190,11 @@ bash scripts/qa_check.sh
 5. 多租戶隔離（查詢缺 company_id）
 6. 子頁面返回按鍵
 7. 消費者頁面不應有 LIFF
+8. RLS 政策靜態檢查（新 migration 不得寫出 `USING(true)` 政策、建表必須 `ENABLE ROW LEVEL SECURITY`）
+
+正式庫的 RLS 實況要另外跑 `bash scripts/rls_audit.sh`（需連線，只讀 metadata 不撈資料）。
+⚠️ 目前 64 張表有 62 張是 RLS 未開或有全開政策，屬已知未修復問題，見 `docs/BUG_TRACKER.md` 開頭那一節。
+第 8 項現在必然 WARN——**新增改動時要比對 WARN 內容有沒有變多，變多就是你加的**。
 
 **FAIL 必須修正才能 commit；WARN 不 block commit，但必須在證據中列出並確認。**
 **Hook 新出現的警告視同 FAIL，必須修正。**

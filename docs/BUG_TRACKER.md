@@ -1,7 +1,51 @@
 # RunPiston Bug 追蹤 & 測試清單
 
-> 更新日期：2026-08-05
+> 更新日期：2026-08-06
 > 每次修改後更新此檔案
+
+---
+
+## 🔴 2026-08-05 RLS 形同虛設：公開 anon key 可讀寫幾乎整個資料庫（**未修復**）
+
+健康檢查盤點時查證正式庫 metadata 得出（**沒有撈任何一筆業務資料**，全部靠 `pg_class` / `pg_policy` / `information_schema` 判定）。
+
+### 規模
+
+| 指標 | 數字 |
+|------|------|
+| public schema 資料表總數 | 64 |
+| **RLS 完全未開啟** | **12** |
+| **有 `USING (true)` 且套用到 anon／PUBLIC 政策的表** | **50** |
+| 這類全開政策條數 | 101 |
+
+也就是 64 張表裡有 **62 張** 不是 RLS 沒開、就是有一條政策把門全開。
+
+### 為什麼 `Block direct access` 沒有用
+
+`attendance` / `employees` 上都有一條 `Block direct access USING (false)`，但同表另有 `允許查看考勤記錄 USING (true)`、`允許更新考勤記錄 USING (true)`，角色明確是 `anon, authenticated`。**PostgreSQL 的 permissive policy 是 OR 起來的**——只要有一條 `true` 就全開，`false` 那條完全擋不住。
+
+### 確認受影響的資料
+
+- `employees`：SELECT／UPDATE 對 anon 全開 → 所有公司的員工個資可讀可改
+- `attendance`：同上 → 所有考勤可讀可改
+- `payroll_records`：`payroll_select` / `payroll_update` 皆 `USING (true)` 且角色是 **PUBLIC** → 薪資可讀可改
+- `overtime_requests`：**RLS 完全關閉、0 條政策**
+- 另外 RLS 未開的還有 `attendance_backup`（考勤全量備份）、`companies`、`clients`、`field_work_logs`、`field_work_trips`、`lunch_order_details`、`binding_attempts`、`booking_settings`、`insurance_brackets` 等
+
+table-level 權限方面，anon 對 `employees` / `attendance` / `payroll_records` / `overtime_requests` / `system_settings` 全都有 `SELECT,INSERT,UPDATE,DELETE`——唯一防線就是 RLS，而 RLS 是上面這個狀態。
+
+anon key 本身寫在 `common.js` 裡，任何人打開網頁原始碼就看得到，這是 Supabase 的正常設計，前提是 RLS 有在做事。
+
+### 為什麼一直沒修（不是疏忽，是有結構性原因）
+
+前端是 **LIFF 認證、沒有 Supabase auth session**。收緊成 `auth.jwt() ->> 'sub'` 型政策會讓所有頁面直接壞掉——現有大量頁面是拿 anon key 直接 `sb.from(...)` 讀表的（包含 2026-08-05 新增的加班確認卡片，它能運作正是因為 `overtime_requests` 沒開 RLS）。
+
+正解是**全面改走 SECURITY DEFINER RPC**，再把 `USING(true)` 政策撤掉。這是架構級工程，需單獨排期，不是一次 commit 能收的。
+
+### 已做的：讓它至少會被喊出來
+
+- `scripts/qa_check.sh` 新增第 8 項 RLS 靜態檢查：新 migration 若又寫出 `USING(true)` 政策、或建表後沒 `ENABLE ROW LEVEL SECURITY`，會出 WARN
+- 新增 `scripts/rls_audit.sh`：連線正式庫列出「RLS 未開的表」「全開政策」「RLS 開但 0 政策（走 RPC 的預期設計）」「anon 的 table 權限」四段，只讀 metadata
 
 ---
 
