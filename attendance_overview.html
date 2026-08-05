@@ -65,6 +65,7 @@
         .late-flag { color:#EA580C; font-size:10px; font-weight:700; }
         .early-flag { color:#DC2626; font-size:10px; font-weight:700; }
         .loc-hint { font-size:10px; color:#94A3B8; display:block; max-width:80px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .loc-hint.out-range { color:#BE123C; font-weight:800; }
 
         .refresh-bar { display:flex; align-items:center; justify-content:space-between; font-size:11px; color:#94A3B8; margin-bottom:8px; }
         .refresh-dot { width:8px; height:8px; border-radius:50%; background:#10B981; display:inline-block; margin-right:4px; animation:pulse 2s infinite; }
@@ -158,6 +159,21 @@
                     </div>
                     <div id="failureSummary" style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;"></div>
                     <div id="failureDetail" style="display:none;margin-top:10px;max-height:320px;overflow-y:auto;"></div>
+                </div>
+            </div>
+
+            <!-- 下班定位範圍外（前端現算，不擋人只呈現） -->
+            <div id="checkoutRangeCard" style="display:none;margin-bottom:16px;">
+                <div style="padding:14px 18px;background:#FFF1F2;border:2px solid #FDA4AF;border-radius:14px;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;cursor:pointer;" onclick="toggleCheckoutRangeDetail()">
+                        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                            <span style="font-size:20px;">📍</span>
+                            <span style="font-weight:700;font-size:14px;color:#9F1239;">下班定位範圍外</span>
+                            <span id="checkoutRangeBadge" style="font-size:12px;font-weight:800;color:#BE123C;background:#FFE4E6;border-radius:999px;padding:4px 8px;"></span>
+                        </div>
+                        <span id="checkoutRangeArrow" style="font-size:12px;color:#BE123C;">▼</span>
+                    </div>
+                    <div id="checkoutRangeDetail" style="display:none;margin-top:10px;max-height:320px;overflow-y:auto;"></div>
                 </div>
             </div>
 
@@ -439,11 +455,16 @@
             document.getElementById('dailyDayLabel').textContent = dayNames[d.getDay()];
 
             try {
-                const { data, error } = await sb.rpc('get_company_daily_attendance', {
-                    p_company_id: window.currentCompanyId,
-                    p_date: dateStr,
-                    p_line_user_id: liffProfile?.userId || null   // 099 呼叫者身分驗證
-                });
+                // 下班定位距離與出勤資料並行載入（loadCheckoutDistances 內部自行吞錯，不會拖垮主流程）
+                const [attRes] = await Promise.all([
+                    sb.rpc('get_company_daily_attendance', {
+                        p_company_id: window.currentCompanyId,
+                        p_date: dateStr,
+                        p_line_user_id: liffProfile?.userId || null   // 099 呼叫者身分驗證
+                    }),
+                    loadCheckoutDistances(dateStr)
+                ]);
+                const { data, error } = attRes;
 
                 if (error) throw error;
 
@@ -451,6 +472,7 @@
                 updateDailyStats();
                 updateDeptFilter();
                 renderDailyTable();
+                renderCheckoutRangeCard();
                 document.getElementById('lastRefresh').textContent = '更新：' + new Date().toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
                 loadLunchStats(dateStr);
                 loadAnomalyData();
@@ -458,7 +480,146 @@
             } catch (e) {
                 console.error('Load daily data error:', e);
                 document.getElementById('dailyTableBody').innerHTML = '<tr><td colspan="7" style="text-align:center;color:#ef4444;padding:20px;">載入失敗：' + escapeHTML(e.message || '') + '</td></tr>';
+                // 出勤載入失敗時一併收起距離卡片，避免留著上一天的資料誤導
+                checkoutDistanceMap = {};
+                const crCard = document.getElementById('checkoutRangeCard');
+                if (crCard) crCard.style.display = 'none';
             }
+        }
+
+        // ===== 下班定位距離（前端現算，不擋人、只呈現）=====
+        // 下班本來就不驗打卡範圍（quick_check_in 下班分支提前 RETURN），真實座標一直寫在
+        // attendance.checkout_latitude/longitude，只是過去沒有任何介面呈現。這裡用
+        // common.js 既有的 calculateDistance 與 officeLocations 現算，純讀取、無 DB 寫入。
+        // 門檻與 quick_check_in 對齊：半徑取 office.radius，未設定時 fallback 100 公尺。
+        const CHECKOUT_DEFAULT_RADIUS_M = 100;
+        const CHECKOUT_RANGE_WINDOW_DAYS = 30;   // 卡片回看天數
+        let checkoutDistanceMap = {};      // 「選定日期」的 employee_id -> info，供表格標示
+        let checkoutRangeHistory = [];     // 近 30 天所有範圍外的下班卡，供卡片列出
+
+        // Number(null) 與 Number('') 都是 0，若不先擋掉，缺座標的列會被當成
+        // 南大西洋的 (0, 0) 而算出一萬多公里的假「範圍外」。isFinite 擋不到這種。
+        function isUsableCoord(v) {
+            return v !== null && v !== undefined && v !== '' && Number.isFinite(Number(v));
+        }
+
+        function evaluateCheckoutDistance(lat, lng) {
+            if (!isUsableCoord(lat) || !isUsableCoord(lng)) return null;
+            const la = Number(lat), ln = Number(lng);
+            const locs = (typeof officeLocations !== 'undefined' && Array.isArray(officeLocations)) ? officeLocations : [];
+            if (locs.length === 0) return null;   // 公司沒設定打卡地點 → 無從判斷，不顯示
+
+            let nearest = null, minDist = Infinity;
+            locs.forEach(o => {
+                if (!isUsableCoord(o?.lat) || !isUsableCoord(o?.lng)) return;
+                const oLat = Number(o.lat), oLng = Number(o.lng);
+                const d = calculateDistance(la, ln, oLat, oLng);
+                if (Number.isFinite(d) && d < minDist) { minDist = d; nearest = o; }
+            });
+            if (!nearest) return null;
+
+            const r = Number(nearest.radius);
+            const radius = Number.isFinite(r) && r > 0 ? r : CHECKOUT_DEFAULT_RADIUS_M;
+            return {
+                name: nearest.name || '打卡地點',
+                distance: minDist,
+                radius: radius,
+                isOutside: minDist > radius
+            };
+        }
+
+        function fmtDistance(m) {
+            if (!Number.isFinite(m)) return '-';
+            // 用四捨五入後的值判斷單位，避免 999.5 顯示成「1000m」
+            return Math.round(m) < 1000 ? Math.round(m) + 'm' : (m / 1000).toFixed(1) + 'km';
+        }
+
+        function checkoutDistanceHint(info) {
+            if (!info) return '';
+            const title = '下班定位距離「' + info.name + '」' + Math.round(info.distance) + ' 公尺'
+                + '（允許範圍 ' + Math.round(info.radius) + ' 公尺）';
+            if (info.isOutside) {
+                return '<span class="loc-hint out-range" title="' + escapeHTML(title) + '">⚠️範圍外 ' + escapeHTML(fmtDistance(info.distance)) + '</span>';
+            }
+            return '<span class="loc-hint" title="' + escapeHTML(title) + '">📍' + escapeHTML(info.name) + ' ' + escapeHTML(fmtDistance(info.distance)) + '</span>';
+        }
+
+        // 實測（2026-08-05，大正正式庫 746 筆有座標的下班卡）4 個月只有 6 筆範圍外，
+        // 只看單日業主幾乎永遠遇不到，所以卡片回看 30 天，表格則只標選定日期。
+        async function loadCheckoutDistances(dateStr) {
+            checkoutDistanceMap = {};
+            checkoutRangeHistory = [];
+            if (!window.currentCompanyId) return;
+            try {
+                // 由選定日期往回推。不可用 getTaiwanDate()（它收的是「距今天幾天」的數字）；
+                // 也不可用 setDate()——本地時區若有 DST，一天可能是 23/25 小時而多抓一天。
+                // 台灣無 DST，直接用 epoch 毫秒加減最穩，且與瀏覽器所在時區無關。
+                const fromMs = Date.parse(dateStr + 'T00:00:00+08:00') - (CHECKOUT_RANGE_WINDOW_DAYS - 1) * 86400000;
+                const fromStr = new Date(fromMs).toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' });
+
+                const { data, error } = await sb.from('attendance')
+                    .select('employee_id, date, check_out_time, checkout_latitude, checkout_longitude, employees!inner(company_id, name, employee_number)')
+                    .gte('date', fromStr)
+                    .lte('date', dateStr)
+                    .eq('employees.company_id', window.currentCompanyId)
+                    .not('checkout_latitude', 'is', null)
+                    .not('checkout_longitude', 'is', null)
+                    .limit(1000);
+                if (error) throw error;
+
+                (data || []).forEach(a => {
+                    const info = evaluateCheckoutDistance(a.checkout_latitude, a.checkout_longitude);
+                    if (!info) return;
+                    if (a.date === dateStr) checkoutDistanceMap[a.employee_id] = info;
+                    if (info.isOutside) {
+                        checkoutRangeHistory.push({
+                            date: a.date,
+                            name: a.employees?.name || '未知員工',
+                            employeeNumber: a.employees?.employee_number || '',
+                            checkOutTime: a.check_out_time,
+                            info: info
+                        });
+                    }
+                });
+                checkoutRangeHistory.sort((a, b) => (a.date === b.date ? b.info.distance - a.info.distance : (a.date < b.date ? 1 : -1)));
+            } catch (e) {
+                // 距離只是輔助資訊，取不到就不顯示，絕不影響打卡總覽主流程
+                console.warn('Load checkout distances warning:', e);
+                checkoutDistanceMap = {};
+                checkoutRangeHistory = [];
+            }
+        }
+
+        function renderCheckoutRangeCard() {
+            const card = document.getElementById('checkoutRangeCard');
+            if (!card) return;
+            if (checkoutRangeHistory.length === 0) { card.style.display = 'none'; return; }
+
+            const selectedDate = getDailyDate();
+            const todayCount = checkoutRangeHistory.filter(o => o.date === selectedDate).length;
+            document.getElementById('checkoutRangeBadge').textContent =
+                (todayCount > 0 ? '當日 ' + todayCount + ' 筆 · ' : '') + '近 ' + CHECKOUT_RANGE_WINDOW_DAYS + ' 天 ' + checkoutRangeHistory.length + ' 筆';
+
+            document.getElementById('checkoutRangeDetail').innerHTML = checkoutRangeHistory.map(o =>
+                '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:6px 0;border-top:1px dashed #FECDD3;">'
+                + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
+                + '<span style="font-size:12px;font-weight:800;color:#9F1239;">' + escapeHTML((o.date || '').slice(5).replace('-', '/')) + '</span>'
+                + '<span style="font-size:13px;font-weight:700;color:#0F172A;">' + escapeHTML(o.name) + (o.employeeNumber ? '（' + escapeHTML(o.employeeNumber) + '）' : '') + '</span>'
+                + '<span style="font-size:11px;color:#9F1239;">下班 ' + escapeHTML(fmtTime(o.checkOutTime)) + '</span>'
+                + '</div>'
+                + '<span style="font-size:12px;font-weight:800;color:#BE123C;">距「' + escapeHTML(o.info.name) + '」' + escapeHTML(fmtDistance(o.info.distance))
+                + '<span style="font-weight:600;color:#9F1239;">（限 ' + escapeHTML(fmtDistance(o.info.radius)) + '）</span></span>'
+                + '</div>'
+            ).join('') + '<div style="margin-top:8px;padding-top:8px;border-top:1px solid #FECDD3;font-size:11px;color:#9F1239;">下班打卡不驗範圍，這裡只呈現距離供查核，員工不會被擋。沒有座標的下班卡（管理員代補、公務機打卡）無從計算，不會列入。</div>';
+            card.style.display = 'block';
+        }
+
+        function toggleCheckoutRangeDetail() {
+            const panel = document.getElementById('checkoutRangeDetail');
+            const arrow = document.getElementById('checkoutRangeArrow');
+            const open = panel.style.display === 'none';
+            panel.style.display = open ? 'block' : 'none';
+            arrow.textContent = open ? '▲' : '▼';
         }
 
         // ===== 缺卡追蹤（下班未打卡，僅大正科技，DB 端 RPC 另驗 admin/manager）=====
@@ -873,6 +1034,7 @@
                     '</td>' +
                     '<td class="time-cell">' + outTime +
                         (r.is_early_leave ? ' <span class="early-flag">早退</span>' : '') +
+                        (r.check_out_time ? checkoutDistanceHint(checkoutDistanceMap[r.employee_id]) : '') +
                     '</td>' +
                     '<td class="time-cell">' + fmtHours(r.total_work_hours) + '</td>' +
                     '<td>' + statusBadge(r) + '</td>' +
