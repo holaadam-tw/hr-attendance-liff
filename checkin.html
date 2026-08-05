@@ -851,9 +851,15 @@
                         btn.disabled = false; btn.textContent = '📸 重試';
                         return;
                     }
-                    if (loc.accuracy > GPS_MAX_ACCURACY_M && !currentEmployee?.gps_relaxed) {
+                    // 精度門檻只套用在上班（業主 2026-08-05 決定）。
+                    // 精度＝手機自評的誤差範圍，不等於人離公司多遠：人在工廠但關了精確位置
+                    // 會是 2000m 被擋，人在家但訊號好會是 10m 暢通——擋不到作弊只擋誠實員工。
+                    // 下班該把關的是「距離」而非精度，而下班本來就不驗範圍
+                    // （quick_check_in 下班分支提前 RETURN），故拿掉此門檻不降低任何防弊能力。
+                    // 真實座標仍寫入 checkout_latitude/longitude 供事後稽核。
+                    if (currentCheckInType === 'in' && loc.accuracy > GPS_MAX_ACCURACY_M && !currentEmployee?.gps_relaxed) {
                         showStatus(statusBox, 'info', `📍 GPS 精度 ${Math.round(loc.accuracy)}m，改送主管審核...`);
-                        const pending = await submitLowAccuracyReviewRequest(currentCheckInType === 'in' ? 'check_in' : 'check_out', loc, publicUrl);
+                        const pending = await submitLowAccuracyReviewRequest('check_in', loc, publicUrl);
                         clearTimeout(safetyTimer);
                         showLowAccuracyPendingSuccess(pending.typeText, pending.nowParts, loc);
                         return;
@@ -1032,9 +1038,10 @@
                             showStatus(statusBox, 'warning', '⚠️ GPS 精度異常（過於精確），請關閉模擬定位 App 後重試');
                             btn.disabled = false; btn.textContent = '📸 開啟相機拍照'; return;
                         }
-                        if (loc.accuracy > GPS_MAX_ACCURACY_M && !currentEmployee?.gps_relaxed) {
+                        // 精度門檻只套用在上班（理由同另一個拍照流程的註解）
+                        if (currentCheckInType === 'in' && loc.accuracy > GPS_MAX_ACCURACY_M && !currentEmployee?.gps_relaxed) {
                             showStatus(statusBox, 'info', `📍 GPS 精度 ${Math.round(loc.accuracy)}m，改送主管審核...`);
-                            const pending = await submitLowAccuracyReviewRequest(currentCheckInType === 'in' ? 'check_in' : 'check_out', loc, publicUrl);
+                            const pending = await submitLowAccuracyReviewRequest('check_in', loc, publicUrl);
                             showLowAccuracyPendingSuccess(pending.typeText, pending.nowParts, loc);
                             return;
                         }
