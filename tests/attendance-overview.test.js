@@ -274,7 +274,7 @@ function makeSb(tables) {
       const rec = { table: t, chain: [] };
       calls.push(rec);
       const api = {};
-      ['select', 'gte', 'lte', 'eq', 'not', 'limit', 'order'].forEach(m => {
+      ['select', 'gte', 'lte', 'gt', 'lt', 'eq', 'is', 'not', 'limit', 'order'].forEach(m => {
         api[m] = (...a) => { rec.chain.push(m + '(' + a.join(',') + ')'); return api; };
       });
       api.then = (res) => res({ data: tables[t] || [], error: null });
@@ -381,6 +381,60 @@ const OTR = [
   rpcArgs = null;
   await ctx.submitOvertimeDecision(K1, 'confirm');
   check('確認對話框按取消不送 RPC', rpcArgs === null);
+
+  console.log('\n=== 11. 歷史缺卡（追蹤啟用前） ===');
+  // 追蹤啟用日 2026-07-13 之前、有上班卡沒下班卡的日子。排除條件必須與
+  // scan_missing_checkouts() 對齊：停用／免打卡／公務機／當日有核准請假。
+  const LEG_ATT = [
+    { employee_id: 'L1', date: '2026-06-16', check_in_time: utc('2026-06-16', '08:19'), check_out_time: null,
+      employees: { company_id: 'COMPANY-A', name: '正常缺卡者', employee_number: 'L801', is_active: true, no_checkin: false, is_kiosk: false } },
+    { employee_id: 'L2', date: '2026-06-03', check_in_time: utc('2026-06-03', '12:56'), check_out_time: null,
+      employees: { company_id: 'COMPANY-A', name: '當日有請假', employee_number: 'L802', is_active: true, no_checkin: false, is_kiosk: false } },
+    { employee_id: 'L3', date: '2026-06-10', check_in_time: utc('2026-06-10', '07:54'), check_out_time: null,
+      employees: { company_id: 'COMPANY-A', name: '免打卡員工', employee_number: 'L803', is_active: true, no_checkin: true, is_kiosk: false } },
+    { employee_id: 'L4', date: '2026-06-11', check_in_time: utc('2026-06-11', '07:54'), check_out_time: null,
+      employees: { company_id: 'COMPANY-A', name: '公務機帳號', employee_number: 'L804', is_active: true, no_checkin: false, is_kiosk: true } },
+    { employee_id: 'L5', date: '2026-06-12', check_in_time: utc('2026-06-12', '07:54'), check_out_time: null,
+      employees: { company_id: 'COMPANY-A', name: '已停用員工', employee_number: 'L805', is_active: false, no_checkin: false, is_kiosk: false } },
+    { employee_id: 'L1', date: '2026-06-17', check_in_time: utc('2026-06-17', '08:21'), check_out_time: null,
+      employees: { company_id: 'COMPANY-A', name: '正常缺卡者', employee_number: 'L801', is_active: true, no_checkin: false, is_kiosk: false } },
+  ];
+  const LEG_LV = [
+    { employee_id: 'L2', start_date: '2026-06-03', end_date: '2026-06-03', employees: { company_id: 'COMPANY-A' } },
+  ];
+  ctx.sb = makeSb({ attendance: LEG_ATT, leave_requests: LEG_LV });
+  await ctx.loadLegacyGaps();
+
+  const legCard = el('legacyGapCard'), legBadge = el('legacyGapBadge'), legDetail = el('legacyGapDetail');
+  const lh = legDetail.innerHTML;
+  check('列出缺卡日（L801 兩天）', (lh.match(/L801/g) || []).length === 2, '出現 ' + (lh.match(/L801/g) || []).length + ' 次');
+  check('當日有核准請假 → 排除（與 scan_missing_checkouts 對齊）', !lh.includes('L802'));
+  check('免打卡員工 → 排除', !lh.includes('L803'));
+  check('公務機帳號 → 排除', !lh.includes('L804'));
+  check('已停用員工 → 排除', !lh.includes('L805'));
+  check('badge 顯示天數與人數', legBadge.textContent === '2 天 · 1 人未補', legBadge.textContent);
+  check('說明寫明工時算 0 會少算薪資', lh.includes('少算薪資'));
+  check('說明寫明不發通知給員工', lh.includes('不發任何通知'));
+  check('提供補登下班按鈕並帶入正確員工與日期',
+    lh.includes("openAdminMakeup({employeeId:'L1',date:'2026-06-16',type:'clock_out'})"));
+  check('依日期分組顯示', lh.includes('2026-06-16') && lh.includes('2026-06-17'));
+
+  const legAttQ = ctx.sb.calls.find(c => c.table === 'attendance');
+  const legLvQ = ctx.sb.calls.find(c => c.table === 'leave_requests');
+  check('attendance 查詢帶 employees.company_id（多租戶）', legAttQ.chain.some(s => s === 'eq(employees.company_id,COMPANY-A)'));
+  check('leave_requests 查詢帶 employees.company_id（多租戶）', legLvQ.chain.some(s => s === 'eq(employees.company_id,COMPANY-A)'));
+  check('只查追蹤啟用日之前（lt 2026-07-13，不與現行缺卡追蹤重疊）',
+    legAttQ.chain.some(s => s === 'lt(date,2026-07-13)'), legAttQ.chain.join(' '));
+  check('只查有上班卡且無下班卡', legAttQ.chain.some(s => s === 'not(check_in_time,is,)') && legAttQ.chain.some(s => s === 'is(check_out_time,)'));
+
+  ctx.sb = makeSb({ attendance: [], leave_requests: [] });
+  await ctx.loadLegacyGaps();
+  check('全部補完後卡片自動隱藏', legCard.style.display === 'none');
+
+  ctx.window.currentCompanyId = null;
+  await ctx.loadLegacyGaps();
+  check('無 company context 時卡片隱藏', legCard.style.display === 'none');
+  ctx.window.currentCompanyId = 'COMPANY-A';
 
   console.log('\n═══════════════════════════════════════');
   console.log('  結果：✅ ' + pass + ' 通過  ❌ ' + fail + ' 失敗');

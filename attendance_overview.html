@@ -177,6 +177,21 @@
                 </div>
             </div>
 
+            <!-- 歷史缺卡（缺卡追蹤啟用前，系統從未追蹤過的日子） -->
+            <div id="legacyGapCard" style="display:none;margin-bottom:16px;">
+                <div style="padding:14px 18px;background:#FEF2F2;border:2px solid #FCA5A5;border-radius:14px;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;cursor:pointer;" onclick="toggleLegacyGapDetail()">
+                        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                            <span style="font-size:20px;">🗂️</span>
+                            <span style="font-weight:700;font-size:14px;color:#991B1B;">歷史缺卡（追蹤啟用前）</span>
+                            <span id="legacyGapBadge" style="font-size:12px;font-weight:800;color:#B91C1C;background:#FEE2E2;border-radius:999px;padding:4px 8px;"></span>
+                        </div>
+                        <span id="legacyGapArrow" style="font-size:12px;color:#B91C1C;">▼</span>
+                    </div>
+                    <div id="legacyGapDetail" style="display:none;margin-top:10px;max-height:420px;overflow-y:auto;"></div>
+                </div>
+            </div>
+
             <!-- 下班定位查核（前端現算，不擋人只呈現） -->
             <div id="checkoutRangeCard" style="display:none;margin-bottom:16px;">
                 <div id="checkoutRangeBox" style="padding:14px 18px;background:#FFF1F2;border:2px solid #FDA4AF;border-radius:14px;">
@@ -504,6 +519,7 @@
                 loadAnomalyData();
                 loadCheckinFailures();
                 loadOvertimeConfirm();
+                loadLegacyGaps();
             } catch (e) {
                 console.error('Load daily data error:', e);
                 document.getElementById('dailyTableBody').innerHTML = '<tr><td colspan="7" style="text-align:center;color:#ef4444;padding:20px;">載入失敗：' + escapeHTML(e.message || '') + '</td></tr>';
@@ -1011,6 +1027,118 @@
                 console.error('Confirm overtime error:', e);
                 showToast('確認失敗：' + (e.message || ''));
             }
+        }
+
+        // ===== 歷史缺卡（缺卡追蹤啟用前的日子）=====
+        // 缺卡追蹤（migration 092 的 scan_missing_checkouts + 每日 01:10 排程）是
+        // 2026-07-13 才開始跑的，只掃「昨天起算 p_days_back 天內」。在那之前有上班卡
+        // 卻沒有下班卡的日子，從來沒有被建立過追蹤記錄，工時一律 0，直接少算薪資，
+        // 而且缺卡追蹤卡片顯示「0 待處理」會讓人以為都處理完了。
+        //
+        // 刻意不回補 attendance_anomalies：那張表只要有 pending 列，每日 01:10 的
+        // run_daily_attendance_audit 就會「每天」DM 每一位當事員工（訊息明寫「未處理
+        // 前每天都會提醒」）並發管理群組彙總。回補兩個月前的資料等於讓 8 位員工天天
+        // 收到六月的提醒。所以這裡改成純前端現算的管理員清單：不寫入、不通知，
+        // 補登下班之後該列自動消失（因為 check_out_time 不再是 null）。
+        //
+        // 排除條件與 scan_missing_checkouts() 對齊：停用員工、免打卡、公務機帳號、
+        // 當日有已核准請假（缺下班卡已有解釋）都不列入。
+        const ANOMALY_TRACKING_START = '2026-07-13';   // 缺卡追蹤啟用日，早於此日者系統從未追蹤
+        const LEGACY_GAP_FROM = '2026-06-01';          // 往前看到哪
+        let legacyGapRows = [];
+
+        async function loadLegacyGaps() {
+            const card = document.getElementById('legacyGapCard');
+            if (!card) return;
+            if (!window.currentCompanyId) { legacyGapRows = []; card.style.display = 'none'; return; }
+            const rows = [];
+            try {
+                const [attRes, lvRes] = await Promise.all([
+                    sb.from('attendance')
+                        .select('employee_id, date, check_in_time, employees!inner(company_id, name, employee_number, is_active, no_checkin, is_kiosk)')
+                        .gte('date', LEGACY_GAP_FROM).lt('date', ANOMALY_TRACKING_START)
+                        .eq('employees.company_id', window.currentCompanyId)
+                        .not('check_in_time', 'is', null)
+                        .is('check_out_time', null)
+                        .limit(1000),
+                    sb.from('leave_requests')
+                        .select('employee_id, start_date, end_date, employees!leave_requests_employee_id_fkey!inner(company_id)')
+                        .eq('employees.company_id', window.currentCompanyId)
+                        .eq('status', 'approved')
+                        .lte('start_date', ANOMALY_TRACKING_START).gte('end_date', LEGACY_GAP_FROM)
+                        .limit(1000)
+                ]);
+                if (attRes.error) throw attRes.error;
+                if (lvRes.error) throw lvRes.error;
+
+                const leaves = (lvRes.data || []).map(l => ({
+                    employeeId: l.employee_id,
+                    from: l.start_date,
+                    to: l.end_date || l.start_date
+                }));
+                const onLeave = (empId, date) => leaves.some(l => l.employeeId === empId && date >= l.from && date <= l.to);
+
+                (attRes.data || []).forEach(a => {
+                    const e = a.employees || {};
+                    if (e.is_active === false || e.no_checkin === true || e.is_kiosk === true) return;
+                    if (onLeave(a.employee_id, a.date)) return;
+                    rows.push({
+                        employeeId: a.employee_id,
+                        date: a.date,
+                        name: e.name || '未知員工',
+                        employeeNumber: e.employee_number || '',
+                        checkInTime: a.check_in_time
+                    });
+                });
+                rows.sort((a, b) => (a.date === b.date ? String(a.name).localeCompare(String(b.name)) : (a.date < b.date ? -1 : 1)));
+
+                legacyGapRows = rows;
+                renderLegacyGapCard();
+            } catch (e) {
+                console.warn('Load legacy gaps warning:', e);
+                card.style.display = 'none';
+            }
+        }
+
+        function renderLegacyGapCard() {
+            const card = document.getElementById('legacyGapCard');
+            if (legacyGapRows.length === 0) { card.style.display = 'none'; return; }
+
+            const people = new Set(legacyGapRows.map(r => r.employeeId)).size;
+            document.getElementById('legacyGapBadge').textContent = legacyGapRows.length + ' 天 · ' + people + ' 人未補';
+
+            let html = '<div style="font-size:11px;color:#991B1B;margin-bottom:8px;line-height:1.6;">'
+                + escapeHTML(LEGACY_GAP_FROM) + ' ~ ' + escapeHTML(ANOMALY_TRACKING_START)
+                + ' 之間有上班卡、沒有下班卡的日子。缺卡追蹤是 ' + escapeHTML(ANOMALY_TRACKING_START)
+                + ' 才啟用的，這些日子<b>系統從來沒有追蹤過</b>，工時一律算 0，會少算薪資。<br>'
+                + '已排除當日有核准請假、免打卡、公務機帳號與停用員工。'
+                + '<b>補登下班後該列會自動消失</b>；本清單不發任何通知給員工。</div>';
+
+            let lastDate = '';
+            legacyGapRows.forEach(r => {
+                if (r.date !== lastDate) {
+                    html += '<div style="font-size:12px;font-weight:800;color:#7F1D1D;margin:8px 0 4px;">' + escapeHTML(r.date) + '</div>';
+                    lastDate = r.date;
+                }
+                html += '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;padding:6px 10px;margin-bottom:4px;border-radius:8px;background:#fff;border:1px solid #FECACA;">'
+                    + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
+                    + '<span style="font-size:13px;font-weight:700;color:#0F172A;">' + escapeHTML(r.name) + (r.employeeNumber ? '（' + escapeHTML(r.employeeNumber) + '）' : '') + '</span>'
+                    + '<span style="font-size:11px;color:#64748B;">上班 ' + escapeHTML(fmtTime(r.checkInTime)) + ' · 下班未打卡</span>'
+                    + '</div>'
+                    + '<button onclick="openAdminMakeup({employeeId:\'' + escapeHTML(r.employeeId) + '\',date:\'' + escapeHTML(r.date) + '\',type:\'clock_out\'})" style="border:none;background:#B91C1C;color:#fff;font-size:12px;font-weight:700;border-radius:8px;padding:4px 10px;cursor:pointer;font-family:inherit;">補登下班</button>'
+                    + '</div>';
+            });
+
+            document.getElementById('legacyGapDetail').innerHTML = html;
+            card.style.display = 'block';
+        }
+
+        function toggleLegacyGapDetail() {
+            const panel = document.getElementById('legacyGapDetail');
+            const arrow = document.getElementById('legacyGapArrow');
+            const open = panel.style.display === 'none';
+            panel.style.display = open ? 'block' : 'none';
+            arrow.textContent = open ? '▲' : '▼';
         }
 
         // ===== 缺卡追蹤（下班未打卡，僅大正科技，DB 端 RPC 另驗 admin/manager）=====
