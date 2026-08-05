@@ -55,9 +55,27 @@ export async function exportReport(type) {
 
         if (type === 'payroll_summary') {
             // 一人一列的薪資計算用彙總。資料來源與已知限制見 docs/PAYROLL_SUMMARY_REPORT.md
-            const SHIFT_START_MIN = 8 * 60;     // 全公司上班 08:00（employees.fixed_shift_start 皆為此值）
-            const OT_AFTER_MIN = 18 * 60;       // 下班 18:00 之後才算加班（17:0x 下班屬正常收工）
+            // 'HH:MM' → 當日分鐘數；讀不到或格式不對就用 fallback
+            const hhmmToMin = (v, fb) => {
+                const m = /^(\d{1,2}):(\d{2})$/.exec(typeof v === 'string' ? v : '');
+                return m ? Number(m[1]) * 60 + Number(m[2]) : fb;
+            };
+            const gs = (k) => (typeof getCachedSetting === 'function' ? getCachedSetting(k) : null);
+
+            const SHIFT_START_MIN = hhmmToMin(gs('default_work_start'), 8 * 60);   // 大正 08:00
+            const SHIFT_END_MIN = hhmmToMin(gs('default_work_end'), 17 * 60);      // 大正 17:00
+            // 業主規則（2026-08-05 確認）：17:00–17:30 是休息時間，不計薪也不算加班，
+            // 加班從 17:30 起算——例「17:30–20:30 加班三小時」。
+            // 舊版基準誤用 SHIFT_END_MIN（17:00），每次加班都多算 30 分鐘。
+            const OT_REST_MIN = 30;
+            const OT_START_MIN = SHIFT_END_MIN + OT_REST_MIN;
+            const OT_AFTER_MIN = 18 * 60;       // 下班 18:00 之後才認定為加班（17:0x 下班屬正常收工）
             const HALF_DAY_AFTER_MIN = 9 * 60 + 30;  // 晚於 09:30 才上班 → 疑似半天/外出，另計一欄
+            // 午休不計工時（migration 096），大正 12:00–13:00；本米未設定 → 不扣
+            const LUNCH_S = hhmmToMin(gs('lunch_break_start'), null);
+            const LUNCH_E = hhmmToMin(gs('lunch_break_end'), null);
+            const lunchOverlapMin = (s, e) => (LUNCH_S === null || LUNCH_E === null || LUNCH_E <= LUNCH_S)
+                ? 0 : Math.max(0, Math.min(e, LUNCH_E) - Math.max(s, LUNCH_S));
 
             const [attRes, lvRes, otRes] = await Promise.all([
                 sb.from('attendance')
@@ -85,7 +103,7 @@ export async function exportReport(type) {
             const pick = (id, emp) => {
                 if (!map.has(id)) map.set(id, {
                     no: '', name: '', dept: '',
-                    days: 0, hours: 0, otH: 0, otC: 0, otApproved: 0,
+                    days: 0, normalH: 0, actualH: 0, otH: 0, otC: 0, otApproved: 0,
                     late: 0, lateEx: 0, halfDay: 0, noOut: 0,
                     annualD: 0, annualH: 0, otherD: 0, otherH: 0
                 });
@@ -105,9 +123,15 @@ export async function exportReport(type) {
                     r.late += lateMin;
                     if (inMin > HALF_DAY_AFTER_MIN) r.halfDay++; else r.lateEx += lateMin;
                 }
-                r.hours += Number(a.total_work_hours || 0);
+                r.actualH += Number(a.total_work_hours || 0);
+                // 計薪用的正常工時：下班一律壓到 17:00。超過的部分不是休息（17:00–17:30）
+                // 就是加班（另計一欄），不可併進正常工時，否則晚打卡的人會被多算薪水。
+                if (inMin !== null && outMin !== null) {
+                    const effOut = Math.min(outMin, SHIFT_END_MIN);
+                    if (effOut > inMin) r.normalH += (effOut - inMin - lunchOverlapMin(inMin, effOut)) / 60;
+                }
                 if (inMin !== null && outMin === null) r.noOut++;
-                if (outMin !== null && outMin >= OT_AFTER_MIN) { r.otC++; r.otH += (outMin - 17 * 60) / 60; }
+                if (outMin !== null && outMin >= OT_AFTER_MIN) { r.otC++; r.otH += (outMin - OT_START_MIN) / 60; }
             });
 
             (lvRes.data || []).forEach(l => {
@@ -131,12 +155,12 @@ export async function exportReport(type) {
             });
 
             const r1 = (n) => Math.round(n * 10) / 10;
-            rows.push(['工號', '姓名', '部門', '出勤天數', '總工時', '加班時數(推估)', '加班次數(推估)', '加班時數(已核准)',
+            rows.push(['工號', '姓名', '部門', '出勤天數', '正常工時(至17:00)', '實際工時(打卡)', '加班時數(推估)', '加班次數(推估)', '加班時數(已核准)',
                 '遲到分鐘', '遲到分鐘(排除疑似半天)', '疑似半天天數', '特休天數', '特休時數', '其他假天數', '其他假時數', '缺下班卡天數']);
             [...map.values()]
                 .filter(r => r.days > 0 || r.annualD || r.otherD || r.annualH || r.otherH || r.otApproved)
                 .sort((a, b) => String(a.no).localeCompare(String(b.no)))
-                .forEach(r => rows.push([r.no, r.name, r.dept, r.days, r1(r.hours), r1(r.otH), r.otC, r1(r.otApproved),
+                .forEach(r => rows.push([r.no, r.name, r.dept, r.days, r1(r.normalH), r1(r.actualH), r1(r.otH), r.otC, r1(r.otApproved),
                     r.late, r.lateEx, r.halfDay, r1(r.annualD), r1(r.annualH), r1(r.otherD), r1(r.otherH), r.noOut]));
             fn = `薪資計算彙總_${ms}.csv`;
         } else if (type === 'attendance') {

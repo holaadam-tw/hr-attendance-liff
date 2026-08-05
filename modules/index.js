@@ -12,7 +12,7 @@ import {
 
 import {
     loadAuditLogs, exportReport, initReportMonth
-} from './audit.js?v=20260805-payrollsummary';
+} from './audit.js?v=20260805-otbase1730';
 
 import {
     showAddEmployeeModal, closeAddEmployeeModal, initEmployeeFormHandler,
