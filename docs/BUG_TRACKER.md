@@ -91,6 +91,63 @@ qa_check ALL PASS、npm test 52/52、inline script `node --check` 兩段皆通�
 
 ---
 
+## 🟡 2026-08-05 隔天主管確認加班（migration 108，**尚未套用正式庫**）
+
+業主 2026-08-05 決定：加班改為**隔天由主管逐筆確認**，只有確認過的才計薪。原本薪資彙總的加班完全由打卡時間推估，沒有任何人把關。
+
+### 開工前的發現：這個功能其實已經蓋好一半
+
+`migration 072_late_close_overtime_approval` 的目標寫得跟業主的要求幾乎一樣（自動建立待核認加班、主管核認可全額／部分／不認列、薪資只吃核認後時數），而且**整條管線都在**：
+
+| 元件 | 狀態 |
+|------|------|
+| `overtime_requests` 的 `late_close_auto` 來源欄位 | ✅ 072 已建 |
+| 主管核認 UI（`modules/schedules.js:567` 起，有「系統自動」標籤、班表下班／實際下班／超時分鐘對照） | ✅ 已存在 |
+| `approve_overtime_request` / `reject_overtime_request` | ✅ 已存在（101/102 再補呼叫者驗證） |
+| 薪資彙總「加班時數(已核准)」讀 `overtime_requests` status=approved（不分 source_type） | ✅ 已存在 |
+| **產生待核認記錄** | ❌ **缺這一環** |
+
+`sync_late_close_overtime_request()` 是 RPC 不是 trigger，而且**前端從頭到尾沒有任何一處呼叫它**（全庫 grep 只有 `get_pending_overtime_requests` 有被呼叫）。所以從來沒有任何 `late_close_auto` 記錄被建立，核認清單永遠是空的——**2026-06 全月 0 筆核准、1 筆駁回就是這個原因**，不是主管不批。
+
+### 為什麼不直接把 072 的 sync 接上去
+
+072 的算法是 `late_minutes = 實際下班 − 班表下班(17:00)`，**沒有 18:00 門檻，也沒有扣 17:00–17:30 的休息時間**。直接接上，17:0x 正常收工的人會全部湧進待審清單（handover #78 已實測：以 17:00 為基準全公司會多出 1~9 小時的假加班）。業主規則是門檻 18:00、從 17:30 起算。
+
+### 改動
+
+| 檔案 | 內容 |
+|------|------|
+| `migrations/108_daily_overtime_confirm.sql`（新增） | `confirm_daily_overtime()` SECURITY DEFINER RPC：驗 admin/manager、驗目標員工同公司、該日必須有已完成下班打卡、confirm→approved／reject→rejected、員工自送的 manual 申請優先不覆蓋、依 072 的 `idx_ot_late_close_attendance_unique` 冪等 |
+| `attendance_overview.html` | 新卡片「⏱️ 加班確認」：列出近 14 天未確認且下班 ≥18:00 的日子，每列可調整分鐘數後按「確認加班」／「不算加班」；badge 顯示「昨天 N 筆 · 待確認 M 筆」 |
+| `modules/audit.js` | **不用改**——「加班時數(已核准)」本來就讀 `overtime_requests` status=approved 不分來源，確認過的會自動流進去 |
+
+清單只看到**昨天**為止（今天還沒過完，不該叫主管確認今天），但回看 14 天，主管漏看幾天也不會掉件。
+
+### 驗證
+
+把 inline script 原樣載入 vm sandbox 執行，餵可鏈式呼叫的 supabase 替身（會記錄整條 filter 鏈），本次新增 33 項、全檔累計 91 項全通：
+
+- **候選判定**：20:30 與 18:18 列入、17:05 不列入（門檻 18:00）；推估分鐘 180 / 48（從 17:30 起算）；`default_work_end` 改 18:00 時起算跟著變 18:30
+- **不重複列出**：已確認過的（late_close_auto 任何狀態）、員工自送的 manual pending/approved 都排除；已確認者仍出現在「已核准加班」區塊
+- **多租戶**：`attendance` 與 `overtime_requests` 兩張表的查詢都確認帶 `eq(employees.company_id, ...)`；無 company context 時不查詢
+- **窗期**：只查到昨天（`lte(date, 2026-08-05)`）、回看 14 天（`gte(date, 2026-07-23)`）
+- **送出防呆**：0 分鐘與 >720 分鐘都擋下且不送 RPC；合法值送出的 RPC 參數逐項比對；按取消不送出
+
+qa_check ALL PASS、npm test 52/52、inline script `node --check` 兩段皆通過、多租戶 hook 仍為既有 6 筆無新增。
+
+### 走查時補掉的兩個洞
+
+1. **索引錯位會對錯人下確認**：原本按鈕帶的是陣列索引，但確認完會非同步重載清單、該列消失、後面的索引整個往前移——這時按第二列會送出**別人**的確認。已改為以 `employeeId|date` 為識別，找不到該列時明確提示「清單已更新，請重新確認一次」而不是靜靜沒反應
+2. **重載空窗**：原本一進 `loadOvertimeConfirm()` 就把清單清空，主管確認完第一列馬上按第二列會撲空。改為先收在區域變數、資料到齊才換掉畫面上那份
+
+### 未完成 / 待決定
+
+- ⚠️ **migration 108 尚未套用正式庫**，需 L2 授權；套用前必須先確認 072 已部署（108 依賴 `source_type`／`attendance_id`／`late_close_minutes` 等欄位）
+- `modules/payroll.js:186` 與 `:830` **明確把 `late_close_auto` 排除**在加班時數之外，與 072「薪資只吃核認後時數」的目標相反。目前沒有 late_close_auto 資料所以是 no-op，但 108 上線後薪資頁與薪資彙總報表的加班數字會不一致，需業主決定薪資頁要不要一併吃。本次刻意不動——那會直接改變薪資頁數字
+- 確認動作沒有 LINE 通知，主管需自己進打卡總覽看
+
+---
+
 ## 🟢 2026-08-05 下班定位點統計（近 90 天分群，純前端）
 
 上一節的卡片回答的是「**有沒有**範圍外」，這一節回答「**是不是同一個地方**」。單次落在工廠外可能是外務、送貨、臨時狀況；同一個座標反覆出現才代表有固定模式（例如每天都在住家附近打下班卡）。這個判斷靠翻清單看不出來，必須把座標分群。

@@ -162,6 +162,21 @@
                 </div>
             </div>
 
+            <!-- 加班確認（隔天由主管逐筆確認昨天是不是加班；只有確認過的才計薪） -->
+            <div id="otConfirmCard" style="display:none;margin-bottom:16px;">
+                <div style="padding:14px 18px;background:#EEF2FF;border:2px solid #A5B4FC;border-radius:14px;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;cursor:pointer;" onclick="toggleOtConfirmDetail()">
+                        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                            <span style="font-size:20px;">⏱️</span>
+                            <span style="font-weight:700;font-size:14px;color:#3730A3;">加班確認</span>
+                            <span id="otConfirmBadge" style="font-size:12px;font-weight:800;color:#4338CA;background:#E0E7FF;border-radius:999px;padding:4px 8px;"></span>
+                        </div>
+                        <span id="otConfirmArrow" style="font-size:12px;color:#4338CA;">▼</span>
+                    </div>
+                    <div id="otConfirmDetail" style="display:none;margin-top:10px;max-height:420px;overflow-y:auto;"></div>
+                </div>
+            </div>
+
             <!-- 下班定位查核（前端現算，不擋人只呈現） -->
             <div id="checkoutRangeCard" style="display:none;margin-bottom:16px;">
                 <div id="checkoutRangeBox" style="padding:14px 18px;background:#FFF1F2;border:2px solid #FDA4AF;border-radius:14px;">
@@ -488,6 +503,7 @@
                 loadLunchStats(dateStr);
                 loadAnomalyData();
                 loadCheckinFailures();
+                loadOvertimeConfirm();
             } catch (e) {
                 console.error('Load daily data error:', e);
                 document.getElementById('dailyTableBody').innerHTML = '<tr><td colspan="7" style="text-align:center;color:#ef4444;padding:20px;">載入失敗：' + escapeHTML(e.message || '') + '</td></tr>';
@@ -779,6 +795,222 @@
             const open = panel.style.display === 'none';
             panel.style.display = open ? 'block' : 'none';
             arrow.textContent = open ? '▲' : '▼';
+        }
+
+        // ===== 加班確認（隔天由主管逐筆確認昨天是不是加班）=====
+        // 業主規則（2026-08-05）：下班 >= 18:00 才認定為加班（17:0x 屬正常收工），
+        // 時數從 17:30 起算（17:00–17:30 是休息時間）。這三個值必須與
+        // modules/audit.js payroll_summary 的 OT_AFTER_MIN / OT_REST_MIN /
+        // SHIFT_END_MIN 一致，改一邊就要改另一邊，否則清單與報表會對不起來。
+        const OT_CONFIRM_WINDOW_DAYS = 14;   // 主管漏看幾天也不會掉件
+        const OT_AFTER_MIN = 18 * 60;
+        const OT_REST_MIN = 30;
+        let otPendingRows = [];
+        let otConfirmedRecent = [];
+
+        function otShiftEndMin() {
+            const raw = (typeof getCachedSetting === 'function' ? getCachedSetting('default_work_end') : null);
+            const m = /^(\d{1,2}):(\d{2})/.exec(String(raw || ''));
+            return m ? Number(m[1]) * 60 + Number(m[2]) : 17 * 60;
+        }
+
+        // 台灣時區的當日分鐘數。DB 存 UTC，不可用 getHours()
+        function otMinutesOfDay(ts) {
+            if (!ts) return null;
+            const hm = new Date(ts).toLocaleTimeString('en-GB', { timeZone: 'Asia/Taipei', hourCycle: 'h23', hour: '2-digit', minute: '2-digit' });
+            return Number(hm.substring(0, 2)) * 60 + Number(hm.substring(3, 5));
+        }
+
+        function otEstimateMinutes(outMin) {
+            return Math.max(0, Math.round(outMin - (otShiftEndMin() + OT_REST_MIN)));
+        }
+
+        function fmtMinutesAsHours(min) {
+            return (Math.round((min / 60) * 100) / 100).toFixed(2) + 'h';
+        }
+
+        async function loadOvertimeConfirm() {
+            const card = document.getElementById('otConfirmCard');
+            if (!card) return;
+            if (!window.currentCompanyId) {
+                otPendingRows = [];
+                otConfirmedRecent = [];
+                card.style.display = 'none';
+                return;
+            }
+            // 先收在區域變數，等資料到齊才換掉畫面上那份——中途清空會出現一段
+            // 「清單是空的」的空窗，主管確認完第一列馬上按第二列就會撲空。
+            const pending = [];
+            const confirmedRecent = [];
+            try {
+                // 只看到「昨天」為止——今天還沒過完，不該叫主管確認今天的加班
+                const today = getTaiwanDate();
+                const endMs = Date.parse(today + 'T00:00:00+08:00') - 86400000;
+                const endStr = new Date(endMs).toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' });
+                const fromMs = endMs - (OT_CONFIRM_WINDOW_DAYS - 1) * 86400000;
+                const fromStr = new Date(fromMs).toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' });
+
+                const [attRes, otRes] = await Promise.all([
+                    sb.from('attendance')
+                        .select('employee_id, date, check_out_time, employees!inner(company_id, name, employee_number)')
+                        .gte('date', fromStr).lte('date', endStr)
+                        .eq('employees.company_id', window.currentCompanyId)
+                        .not('check_out_time', 'is', null)
+                        .limit(1000),
+                    sb.from('overtime_requests')
+                        .select('employee_id, ot_date, status, source_type, final_hours, approved_hours, hours, employees!overtime_requests_employee_id_fkey!inner(company_id, name, employee_number)')
+                        .gte('ot_date', fromStr).lte('ot_date', endStr)
+                        .eq('employees.company_id', window.currentCompanyId)
+                        .limit(1000)
+                ]);
+                if (attRes.error) throw attRes.error;
+                if (otRes.error) throw otRes.error;
+
+                // 已經有結論的（員工自送的 manual 申請、或已確認/否決過的）都不再列出
+                const decided = new Set();
+                (otRes.data || []).forEach(o => {
+                    const key = o.employee_id + '|' + o.ot_date;
+                    const isManualOpen = (o.source_type || 'manual') === 'manual' && (o.status === 'pending' || o.status === 'approved');
+                    if (isManualOpen || (o.source_type || 'manual') === 'late_close_auto') decided.add(key);
+                    if (o.status === 'approved') {
+                        confirmedRecent.push({
+                            date: o.ot_date,
+                            name: o.employees?.name || '未知員工',
+                            hours: Number(o.final_hours ?? o.approved_hours ?? o.hours ?? 0),
+                            auto: (o.source_type || 'manual') === 'late_close_auto'
+                        });
+                    }
+                });
+
+                (attRes.data || []).forEach(a => {
+                    const outMin = otMinutesOfDay(a.check_out_time);
+                    if (outMin === null || outMin < OT_AFTER_MIN) return;
+                    if (decided.has(a.employee_id + '|' + a.date)) return;
+                    pending.push({
+                        employeeId: a.employee_id,
+                        date: a.date,
+                        name: a.employees?.name || '未知員工',
+                        employeeNumber: a.employees?.employee_number || '',
+                        checkOutTime: a.check_out_time,
+                        estimateMin: otEstimateMinutes(outMin)
+                    });
+                });
+                pending.sort((a, b) => (a.date === b.date ? String(a.name).localeCompare(String(b.name)) : (a.date < b.date ? 1 : -1)));
+                confirmedRecent.sort((a, b) => (a.date < b.date ? 1 : -1));
+
+                otPendingRows = pending;
+                otConfirmedRecent = confirmedRecent;
+                renderOvertimeConfirm(endStr);
+            } catch (e) {
+                // 確認清單只是輔助，取不到就收起來，不影響打卡總覽主流程
+                console.warn('Load overtime confirm warning:', e);
+                card.style.display = 'none';
+            }
+        }
+
+        function renderOvertimeConfirm(yesterdayStr) {
+            const card = document.getElementById('otConfirmCard');
+            if (otPendingRows.length === 0 && otConfirmedRecent.length === 0) { card.style.display = 'none'; return; }
+
+            const ydCount = otPendingRows.filter(r => r.date === yesterdayStr).length;
+            document.getElementById('otConfirmBadge').textContent = otPendingRows.length === 0
+                ? '近 ' + OT_CONFIRM_WINDOW_DAYS + ' 天已全部確認'
+                : (ydCount > 0 ? '昨天 ' + ydCount + ' 筆 · ' : '') + '待確認 ' + otPendingRows.length + ' 筆';
+
+            let html = '<div style="font-size:11px;color:#4338CA;margin-bottom:8px;line-height:1.6;">'
+                + '下班 ' + Math.floor(OT_AFTER_MIN / 60) + ':00 之後才列入（17:0x 屬正常收工）。時數從 '
+                + String(Math.floor((otShiftEndMin() + OT_REST_MIN) / 60)).padStart(2, '0') + ':'
+                + String((otShiftEndMin() + OT_REST_MIN) % 60).padStart(2, '0')
+                + ' 起算，17:00–17:30 為休息時間。<b>只有確認過的才會進薪資彙總的加班時數</b>，可自行調整分鐘數。</div>';
+
+            if (otPendingRows.length === 0) {
+                html += '<div style="font-size:12px;color:#4338CA;padding:6px 0;">目前沒有待確認的加班。</div>';
+            }
+
+            otPendingRows.forEach((r) => {
+                const isYesterday = r.date === yesterdayStr;
+                // 用 employeeId|date 當識別而不是陣列索引——確認完會非同步重載清單，
+                // 該列會消失、後面的索引整個往前移，這時若按到第二列會對錯人下確認。
+                const key = r.employeeId + '|' + r.date;
+                html += '<div style="padding:8px 10px;margin-bottom:6px;border-radius:10px;background:' + (isYesterday ? '#fff' : '#F8FAFC') + ';border:1px solid ' + (isYesterday ? '#A5B4FC' : '#E2E8F0') + ';">'
+                    + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;">'
+                    + '<span style="font-size:12px;font-weight:800;color:#3730A3;">' + escapeHTML((r.date || '').slice(5).replace('-', '/')) + '</span>'
+                    + (isYesterday ? '<span style="font-size:10px;font-weight:800;color:#4338CA;background:#E0E7FF;border-radius:999px;padding:2px 6px;">昨天</span>' : '')
+                    + '<span style="font-size:13px;font-weight:700;color:#0F172A;">' + escapeHTML(r.name) + (r.employeeNumber ? '（' + escapeHTML(r.employeeNumber) + '）' : '') + '</span>'
+                    + '<span style="font-size:11px;color:#475569;">下班 ' + escapeHTML(fmtTime(r.checkOutTime)) + '</span>'
+                    + '</div>'
+                    + '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">'
+                    + '<span style="font-size:11px;color:#64748B;">加班</span>'
+                    + '<input type="number" id="otMin_' + escapeHTML(key) + '" value="' + r.estimateMin + '" min="1" max="720" step="5" style="width:76px;padding:5px 8px;border:1px solid #C7D2FE;border-radius:8px;font-size:13px;font-family:inherit;">'
+                    + '<span style="font-size:11px;color:#64748B;">分鐘（推估 ' + escapeHTML(fmtMinutesAsHours(r.estimateMin)) + '）</span>'
+                    + '<button onclick="submitOvertimeDecision(\'' + escapeHTML(key) + '\',\'confirm\')" style="border:none;background:#4338CA;color:#fff;font-size:12px;font-weight:700;border-radius:8px;padding:5px 12px;cursor:pointer;font-family:inherit;">確認加班</button>'
+                    + '<button onclick="submitOvertimeDecision(\'' + escapeHTML(key) + '\',\'reject\')" style="border:1px solid #CBD5E1;background:#fff;color:#64748B;font-size:12px;font-weight:700;border-radius:8px;padding:5px 12px;cursor:pointer;font-family:inherit;">不算加班</button>'
+                    + '</div>'
+                    + '</div>';
+            });
+
+            if (otConfirmedRecent.length > 0) {
+                html += '<div style="margin-top:8px;padding-top:8px;border-top:1px solid #C7D2FE;font-size:11px;color:#4338CA;">'
+                    + '<div style="font-weight:800;margin-bottom:4px;">近 ' + OT_CONFIRM_WINDOW_DAYS + ' 天已核准加班</div>'
+                    + otConfirmedRecent.map(o => escapeHTML((o.date || '').slice(5).replace('-', '/')) + ' ' + escapeHTML(o.name)
+                        + ' ' + escapeHTML(String(Math.round(o.hours * 100) / 100)) + 'h' + (o.auto ? '' : '（員工申請）')).join('<br>')
+                    + '</div>';
+            }
+
+            document.getElementById('otConfirmDetail').innerHTML = html;
+            card.style.display = 'block';
+        }
+
+        function toggleOtConfirmDetail() {
+            const panel = document.getElementById('otConfirmDetail');
+            const arrow = document.getElementById('otConfirmArrow');
+            const open = panel.style.display === 'none';
+            panel.style.display = open ? 'block' : 'none';
+            arrow.textContent = open ? '▲' : '▼';
+        }
+
+        async function submitOvertimeDecision(key, decision) {
+            const r = otPendingRows.find(x => x.employeeId + '|' + x.date === key);
+            // 清單正在重載時按下去會找不到——明講而不是靜靜沒反應
+            if (!r) return showToast('清單已更新，請重新確認一次');
+            const input = document.getElementById('otMin_' + key);
+            const minutes = decision === 'confirm' ? Number(input && input.value) : 0;
+
+            if (decision === 'confirm') {
+                if (!Number.isFinite(minutes) || minutes <= 0) return showToast('❌ 加班分鐘必須大於 0');
+                if (minutes > 720) return showToast('❌ 加班不可超過 12 小時（720 分鐘）');
+            }
+            const msg = decision === 'confirm'
+                ? '確認 ' + r.name + ' ' + r.date + ' 加班 ' + minutes + ' 分鐘（' + fmtMinutesAsHours(minutes) + '）？\n\n確認後會計入薪資彙總的加班時數。'
+                : '確認 ' + r.name + ' ' + r.date + ' 不算加班？\n\n之後不會再出現在待確認清單。';
+            if (!confirm(msg)) return;
+
+            try {
+                const { data, error } = await sb.rpc('confirm_daily_overtime', {
+                    p_company_id: window.currentCompanyId,
+                    p_line_user_id: liffProfile?.userId || null,
+                    p_employee_id: r.employeeId,
+                    p_ot_date: r.date,
+                    p_decision: decision,
+                    p_minutes: minutes,
+                    p_note: null
+                });
+                if (error || !data || !data.success) {
+                    showToast('確認失敗：' + ((data && data.error) || (error && error.message) || ''));
+                    return;
+                }
+                if (data.skipped === 'manual_request_exists') {
+                    showToast('⚠️ 該員工當天已有自行送出的加班申請，未覆蓋');
+                } else {
+                    showToast(decision === 'confirm' ? '✅ 已確認加班 ' + fmtMinutesAsHours(minutes) : '✅ 已記為不算加班');
+                }
+                writeAuditLog('confirm_daily_overtime', 'overtime_requests', r.employeeId, r.name,
+                    { ot_date: r.date, decision: decision, minutes: minutes });
+                loadOvertimeConfirm();
+            } catch (e) {
+                console.error('Confirm overtime error:', e);
+                showToast('確認失敗：' + (e.message || ''));
+            }
         }
 
         // ===== 缺卡追蹤（下班未打卡，僅大正科技，DB 端 RPC 另驗 admin/manager）=====
