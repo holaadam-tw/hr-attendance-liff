@@ -64,7 +64,7 @@ import {
     editInsBracket, saveInsBracket, deleteInsBracket, updateAllInsRates,
     switchPayTab,
     initAuditPage, loadAuditData
-} from './payroll.js?v=20260716-lunch';
+} from './payroll.js?v=20260805-otconfirm';
 
 import {
     loadRestaurantList, openRestaurantDetail, previewStoreOrder, openKDS,

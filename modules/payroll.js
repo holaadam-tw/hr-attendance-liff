@@ -180,10 +180,13 @@ export async function loadAuditData() {
             if (l.leave_type === 'annual') m.annualH += h; else m.otherH += h;
         });
 
-        // 加班：核准時數（來源非自動補班）
+        // 加班：核准時數。不分 source_type——late_close_auto 現在是主管在打卡總覽
+        // 逐筆確認的結果（migration 108 confirm_daily_overtime），與員工自送的申請
+        // 一樣經過人為把關，業主 2026-08-05 指示一併計入。查詢已 filter
+        // status='approved'，未確認與否決的不會進來。這裡是本頁加班時數的唯一來源
+        // （calcEmployeePayroll 沒有另一條從 attendance 推估的路），不會重複計算。
         const otMap = {};
         (otRes.data || []).forEach(o => {
-            if ((o.source_type || 'manual') === 'late_close_auto') return;
             const h = o.final_hours ?? o.approved_hours ?? o.actual_hours ?? o.planned_hours ?? o.hours ?? 0;
             otMap[o.employee_id] = (otMap[o.employee_id] || 0) + Number(h || 0);
         });
@@ -825,9 +828,9 @@ export async function loadPayrollData() {
             if (l.leave_type === 'personal') leaveMap[l.employee_id].personal += overlapDays;
         });
 
+        // 同上：不分 source_type，主管確認過的加班（late_close_auto + approved）一併計入
         const otMap = {};
         (otRes.data || []).forEach(o => {
-            if ((o.source_type || 'manual') === 'late_close_auto') return;
             const approvedOtHours = o.final_hours ?? o.approved_hours ?? o.actual_hours ?? o.planned_hours ?? o.hours ?? 0;
             otMap[o.employee_id] = (otMap[o.employee_id] || 0) + approvedOtHours;
         });
