@@ -280,6 +280,16 @@
                 punchType
             });
 
+            // 通知主管：這裡原本完全沒通知，是待審件躺 6-16 天的根因
+            // （E815 2026-06 有四天因為早上待審沒人批，傍晚連下班卡都打不進去）
+            // 同樣不 await，sendAdminNotify 內部已自帶 try/catch
+            sendAdminNotify(
+                `🔔 ${currentEmployee?.name || ''} ${typeText}打卡待核認\n` +
+                `📅 ${nowParts.date} ${nowParts.displayTime}\n` +
+                `📝 ${reason}\n` +
+                `⚠️ 核准前系統仍算他沒打卡`
+            );
+
             return { typeText, nowParts, reviewType, minDistance };
         }
 

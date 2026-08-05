@@ -5,6 +5,76 @@
 
 ---
 
+## 🔴→🟢 2026-08-05 上班卡待審時下班卡被擋（migration 107）＋送待審通知主管
+
+業主問「下班應該是沒問題的吧，因為沒有設定 GPS 範圍」。範圍確實不驗（`quick_check_in` 下班分支在 L262 就 `RETURN`，範圍比對寫在 L272-299，執行流程走不到），**但下班還有別的關卡，而且其中一道就是 E815 缺下班卡的真正原因**。
+
+### 根因：早上的卡卡在待審，傍晚下班就打不進去
+
+1. GPS 失敗（精度 >500m 或超出範圍）時 `checkin.html` **不寫 attendance**，只送一筆 `makeup_punch_requests` 待審，員工看到「✅ 已送出待審核」
+2. 當天沒有 attendance 列 → 傍晚打下班卡，`quick_check_in` 走到 `ELSIF p_action = 'check_out'` 發現 `v_existing.id IS NULL` → 回 `no_open_check_in_record`
+3. 員工打不了，隔天說「系統有問題」
+
+**資料 100% 吻合，E815 九天 GPS 待審無一例外：**
+
+| 日期 | 核准延遲 | 當天下班卡 |
+|------|---------|-----------|
+| 06-09 | 13 分鐘 | ✅ 17:09 |
+| 06-10 | 13 分鐘 | ✅ 17:05 |
+| 07-03 | 主管 17:18 核准 | ✅ **17:19（核准後 1 分鐘）** |
+| 06-26 | 153h | ❌ 缺 |
+| 06-24 | 201h | ❌ 缺 |
+| 06-17 | 369h | ❌ 缺 |
+| 06-16 | 393h | ❌ 缺 |
+
+當天批得到就打得到，隔夜才批就缺卡。07-03 是決定性證據。
+
+### 下班會被擋的五個地方（本次查證釐清）
+
+| 關卡 | 位置 | 狀態 |
+|------|------|------|
+| 找不到當天上班記錄 `no_open_check_in_record` | `quick_check_in` L151-153 | 🔴 主因 → **107 已修** |
+| GPS 精度 >500m 轉待審 | `checkin.html` L844-846（上下班共用）| ⚠️ 仍在，E815 6/4 中過 |
+| 超過下班截止 `checkout_time_expired` | `quick_check_in` | ✅ 已放寬到 01:00 |
+| 今天已打過下班 `already_checked_out_today` | `quick_check_in` L74 | ✅ 正常防呆 |
+| 打卡範圍 `outside_allowed_location` | L292-297 | ✅ 下班走不到 |
+
+附帶查證：`kiosk_check_in`（公務機打卡）不驗 GPS 精度（0 處）、不驗範圍（0 處）、不會回 `no_open_check_in_record`，直接 `INSERT INTO attendance`——E815 07-01 就是靠這個脫困的。
+
+### migration 107 修正內容
+
+`check_out` 分支：當天沒有 attendance 列時，**若該員工當天確實有 pending／approved 的「上班」補卡申請**，先建立當日空白列再讓下班寫入。之後主管核准上班卡，`approve_makeup_request` 的 `ON CONFLICT (employee_id, date) DO UPDATE` 會把 `check_in_time` 填回同一列，`trg_calc_work_hours` 重算工時。
+
+**刻意不做**：沒有任何上班申請的人仍然擋著（避免幽靈下班卡）；昨天的待審上班卡不處理（下班截止已放寬到 01:00，窗口極窄）。
+
+### checkin.html：送待審時通知主管
+
+`submitGpsReviewRequest()` 原本**完全沒有呼叫 `sendAdminNotify`**——這是待審件躺 6~16 天的根因（handover #75 已查出，當時 Spec Lock 2 刻意先不修、等資料）。本次補上，fire-and-forget 不 await（`sendAdminNotify` 內部自帶 try/catch）。
+
+### 正式庫實測（2026-08-05，測試資料事後全清、四項計數歸零）
+
+用業主 admin 帳號（Adam，當天 0 出勤列 / 0 補卡申請）：
+
+| # | 步驟 | 結果 |
+|---|------|------|
+| 1 | 套用 107 **前**呼叫 `check_out` | ✅ `no_open_check_in_record`（基準）|
+| 2 | 套用 107 | ✅ `v_has_pending_checkin` 已在函式內，`anon` EXECUTE 權限未掉 |
+| 3 | 無待審申請時呼叫 `check_out` | ✅ **仍擋**——沒開出幽靈下班卡的洞 |
+| 4 | 建立 pending 上班補卡（08:00）| ✅ 仍無 attendance 列，重現 E815 處境 |
+| 5 | 再呼叫 `check_out` | ✅ `success:true`，建立 `check_in=null` / 下班 14:30:37 / 工時 0.00 的列 |
+| 6 | 核准上班補卡 | ✅ 上班 08:00 填回**同一列**，工時 **5.51**（6.51 扣午休 1 小時）|
+| 7 | 清空 | ✅ Adam 出勤列 0、殘留測試申請 0、缺卡追蹤 0，未波及 E815 |
+
+qa_check ALL PASS、npm test 52/52、`node --check` checkin.html inline script 通過、hook 警告與改動前逐筆比對仍為既有 6 筆無新增。
+
+> ⚠️ **操作鐵則（本次踩到）**：Windows PowerShell 5.1 的 `Get-Content -Raw` **預設用 ANSI（Big5）解碼**，讀含中文註解的 UTF-8 migration 會吞掉換行（本次吞了 40 個），造成 PG 回報的行號與檔案對不上的假語法錯誤。必須用 `-Encoding UTF8`，或 `[System.IO.File]::ReadAllText(path, [System.Text.Encoding]::UTF8)`。
+
+### 未做
+
+`attendance_anomalies` 沒有 `missing_checkin` 類型，「只有下班卡」的日子不會被稽核標記。但 107 的放行條件保證那天一定有一筆待審申請躺在審核清單，加上本次補的 `sendAdminNotify`，不會無聲遺失。
+
+---
+
 ## 🔴→🟢 2026-08-05 補打卡只驗日期不驗時間（migration 106）＋E815 打卡稽核
 
 業主圈出畫面問「為什麼今天早上就能補今天 8/5 的下班紀錄」。
