@@ -85,10 +85,12 @@ export async function exportReport(type) {
                     .select('employee_id, leave_type, leave_period, leave_hours, days, start_date, end_date, employees!leave_requests_employee_id_fkey!inner(name, employee_number, department, company_id)')
                     .eq('employees.company_id', window.currentCompanyId).eq('status', 'approved')
                     .lte('start_date', last).gte('end_date', first),
-                sb.from('overtime_requests')
-                    .select('employee_id, ot_date, hours, approved_hours, final_hours, employees!overtime_requests_employee_id_fkey!inner(name, employee_number, department, company_id)')
-                    .eq('employees.company_id', window.currentCompanyId).eq('status', 'approved')
-                    .gte('ot_date', first).lte('ot_date', last)
+                // overtime_requests 改走 RPC（migration 109；110 收 RLS 後直接查表會查不到）
+                sb.rpc('get_company_overtime_requests', {
+                    p_company_id: window.currentCompanyId,
+                    p_line_user_id: window.currentAdminEmployee?.line_user_id || null,
+                    p_from: first, p_to: last, p_status: 'approved', p_limit: 1000
+                })
             ]);
 
             // 台灣時區的當日分鐘數（0=00:00）。DB 存 UTC，不可用 getHours()
@@ -151,7 +153,10 @@ export async function exportReport(type) {
             });
 
             (otRes.data || []).forEach(o => {
-                pick(o.employee_id, o.employees).otApproved += Number(o.final_hours ?? o.approved_hours ?? o.hours ?? 0);
+                // RPC 回傳攤平欄位，組回 pick() 需要的形狀（整月都在加班、完全沒打卡的人
+                // 只會出現在這裡，姓名要從這邊補進去）
+                const emp = { name: o.employee_name, employee_number: o.employee_number, department: o.department };
+                pick(o.employee_id, emp).otApproved += Number(o.final_hours ?? o.approved_hours ?? o.hours ?? 0);
             });
 
             const r1 = (n) => Math.round(n * 10) / 10;
@@ -180,9 +185,15 @@ export async function exportReport(type) {
             (data || []).forEach(r => rows.push([r.employees?.employee_number, r.employees?.name, r.employees?.department, tm[r.leave_type] || r.leave_type, periodLabel(r), r.start_date, r.end_date, r.days || 1, r.reason || '', r.status, r.rejection_reason || '']));
             fn = `請假報表_${ms}.csv`;
         } else if (type === 'overtime') {
-            const { data } = await sb.from('overtime_requests').select('*, employees!overtime_requests_employee_id_fkey!inner(name, employee_number, department, company_id)').eq('employees.company_id', window.currentCompanyId).order('ot_date', { ascending: false }).limit(200);
+            // 改走 RPC（migration 109）。RPC 內固定 ORDER BY ot_date DESC, created_at DESC，
+            // 與原本的 .order('ot_date', {ascending:false}).limit(200) 語意一致。
+            const { data } = await sb.rpc('get_company_overtime_requests', {
+                p_company_id: window.currentCompanyId,
+                p_line_user_id: window.currentAdminEmployee?.line_user_id || null,
+                p_from: null, p_to: null, p_status: null, p_limit: 200
+            });
             rows.push(['工號', '姓名', '部門', '日期', '申請h', '核准h', '實際h', '計薪h', '補償', '狀態']);
-            (data || []).forEach(r => rows.push([r.employees?.employee_number, r.employees?.name, r.employees?.department, r.ot_date, r.planned_hours, r.approved_hours || '', r.actual_hours || '', r.final_hours || '', r.compensation_type === 'pay' ? '加班費' : '補休', r.status]));
+            (data || []).forEach(r => rows.push([r.employee_number, r.employee_name, r.department, r.ot_date, r.planned_hours, r.approved_hours || '', r.actual_hours || '', r.final_hours || '', r.compensation_type === 'pay' ? '加班費' : '補休', r.status]));
             fn = `加班報表_${ms}.csv`;
         } else if (type === 'lunch') {
             const { data } = await sb.from('lunch_orders').select('*, employees!inner(name, employee_number, company_id)').eq('employees.company_id', window.currentCompanyId).gte('order_date', first).lte('order_date', last).order('order_date');

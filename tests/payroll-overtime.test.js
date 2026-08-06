@@ -70,6 +70,30 @@ check('modules/payroll.js 不得再出現 late_close_auto 的 early return',
 check('欄位優先序仍為 final_hours → approved_hours → …（核認後時數優先）',
   blocks.every(b => b.includes('final_hours ?? ') && b.indexOf('final_hours') < b.indexOf('hours ?? 0')));
 
+console.log('\n=== 3b. overtime_requests 讀取必須走 RPC（migration 109/110） ===');
+// 110 會把 overtime_requests 的 RLS 打開且不建任何 policy，直接查表會拿不到資料。
+// 這幾題防止有人把 sb.from('overtime_requests') 加回來。
+const AUDIT = fs.readFileSync(path.join(ROOT, 'modules', 'audit.js'), 'utf8');
+const OVERVIEW = fs.readFileSync(path.join(ROOT, 'attendance_overview.html'), 'utf8');
+[['modules/payroll.js', src], ['modules/audit.js', AUDIT], ['attendance_overview.html', OVERVIEW]].forEach(([name, text]) => {
+  check(name + ' 不得直接查 overtime_requests', !text.includes("from('overtime_requests')"));
+  check(name + ' 有呼叫 get_company_overtime_requests', text.includes('get_company_overtime_requests'));
+});
+check('RPC 呼叫都帶 p_line_user_id（函式內驗 admin/manager）',
+  [src, AUDIT, OVERVIEW].every(t => {
+    const idx = [];
+    let i = -1;
+    while ((i = t.indexOf('get_company_overtime_requests', i + 1)) !== -1) idx.push(i);
+    return idx.every(p => t.slice(p, p + 400).includes('p_line_user_id'));
+  }));
+check('RPC 呼叫都帶 p_company_id（多租戶）',
+  [src, AUDIT, OVERVIEW].every(t => {
+    const idx = [];
+    let i = -1;
+    while ((i = t.indexOf('get_company_overtime_requests', i + 1)) !== -1) idx.push(i);
+    return idx.every(p => t.slice(p, p + 400).includes('p_company_id'));
+  }));
+
 console.log('\n=== 4. 欄位缺漏時的退讓 ===');
 [['只有 approved_hours', { approved_hours: 2.5 }, 2.5],
  ['只有 actual_hours', { actual_hours: 1.25 }, 1.25],

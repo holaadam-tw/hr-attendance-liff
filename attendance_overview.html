@@ -873,11 +873,16 @@
                         .eq('employees.company_id', window.currentCompanyId)
                         .not('check_out_time', 'is', null)
                         .limit(1000),
-                    sb.from('overtime_requests')
-                        .select('employee_id, ot_date, status, source_type, final_hours, approved_hours, hours, employees!overtime_requests_employee_id_fkey!inner(company_id, name, employee_number)')
-                        .gte('ot_date', fromStr).lte('ot_date', endStr)
-                        .eq('employees.company_id', window.currentCompanyId)
-                        .limit(1000)
+                    // overtime_requests 改走 RPC（migration 109）——該表原本 RLS 未開、
+                    // anon 可直接讀寫全部公司的加班資料，110 收 RLS 後直接查表會查不到。
+                    sb.rpc('get_company_overtime_requests', {
+                        p_company_id: window.currentCompanyId,
+                        p_line_user_id: liffProfile?.userId || null,
+                        p_from: fromStr,
+                        p_to: endStr,
+                        p_status: null,
+                        p_limit: 1000
+                    })
                 ]);
                 if (attRes.error) throw attRes.error;
                 if (otRes.error) throw otRes.error;
@@ -891,7 +896,8 @@
                     if (o.status === 'approved') {
                         confirmedRecent.push({
                             date: o.ot_date,
-                            name: o.employees?.name || '未知員工',
+                            // RPC 回傳的是攤平欄位（employee_name），不是巢狀的 employees 物件
+                            name: o.employee_name || '未知員工',
                             hours: Number(o.final_hours ?? o.approved_hours ?? o.hours ?? 0),
                             auto: (o.source_type || 'manual') === 'late_close_auto'
                         });

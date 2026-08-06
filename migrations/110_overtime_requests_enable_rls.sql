@@ -1,0 +1,33 @@
+-- ============================================================
+-- 110: overtime_requests 開啟 RLS（RLS 整治 P0 第一張表，收尾）
+--
+-- ⚠️ 套用前提（順序不可顛倒，見 docs/RLS_REMEDIATION_INVENTORY.md §5）：
+--   1. migration 109 已套用（get_company_overtime_requests 存在）
+--   2. 前端 5 個直接讀取點已全部改為呼叫 RPC，且已合併 main 部署完成
+--   3. 線上實際確認打卡總覽的加班確認卡片、薪資彙總報表、加班報表、
+--      薪資計算頁的加班時數都還正常
+--
+--   在 (2) 完成前套用這支，會讓那 4 個畫面的加班資料直接變成空白。
+--
+-- 做什麼：
+--   ENABLE ROW LEVEL SECURITY 且**刻意不建立任何 policy**。
+--   RLS 開啟 + 0 policy = anon / authenticated 直接查表一律拿不到資料，
+--   所有存取只能透過 SECURITY DEFINER 函式（函式內自己驗身分與多租戶）。
+--   這與 attendance_anomalies（092）、checkin_failures（105）的設計一致，
+--   兩張表都是 RLS on + 0 policy + 走 RPC。
+--
+--   SECURITY DEFINER 函式以 owner 身分執行，不受 RLS 限制，所以既有的
+--   approve_overtime_request / reject_overtime_request / submit_overtime_request /
+--   get_my_overtime_requests / get_pending_overtime_requests /
+--   confirm_daily_overtime（108）/ get_company_overtime_requests（109）全部不受影響。
+--
+-- 回滾：
+--   ALTER TABLE overtime_requests DISABLE ROW LEVEL SECURITY;
+--   （回滾後就退回本次整治前的狀態：anon 可直接讀寫）
+--
+-- 驗證方式：
+--   套用後跑 bash scripts/rls_audit.sh，overtime_requests 應該從
+--   「第 1 段：RLS 未開啟的表」消失，改出現在「第 3 段：RLS 已開但 0 條政策」。
+-- ============================================================
+
+ALTER TABLE overtime_requests ENABLE ROW LEVEL SECURITY;

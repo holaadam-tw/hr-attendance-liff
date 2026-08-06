@@ -12,7 +12,7 @@ import {
 
 import {
     loadAuditLogs, exportReport, initReportMonth
-} from './audit.js?v=20260805-otbase1730';
+} from './audit.js?v=20260806-otrpc';
 
 import {
     showAddEmployeeModal, closeAddEmployeeModal, initEmployeeFormHandler,
@@ -64,7 +64,7 @@ import {
     editInsBracket, saveInsBracket, deleteInsBracket, updateAllInsRates,
     switchPayTab,
     initAuditPage, loadAuditData
-} from './payroll.js?v=20260805-otconfirm';
+} from './payroll.js?v=20260806-otrpc';
 
 import {
     loadRestaurantList, openRestaurantDetail, previewStoreOrder, openKDS,

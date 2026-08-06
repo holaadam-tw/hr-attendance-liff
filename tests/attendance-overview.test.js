@@ -266,10 +266,14 @@ check('submitAdminMakeup 仍保有「請填寫時間」檢查（沒因為有預�
   html.includes("if (!time) return showToast('❌ 請填寫時間')"));
 
 // ---- 加班確認：需要可鏈式呼叫的 supabase 替身 ----
-function makeSb(tables) {
+// tables: 直接查表的回傳；rpcData: 各 RPC 名稱的回傳（overtime_requests 已改走
+// get_company_overtime_requests，migration 109/110）
+function makeSb(tables, rpcData) {
   const calls = [];
+  const rpcCalls = [];
   return {
     calls,
+    rpcCalls,
     from(t) {
       const rec = { table: t, chain: [] };
       calls.push(rec);
@@ -280,7 +284,11 @@ function makeSb(tables) {
       api.then = (res) => res({ data: tables[t] || [], error: null });
       return api;
     },
-    rpc: async () => ({ data: { success: true }, error: null })
+    rpc: async (name, args) => {
+      rpcCalls.push({ name, args });
+      const d = (rpcData || {})[name];
+      return { data: d !== undefined ? d : { success: true }, error: null };
+    }
   };
 }
 
@@ -294,14 +302,15 @@ const ATT = [
   { employee_id: 'E5', date: '2026-08-02', check_out_time: utc('2026-08-02', '19:30'), employees: { company_id: 'COMPANY-A', name: '戊君', employee_number: 'E805' } },
   { employee_id: 'E6', date: '2026-08-03', check_out_time: utc('2026-08-03', '21:00'), employees: { company_id: 'COMPANY-A', name: '己君', employee_number: 'E806' } },
 ];
+// get_company_overtime_requests 回傳攤平欄位（不是巢狀 employees 物件）
 const OTR = [
-  { employee_id: 'E4', ot_date: '2026-08-01', status: 'approved', source_type: 'late_close_auto', final_hours: 1.5, employees: { company_id: 'COMPANY-A', name: '丁君', employee_number: 'E804' } },
-  { employee_id: 'E6', ot_date: '2026-08-03', status: 'pending', source_type: 'manual', hours: 3, employees: { company_id: 'COMPANY-A', name: '己君', employee_number: 'E806' } },
+  { employee_id: 'E4', ot_date: '2026-08-01', status: 'approved', source_type: 'late_close_auto', final_hours: 1.5, employee_name: '丁君', employee_number: 'E804' },
+  { employee_id: 'E6', ot_date: '2026-08-03', status: 'pending', source_type: 'manual', hours: 3, employee_name: '己君', employee_number: 'E806' },
 ];
 
 (async () => {
   console.log('\n=== 9. 加班確認清單 ===');
-  ctx.sb = makeSb({ attendance: ATT, overtime_requests: OTR });
+  ctx.sb = makeSb({ attendance: ATT }, { get_company_overtime_requests: OTR });
   ctx.getCachedSetting = (k) => ({ default_work_end: '17:00' })[k];
 
   const otDetail = el('otConfirmDetail'), otBadge = el('otConfirmBadge'), otCard = el('otConfirmCard');
@@ -324,11 +333,19 @@ const OTR = [
   check('說明寫明只有確認過的才計薪', h.includes('只有確認過的才會進薪資彙總'));
 
   const attQ = ctx.sb.calls.find(c => c.table === 'attendance');
-  const otQ = ctx.sb.calls.find(c => c.table === 'overtime_requests');
   check('attendance 查詢帶 employees.company_id（多租戶）', attQ.chain.some(s => s === 'eq(employees.company_id,COMPANY-A)'));
-  check('overtime_requests 查詢帶 employees.company_id（多租戶）', otQ.chain.some(s => s === 'eq(employees.company_id,COMPANY-A)'));
   check('只查到昨天為止（今天還沒過完，不該叫主管確認）', attQ.chain.some(s => s === 'lte(date,2026-08-05)'));
   check('回看 14 天（起日 2026-07-23）', attQ.chain.some(s => s === 'gte(date,2026-07-23)'));
+
+  // overtime_requests 已改走 RPC（migration 109），前端不得再直接查表
+  check('overtime_requests 不再直接查表', !ctx.sb.calls.some(c => c.table === 'overtime_requests'));
+  const otRpc = ctx.sb.rpcCalls.find(c => c.name === 'get_company_overtime_requests');
+  check('改呼叫 get_company_overtime_requests', !!otRpc);
+  check('RPC 帶 company_id（多租戶隔離改由函式內把關）', otRpc && otRpc.args.p_company_id === 'COMPANY-A');
+  check('RPC 帶呼叫者身分（函式內驗 admin/manager）', otRpc && otRpc.args.p_line_user_id === 'U1');
+  check('RPC 帶與 attendance 相同的日期窗期', otRpc && otRpc.args.p_from === '2026-07-23' && otRpc.args.p_to === '2026-08-05',
+    otRpc && (otRpc.args.p_from + ' ~ ' + otRpc.args.p_to));
+  check('RPC 不限狀態（待確認清單要看到 pending 的 manual 申請）', otRpc && otRpc.args.p_status === null);
 
   ctx.getCachedSetting = (k) => ({ default_work_end: '18:00' })[k];
   check('起算時間跟著 system_settings 走（18:00 → 18:30 起算）', ctx.otEstimateMinutes(20 * 60 + 30) === 120, ctx.otEstimateMinutes(20 * 60 + 30) + ' 分鐘');
@@ -343,8 +360,13 @@ const OTR = [
   let toastMsg = '', rpcArgs = null;
   ctx.showToast = (m) => { toastMsg = m; };
   ctx.confirm = () => true;
-  ctx.sb = makeSb({ attendance: ATT, overtime_requests: OTR });
-  ctx.sb.rpc = async (name, args) => { rpcArgs = { name, args }; return { data: { success: true }, error: null }; };
+  ctx.sb = makeSb({ attendance: ATT }, { get_company_overtime_requests: OTR });
+  // 只攔截 confirm_daily_overtime，讀取用的 RPC 仍要回真資料，清單才長得出來
+  const innerRpc = ctx.sb.rpc;
+  ctx.sb.rpc = async (name, args) => {
+    if (name === 'confirm_daily_overtime') { rpcArgs = { name, args }; return { data: { success: true }, error: null }; }
+    return innerRpc(name, args);
+  };
   await ctx.loadOvertimeConfirm();
 
   const K1 = 'E1|2026-08-05', K2 = 'E2|2026-08-05';

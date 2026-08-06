@@ -161,7 +161,12 @@ export async function loadAuditData() {
             sb.rpc('get_company_current_salaries', { p_company_id: window.currentCompanyId, p_line_user_id: window.currentAdminEmployee?.line_user_id }),
             sb.from('attendance').select('employee_id, date, check_in_time, is_manual, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).gte('date', startDate).lte('date', endDate),
             sb.from('leave_requests').select('employee_id, days, leave_type, leave_period, leave_hours, start_date, end_date, employees!leave_requests_employee_id_fkey!inner(company_id)').eq('employees.company_id', window.currentCompanyId).eq('status', 'approved').lte('start_date', endDate).gte('end_date', startDate),
-            sb.from('overtime_requests').select('employee_id, hours, planned_hours, actual_hours, approved_hours, final_hours, source_type, ot_date, employees!overtime_requests_employee_id_fkey!inner(company_id)').eq('employees.company_id', window.currentCompanyId).eq('status', 'approved').gte('ot_date', startDate).lte('ot_date', endDate).then(r => r).catch(() => ({ data: [] })),
+            // overtime_requests 改走 RPC（migration 109；110 收 RLS 後直接查表會查不到）
+            sb.rpc('get_company_overtime_requests', {
+                p_company_id: window.currentCompanyId,
+                p_line_user_id: window.currentAdminEmployee?.line_user_id || null,
+                p_from: startDate, p_to: endDate, p_status: 'approved', p_limit: 1000
+            }).then(r => r).catch(() => ({ data: [] })),
             sb.from('schedules').select('employee_id, date, is_off_day, employees!schedules_employee_id_fkey!inner(company_id)').eq('employees.company_id', window.currentCompanyId).gte('date', startDate).lte('date', endDate).then(r => r).catch(() => ({ data: [] }))
         ]);
         if (empRes.error) throw empRes.error;
@@ -785,7 +790,12 @@ export async function loadPayrollData() {
             sb.rpc('get_company_current_salaries', { p_company_id: window.currentCompanyId, p_line_user_id: window.currentAdminEmployee?.line_user_id }),
             sb.from('attendance').select('employee_id, date, is_late, total_work_hours, overtime_hours, check_in_time, check_out_time, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).gte('date', startDate).lte('date', endDate),
             sb.from('leave_requests').select('employee_id, days, leave_type, start_date, end_date, employees!leave_requests_employee_id_fkey!inner(company_id)').eq('employees.company_id', window.currentCompanyId).eq('status', 'approved').lte('start_date', endDate).gte('end_date', startDate),
-            sb.from('overtime_requests').select('employee_id, hours, planned_hours, actual_hours, approved_hours, final_hours, source_type, ot_date, employees!overtime_requests_employee_id_fkey!inner(company_id)').eq('employees.company_id', window.currentCompanyId).eq('status', 'approved').gte('ot_date', startDate).lte('ot_date', endDate).then(r => r).catch(() => ({ data: [] })),
+            // 同上：改走 RPC（migration 109）
+            sb.rpc('get_company_overtime_requests', {
+                p_company_id: window.currentCompanyId,
+                p_line_user_id: window.currentAdminEmployee?.line_user_id || null,
+                p_from: startDate, p_to: endDate, p_status: 'approved', p_limit: 1000
+            }).then(r => r).catch(() => ({ data: [] })),
             sb.rpc('get_company_payroll', { p_company_id: window.currentCompanyId, p_line_user_id: window.currentAdminEmployee?.line_user_id, p_year: year, p_month: month }),
             sb.from('insurance_brackets').select('*').eq('is_active', true).order('salary_min').then(r => r).catch(() => ({ data: [] })),
             sb.from('schedules').select('employee_id, date, is_off_day, shift_types(start_time,end_time,is_overnight), employees!schedules_employee_id_fkey!inner(company_id)').eq('employees.company_id', window.currentCompanyId).gte('date', startDate).lte('date', endDate).then(r => r).catch(() => ({ data: [] }))
