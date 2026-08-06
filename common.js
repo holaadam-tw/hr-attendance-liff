@@ -1915,10 +1915,10 @@ function showPayrollPasswordDialog(callback) {
     setTimeout(function() { document.getElementById('payrollPwInput')?.focus(); }, 100);
 }
 
-// 密碼顯示切換：欄位是置中對齊，切換時不改變 padding 才不會讓文字跳動
-window.togglePayrollPwVisibility = function() {
-    const input = document.getElementById('payrollPwInput');
-    const btn = document.getElementById('payrollPwToggle');
+// 密碼欄位顯示/隱藏切換（共用）
+// btn 直接傳元素本身（inline onclick 用 this），不必每個欄位都給按鈕一個 id
+window.togglePasswordField = function(inputId, btn) {
+    const input = document.getElementById(inputId);
     if (!input || !btn) return;
     const willShow = input.type === 'password';
     input.type = willShow ? 'text' : 'password';
@@ -1929,6 +1929,11 @@ window.togglePayrollPwVisibility = function() {
     input.focus();
     const end = input.value.length;
     try { input.setSelectionRange(end, end); } catch (e) { /* type=password 在部分瀏覽器不支援，忽略 */ }
+};
+
+// 薪酬管理密碼對話框專用（沿用舊名，避免其他地方已經在呼叫）
+window.togglePayrollPwVisibility = function() {
+    window.togglePasswordField('payrollPwInput', document.getElementById('payrollPwToggle'));
 };
 
 window.verifyPayrollPw = function() {

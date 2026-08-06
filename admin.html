@@ -1291,7 +1291,7 @@
                         <label>Channel Access Token</label>
                         <div style="position:relative;">
                             <input type="password" id="lineChannelToken" placeholder="貼上 Channel Access Token" style="padding-right:40px;">
-                            <span onclick="var el=document.getElementById('lineChannelToken');el.type=el.type==='password'?'text':'password';this.textContent=el.type==='password'?'👁️':'🙈';" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:16px;">👁️</span>
+                            <span onclick="togglePasswordField('lineChannelToken', this)" aria-label="顯示密碼" title="顯示密碼" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:16px;">👁️</span>
                         </div>
                     </div>
                     <div class="form-group">
@@ -1346,7 +1346,10 @@
                     <h3 style="margin-bottom:8px;">🔒 薪酬管理密碼</h3>
                     <p style="font-size:12px;color:#64748B;margin-bottom:14px;">platform_admin 進入薪酬模組需驗證此密碼（預設：0000）</p>
                     <div style="display:flex;gap:10px;">
-                        <input type="password" id="payrollNewPw" placeholder="設定新密碼" style="flex:1;padding:12px;border:2px solid #E2E8F0;border-radius:10px;font-size:14px;font-family:inherit;">
+                        <div style="flex:1;position:relative;">
+                            <input type="password" id="payrollNewPw" placeholder="設定新密碼" style="width:100%;padding:12px 44px 12px 12px;border:2px solid #E2E8F0;border-radius:10px;font-size:14px;font-family:inherit;box-sizing:border-box;">
+                            <button type="button" onclick="togglePasswordField('payrollNewPw', this)" aria-label="顯示密碼" title="顯示密碼" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);border:none;background:transparent;cursor:pointer;font-size:16px;line-height:1;padding:6px;">👁️</button>
+                        </div>
                         <button onclick="savePayrollPassword()" style="padding:12px 18px;background:#6366F1;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;">💾 儲存</button>
                     </div>
                 </div>

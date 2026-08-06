@@ -87,7 +87,11 @@
             <div style="font-size:48px;text-align:center;margin-bottom:16px;">🔒</div>
             <h3 style="text-align:center;margin:0 0 8px;font-size:18px;font-weight:800;">薪資查詢</h3>
             <p style="text-align:center;font-size:13px;color:#666;margin-bottom:20px;">請輸入薪資查詢密碼</p>
-            <input type="password" id="payrollPasswordInput" placeholder="請輸入密碼" style="width:100%;padding:12px;border:1.5px solid #E2E8F0;border-radius:10px;font-size:16px;margin-bottom:12px;box-sizing:border-box;text-align:center;" onkeydown="if(event.key==='Enter') submitPayrollPassword()">
+            <!-- 置中對齊，左右 padding 對稱（皆 44px），眼睛按鈕才不會把文字推歪 -->
+            <div style="position:relative;margin-bottom:12px;">
+                <input type="password" id="payrollPasswordInput" placeholder="請輸入密碼" style="width:100%;padding:12px 44px;border:1.5px solid #E2E8F0;border-radius:10px;font-size:16px;box-sizing:border-box;text-align:center;" onkeydown="if(event.key==='Enter') submitPayrollPassword()">
+                <button type="button" onclick="togglePasswordField('payrollPasswordInput', this)" aria-label="顯示密碼" title="顯示密碼" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);border:none;background:transparent;cursor:pointer;font-size:16px;line-height:1;padding:6px;">👁️</button>
+            </div>
             <p id="payrollPasswordError" style="color:#EF4444;font-size:13px;text-align:center;margin-bottom:12px;display:none;">密碼錯誤，請重試</p>
             <div style="display:flex;gap:10px;">
                 <button onclick="history.back()" style="flex:1;padding:12px;border:1px solid #ddd;border-radius:10px;background:#fff;font-size:15px;cursor:pointer;">返回</button>
@@ -342,7 +346,7 @@
         </div>
     </div>
 
-    <script src="common.js"></script>
+    <script src="common.js?v=20260806-pweye"></script>
     <script type="module">
         import { loadHybridBonusData, renderSelectedBonusCard, saveAllBonuses, exportBonusCSV, toggleMatrixRef, updatePerformance, updateAdjustment } from './modules/payroll.js';
         window.loadHybridBonusData = loadHybridBonusData;
