@@ -73,6 +73,20 @@
 
 ---
 
+## 四之二、執行中的權限模型（2026-08-06 實測發現）
+
+做 P0 第一張表時查到一個對後續每一支 RPC 都有影響的事實：
+
+**「管理員」在這套系統裡是跨公司的身分。** 大正科技的兩位管理員（`admin`、`E006`）同時也是本米的成員。所以：
+
+- 隔離**完全靠 `p_company_id` 參數**，不能靠「呼叫者屬於哪家公司」去推斷
+- 每一支 RPC 的驗證必須是「這個 `line_user_id` 在 **`p_company_id` 這家公司** 是不是 admin/manager」，而不是「這個人是不是管理員」
+- 資料的 WHERE 條件也必須用 `p_company_id`，不可用呼叫者自己的 `company_id`
+
+`get_company_overtime_requests`（109）已按此實作，實測：以本米 `company_id` 呼叫回 **0 筆**（本米實際就是 0），沒有回到大正的 2 筆；以不存在的 `company_id` 呼叫則被擋下。
+
+---
+
 ## 五、建議分三階段，順序不可顛倒
 
 ### ⚠️ 鐵則：先補 RPC，全部改完並驗證，最後才收政策
@@ -90,7 +104,24 @@
 
 ### P0 — HR 敏感資料（薪資與個資）
 
-`employees`、`attendance`、`leave_requests`、`payroll_records`、`salary_settings`、`overtime_requests`、`makeup_punch_requests`、`schedules`
+`employees`、`attendance`、`leave_requests`、`payroll_records`、`salary_settings`、~~`overtime_requests`~~（✅ **2026-08-06 完成**）、`makeup_punch_requests`、`schedules`
+
+#### ✅ `overtime_requests` 已完成（migration 109 + 110）
+
+整套流程跑完一輪，可作為後續每張表的樣板：
+
+| 步驟 | 內容 | 結果 |
+|------|------|------|
+| 1 | 套 109 建 `get_company_overtime_requests()` | ✅ `prosecdef=true`、`STABLE`、anon/authenticated 有 EXECUTE |
+| 2 | 正式庫實測 RPC | ✅ 一般員工擋下、無管理權公司擋下、日期／狀態／limit 篩選正確、跨公司只回該公司自身資料 |
+| 3 | 前端 5 個讀取點改呼叫 RPC、部署 main | ✅ curl 驗證 9/9：三個檔案都有 RPC、都無 `sb.from('overtime_requests')`、版本號更新 |
+| 4 | 套 110 `ENABLE ROW LEVEL SECURITY`（0 policy） | ✅ RLS on、policy 0 條 |
+| 5 | 確認 RPC 不受影響 | ✅ 收 RLS 後 RPC 仍回 2 筆＝表內實際 2 筆 |
+| 6 | `scripts/rls_audit.sh` | ✅ 已從「RLS 未開」消失、改列在「RLS 開但 0 政策」 |
+
+**RLS 未開的表：12 → 11。**
+
+寫入 RPC（072 的 approve/reject、108 的 `confirm_daily_overtime`）未另行實測，但與讀取 RPC 是同一個機制——`SECURITY DEFINER` 以 owner 身分執行不受 RLS 限制，第 5 步已證實此機制在本表上成立。
 
 - 寫入部分：`attendance` / `leave_requests` / `overtime_requests` 已完成，只剩 `employees`（7 個寫入點）、`schedules`（1 個）、`salary_settings`（2 個）、`payroll`（1 個）
 - 讀取部分是主要工作量：`employees` 15 個、`leave_requests` 8 個、`attendance` 6 個
