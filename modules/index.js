@@ -12,7 +12,7 @@ import {
 
 import {
     loadAuditLogs, exportReport, initReportMonth
-} from './audit.js?v=20260806-otrpc';
+} from './audit.js?v=20260806-payrollrpc';
 
 import {
     showAddEmployeeModal, closeAddEmployeeModal, initEmployeeFormHandler,
@@ -25,7 +25,7 @@ import {
     loadUnbindEmployees, quickBindLine,
     showResignModal, closeResignModal, confirmResign, restoreEmployee,
     loadResignedEmployees, loadAllEmployees
-} from './employees.js?v=20260712-leavefk';
+} from './employees.js?v=20260806-payrollrpc';
 
 import {
     switchApprovalType, switchLeaveTab, loadLeaveApprovals, approveLeave,
@@ -64,7 +64,7 @@ import {
     editInsBracket, saveInsBracket, deleteInsBracket, updateAllInsRates,
     switchPayTab,
     initAuditPage, loadAuditData
-} from './payroll.js?v=20260806-otrpc';
+} from './payroll.js?v=20260806-payrollrpc';
 
 import {
     loadRestaurantList, openRestaurantDetail, previewStoreOrder, openKDS,

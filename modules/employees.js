@@ -313,9 +313,22 @@ export async function saveSalarySetting() {
     };
 
     try {
-        await sb.from('salary_settings').update({ is_current: false }).eq('employee_id', currentSalaryEmpId).eq('is_current', true);
-        const { error } = await sb.from('salary_settings').insert(record);
+        // 改走 RPC（migration 111）：舊版失效與新版寫入在同一交易，
+        // 且伺服器端驗管理員身分與目標員工是否屬於本公司
+        const { data: res, error } = await sb.rpc('upsert_salary_setting', {
+            p_company_id: window.currentCompanyId,
+            p_line_user_id: window.currentAdminEmployee?.line_user_id || null,
+            p_employee_id: currentSalaryEmpId,
+            p_salary_type: record.salary_type,
+            p_base_salary: record.base_salary,
+            p_meal_allowance: record.meal_allowance,
+            p_position_allowance: record.position_allowance,
+            p_full_attendance_bonus: record.full_attendance_bonus,
+            p_pension_self_rate: record.pension_self_rate,
+            p_sync_employee_rate: false
+        });
         if (error) throw error;
+        if (!res || !res.success) throw new Error(res?.error || '儲存失敗');
         showToast('✅ 薪資設定已儲存');
         closeSalarySettingModal();
         if (typeof window.loadSalarySettingList === 'function') window.loadSalarySettingList();

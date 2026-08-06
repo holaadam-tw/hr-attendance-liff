@@ -742,16 +742,18 @@ export async function saveAllSalarySettings() {
             const baseSalary = parseFloat(baseInput.value) || 0;
             if (!baseSalary) { fail++; continue; }
 
-            await sb.from('salary_settings').update({ is_current: false }).eq('employee_id', empId).eq('is_current', true);
-            const { error } = await sb.from('salary_settings').insert({
-                employee_id: empId, salary_type: salaryType, base_salary: baseSalary, is_current: true
+            // 改走 RPC（migration 111）：舊版失效＋新版寫入＋同步 employees 的
+            // salary_type/hourly_rate 都在同一個交易裡完成。原本是三個獨立語句，
+            // 中間失敗會讓該員工變成「沒有任何生效中的薪資設定」。
+            const { data: res, error } = await sb.rpc('upsert_salary_setting', {
+                p_company_id: window.currentCompanyId,
+                p_line_user_id: window.currentAdminEmployee?.line_user_id || null,
+                p_employee_id: empId,
+                p_salary_type: salaryType,
+                p_base_salary: baseSalary,
+                p_sync_employee_rate: true
             });
-            if (error) { fail++; console.error(error); continue; }
-
-            const hourlyRate = salaryType === 'hourly' ? baseSalary
-                : salaryType === 'daily' ? Math.round(baseSalary / 8 * 100) / 100
-                : Math.round(baseSalary / 30 / 8 * 100) / 100;
-            await sb.from('employees').update({ salary_type: salaryType, hourly_rate: hourlyRate }).eq('id', empId);
+            if (error || !res || !res.success) { fail++; console.error(error || res); continue; }
             ok++;
         }
         showToast(fail ? `✅ ${ok} 筆儲存，❌ ${fail} 筆失敗（金額為空）` : `✅ ${ok} 筆薪資設定已儲存`);
@@ -1330,8 +1332,17 @@ export async function saveAllPayroll() {
             is_published: false, updated_at: new Date().toISOString()
         }));
 
-        const { error } = await sb.from('payroll').upsert(records, { onConflict: 'employee_id,year,month' });
+        // 改走 RPC（migration 111）：伺服器端驗管理員身分，並逐筆確認每位員工
+        // 都屬於本公司——原本是把整包 records 直接 upsert，被竄改的 client
+        // 可以寫進別家公司員工的薪資。
+        const { data: saveRes, error } = await sb.rpc('save_payroll_records', {
+            p_company_id: window.currentCompanyId,
+            p_line_user_id: window.currentAdminEmployee?.line_user_id || null,
+            p_year: year, p_month: month,
+            p_records: records, p_is_published: false
+        });
         if (error) throw error;
+        if (!saveRes || !saveRes.success) throw new Error(saveRes?.error || '儲存失敗');
 
         writeAuditLog('save_payroll', 'payroll', null, `${year}年${month}月薪資草稿`, {
             count: records.length, total: records.reduce((s, r) => s + r.net_salary, 0)
@@ -1375,8 +1386,15 @@ export async function publishPayroll() {
             is_published: true, updated_at: new Date().toISOString()
         }));
 
-        const { error } = await sb.from('payroll').upsert(records, { onConflict: 'employee_id,year,month' });
+        // 同上：改走 RPC（migration 111），p_is_published=true
+        const { data: pubRes, error } = await sb.rpc('save_payroll_records', {
+            p_company_id: window.currentCompanyId,
+            p_line_user_id: window.currentAdminEmployee?.line_user_id || null,
+            p_year: year, p_month: month,
+            p_records: records, p_is_published: true
+        });
         if (error) throw error;
+        if (!pubRes || !pubRes.success) throw new Error(pubRes?.error || '發布失敗');
 
         writeAuditLog('publish_payroll', 'payroll', null, `${year}年${month}月薪資發布`, {
             count: records.length, total: records.reduce((s, r) => s + r.net_salary, 0)
