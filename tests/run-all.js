@@ -19,6 +19,7 @@ const SUITES = [
   { name: '打卡總覽', file: 'attendance-overview.test.js' },
   { name: '薪資頁加班來源', file: 'payroll-overtime.test.js' },
   { name: 'RLS 已鎖定資料表', file: 'rls-locked-tables.test.js' },
+  { name: '批次薪資設定', file: 'salary-batch.test.js' },
 ];
 
 const results = [];

@@ -6,7 +6,8 @@
     "test:payroll-ot": "node tests/payroll-overtime.test.js",
     "test:payroll": "node tests/payroll-simulation.js",
     "test:ui": "node tests/ui-company-switcher.test.js",
-    "test:rls": "node tests/rls-locked-tables.test.js"
+    "test:rls": "node tests/rls-locked-tables.test.js",
+    "test:salary-batch": "node tests/salary-batch.test.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.101.1",

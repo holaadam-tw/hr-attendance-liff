@@ -664,8 +664,16 @@ export function toggleSalarySettingPanel() {
     }
 }
 
+// 批次頁載入時的原始值快照：empId -> { type, base, meal, pos, fab, pension, hadSetting }
+// 用途有二：
+//   1. 儲存時只寫「真的有改」的那幾筆，不再每次都幫 22 個人各長一筆版本歷史
+//   2. 把津貼原值帶回 RPC。這頁只有制度與金額兩個欄位，先前送出時其他津貼
+//      一律變 0，等於無聲清掉伙食／職務／全勤／勞退自提
+let salarySettingSnapshot = {};
+
 export async function loadSalarySettingList() {
     const listEl = document.getElementById('salarySettingList');
+    salarySettingSnapshot = {};
     try {
         const [empRes, ssRes] = await Promise.all([
             sb.from('employees').select('id, name, employee_number, department').eq('company_id', window.currentCompanyId).eq('is_active', true).order('department'),
@@ -689,6 +697,18 @@ export async function loadSalarySettingList() {
             const ss = ssMap[emp.id];
             const curType = ss?.salary_type || 'hourly';
             const curBase = ss?.base_salary || (curType === 'hourly' ? 196 : '');
+            salarySettingSnapshot[emp.id] = {
+                name: emp.name,
+                hadSetting: !!ss,
+                // 沒有設定的人，畫面上顯示的是「時薪 196」這個預設值而非真實設定，
+                // 所以快照要記 null，儲存時才分得出「沒改」與「本來就沒有」
+                type: ss ? ss.salary_type : null,
+                base: ss ? Number(ss.base_salary) : null,
+                meal: Number(ss?.meal_allowance || 0),
+                pos: Number(ss?.position_allowance || 0),
+                fab: Number(ss?.full_attendance_bonus || 0),
+                pension: Number(ss?.pension_self_rate || 0)
+            };
             html += `<div style="min-width:0;">
                 <div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHTML(emp.name)}</div>
                 <div style="color:#94A3B8;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHTML(emp.department || '-')}</div>
@@ -707,8 +727,15 @@ export async function loadSalarySettingList() {
     } catch(e) { listEl.innerHTML = '<p style="color:#EF4444;text-align:center;">載入失敗</p>'; console.error(e); }
 }
 
+// 標記「這一列被人動過」。沒有設定的員工，畫面上的時薪 196 是預設佔位值不是
+// 真實設定，沒被動過就不該因為按了儲存而變成正式資料
+function markSalaryRowTouched(empId) {
+    document.querySelectorAll(`[data-emp-id="${empId}"]`).forEach(el => { el.dataset.touched = '1'; });
+}
+
 export function onBatchSalaryTypeChange(sel) {
     const empId = sel.dataset.empId;
+    markSalaryRowTouched(empId);
     const baseInput = document.querySelector(`input[data-emp-id="${empId}"][data-field="base"]`);
     if (sel.value === 'hourly') { baseInput.value = 196; }
     else { baseInput.value = ''; }
@@ -717,6 +744,7 @@ export function onBatchSalaryTypeChange(sel) {
 
 export function onBatchSalaryBaseChange(input) {
     const empId = input.dataset.empId;
+    markSalaryRowTouched(empId);
     const typeSel = document.querySelector(`select[data-emp-id="${empId}"][data-field="type"]`);
     const display = document.querySelector(`span[data-emp-id="${empId}"][data-field="hourly-display"]`);
     const base = parseFloat(input.value) || 0;
@@ -727,36 +755,91 @@ export function onBatchSalaryBaseChange(input) {
     else display.textContent = `NT$${Math.round(base / 30 / 8)}/h`;
 }
 
+const SALARY_TYPE_LABEL = { hourly: '時薪', monthly: '月薪', daily: '日薪' };
+const fmtSalary = (type, base) => `${SALARY_TYPE_LABEL[type] || type} ${Number(base).toLocaleString('en-US')}`;
+
+// 比對畫面上的值與載入時的快照，只挑出真的有變動的那幾筆
+function collectSalarySettingChanges() {
+    const changes = [];
+    const invalid = [];
+    document.querySelectorAll('select[data-field="type"]').forEach(sel => {
+        const empId = sel.dataset.empId;
+        const snap = salarySettingSnapshot[empId];
+        if (!snap) return;
+        const baseInput = document.querySelector(`input[data-emp-id="${empId}"][data-field="base"]`);
+        const salaryType = sel.value;
+        const baseSalary = parseFloat(baseInput?.value) || 0;
+
+        // 本來就沒有設定、金額也留空 → 使用者沒打算設定他，不算失敗也不寫入
+        if (!baseSalary) {
+            if (snap.hadSetting) invalid.push(snap.name);
+            return;
+        }
+        if (snap.hadSetting && snap.type === salaryType && snap.base === baseSalary) return;   // 沒改
+        // 本來沒有設定、這一列又沒被動過 → 畫面上的時薪 196 只是預設佔位值，
+        // 不可因為按了儲存就替他建立一筆正式薪資設定
+        const touched = sel.dataset.touched === '1' || baseInput?.dataset.touched === '1';
+        if (!snap.hadSetting && !touched) return;
+
+        changes.push({
+            empId, name: snap.name, salaryType, baseSalary,
+            before: snap.hadSetting ? fmtSalary(snap.type, snap.base) : '（無設定）',
+            after: fmtSalary(salaryType, baseSalary),
+            // 津貼原值帶回去，否則 RPC 會把這四欄寫成 0
+            meal: snap.meal, pos: snap.pos, fab: snap.fab, pension: snap.pension
+        });
+    });
+    return { changes, invalid };
+}
+
 export async function saveAllSalarySettings() {
     const typeEls = document.querySelectorAll('select[data-field="type"]');
     if (typeEls.length === 0) return;
+
+    const { changes, invalid } = collectSalarySettingChanges();
+
+    if (invalid.length > 0) {
+        showToast(`❌ 這些人的金額是空的，請填寫或改回原值：${invalid.slice(0, 3).join('、')}${invalid.length > 3 ? ` 等 ${invalid.length} 人` : ''}`);
+        return;
+    }
+    if (changes.length === 0) { showToast('沒有任何變更'); return; }
+
+    // 存檔前把「誰、從什麼變成什麼」攤出來。這頁以前是一按就把全部人重寫一次，
+    // 使用者無從得知自己動到了誰
+    const MAX_LIST = 10;
+    const lines = changes.slice(0, MAX_LIST).map(c => `• ${c.name}　${c.before} → ${c.after}`);
+    if (changes.length > MAX_LIST) lines.push(`…另 ${changes.length - MAX_LIST} 人`);
+    const msg = `確定儲存薪資設定？\n\n共 ${changes.length} 人變更：\n${lines.join('\n')}\n\n`
+        + `未變更的 ${typeEls.length - changes.length} 人不會寫入。\n`
+        + `伙食／職務／全勤／勞退自提維持原值不變。`;
+    if (!confirm(msg)) return;
+
     const btn = document.querySelector('#salarySettingList button');
     const origText = btn.textContent;
     btn.disabled = true; btn.textContent = '⏳ 儲存中...';
     let ok = 0, fail = 0;
     try {
-        for (const sel of typeEls) {
-            const empId = sel.dataset.empId;
-            const salaryType = sel.value;
-            const baseInput = document.querySelector(`input[data-emp-id="${empId}"][data-field="base"]`);
-            const baseSalary = parseFloat(baseInput.value) || 0;
-            if (!baseSalary) { fail++; continue; }
-
+        for (const c of changes) {
             // 改走 RPC（migration 111）：舊版失效＋新版寫入＋同步 employees 的
             // salary_type/hourly_rate 都在同一個交易裡完成。原本是三個獨立語句，
             // 中間失敗會讓該員工變成「沒有任何生效中的薪資設定」。
             const { data: res, error } = await sb.rpc('upsert_salary_setting', {
                 p_company_id: window.currentCompanyId,
                 p_line_user_id: window.currentAdminEmployee?.line_user_id || null,
-                p_employee_id: empId,
-                p_salary_type: salaryType,
-                p_base_salary: baseSalary,
+                p_employee_id: c.empId,
+                p_salary_type: c.salaryType,
+                p_base_salary: c.baseSalary,
+                p_meal_allowance: c.meal,
+                p_position_allowance: c.pos,
+                p_full_attendance_bonus: c.fab,
+                p_pension_self_rate: c.pension,
                 p_sync_employee_rate: true
             });
             if (error || !res || !res.success) { fail++; console.error(error || res); continue; }
             ok++;
         }
-        showToast(fail ? `✅ ${ok} 筆儲存，❌ ${fail} 筆失敗（金額為空）` : `✅ ${ok} 筆薪資設定已儲存`);
+        showToast(fail ? `✅ ${ok} 筆儲存，❌ ${fail} 筆失敗` : `✅ ${ok} 筆薪資設定已儲存`);
+        if (ok > 0) loadSalarySettingList();   // 重載以更新快照，避免再按一次又被視為變更
     } catch(e) { showToast('❌ 儲存失敗：' + e.message); console.error(e); }
     finally { btn.disabled = false; btn.textContent = origText; }
 }
