@@ -1896,7 +1896,11 @@ function showPayrollPasswordDialog(callback) {
         '<div style="font-size:40px;margin-bottom:12px;">🔒</div>' +
         '<div style="font-size:18px;font-weight:800;margin-bottom:4px;">薪酬管理</div>' +
         '<div style="font-size:13px;color:#64748B;margin-bottom:20px;">請輸入管理密碼</div>' +
-        '<input type="password" id="payrollPwInput" placeholder="輸入密碼" style="width:100%;padding:14px;border:2px solid #E2E8F0;border-radius:12px;font-size:16px;text-align:center;font-family:inherit;margin-bottom:16px;box-sizing:border-box;" onkeypress="if(event.key===\'Enter\')verifyPayrollPw()">' +
+        // 左右 padding 對稱（皆 46px），眼睛按鈕蓋在右側才不會把置中的文字推歪
+        '<div style="position:relative;margin-bottom:16px;">' +
+        '<input type="password" id="payrollPwInput" placeholder="輸入密碼" style="width:100%;padding:14px 46px;border:2px solid #E2E8F0;border-radius:12px;font-size:16px;text-align:center;font-family:inherit;box-sizing:border-box;" onkeypress="if(event.key===\'Enter\')verifyPayrollPw()">' +
+        '<button type="button" id="payrollPwToggle" onclick="togglePayrollPwVisibility()" aria-label="顯示密碼" title="顯示密碼" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);border:none;background:transparent;cursor:pointer;font-size:18px;line-height:1;padding:8px;">👁️</button>' +
+        '</div>' +
         '<div style="display:flex;gap:10px;">' +
         '<button onclick="this.closest(\'div\').parentElement.parentElement.remove()" style="flex:1;padding:12px;background:#F1F5F9;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;">取消</button>' +
         '<button onclick="verifyPayrollPw()" style="flex:1;padding:12px;background:#6366F1;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;">確認</button>' +
@@ -1910,6 +1914,22 @@ function showPayrollPasswordDialog(callback) {
 
     setTimeout(function() { document.getElementById('payrollPwInput')?.focus(); }, 100);
 }
+
+// 密碼顯示切換：欄位是置中對齊，切換時不改變 padding 才不會讓文字跳動
+window.togglePayrollPwVisibility = function() {
+    const input = document.getElementById('payrollPwInput');
+    const btn = document.getElementById('payrollPwToggle');
+    if (!input || !btn) return;
+    const willShow = input.type === 'password';
+    input.type = willShow ? 'text' : 'password';
+    btn.textContent = willShow ? '🙈' : '👁️';
+    btn.setAttribute('aria-label', willShow ? '隱藏密碼' : '顯示密碼');
+    btn.setAttribute('title', willShow ? '隱藏密碼' : '顯示密碼');
+    // 切回輸入框並把游標移到最後，避免切換後要再點一次才能繼續打
+    input.focus();
+    const end = input.value.length;
+    try { input.setSelectionRange(end, end); } catch (e) { /* type=password 在部分瀏覽器不支援，忽略 */ }
+};
 
 window.verifyPayrollPw = function() {
     const input = document.getElementById('payrollPwInput')?.value;
