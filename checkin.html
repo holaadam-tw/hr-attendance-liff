@@ -47,6 +47,9 @@
 
                 <button class="btn btn-primary" id="captureBtn" onclick="captureAndCheckIn()" disabled style="font-size:16px;padding:16px;border-radius:16px;" data-i18n="takePhotoAndPunch">📸 拍照並打卡</button>
                 <input type="file" id="captureInput" accept="image/jpeg,image/png" capture="user" style="display:none" onchange="handleCapturePhoto(this)">
+                <button class="btn btn-secondary" id="healthCheckBtn" onclick="runCheckinHealthCheck()" style="margin-top:10px;font-size:14px;padding:12px;border-radius:14px;background:#fff;border:2px solid #A5B4FC;color:#3730A3;font-weight:800;">🩺 打卡環境檢查</button>
+                <input type="file" id="healthCaptureInput" accept="image/jpeg,image/png" capture="user" style="display:none" onchange="handleHealthCapturePhoto(this)">
+                <div id="healthCheckPanel" style="display:none;margin-top:10px;padding:14px;border-radius:14px;background:#F8FAFC;border:1px solid #CBD5E1;text-align:left;font-size:12px;line-height:1.55;"></div>
                 <div id="locationDiagnostic" style="display:none;margin:12px 0 0;padding:12px;border-radius:12px;background:#F8FAFC;border:1px solid #CBD5E1;color:#334155;font-size:12px;line-height:1.55;text-align:left;"></div>
             </div>
         </div>
@@ -412,6 +415,8 @@
         const PHOTO_ENCODE_TIMEOUT_MS = 3000;
         const CAMERA_FRAME_TIMEOUT_MS = 5000;
         const CHECKIN_OPERATION_TIMEOUT_MS = 60000;
+        const HEALTH_NETWORK_TIMEOUT_MS = 8000;
+        const CHECKIN_HEALTH_VERSION = '20260810.1';
 
         let gpsPermissionState = 'unknown';
         let captureAttemptSequence = 0;
@@ -484,6 +489,7 @@
             lastGpsDiagnostic = { ...lastGpsDiagnostic, ...next };
             const el = document.getElementById('locationDiagnostic');
             if (!el) return;
+            if (healthCheckRunning) { el.style.display = 'none'; return; }
             el.style.display = 'block';
             const d = lastGpsDiagnostic;
             const hasCoords = d.hasCoords === 'Yes';
@@ -857,6 +863,160 @@
             });
         }
 
+        let healthCheckRunning = false;
+        let healthCheckResults = [];
+
+        function makeHealthResult(name, status, code, message, action, startedAt) {
+            return { name, status, code, message, action, elapsedMs: Math.max(0, Date.now() - startedAt) };
+        }
+
+        function makeHealthFailure(name, error, startedAt) {
+            const code = error?.code || error?.name || error?.message || 'unexpected_error';
+            if (name === '網路連線') return makeHealthResult(name, 'error', code === 'AbortError' ? 'network_timeout' : 'network_failed', '正式打卡網站目前連不上。', '切換 Wi-Fi／行動網路後重新檢查。', startedAt);
+            if (name === '定位' && (error?.code === 1 || code === 'PERMISSION_DENIED')) return makeHealthResult(name, 'error', 'gps_permission_denied', 'LINE 沒有定位權限。', 'iPhone 設定 → 隱私權與安全性 → 定位服務 → LINE → 使用 App 期間，並開啟精確位置。', startedAt);
+            if (name === '定位') return makeHealthResult(name, 'error', code, '目前抓不到定位。', '移到窗邊、確認網路後重新檢查。', startedAt);
+            if (name === '相機與照片' && (code === 'NotAllowedError' || code === 'PermissionDeniedError')) return makeHealthResult(name, 'error', 'camera_permission_denied', 'LINE 沒有相機權限。', 'iPhone 設定 → LINE → 開啟相機，關閉 LINE 後重試。', startedAt);
+            if (name === '相機與照片') return makeHealthResult(name, 'error', code, '相機畫面或照片處理沒有完成。', '關閉 LINE 後重新開啟，並確認 LINE 的相機權限。', startedAt);
+            return makeHealthResult(name, 'error', code, '檢查沒有完成。', '關閉 LINE 後重新開啟再試。', startedAt);
+        }
+
+        function getHealthPlatform() {
+            const ua = navigator.userAgent || '';
+            if (/iPhone|iPad|iPod/i.test(ua)) return 'iOS / LINE';
+            if (/Android/i.test(ua)) return 'Android / LINE';
+            return '其他裝置';
+        }
+
+        function buildHealthSafeSummary(results) {
+            const checkedAt = new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Taipei', hour12: false });
+            return [
+                `檢查時間：${checkedAt}`,
+                `裝置：${getHealthPlatform()}`,
+                `版本：${CHECKIN_HEALTH_VERSION}`,
+                ...results.map(item => `${item.name}：${item.status === 'ok' ? '正常' : item.status === 'warn' ? '待完成' : '需處理'}｜${item.code}｜${item.elapsedMs}ms`)
+            ].join('\n');
+        }
+
+        function renderCheckinHealthResults(done = false) {
+            const panel = document.getElementById('healthCheckPanel');
+            if (!panel) return;
+            panel.style.display = 'block';
+            const allOk = healthCheckResults.length === 4 && healthCheckResults.every(item => item.status === 'ok');
+            const title = done
+                ? (allOk ? '✅ 這支手機目前可進行打卡' : '⚠️ 有項目需要處理')
+                : '⏳ 正在檢查，請保持畫面開啟';
+            const items = healthCheckResults.map(item => {
+                const icon = item.status === 'ok' ? '✅' : item.status === 'warn' ? '🟡' : '❌';
+                const manual = item.code === 'manual_photo_required'
+                    ? '<button onclick="startHealthCaptureTest()" style="margin-top:6px;padding:8px 12px;border:0;border-radius:9px;background:#4F46E5;color:#fff;font-weight:700;">📸 拍一張測試照（不會上傳）</button>'
+                    : '';
+                return `<div style="padding:8px 0;border-bottom:1px solid #E2E8F0;"><b>${icon} ${escapeHTML(item.name)}</b> <span style="color:#64748B;">${item.elapsedMs}ms</span><br>${escapeHTML(item.message)}${item.action ? `<br><span style="color:#B45309;">處理方式：${escapeHTML(item.action)}</span>` : ''}${manual}</div>`;
+            }).join('');
+            panel.innerHTML = `<div style="font-size:14px;font-weight:900;color:${allOk ? '#047857' : '#9A3412'};margin-bottom:4px;">${title}</div>` +
+                '<div style="color:#64748B;margin-bottom:6px;">只測試目前手機，不會打卡、不會上傳照片，也不會寫入資料庫。</div>' + items +
+                (done ? `<pre style="white-space:pre-wrap;background:#fff;border:1px solid #E2E8F0;border-radius:10px;padding:9px;margin:10px 0 0;font-size:11px;">${escapeHTML(buildHealthSafeSummary(healthCheckResults))}</pre>` : '');
+        }
+
+        function setHealthCheckBusy(busy) {
+            healthCheckRunning = busy;
+            const healthBtn = document.getElementById('healthCheckBtn');
+            const captureBtn = document.getElementById('captureBtn');
+            if (busy) {
+                const locationDiagnostic = document.getElementById('locationDiagnostic');
+                if (locationDiagnostic) locationDiagnostic.style.display = 'none';
+            }
+            if (healthBtn) {
+                healthBtn.disabled = busy;
+                healthBtn.textContent = busy ? '⏳ 檢查中...' : '🩺 重新檢查打卡環境';
+            }
+            if (captureBtn) captureBtn.disabled = busy || (!useCaptureInput && !hasUsableCameraFrame(document.getElementById('video')));
+        }
+
+        async function runCheckinHealthCheck() {
+            if (healthCheckRunning) return;
+            setHealthCheckBusy(true);
+            healthCheckResults = [];
+            renderCheckinHealthResults(false);
+
+            const run = async (name, probe) => {
+                const startedAt = Date.now();
+                try { healthCheckResults.push(await probe(startedAt)); }
+                catch (error) { healthCheckResults.push(makeHealthFailure(name, error, startedAt)); }
+                renderCheckinHealthResults(false);
+            };
+
+            try {
+                await run('LINE 與登入', async startedAt => {
+                    const ok = typeof liff !== 'undefined' && liff.isInClient?.() && liff.isLoggedIn?.() && liffProfile?.userId && currentEmployee?.id && currentCompanyId;
+                    return makeHealthResult('LINE 與登入', ok ? 'ok' : 'error', ok ? 'line_ready' : 'line_context_missing', ok ? 'LINE 登入與員工身分正常。' : '目前不是完整的員工登入狀態。', ok ? '' : '關閉頁面，從 LINE 員工服務中心重新進入。', startedAt);
+                });
+                await run('網路連線', async startedAt => {
+                    const controller = new AbortController();
+                    const timer = setTimeout(() => controller.abort(), HEALTH_NETWORK_TIMEOUT_MS);
+                    try {
+                        const response = await fetch(`checkin.html?health=${Date.now()}`, { cache: 'no-store', signal: controller.signal });
+                        if (!response.ok) throw new Error('network_http_error');
+                        return makeHealthResult('網路連線', 'ok', 'site_reachable', '正式打卡網站連線正常。', '', startedAt);
+                    } finally { clearTimeout(timer); }
+                });
+                await run('相機與照片', async startedAt => {
+                    const statusBox = document.getElementById('checkInStatus');
+                    const video = await ensureCameraReadyForCapture(statusBox);
+                    if (!video && useCaptureInput) return makeHealthResult('相機與照片', 'warn', 'manual_photo_required', '此手機使用系統相機，需要拍一張測試照。', '點下方按鈕拍照；照片只在手機記憶體測試。', startedAt);
+                    if (!hasUsableCameraFrame(video)) throw Object.assign(new Error('camera_frame_unavailable'), { code: 'camera_frame_unavailable' });
+                    const testCanvas = document.createElement('canvas');
+                    testCanvas.width = Math.min(video.videoWidth, 640); testCanvas.height = Math.min(video.videoHeight, 480);
+                    const ctx = testCanvas.getContext('2d');
+                    if (!ctx) throw Object.assign(new Error('photo_encode_failed'), { code: 'photo_encode_failed' });
+                    ctx.drawImage(video, 0, 0, testCanvas.width, testCanvas.height);
+                    const blob = await canvasToJpegBlob(testCanvas);
+                    if (!blob?.size) throw Object.assign(new Error('photo_encode_failed'), { code: 'photo_encode_failed' });
+                    return makeHealthResult('相機與照片', 'ok', 'camera_photo_ready', '相機畫面與照片處理正常。', '', startedAt);
+                });
+                await run('定位', async startedAt => {
+                    const loc = await resolveGpsLocation();
+                    if (!Number.isFinite(loc?.latitude) || !Number.isFinite(loc?.longitude)) throw Object.assign(new Error('gps_no_coords'), { code: 'gps_no_coords' });
+                    const level = !Number.isFinite(loc.accuracy) ? '已取得定位' : loc.accuracy <= GPS_MAX_ACCURACY_M ? `精度正常（約 ${Math.round(loc.accuracy)} 公尺）` : `精度較慢（約 ${Math.round(loc.accuracy)} 公尺）`;
+                    return makeHealthResult('定位', 'ok', 'gps_ready', level + '。', '', startedAt);
+                });
+            } finally {
+                setHealthCheckBusy(false);
+                renderCheckinHealthResults(true);
+            }
+        }
+
+        function startHealthCaptureTest() {
+            const input = document.getElementById('healthCaptureInput');
+            if (input) { input.value = ''; input.click(); }
+        }
+
+        async function handleHealthCapturePhoto(input) {
+            const file = input.files?.[0];
+            if (!file || healthCheckRunning) return;
+            setHealthCheckBusy(true);
+            const startedAt = Date.now();
+            const objectUrl = URL.createObjectURL(file);
+            try {
+                const img = new Image();
+                await new Promise((resolve, reject) => { img.onload = resolve; img.onerror = () => reject(new Error('image_load_failed')); img.src = objectUrl; });
+                const scale = Math.min(1, 800 / img.width, 600 / img.height);
+                const testCanvas = document.createElement('canvas');
+                testCanvas.width = Math.round(img.width * scale); testCanvas.height = Math.round(img.height * scale);
+                testCanvas.getContext('2d').drawImage(img, 0, 0, testCanvas.width, testCanvas.height);
+                const blob = await canvasToJpegBlob(testCanvas);
+                if (!blob?.size) throw new Error('photo_encode_failed');
+                const result = makeHealthResult('相機與照片', 'ok', 'system_camera_photo_ready', '系統相機與照片處理正常。', '', startedAt);
+                const index = healthCheckResults.findIndex(item => item.name === '相機與照片');
+                if (index >= 0) healthCheckResults[index] = result; else healthCheckResults.push(result);
+            } catch (error) {
+                const result = makeHealthResult('相機與照片', 'error', error.message || 'photo_encode_failed', '測試照片無法處理。', '關閉 LINE 後重新開啟，並確認 LINE 的相機權限。', startedAt);
+                const index = healthCheckResults.findIndex(item => item.name === '相機與照片');
+                if (index >= 0) healthCheckResults[index] = result; else healthCheckResults.push(result);
+            } finally {
+                URL.revokeObjectURL(objectUrl); input.value = ''; setHealthCheckBusy(false); renderCheckinHealthResults(true);
+            }
+        }
+
         function ensureCaptureAttemptActive(attemptId) {
             if (activeCaptureAttemptId === attemptId) return;
             const error = new Error('capture_attempt_cancelled');
@@ -1057,9 +1217,11 @@
         }
 
         let useCaptureInput = false;
+        let cameraOpeningPromise = null;
 
         function onCameraReady(stream) {
             const video = document.getElementById('video');
+            useCaptureInput = false;
             video.srcObject = stream;
             videoStream = stream;
             video.onloadedmetadata = () => {
@@ -1076,7 +1238,14 @@
             };
         }
 
-        async function openCamera() {
+        function openCamera() {
+            if (!cameraOpeningPromise) {
+                cameraOpeningPromise = tryOpenCamera().finally(() => { cameraOpeningPromise = null; });
+            }
+            return cameraOpeningPromise;
+        }
+
+        async function tryOpenCamera() {
             const attempts = [
                 { video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } } },
                 { video: { facingMode: 'user' } },

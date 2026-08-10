@@ -277,9 +277,11 @@ async function main() {
   console.log('  RunPiston 冒煙測試');
   console.log('═══════════════════════════════════════');
 
-  await testSupabaseConnection();
+  const offlineSafe = process.env.SKIP_EXTERNAL_SMOKE === '1';
+  if (offlineSafe) console.log('\n🛡️ 離線安全模式：略過 Supabase 連線與 error_logs 寫入／刪除');
+  else await testSupabaseConnection();
   testHtmlSyntax();
-  await testErrorLogs();
+  if (!offlineSafe) await testErrorLogs();
   testConfigConsistency();
   testCommonFunctions();
 

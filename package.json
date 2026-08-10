@@ -3,6 +3,7 @@
     "test": "node tests/run-all.js",
     "test:smoke": "node tests/smoke-test.js",
     "test:checkin-photo": "node tests/checkin-photo-retry.test.js",
+    "test:checkin-health": "node tests/checkin-health-check.test.js",
     "test:overview": "node tests/attendance-overview.test.js",
     "test:payroll-ot": "node tests/payroll-overtime.test.js",
     "test:payroll": "node tests/payroll-simulation.js",

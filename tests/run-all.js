@@ -15,8 +15,9 @@ const { spawnSync } = require('child_process');
 const path = require('path');
 
 const SUITES = [
-  { name: '冒煙測試', file: 'smoke-test.js' },
+  { name: '冒煙測試', file: 'smoke-test.js', env: { SKIP_EXTERNAL_SMOKE: '1' } },
   { name: '打卡相機／照片重試', file: 'checkin-photo-retry.test.js' },
+  { name: '打卡環境自我檢查', file: 'checkin-health-check.test.js' },
   { name: '打卡總覽', file: 'attendance-overview.test.js' },
   { name: '薪資頁加班來源', file: 'payroll-overtime.test.js' },
   { name: 'RLS 已鎖定資料表', file: 'rls-locked-tables.test.js' },
@@ -25,7 +26,10 @@ const SUITES = [
 
 const results = [];
 for (const s of SUITES) {
-  const r = spawnSync(process.execPath, [path.join(__dirname, s.file)], { stdio: 'inherit' });
+  const r = spawnSync(process.execPath, [path.join(__dirname, s.file)], {
+    stdio: 'inherit',
+    env: { ...process.env, ...(s.env || {}) }
+  });
   results.push({ name: s.name, code: r.status === null ? 1 : r.status });
 }
 
