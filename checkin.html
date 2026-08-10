@@ -409,8 +409,13 @@
         const GPS_OUTSIDE_REVIEW_MAX_DISTANCE_M = 5000;
         const GPS_REFINEMENT_TIMEOUT_MS = 15000;
         const GPS_STORAGE_KEY = 'last_gps_location';
+        const PHOTO_ENCODE_TIMEOUT_MS = 3000;
+        const CAMERA_FRAME_TIMEOUT_MS = 5000;
+        const CHECKIN_OPERATION_TIMEOUT_MS = 60000;
 
         let gpsPermissionState = 'unknown';
+        let captureAttemptSequence = 0;
+        let activeCaptureAttemptId = 0;
         let lastGpsDiagnostic = {
             permission: 'unknown',
             code: '-',
@@ -765,6 +770,100 @@
             return getDiagnosticGPS();
         }
 
+        function hasUsableCameraFrame(video) {
+            if (!video || !video.srcObject || video.readyState < 2 || video.videoWidth <= 0 || video.videoHeight <= 0) {
+                return false;
+            }
+            const tracks = typeof video.srcObject.getVideoTracks === 'function'
+                ? video.srcObject.getVideoTracks()
+                : [];
+            return tracks.some(track => track.readyState === 'live' && track.enabled !== false);
+        }
+
+        function waitForUsableCameraFrame(video, timeoutMs = CAMERA_FRAME_TIMEOUT_MS) {
+            if (hasUsableCameraFrame(video)) return Promise.resolve(video);
+            return new Promise((resolve, reject) => {
+                const startedAt = Date.now();
+                const timer = setInterval(() => {
+                    if (hasUsableCameraFrame(video)) {
+                        clearInterval(timer);
+                        resolve(video);
+                        return;
+                    }
+                    if (Date.now() - startedAt >= timeoutMs) {
+                        clearInterval(timer);
+                        reject(new Error('camera_frame_unavailable'));
+                    }
+                }, 100);
+            });
+        }
+
+        async function ensureCameraReadyForCapture(statusBox) {
+            let video = document.getElementById('video');
+            if (hasUsableCameraFrame(video)) return video;
+
+            showStatus(statusBox, 'info', '📷 相機正在重新啟動，請稍等...');
+            stopCamera();
+            await openCamera();
+            if (useCaptureInput) return null;
+
+            video = document.getElementById('video');
+            return waitForUsableCameraFrame(video);
+        }
+
+        function dataUrlToJpegBlob(dataUrl) {
+            const parts = String(dataUrl || '').split(',');
+            if (parts.length !== 2 || !parts[1]) throw new Error('photo_encode_failed');
+            const mimeMatch = /^data:([^;]+);base64$/.exec(parts[0]);
+            if (!mimeMatch) throw new Error('photo_encode_failed');
+            const binary = atob(parts[1]);
+            if (!binary.length) throw new Error('photo_encode_failed');
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+            return new Blob([bytes], { type: mimeMatch[1] || 'image/jpeg' });
+        }
+
+        function canvasToJpegBlob(canvas, quality = 0.6, timeoutMs = PHOTO_ENCODE_TIMEOUT_MS) {
+            return new Promise((resolve, reject) => {
+                let settled = false;
+                let timer = null;
+                const finish = (value, isError = false) => {
+                    if (settled) return;
+                    settled = true;
+                    clearTimeout(timer);
+                    if (isError) reject(value);
+                    else resolve(value);
+                };
+                const fallback = () => {
+                    if (settled) return;
+                    try {
+                        const blob = dataUrlToJpegBlob(canvas.toDataURL('image/jpeg', quality));
+                        if (!blob || blob.size <= 0) throw new Error('photo_encode_failed');
+                        finish(blob);
+                    } catch (error) {
+                        finish(error?.message === 'photo_encode_failed' ? error : new Error('photo_encode_failed'), true);
+                    }
+                };
+                timer = setTimeout(fallback, timeoutMs);
+
+                try {
+                    canvas.toBlob(blob => {
+                        if (blob && blob.size > 0) finish(blob);
+                        else fallback();
+                    }, 'image/jpeg', quality);
+                } catch (error) {
+                    fallback();
+                }
+            });
+        }
+
+        function ensureCaptureAttemptActive(attemptId) {
+            if (activeCaptureAttemptId === attemptId) return;
+            const error = new Error('capture_attempt_cancelled');
+            error._captureCancelled = true;
+            throw error;
+        }
+
         async function captureAndCheckIn() {
             // capture input 模式 → 觸發系統相機
             if (useCaptureInput) {
@@ -778,39 +877,62 @@
             const btn = document.getElementById('captureBtn');
             const statusBox = document.getElementById('checkInStatus');
             btn.disabled = true; btn.textContent = '處理中...';
+            const attemptId = ++captureAttemptSequence;
+            activeCaptureAttemptId = attemptId;
+            let attemptStage = 'camera';
             // 安全計時：60 秒後自動恢復按鈕（定位可能需要高精度 + fallback）
             const safetyTimer = setTimeout(() => {
-                if (btn.disabled && btn.textContent === '處理中...') {
+                if (activeCaptureAttemptId === attemptId && btn.disabled && btn.textContent === '處理中...') {
+                    activeCaptureAttemptId = 0;
+                    logCheckinFailure({
+                        stage: attemptStage,
+                        code: 'operation_timeout',
+                        detail: { attempt_stage: attemptStage, timeout_ms: CHECKIN_OPERATION_TIMEOUT_MS }
+                    });
                     stopCamera();
                     btn.disabled = false; btn.textContent = '📸 重試';
-                    showStatus(statusBox, 'warning', '⚠️ 操作逾時，請重試');
+                    showStatus(statusBox, 'warning', `⚠️ ${attemptStage === 'photo' ? '照片處理' : attemptStage === 'upload' ? '照片上傳' : attemptStage === 'gps' ? '定位' : attemptStage === 'rpc' ? '送出打卡' : '相機'}逾時，請重試`);
                 }
-            }, 60000);
+            }, CHECKIN_OPERATION_TIMEOUT_MS);
 
             try {
-                const video = document.getElementById('video');
+                const video = await ensureCameraReadyForCapture(statusBox);
+                ensureCaptureAttemptActive(attemptId);
+                if (!video && useCaptureInput) {
+                    btn.disabled = false;
+                    btn.textContent = '📸 開啟相機拍照';
+                    showStatus(statusBox, 'info', '📸 已切換系統相機，請再按一次拍照');
+                    return;
+                }
                 const canvas = document.getElementById('canvas');
-                
+
+                attemptStage = 'photo';
+                showStatus(statusBox, 'info', '📸 照片處理中...');
                 // ===== 圖片壓縮：縮放至 max 800x600 =====
                 const vw = video.videoWidth, vh = video.videoHeight;
+                if (vw <= 0 || vh <= 0) throw new Error('camera_frame_unavailable');
                 const MAX_W = 800, MAX_H = 600;
                 let cw = vw, ch = vh;
                 if (cw > MAX_W) { ch = Math.round(ch * MAX_W / cw); cw = MAX_W; }
                 if (ch > MAX_H) { cw = Math.round(cw * MAX_H / ch); ch = MAX_H; }
                 canvas.width = cw; canvas.height = ch;
                 const ctx = canvas.getContext('2d');
+                if (!ctx) throw new Error('photo_encode_failed');
                 ctx.translate(cw, 0); ctx.scale(-1, 1);
                 ctx.drawImage(video, 0, 0, cw, ch);
-                const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.6));
+                const blob = await canvasToJpegBlob(canvas);
+                ensureCaptureAttemptActive(attemptId);
                 if (!blob) {
                     const photoErr = getPhotoProcessError();
                     throw new Error(photoErr.message);
                 }
                 console.log(`📸 壓縮: ${vw}x${vh} → ${cw}x${ch}, ${(blob.size/1024).toFixed(0)}KB`);
 
-                showStatus(statusBox, 'info', '☁️ 上傳中...');
+                attemptStage = 'upload';
+                showStatus(statusBox, 'info', '☁️ 照片上傳中...');
                 const fileName = `${currentEmployee.employee_number}_${Date.now()}.jpg`; 
                 const { error: uploadError } = await sb.storage.from(CONFIG.BUCKET).upload(fileName, blob);
+                ensureCaptureAttemptActive(attemptId);
                 if (uploadError) throw uploadError;
 
                 const { data: urlData } = sb.storage.from(CONFIG.BUCKET).getPublicUrl(fileName);
@@ -818,11 +940,14 @@
                 if (!publicUrl) throw new Error('無法取得照片網址');
 
                 // ===== GPS 精度檢查 =====
+                attemptStage = 'gps';
                 showStatus(statusBox, 'info', '📍 定位中...');
                 let loc;
                 try {
                     loc = await resolveGpsLocation();
+                    ensureCaptureAttemptActive(attemptId);
                 } catch(gpsErr) {
+                    ensureCaptureAttemptActive(attemptId);
                     clearTimeout(safetyTimer);
                     logCheckinFailure({
                         stage: 'gps',
@@ -838,6 +963,7 @@
                     return;
                 }
                 loc = await refineGpsIfNeeded(loc, statusBox);
+                ensureCaptureAttemptActive(attemptId);
 
                 if (loc.accuracy !== undefined) {
                     if (loc.accuracy < GPS_MIN_ACCURACY_M) {
@@ -860,20 +986,24 @@
                     if (currentCheckInType === 'in' && loc.accuracy > GPS_MAX_ACCURACY_M && !currentEmployee?.gps_relaxed) {
                         showStatus(statusBox, 'info', `📍 GPS 精度 ${Math.round(loc.accuracy)}m，改送主管審核...`);
                         const pending = await submitLowAccuracyReviewRequest('check_in', loc, publicUrl);
+                        ensureCaptureAttemptActive(attemptId);
                         clearTimeout(safetyTimer);
                         showLowAccuracyPendingSuccess(pending.typeText, pending.nowParts, loc);
                         return;
                     }
                 }
 
+                attemptStage = 'rpc';
                 const rpcAction = currentCheckInType === 'in' ? 'check_in' : 'check_out';
+                showStatus(statusBox, 'info', `🕐 正在送出${rpcAction === 'check_in' ? '上班' : '下班'}打卡...`);
                 const { data: rpcData, error: rpcError } = await submitCheckInRpc(rpcAction, loc, publicUrl);
-
-                clearTimeout(safetyTimer);
+                ensureCaptureAttemptActive(attemptId);
 
                 if (rpcError || !rpcData?.success) {
-                    if (!rpcError && await submitOutsideRangeReviewIfAllowed(rpcData, rpcAction, loc, publicUrl, statusBox)) {
-                        return;
+                    if (!rpcError) {
+                        const submittedForReview = await submitOutsideRangeReviewIfAllowed(rpcData, rpcAction, loc, publicUrl, statusBox);
+                        ensureCaptureAttemptActive(attemptId);
+                        if (submittedForReview) return;
                     }
                     logCheckinFailure({
                         stage: 'rpc',
@@ -902,14 +1032,16 @@
 
             } catch (err) {
                 clearTimeout(safetyTimer);
+                if (err?._captureCancelled) return;
                 stopCamera();
                 console.error(err);
                 const photoErr = getPhotoProcessError();
-                const isPhotoError = (err.message || '').includes(photoErr.message) || (err.message || '').includes('blob.size');
+                const isPhotoError = attemptStage === 'photo' || (err.message || '').includes(photoErr.message) || (err.message || '').includes('blob.size') || err?.message === 'photo_encode_failed';
                 if (!err?._logged) {
                     logCheckinFailure({
-                        stage: isPhotoError ? 'photo' : 'system',
-                        code: (err?.message || 'unknown_error').slice(0, 80)
+                        stage: isPhotoError ? 'photo' : attemptStage,
+                        code: (err?.message || 'unknown_error').slice(0, 80),
+                        detail: { attempt_stage: attemptStage }
                     });
                 }
                 const mapped = mapCheckinError(null, null);
@@ -918,6 +1050,9 @@
                     isPhotoError ? photoErr.message : (err.message || mapped.message),
                     true
                 );
+            } finally {
+                clearTimeout(safetyTimer);
+                if (activeCaptureAttemptId === attemptId) activeCaptureAttemptId = 0;
             }
         }
 
@@ -981,39 +1116,68 @@
             const statusBox = document.getElementById('checkInStatus');
             const btn = document.getElementById('captureBtn');
             btn.disabled = true; btn.textContent = '處理中...';
+            const attemptId = ++captureAttemptSequence;
+            activeCaptureAttemptId = attemptId;
+            let attemptStage = 'photo';
+            const safetyTimer = setTimeout(() => {
+                if (activeCaptureAttemptId !== attemptId) return;
+                activeCaptureAttemptId = 0;
+                logCheckinFailure({
+                    stage: attemptStage,
+                    code: 'operation_timeout',
+                    detail: { attempt_stage: attemptStage, timeout_ms: CHECKIN_OPERATION_TIMEOUT_MS, capture_mode: 'system_camera' }
+                });
+                URL.revokeObjectURL(objectUrl);
+                input.value = '';
+                btn.disabled = false;
+                btn.textContent = '📸 開啟相機拍照';
+                showStatus(statusBox, 'warning', `⚠️ ${attemptStage === 'photo' ? '照片處理' : attemptStage === 'upload' ? '照片上傳' : attemptStage === 'gps' ? '定位' : '送出打卡'}逾時，請重試`);
+            }, CHECKIN_OPERATION_TIMEOUT_MS);
 
             // 壓縮圖片後上傳打卡
             const img = new Image();
+            const objectUrl = URL.createObjectURL(file);
             img.onload = async () => {
                 try {
+                    ensureCaptureAttemptActive(attemptId);
                     const canvas = document.getElementById('canvas');
                     const MAX_W = 800, MAX_H = 600;
                     let cw = img.width, ch = img.height;
+                    if (cw <= 0 || ch <= 0) throw new Error('photo_encode_failed');
                     if (cw > MAX_W) { ch = Math.round(ch * MAX_W / cw); cw = MAX_W; }
                     if (ch > MAX_H) { cw = Math.round(cw * MAX_H / ch); ch = MAX_H; }
                     canvas.width = cw; canvas.height = ch;
-                    canvas.getContext('2d').drawImage(img, 0, 0, cw, ch);
-                    const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.6));
+                    const ctx = canvas.getContext('2d');
+                    if (!ctx) throw new Error('photo_encode_failed');
+                    ctx.drawImage(img, 0, 0, cw, ch);
+                    showStatus(statusBox, 'info', '📸 照片處理中...');
+                    const blob = await canvasToJpegBlob(canvas);
+                    ensureCaptureAttemptActive(attemptId);
                     if (!blob) {
                         const photoErr = getPhotoProcessError();
                         throw new Error(photoErr.message);
                     }
                     console.log(`📸 capture 壓縮: ${img.width}x${img.height} → ${cw}x${ch}, ${(blob.size/1024).toFixed(0)}KB`);
 
-                    showStatus(statusBox, 'info', '☁️ 上傳中...');
+                    attemptStage = 'upload';
+                    showStatus(statusBox, 'info', '☁️ 照片上傳中...');
                     const fileName = `${currentEmployee.employee_number}_${Date.now()}.jpg`;
                     const { error: uploadError } = await sb.storage.from(CONFIG.BUCKET).upload(fileName, blob);
+                    ensureCaptureAttemptActive(attemptId);
                     if (uploadError) throw uploadError;
 
                     const { data: urlData } = sb.storage.from(CONFIG.BUCKET).getPublicUrl(fileName);
                     const publicUrl = urlData?.publicUrl || urlData?.publicURL;
                     if (!publicUrl) throw new Error('無法取得照片網址');
 
+                    attemptStage = 'gps';
                     showStatus(statusBox, 'info', '📍 定位中...');
                     let loc;
                     try {
                         loc = await resolveGpsLocation();
+                        ensureCaptureAttemptActive(attemptId);
                     } catch(gpsErr) {
+                        ensureCaptureAttemptActive(attemptId);
                         logCheckinFailure({
                             stage: 'gps',
                             code: describeGpsError(gpsErr),
@@ -1028,6 +1192,7 @@
                         return;
                     }
                     loc = await refineGpsIfNeeded(loc, statusBox);
+                    ensureCaptureAttemptActive(attemptId);
                     if (loc.accuracy !== undefined) {
                         if (loc.accuracy < GPS_MIN_ACCURACY_M) {
                             logCheckinFailure({
@@ -1042,17 +1207,23 @@
                         if (currentCheckInType === 'in' && loc.accuracy > GPS_MAX_ACCURACY_M && !currentEmployee?.gps_relaxed) {
                             showStatus(statusBox, 'info', `📍 GPS 精度 ${Math.round(loc.accuracy)}m，改送主管審核...`);
                             const pending = await submitLowAccuracyReviewRequest('check_in', loc, publicUrl);
+                            ensureCaptureAttemptActive(attemptId);
                             showLowAccuracyPendingSuccess(pending.typeText, pending.nowParts, loc);
                             return;
                         }
                     }
 
+                    attemptStage = 'rpc';
                     const rpcAction2 = currentCheckInType === 'in' ? 'check_in' : 'check_out';
+                    showStatus(statusBox, 'info', `🕐 正在送出${rpcAction2 === 'check_in' ? '上班' : '下班'}打卡...`);
                     const { data: rpcData, error: rpcError } = await submitCheckInRpc(rpcAction2, loc, publicUrl);
+                    ensureCaptureAttemptActive(attemptId);
 
                     if (rpcError || !rpcData?.success) {
-                        if (!rpcError && await submitOutsideRangeReviewIfAllowed(rpcData, rpcAction2, loc, publicUrl, statusBox)) {
-                            return;
+                        if (!rpcError) {
+                            const submittedForReview = await submitOutsideRangeReviewIfAllowed(rpcData, rpcAction2, loc, publicUrl, statusBox);
+                            ensureCaptureAttemptActive(attemptId);
+                            if (submittedForReview) return;
                         }
                         logCheckinFailure({
                             stage: 'rpc',
@@ -1077,13 +1248,15 @@
 
                     showCheckInSuccess(actualType + overnightHint, locText, nowTime);
                 } catch(err) {
+                    if (err?._captureCancelled) return;
                     console.error(err);
                     const photoErr = getPhotoProcessError();
-                    const isPhotoError = (err.message || '').includes(photoErr.message) || (err.message || '').includes('blob.size');
+                    const isPhotoError = attemptStage === 'photo' || (err.message || '').includes(photoErr.message) || (err.message || '').includes('blob.size') || err?.message === 'photo_encode_failed';
                     if (!err?._logged) {
                         logCheckinFailure({
-                            stage: isPhotoError ? 'photo' : 'system',
-                            code: (err?.message || 'unknown_error').slice(0, 80)
+                            stage: isPhotoError ? 'photo' : attemptStage,
+                            code: (err?.message || 'unknown_error').slice(0, 80),
+                            detail: { attempt_stage: attemptStage, capture_mode: 'system_camera' }
                         });
                     }
                     showCheckinError(
@@ -1091,15 +1264,31 @@
                         isPhotoError ? photoErr.message : (err.message || '打卡失敗，請重試'),
                         true
                     );
+                } finally {
+                    clearTimeout(safetyTimer);
+                    URL.revokeObjectURL(objectUrl);
+                    input.value = '';
+                    if (activeCaptureAttemptId === attemptId) activeCaptureAttemptId = 0;
                 }
             };
             img.onerror = () => {
+                const wasActive = activeCaptureAttemptId === attemptId;
+                clearTimeout(safetyTimer);
+                URL.revokeObjectURL(objectUrl);
+                input.value = '';
+                if (activeCaptureAttemptId === attemptId) activeCaptureAttemptId = 0;
+                if (!wasActive) return;
                 const photoErr = getPhotoProcessError();
+                logCheckinFailure({
+                    stage: 'photo',
+                    code: 'image_load_failed',
+                    detail: { capture_mode: 'system_camera' }
+                });
                 showCheckinError(photoErr.title, photoErr.message, true);
                 btn.disabled = false;
                 btn.textContent = '📸 開啟相機拍照';
             };
-            img.src = URL.createObjectURL(file);
+            img.src = objectUrl;
         }
 
         // ===== 打卡錯誤 Modal =====
