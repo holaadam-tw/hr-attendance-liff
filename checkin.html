@@ -416,7 +416,9 @@
         const CAMERA_FRAME_TIMEOUT_MS = 5000;
         const CHECKIN_OPERATION_TIMEOUT_MS = 60000;
         const HEALTH_NETWORK_TIMEOUT_MS = 8000;
-        const CHECKIN_HEALTH_VERSION = '20260810.1';
+        const HEALTH_GPS_TIMEOUT_MS = 7000;
+        const HEALTH_GPS_PERMISSION_TIMEOUT_MS = 500;
+        const CHECKIN_HEALTH_VERSION = '20260810.2';
 
         let gpsPermissionState = 'unknown';
         let captureAttemptSequence = 0;
@@ -870,11 +872,23 @@
             return { name, status, code, message, action, elapsedMs: Math.max(0, Date.now() - startedAt) };
         }
 
+        function getHealthGpsSettingsAction() {
+            const platform = getHealthPlatform();
+            if (platform.startsWith('Android')) {
+                return 'Android：先開啟手機「位置」；再到「設定 → 應用程式 → LINE → 權限 → 位置」，選擇「使用 App 期間允許」並開啟精確位置。';
+            }
+            if (platform.startsWith('iOS')) {
+                return 'iPhone：設定 → 隱私權與安全性 → 定位服務 → 開啟；再選 LINE → 使用 App 期間，並開啟精確位置。';
+            }
+            return '先開啟手機定位服務，再到 LINE 的應用程式權限中允許使用定位。';
+        }
+
         function makeHealthFailure(name, error, startedAt) {
             const code = error?.code || error?.name || error?.message || 'unexpected_error';
             if (name === '網路連線') return makeHealthResult(name, 'error', code === 'AbortError' ? 'network_timeout' : 'network_failed', '正式打卡網站目前連不上。', '切換 Wi-Fi／行動網路後重新檢查。', startedAt);
-            if (name === '定位' && (error?.code === 1 || code === 'PERMISSION_DENIED')) return makeHealthResult(name, 'error', 'gps_permission_denied', 'LINE 沒有定位權限。', 'iPhone 設定 → 隱私權與安全性 → 定位服務 → LINE → 使用 App 期間，並開啟精確位置。', startedAt);
-            if (name === '定位') return makeHealthResult(name, 'error', code, '目前抓不到定位。', '移到窗邊、確認網路後重新檢查。', startedAt);
+            if (name === '定位' && (error?.code === 1 || code === 'PERMISSION_DENIED')) return makeHealthResult(name, 'error', 'gps_permission_denied', '定位權限已關閉，現在無法使用打卡定位。', getHealthGpsSettingsAction(), startedAt);
+            if (name === '定位' && (error?.code === 2 || code === 'geolocation_unavailable' || code === 'POSITION_UNAVAILABLE')) return makeHealthResult(name, 'error', 'gps_unavailable_or_disabled', '手機目前無法提供定位。最常見原因是「定位服務」沒有開啟。', getHealthGpsSettingsAction(), startedAt);
+            if (name === '定位') return makeHealthResult(name, 'error', 'gps_timeout_or_disabled', '7 秒內收不到定位。最常見原因是手機「定位服務」未開啟，或 LINE 沒有定位權限。', getHealthGpsSettingsAction() + ' 開啟後回到 LINE，再按一次重新檢查。', startedAt);
             if (name === '相機與照片' && (code === 'NotAllowedError' || code === 'PermissionDeniedError')) return makeHealthResult(name, 'error', 'camera_permission_denied', 'LINE 沒有相機權限。', 'iPhone 設定 → LINE → 開啟相機，關閉 LINE 後重試。', startedAt);
             if (name === '相機與照片') return makeHealthResult(name, 'error', code, '相機畫面或照片處理沒有完成。', '關閉 LINE 後重新開啟，並確認 LINE 的相機權限。', startedAt);
             return makeHealthResult(name, 'error', code, '檢查沒有完成。', '關閉 LINE 後重新開啟再試。', startedAt);
@@ -897,23 +911,93 @@
             ].join('\n');
         }
 
+        async function readHealthGpsPermission() {
+            if (!navigator.permissions?.query) return gpsPermissionState;
+            let timer = null;
+            try {
+                const result = await Promise.race([
+                    navigator.permissions.query({ name: 'geolocation' }),
+                    new Promise(resolve => { timer = setTimeout(() => resolve(null), HEALTH_GPS_PERMISSION_TIMEOUT_MS); })
+                ]);
+                const state = result?.state || gpsPermissionState;
+                if (state && state !== 'unknown') gpsPermissionState = state;
+                return state;
+            } catch (_) {
+                return gpsPermissionState;
+            } finally {
+                if (timer) clearTimeout(timer);
+            }
+        }
+
+        async function getHealthGpsLocation(timeoutMs = HEALTH_GPS_TIMEOUT_MS) {
+            const permission = await readHealthGpsPermission();
+            if (permission === 'denied') {
+                throw Object.assign(new Error('gps_permission_denied'), { code: 1 });
+            }
+            if (!navigator.geolocation?.getCurrentPosition) {
+                throw Object.assign(new Error('geolocation_unavailable'), { code: 'geolocation_unavailable' });
+            }
+            return new Promise((resolve, reject) => {
+                let settled = false;
+                const finish = (value, isError = false) => {
+                    if (settled) return;
+                    settled = true;
+                    clearTimeout(timer);
+                    if (isError) reject(value); else resolve(value);
+                };
+                const timer = setTimeout(() => {
+                    finish(Object.assign(new Error('health_gps_timeout'), { code: 3 }), true);
+                }, timeoutMs);
+                navigator.geolocation.getCurrentPosition(
+                    position => {
+                        const coords = position?.coords || {};
+                        if (!Number.isFinite(coords.latitude) || !Number.isFinite(coords.longitude)) {
+                            finish(Object.assign(new Error('gps_no_coords'), { code: 2 }), true);
+                            return;
+                        }
+                        finish({ latitude: coords.latitude, longitude: coords.longitude, accuracy: coords.accuracy });
+                    },
+                    error => finish(error || Object.assign(new Error('gps_unavailable'), { code: 2 }), true),
+                    { enableHighAccuracy: true, timeout: timeoutMs, maximumAge: 0 }
+                );
+            });
+        }
+
         function renderCheckinHealthResults(done = false) {
             const panel = document.getElementById('healthCheckPanel');
             if (!panel) return;
             panel.style.display = 'block';
             const allOk = healthCheckResults.length === 4 && healthCheckResults.every(item => item.status === 'ok');
+            const hasError = healthCheckResults.some(item => item.status === 'error');
+            const hasWarn = healthCheckResults.some(item => item.status === 'warn');
             const title = done
-                ? (allOk ? '✅ 這支手機目前可進行打卡' : '⚠️ 有項目需要處理')
+                ? (allOk ? '✅ 這支手機目前可進行打卡' : hasError ? '❌ 目前可能無法打卡，請先處理紅色項目' : '⚠️ 還有項目尚未完成')
                 : '⏳ 正在檢查，請保持畫面開啟';
             const items = healthCheckResults.map(item => {
                 const icon = item.status === 'ok' ? '✅' : item.status === 'warn' ? '🟡' : '❌';
+                const itemStyle = item.status === 'ok'
+                    ? 'background:#F0FDF4;border:1px solid #86EFAC;border-left:6px solid #16A34A;'
+                    : item.status === 'warn'
+                        ? 'background:#FFFBEB;border:1px solid #FCD34D;border-left:6px solid #D97706;'
+                        : 'background:#FEF2F2;border:2px solid #F87171;border-left:7px solid #DC2626;';
+                const statusLabel = item.status === 'ok' ? '正常' : item.status === 'warn' ? '尚未完成' : '需要立即處理';
                 const manual = item.code === 'manual_photo_required'
                     ? '<button onclick="startHealthCaptureTest()" style="margin-top:6px;padding:8px 12px;border:0;border-radius:9px;background:#4F46E5;color:#fff;font-weight:700;">📸 拍一張測試照（不會上傳）</button>'
                     : '';
-                return `<div style="padding:8px 0;border-bottom:1px solid #E2E8F0;"><b>${icon} ${escapeHTML(item.name)}</b> <span style="color:#64748B;">${item.elapsedMs}ms</span><br>${escapeHTML(item.message)}${item.action ? `<br><span style="color:#B45309;">處理方式：${escapeHTML(item.action)}</span>` : ''}${manual}</div>`;
+                const action = item.action
+                    ? `<div style="margin-top:7px;padding:8px;border-radius:8px;background:${item.status === 'error' ? '#FEF3C7' : '#FFF7ED'};color:#92400E;font-weight:800;">👉 請照這樣處理：${escapeHTML(item.action)}</div>`
+                    : '';
+                return `<div style="${itemStyle}padding:10px;margin:8px 0;border-radius:10px;"><div style="display:flex;justify-content:space-between;gap:8px;align-items:center;"><b style="font-size:14px;">${icon} ${escapeHTML(item.name)}｜${statusLabel}</b><span style="color:#64748B;white-space:nowrap;">${item.elapsedMs}ms</span></div><div style="margin-top:5px;font-weight:${item.status === 'error' ? '800' : '500'};color:${item.status === 'error' ? '#991B1B' : '#334155'};">${escapeHTML(item.message)}</div>${action}${manual}</div>`;
             }).join('');
-            panel.innerHTML = `<div style="font-size:14px;font-weight:900;color:${allOk ? '#047857' : '#9A3412'};margin-bottom:4px;">${title}</div>` +
-                '<div style="color:#64748B;margin-bottom:6px;">只測試目前手機，不會打卡、不會上傳照片，也不會寫入資料庫。</div>' + items +
+            const panelMode = !done ? 'running' : allOk ? 'ok' : hasError ? 'error' : hasWarn ? 'warn' : 'running';
+            panel.style.background = panelMode === 'error' ? '#FFF1F2' : panelMode === 'ok' ? '#ECFDF5' : panelMode === 'warn' ? '#FFFBEB' : '#EFF6FF';
+            panel.style.border = panelMode === 'error' ? '3px solid #DC2626' : panelMode === 'ok' ? '2px solid #10B981' : panelMode === 'warn' ? '2px solid #D97706' : '2px solid #60A5FA';
+            panel.style.boxShadow = panelMode === 'error' ? '0 0 0 4px rgba(220,38,38,.12)' : 'none';
+            const titleStyle = panelMode === 'error'
+                ? 'background:#B91C1C;color:#fff;padding:11px;border-radius:9px;'
+                : `color:${allOk ? '#047857' : '#9A3412'};padding:3px 0;`;
+            panel.innerHTML = `<div style="font-size:15px;font-weight:900;margin-bottom:7px;${titleStyle}">${title}</div>` +
+                '<div style="color:#475569;margin-bottom:7px;font-weight:600;">只測試目前手機，不會打卡、不會上傳照片，也不會寫入資料庫。</div>' + items +
                 (done ? `<pre style="white-space:pre-wrap;background:#fff;border:1px solid #E2E8F0;border-radius:10px;padding:9px;margin:10px 0 0;font-size:11px;">${escapeHTML(buildHealthSafeSummary(healthCheckResults))}</pre>` : '');
         }
 
@@ -974,7 +1058,7 @@
                     return makeHealthResult('相機與照片', 'ok', 'camera_photo_ready', '相機畫面與照片處理正常。', '', startedAt);
                 });
                 await run('定位', async startedAt => {
-                    const loc = await resolveGpsLocation();
+                    const loc = await getHealthGpsLocation();
                     if (!Number.isFinite(loc?.latitude) || !Number.isFinite(loc?.longitude)) throw Object.assign(new Error('gps_no_coords'), { code: 'gps_no_coords' });
                     const level = !Number.isFinite(loc.accuracy) ? '已取得定位' : loc.accuracy <= GPS_MAX_ACCURACY_M ? `精度正常（約 ${Math.round(loc.accuracy)} 公尺）` : `精度較慢（約 ${Math.round(loc.accuracy)} 公尺）`;
                     return makeHealthResult('定位', 'ok', 'gps_ready', level + '。', '', startedAt);
