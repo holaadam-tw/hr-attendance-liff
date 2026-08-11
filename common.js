@@ -840,7 +840,8 @@ async function loadTodayPendingMakeups(today) {
     try {
         const { data, error } = await sb.rpc('get_my_makeup_requests', {
             p_line_user_id: liffProfile.userId,
-            p_limit: 50
+            p_limit: 50,
+            p_company_id: window.currentCompanyId || null
         });
 
         if (error) throw error;
@@ -904,11 +905,37 @@ async function checkTodayAttendance() {
     }
 }
 
+function getTodayPendingPunchState(pendingMakeups = todayPendingMakeups) {
+    const rows = Array.isArray(pendingMakeups)
+        ? pendingMakeups.filter(row => row && row.status === 'pending')
+        : [];
+    const normalizeType = row => String(row?.punch_type || '').toLowerCase();
+    return {
+        pendingIn: rows.find(row => ['clock_in', 'check_in'].includes(normalizeType(row))) || null,
+        pendingOut: rows.find(row => ['clock_out', 'check_out'].includes(normalizeType(row))) || null
+    };
+}
+window.getTodayPendingPunchState = getTodayPendingPunchState;
+
+function formatPendingPunchTime(row) {
+    const raw = String(row?.punch_time || '').slice(0, 5);
+    return /^\d{2}:\d{2}$/.test(raw) ? raw : '';
+}
+
+function getYesterdayMissingCheckoutReminderHtml() {
+    const row = window._yesterdayForgotCheckout;
+    if (!row) return '';
+    const yDate = String(row.date || '');
+    const mdLabel = /^\d{4}-\d{2}-\d{2}$/.test(yDate) ? yDate.slice(5).replace('-', '/') : '昨日';
+    return `<br>⚠️ ${escapeHTML(mdLabel)} 未打下班卡，請申請補打卡 <a href="records.html#makeup" style="color:#B91C1C;text-decoration:underline;font-weight:700;margin-left:6px;">前往補打卡</a>`;
+}
+
 function updateCheckInButtons() {
     const btnIn = document.getElementById('checkInBtn');
     const btnOut = document.getElementById('checkOutBtn');
     const statusBox = document.getElementById('checkInStatusBox');
     const lastLoc = localStorage.getItem('last_location') || '公司';
+    const { pendingIn, pendingOut } = getTodayPendingPunchState();
 
     if (!btnIn || !btnOut || !statusBox) return;
 
@@ -918,13 +945,25 @@ function updateCheckInButtons() {
         btnOut.classList.remove('disabled');
         const yLoc = window._pendingCheckout.check_in_location || lastLoc;
         showStatus(statusBox, 'info', `🌙 昨日上班中 @ ${escapeHTML(yLoc)}（待下班打卡）`);
+    } else if (!todayAttendance && pendingOut) {
+        // 今日下班已送待審：防止重複上班或重複送下班
+        btnIn.classList.add('disabled');
+        btnOut.classList.add('disabled');
+        const pendingTime = formatPendingPunchTime(pendingOut);
+        const timeText = pendingTime ? `（${escapeHTML(pendingTime)}）` : '';
+        showStatus(statusBox, 'warning', `⏳ 今日下班卡${timeText}已送主管審核，請勿重複打卡。${getYesterdayMissingCheckoutReminderHtml()}`, true);
+    } else if (!todayAttendance && pendingIn) {
+        // migration 107 已允許：今日上班補卡待審時可先完成下班打卡
+        btnIn.classList.add('disabled');
+        btnOut.classList.remove('disabled');
+        const pendingTime = formatPendingPunchTime(pendingIn);
+        const timeText = pendingTime ? ` ${escapeHTML(pendingTime)}` : '';
+        showStatus(statusBox, 'warning', `⏳ 今日${timeText} 上班卡待主管審核；<strong>下班按鈕已開放，可以先打下班卡。</strong>${getYesterdayMissingCheckoutReminderHtml()}`, true);
     } else if (!todayAttendance && window._yesterdayForgotCheckout) {
         // 一般日班昨日忘打下班：今天仍可正常上班打卡，同時提示補打卡
         btnIn.classList.remove('disabled');
         btnOut.classList.add('disabled');
-        const yDate = window._yesterdayForgotCheckout.date || '';
-        const mdLabel = yDate ? yDate.slice(5).replace('-', '/') : '昨日';
-        showStatus(statusBox, 'error', `⚠️ ${mdLabel} 未打下班卡，請申請補打卡 <a href="records.html#makeup" style="color:#B91C1C;text-decoration:underline;font-weight:700;margin-left:6px;">前往補打卡</a>`, true);
+        showStatus(statusBox, 'error', getYesterdayMissingCheckoutReminderHtml().replace(/^<br>/, ''), true);
     } else if (!todayAttendance) {
         btnIn.classList.remove('disabled');
         btnOut.classList.add('disabled');

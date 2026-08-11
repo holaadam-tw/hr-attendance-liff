@@ -264,7 +264,7 @@
         </div>
     </div>
 
-    <script src="common.js?v=20260806-pweye"></script>
+    <script src="common.js?v=20260811-pendingcheckout"></script>
     <script>
         // === 全域錯誤監控 ===
         window._errLogCount = 0; window._errLogResetTs = 0;
@@ -388,8 +388,11 @@
             const data = todayAttendance;
             const badgeEl = document.getElementById('userStatusBadge');
             const pendingMakeups = Array.isArray(window.todayPendingMakeups) ? window.todayPendingMakeups : [];
-            const pendingIn = pendingMakeups.find(r => r.status === 'pending' && r.punch_type === 'clock_in');
-            const pendingOut = pendingMakeups.find(r => r.status === 'pending' && r.punch_type === 'clock_out');
+            const pendingState = typeof window.getTodayPendingPunchState === 'function'
+                ? window.getTodayPendingPunchState(pendingMakeups)
+                : { pendingIn: null, pendingOut: null };
+            const pendingIn = pendingState.pendingIn;
+            const pendingOut = pendingState.pendingOut;
             const checkinTimeEl = document.getElementById('todayCheckinTime');
             const checkinStatusEl = document.getElementById('todayCheckinStatus');
             const checkinCardEl = document.getElementById('todayCheckinCard');
