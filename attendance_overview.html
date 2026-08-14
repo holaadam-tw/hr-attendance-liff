@@ -134,12 +134,12 @@
                 <div class="stat-card" style="background:#F3F4F6;"><div class="stat-num" style="color:#6B7280;" id="dLeave">0</div><div class="stat-label" style="color:#6B7280;">請假</div></div>
             </div>
 
-            <!-- 缺卡追蹤（下班未打卡，僅大正科技） -->
+            <!-- 考勤異常追蹤（未下班卡 + 應上班時數不足，僅大正科技） -->
             <div id="anomalyCard" style="display:none;margin-bottom:16px;">
                 <div style="padding:14px 18px;background:#FFF7ED;border:2px solid #FDBA74;border-radius:14px;">
                     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
                         <span style="font-size:20px;">⏰</span>
-                        <span style="font-weight:700;font-size:14px;color:#9A3412;">缺卡追蹤</span>
+                        <span style="font-weight:700;font-size:14px;color:#9A3412;">考勤異常追蹤</span>
                         <span id="anomalyPendingBadge" style="font-size:12px;font-weight:800;color:#C2410C;background:#FFEDD5;border-radius:999px;padding:4px 8px;"></span>
                     </div>
                     <div id="anomalyList" style="margin-top:10px;"></div>
@@ -447,7 +447,7 @@
         </div>
     </div>
 
-    <script src="common.js?v=20260811-pendingcheckout"></script>
+<script src="common.js?v=20260814-leavetimeaudit"></script>
     <script>
         let dailyData = [];
         let monthlyData = [];
@@ -1184,6 +1184,7 @@
         function anomalyResolutionLabel(resolution) {
             if (resolution === 'makeup') return '補卡結案';
             if (resolution === 'leave') return '請假結案';
+            if (resolution === 'system_reconciled') return '系統重新核對結案';
             return '手動結案';
         }
 
@@ -1197,7 +1198,7 @@
 
             let html = '';
             if (pending.length === 0) {
-                html += '<div style="font-size:12px;color:#92400E;">目前沒有待處理的缺卡</div>';
+                html += '<div style="font-size:12px;color:#92400E;">目前沒有待處理的考勤異常</div>';
             }
             pending.forEach(r => {
                 const notifyText = r.notify_count > 0 ? '已提醒 ' + r.notify_count + ' 次' : '尚未通知';
@@ -1205,11 +1206,13 @@
                     + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
                     + '<span style="font-size:13px;font-weight:800;color:#9A3412;">' + escapeHTML((r.date || '').slice(5).replace('-', '/')) + '</span>'
                     + '<span style="font-size:13px;font-weight:700;color:#0F172A;">' + escapeHTML(r.employee_name) + (r.employee_number ? '（' + escapeHTML(r.employee_number) + '）' : '') + '</span>'
-                    + '<span style="font-size:11px;color:#B45309;">下班未打卡 · 第 ' + escapeHTML(String(r.days_outstanding)) + ' 天 · ' + escapeHTML(notifyText) + '</span>'
+                    + '<span style="font-size:11px;color:#B45309;">'
+                    + escapeHTML(r.anomaly_type === 'missing_work_hours' ? ('應上班時數不足 ' + Number(r.missing_minutes || 0) + ' 分鐘') : '下班未打卡')
+                    + ' · 第 ' + escapeHTML(String(r.days_outstanding)) + ' 天 · ' + escapeHTML(notifyText) + '</span>'
                     + anomalyActionChip(r)
                     + '</div>'
                     + '<div style="display:flex;gap:6px;">'
-                    + '<button onclick="openAdminMakeup({employeeId:\'' + escapeHTML(r.employee_id) + '\',date:\'' + escapeHTML(r.date) + '\',type:\'clock_out\'})" style="border:none;background:#C2410C;color:#fff;font-size:12px;font-weight:700;border-radius:8px;padding:4px 10px;cursor:pointer;">補登下班</button>'
+                    + (r.anomaly_type === 'missing_work_hours' ? '' : '<button onclick="openAdminMakeup({employeeId:\'' + escapeHTML(r.employee_id) + '\',date:\'' + escapeHTML(r.date) + '\',type:\'clock_out\'})" style="border:none;background:#C2410C;color:#fff;font-size:12px;font-weight:700;border-radius:8px;padding:4px 10px;cursor:pointer;">補登下班</button>')
                     + '<button onclick="resolveAnomaly(\'' + escapeHTML(r.id) + '\')" style="border:1px solid #FDBA74;background:#fff;color:#C2410C;font-size:12px;font-weight:700;border-radius:8px;padding:4px 10px;cursor:pointer;">結案</button>'
                     + '</div>'
                     + '</div>';

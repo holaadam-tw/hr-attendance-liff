@@ -101,7 +101,7 @@ export function initAuditPage() {
     }
 }
 
-// 上班基準（全員 08:00）→ 遲到分鐘 = 打卡時間 − 08:00，從 08:00 起算不扣寬限。
+// 未排班時的預設上班基準；核准上午半天假會由共用函式調整為 13:00。
 const AUDIT_SHIFT_START_MIN = 8 * 60;
 
 // 台北時間的「當日分鐘數」（0~1439），用於算遲到分鐘
@@ -110,20 +110,9 @@ function taipeiMinutes(iso) {
     return parseInt(hm.slice(0, 2), 10) * 60 + parseInt(hm.slice(3, 5), 10);
 }
 
-// 一筆請假在本月內的時數：時假用 leave_hours、半天 4hr、整天 8hr×當月重疊天數
-function leaveHoursInMonth(l, startStr, endStr) {
-    const period = l.leave_period || 'full_day';
-    if (period === 'hourly') return Number(l.leave_hours) || 0;
-    if (period === 'am' || period === 'pm' || period === 'half_day') return 4;
-    const s = new Date(((l.start_date || startStr)) + 'T00:00:00+08:00');
-    const e = new Date(((l.end_date || l.start_date || endStr)) + 'T00:00:00+08:00');
-    const rs = new Date(startStr + 'T00:00:00+08:00');
-    const re = new Date(endStr + 'T00:00:00+08:00');
-    const os = s > rs ? s : rs;
-    const oe = e < re ? e : re;
-    if (oe < os) return 0;
-    const days = Math.round((oe - os) / 86400000) + 1;
-    return Math.max(0, days) * 8;
+// 整日假直接使用 DB 已排除休假日的 days；時數假優先使用實際起訖，舊資料才回退 leave_hours。
+function leaveHoursInMonth(leave) {
+    return window.getLeaveHoursForAudit?.(leave) || 0;
 }
 
 // 時數格式：8 → "8hr"，9.87 → "9hr52m"
@@ -160,7 +149,13 @@ export async function loadAuditData() {
             sb.from('employees').select('id, name, employee_number, department, status, salary_type, resigned_date').eq('company_id', window.currentCompanyId).eq('no_checkin', false).in('status', ['approved', 'resigned']),
             sb.rpc('get_company_current_salaries', { p_company_id: window.currentCompanyId, p_line_user_id: window.currentAdminEmployee?.line_user_id }),
             sb.from('attendance').select('employee_id, date, check_in_time, is_manual, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).gte('date', startDate).lte('date', endDate),
-            sb.from('leave_requests').select('employee_id, days, leave_type, leave_period, leave_hours, start_date, end_date, employees!leave_requests_employee_id_fkey!inner(company_id)').eq('employees.company_id', window.currentCompanyId).eq('status', 'approved').lte('start_date', endDate).gte('end_date', startDate),
+            sb.rpc('get_company_leave_requests_for_audit', {
+                p_company_id: window.currentCompanyId,
+                p_line_user_id: window.currentAdminEmployee?.line_user_id || liffProfile?.userId || null,
+                p_from: startDate,
+                p_to: endDate,
+                p_include_pending: false
+            }),
             // overtime_requests 改走 RPC（migration 109；110 收 RLS 後直接查表會查不到）
             sb.rpc('get_company_overtime_requests', {
                 p_company_id: window.currentCompanyId,
@@ -170,6 +165,7 @@ export async function loadAuditData() {
             sb.from('schedules').select('employee_id, date, is_off_day, employees!schedules_employee_id_fkey!inner(company_id)').eq('employees.company_id', window.currentCompanyId).gte('date', startDate).lte('date', endDate).then(r => r).catch(() => ({ data: [] }))
         ]);
         if (empRes.error) throw empRes.error;
+        if (leaveRes.error) throw leaveRes.error;
 
         const salaryMap = {};
         (salaryRes.data || []).forEach(s => { salaryMap[s.employee_id] = s; });
@@ -179,10 +175,12 @@ export async function loadAuditData() {
 
         // 請假：分成特休（annual）時數 與 其他假時數
         const leaveMap = {};
+        const approvedLeavesByEmployee = {};
         (leaveRes.data || []).forEach(l => {
-            const h = leaveHoursInMonth(l, startDate, endDate);
+            const h = leaveHoursInMonth(l);
             const m = leaveMap[l.employee_id] = leaveMap[l.employee_id] || { annualH: 0, otherH: 0 };
             if (l.leave_type === 'annual') m.annualH += h; else m.otherH += h;
+            (approvedLeavesByEmployee[l.employee_id] = approvedLeavesByEmployee[l.employee_id] || []).push(l);
         });
 
         // 加班：核准時數。不分 source_type——late_close_auto 現在是主管在打卡總覽
@@ -206,12 +204,14 @@ export async function loadAuditData() {
         const rows = (empRes.data || []).map(emp => {
             if (emp.status === 'resigned' && emp.resigned_date && emp.resigned_date < startDate) return null;
             const atts = attMap[emp.id] || [];
-            // 遲到分鐘：每筆打卡 max(0, 打卡−08:00) 累加；中午(12:00)後打卡標記為「疑似漏打上班卡」
+            // 遲到分鐘會扣除核准假：上午半天以 13:00 起算；時數假只在連續銜接上班起點時延後基準。
             const lateList = [];
             let lateMin = 0, afternoonCnt = 0;
             atts.filter(a => a.check_in_time).forEach(a => {
                 const cm = taipeiMinutes(a.check_in_time);
-                const late = cm - AUDIT_SHIFT_START_MIN;
+                const late = window.getLeaveAdjustedLateMinutes?.(
+                    cm, String(a.date).slice(0, 10), approvedLeavesByEmployee[emp.id] || [], AUDIT_SHIFT_START_MIN
+                ) ?? Math.max(0, cm - AUDIT_SHIFT_START_MIN);
                 if (late > 0) {
                     lateMin += late;
                     const afternoon = cm >= 12 * 60;

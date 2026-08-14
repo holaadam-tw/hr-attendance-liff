@@ -37,7 +37,7 @@ import {
     loadAdminLunchStats, loadStaffOverview, changeLeaveCal,
     resetLeaveCal, loadLeaveCal,
     clearLeaveState
-} from './leave.js?v=20260803-rpcauth';
+} from './leave.js?v=20260814-leavetimeaudit';
 
 import {
     changeShiftWeek, resetShiftWeek, loadShiftMgr, cycleShift,
@@ -64,7 +64,7 @@ import {
     editInsBracket, saveInsBracket, deleteInsBracket, updateAllInsRates,
     switchPayTab,
     initAuditPage, loadAuditData
-} from './payroll.js?v=20260806-batchfix';
+} from './payroll.js?v=20260814-leavetimeaudit';
 
 import {
     loadRestaurantList, openRestaurantDetail, previewStoreOrder, openKDS,

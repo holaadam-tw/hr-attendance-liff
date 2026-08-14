@@ -1224,7 +1224,7 @@ async function loadDailyPendingMakeupRequests() {
     return legacyRes.error ? reviewRes : legacyRes;
 }
 
-// === 缺卡追蹤（下班未打卡，僅大正科技 + 管理員模式） ===
+// === 考勤異常追蹤（未下班卡 + 應上班時數不足，僅大正科技 + 管理員模式） ===
 let anomalyData = [];
 
 function canViewAnomalies() {
@@ -1261,6 +1261,7 @@ function anomalyActionChip(r) {
 function anomalyResolutionLabel(resolution) {
     if (resolution === 'makeup') return t('anomalyResolutionMakeup');
     if (resolution === 'leave') return t('anomalyResolutionLeave');
+    if (resolution === 'system_reconciled') return '系統重新核對結案';
     return t('anomalyResolutionManual');
 }
 
@@ -1270,7 +1271,9 @@ function renderAnomalyCard() {
     if (!canViewAnomalies() || anomalyData.length === 0) { card.style.display = 'none'; return; }
     const pending = anomalyData.filter(r => r.status === 'pending');
     const resolved = anomalyData.filter(r => r.status === 'resolved');
-    document.getElementById('anomalyTitle').textContent = t('anomalyTitle');
+    document.getElementById('anomalyTitle').textContent = anomalyData.some(r => r.anomaly_type === 'missing_work_hours')
+        ? '⚠️ 考勤異常追蹤'
+        : t('anomalyTitle');
     document.getElementById('anomalyPendingBadge').textContent = t('anomalyPending', { n: pending.length });
 
     let html = '';
@@ -1283,7 +1286,11 @@ function renderAnomalyCard() {
             + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">'
             + '<span style="font-size:13px;font-weight:800;color:#9A3412;">' + esc((r.date || '').slice(5).replace('-', '/')) + '</span>'
             + '<span style="font-size:13px;font-weight:700;color:#0F172A;">' + esc(r.employee_name) + (r.employee_number ? '（' + esc(r.employee_number) + '）' : '') + '</span>'
-            + '<span style="font-size:11px;color:#B45309;">' + esc(t('anomalyMissingCheckout')) + ' · ' + esc(t('anomalyDaysOut', { n: r.days_outstanding })) + ' · ' + esc(notifyText) + '</span>'
+            + '<span style="font-size:11px;color:#B45309;">'
+            + esc(r.anomaly_type === 'missing_work_hours'
+                ? ('應上班時數不足 ' + Number(r.missing_minutes || 0) + ' 分鐘')
+                : t('anomalyMissingCheckout'))
+            + ' · ' + esc(t('anomalyDaysOut', { n: r.days_outstanding })) + ' · ' + esc(notifyText) + '</span>'
             + anomalyActionChip(r)
             + '</div>'
             + '<button onclick="resolveAnomaly(\'' + esc(r.id) + '\')" style="border:1px solid #FDBA74;background:#fff;color:#C2410C;font-size:12px;font-weight:700;border-radius:8px;padding:4px 10px;cursor:pointer;">' + esc(t('anomalyResolve')) + '</button>'
@@ -1959,16 +1966,16 @@ function getMonthRange() {
 
 async function loadMonthLeaveRequests() {
     const { startDate, endDate } = getMonthRange();
-    return runOptionalDailyQuery(sb.from('leave_requests')
-        .select('employee_id, leave_type, leave_period, days, leave_hours, start_date, end_date, status, employees!leave_requests_employee_id_fkey!inner(name, company_id)')
-        .eq('employees.company_id', companyId)
-        .in('status', ['approved', 'pending'])
-        .lte('start_date', endDate)
-        .gte('end_date', startDate)
-        .limit(1000));
+    return runOptionalDailyQuery(sb.rpc('get_company_leave_requests_for_audit', {
+        p_company_id: companyId,
+        p_line_user_id: currentLineUserId || null,
+        p_from: startDate,
+        p_to: endDate,
+        p_include_pending: true
+    }));
 }
 
-// 遲到分鐘口徑與薪酬「遲到/缺勤核對」一致：大正全員 08:00 起算，不扣寬限
+// 遲到分鐘口徑與薪酬「遲到/缺勤核對」一致；核准假會調整當日基準。
 const MONTHLY_LATE_BASELINE_MIN = 8 * 60;
 function monthlyLateApplies() { return companyId === DACHENG_COMPANY_ID; }
 function taipeiMinutesOfDay(iso) {
@@ -1976,11 +1983,33 @@ function taipeiMinutesOfDay(iso) {
     return parseInt(hm.slice(0, 2), 10) * 60 + parseInt(hm.slice(3, 5), 10);
 }
 
+function monthLeaveTimeToMinutes(value) {
+    const match = String(value || '').match(/^(\d{1,2}):(\d{2})/);
+    if (!match) return null;
+    const hours = Number(match[1]), minutes = Number(match[2]);
+    return hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59 ? hours * 60 + minutes : null;
+}
+
+function monthLeaveAdjustedLateMinutes(checkInMinutes, dateString, leaves) {
+    const approved = (leaves || []).filter(leave => leave.status === 'approved'
+        && dateString >= String(leave.start_date || '').slice(0, 10)
+        && dateString <= String(leave.end_date || leave.start_date || '').slice(0, 10));
+    if (approved.some(leave => (leave.leave_period || 'full_day') === 'full_day')) return 0;
+    let coveredUntil = MONTHLY_LATE_BASELINE_MIN;
+    if (approved.some(leave => leave.leave_period === 'am')) coveredUntil = Math.max(coveredUntil, 13 * 60);
+    approved.filter(leave => leave.leave_period === 'hourly')
+        .map(leave => ({ start: monthLeaveTimeToMinutes(leave.leave_start_time), end: monthLeaveTimeToMinutes(leave.leave_end_time) }))
+        .filter(range => range.start !== null && range.end !== null && range.end > range.start)
+        .sort((a, b) => a.start - b.start)
+        .forEach(range => { if (range.start <= coveredUntil && range.end > coveredUntil) coveredUntil = range.end; });
+    return Math.max(0, checkInMinutes - coveredUntil);
+}
+
 async function loadMonthLateAttendance() {
     if (!monthlyLateApplies()) return { data: [] };
     const { startDate, endDate } = getMonthRange();
     return runOptionalDailyQuery(sb.from('attendance')
-        .select('employee_id, check_in_time, employees!inner(company_id)')
+        .select('employee_id, date, check_in_time, employees!inner(company_id)')
         .eq('employees.company_id', companyId)
         .gte('date', startDate).lte('date', endDate)
         .not('check_in_time', 'is', null)
@@ -2001,7 +2030,10 @@ async function loadMonthlyData() {
     if (lateRes.error) console.warn('Load month late warning:', lateRes.error);
     monthLateMinutes = new Map();
     (lateRes.data || []).forEach(a => {
-        const late = taipeiMinutesOfDay(a.check_in_time) - MONTHLY_LATE_BASELINE_MIN;
+        const employeeLeaves = monthLeaveData.filter(l => l.employee_id === a.employee_id && l.status === 'approved');
+        const late = monthLeaveAdjustedLateMinutes(
+            taipeiMinutesOfDay(a.check_in_time), String(a.date).slice(0, 10), employeeLeaves
+        );
         if (late > 0) monthLateMinutes.set(a.employee_id, (monthLateMinutes.get(a.employee_id) || 0) + late);
     });
     renderLeaveCalendar();
@@ -2023,7 +2055,7 @@ const LEAVE_COLOR_PALETTE = [
     ['#FEF9C3', '#A16207'], ['#E7E5E4', '#57534E']
 ];
 
-function leaveEmployeeName(r) { return String(r?.employees?.name || '').trim(); }
+function leaveEmployeeName(r) { return String(r?.employee_name || r?.employees?.name || '').trim(); }
 
 function leaveChipTitle(r) {
     const name = leaveEmployeeName(r);
@@ -2099,20 +2131,17 @@ function renderLeaveCalendar() {
     grid.innerHTML = html;
 }
 
-// 一筆請假在本月內的時數（與 payroll.js leaveHoursInMonth 同口徑）：時假=leave_hours、半天=4hr、整天=8hr×當月重疊天數
+// 與 payroll.js 同口徑：整日假使用 DB 已排除休假日的 days；時數假優先用實際起訖。
 function monthLeaveHoursOf(l) {
-    const { startDate, endDate } = getMonthRange();
     const period = l.leave_period || 'full_day';
-    if (period === 'hourly') return Number(l.leave_hours) || 0;
+    if (period === 'hourly') {
+        const start = monthLeaveTimeToMinutes(l.leave_start_time);
+        const end = monthLeaveTimeToMinutes(l.leave_end_time);
+        if (start !== null && end !== null && end > start) return Math.round(((end - start) / 60) * 100) / 100;
+        return Number(l.leave_hours) || (Number(l.days) || 0) * 8;
+    }
     if (period === 'am' || period === 'pm' || period === 'half_day') return 4;
-    const s = parseLocalDate(l.start_date || startDate);
-    const e = parseLocalDate(l.end_date || l.start_date || endDate);
-    const rs = parseLocalDate(startDate);
-    const re = parseLocalDate(endDate);
-    const os = s > rs ? s : rs;
-    const oe = e < re ? e : re;
-    if (oe < os) return 0;
-    return Math.max(0, Math.round((oe - os) / 86400000) + 1) * 8;
+    return (Number(l.days) || 0) * 8;
 }
 
 function buildMonthLeaveHoursMap() {

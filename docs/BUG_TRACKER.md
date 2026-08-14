@@ -993,3 +993,7 @@ PostgREST（anon key，無寫入）另測兩種呼叫形狀都能正確解析：
 ## 2026-08-11 修復紀錄
 
 - **B50**（已修復、待手機實測）：同樣是「今日上班卡待主管審核」，部分員工可先下班、部分員工首頁卻必須等主管核准才出現下班按鈕。原因是 migration 107 後端已允許今日有 pending／approved 上班補卡時先寫下班，但 `common.js updateCheckInButtons()` 仍只認正式 attendance，沒有使用已載入的 `todayPendingMakeups`。修法：待審清單 RPC 補 `p_company_id` 限定目前公司；新增 `getTodayPendingPunchState()` 統一 `clock_in/check_in` 與 `clock_out/check_out`；狀態優先序固定為跨日班 → 下班待審 → 上班待審 → 昨日一般班漏下班 → 未上班。今日只有上班待審時停用重複上班、開放下班，若同時有昨日漏卡仍保留補卡提醒；今日下班已待審則停用兩按鈕防重送。所有 `common.js` 引用同步升為 `20260811-pendingcheckout`。新增 `tests/pending-checkout.test.js`，目標測試 18/18、完整 `npm test` 8/8 suites、UI 29/29、QA 0 FAIL／1 既有 WARN、RLS Hook 0 問題、多租戶 Hook 無新增警告、rls-checker PASS；沒有修改 migration 107、正式打卡 RPC 或資料庫結構。
+
+## 2026-08-14 修復紀錄
+
+- **B51**（已實作、隔離測試庫驗證通過、正式庫尚未套用）：考勤核對把上午半天假後的下午到班誤算成從 08:00 遲到，時數假只能手填整數時數，整日假又以日曆天重算，造成遲到與請假時數失真。修法：`migrations/113_hourly_leave_time_range.sql` 新增實際起訖時間與具公司隔離的新 RPC；時數假限定同一天並由 DB 自動計算。共用前端計算規則為核准上午半天從 13:00 判斷遲到，連續銜接上班起點的時數假才延後基準，待審假不抵遲到；整日假採 DB 已排除休假日的 `days`。`migrations/114_missing_work_hours_audit.sql` 新增隔日晚到、早退、整日無打卡稽核，沿用公司容忍分鐘，排除休假日、免打卡、公務機、跨日班、待審補卡與既有未下班異常，並通知員工 LINE、彙總主管群組；員工私訊及主管彙總皆保存每日通知標記，人工重跑排程不重複發送。2026-08-15 已在獨立 Free Plan 測試專案 `vtlvjbwqrvhfgivbmmaa` 套用 113/114，以虛構資料通過自動時數、半天假容忍、晚到、早退、整日無卡、跨租戶拒絕、掃描冪等及通知冪等實測；假 LINE Token 只取得兩筆 401，無真人收訊，測後已移除假設定並取消 cron。正式資料庫未存取、未套用。

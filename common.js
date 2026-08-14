@@ -1106,24 +1106,106 @@ function getLeaveTypeLabel(type, full = false) {
     return typeof tEmployee === 'function' ? tEmployee(key) : key;
 }
 
+function leaveTimeToMinutes(value) {
+    if (typeof value !== 'string') return null;
+    const match = value.match(/^(\d{1,2}):(\d{2})/);
+    if (!match) return null;
+    const hours = Number(match[1]);
+    const minutes = Number(match[2]);
+    if (!Number.isInteger(hours) || !Number.isInteger(minutes) || hours > 23 || minutes > 59) return null;
+    return hours * 60 + minutes;
+}
+
+function formatLeaveTimeRange(leave) {
+    if (leave?.leave_period !== 'hourly' || !leave.leave_start_time || !leave.leave_end_time) return '';
+    return `${String(leave.leave_start_time).slice(0, 5)}–${String(leave.leave_end_time).slice(0, 5)}`;
+}
+
+function getLeaveHoursForAudit(leave) {
+    const period = leave?.leave_period || 'full_day';
+    if (period === 'hourly') {
+        const start = leaveTimeToMinutes(leave?.leave_start_time);
+        const end = leaveTimeToMinutes(leave?.leave_end_time);
+        if (start !== null && end !== null && end > start) return Math.round(((end - start) / 60) * 100) / 100;
+        const legacyHours = Number(leave?.leave_hours);
+        if (Number.isFinite(legacyHours) && legacyHours > 0) return legacyHours;
+        const legacyDays = Number(leave?.days);
+        return Number.isFinite(legacyDays) && legacyDays > 0 ? legacyDays * 8 : 0;
+    }
+    if (period === 'am' || period === 'pm') return 4;
+    const days = Number(leave?.days);
+    return Number.isFinite(days) && days > 0 ? days * 8 : 0;
+}
+
+function getTaiwanMinutesFromTimestamp(value) {
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) return null;
+    const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', hour12: false
+    }).formatToParts(date);
+    const hour = Number(parts.find(p => p.type === 'hour')?.value);
+    const minute = Number(parts.find(p => p.type === 'minute')?.value);
+    return Number.isFinite(hour) && Number.isFinite(minute) ? (hour % 24) * 60 + minute : null;
+}
+
+function getLeaveAdjustedLateMinutes(checkInValue, dateString, leaves = [], shiftStartMinutes = 480) {
+    const checkInMinutes = typeof checkInValue === 'number'
+        ? checkInValue
+        : getTaiwanMinutesFromTimestamp(checkInValue);
+    if (!Number.isFinite(checkInMinutes)) return 0;
+
+    const approved = (Array.isArray(leaves) ? leaves : []).filter(leave => {
+        if (leave?.status && leave.status !== 'approved') return false;
+        const startDate = String(leave?.start_date || '').slice(0, 10);
+        const endDate = String(leave?.end_date || leave?.start_date || '').slice(0, 10);
+        return dateString >= startDate && dateString <= endDate;
+    });
+    if (approved.some(leave => (leave.leave_period || 'full_day') === 'full_day')) return 0;
+
+    let coveredUntil = Number.isFinite(Number(shiftStartMinutes)) ? Number(shiftStartMinutes) : 480;
+    if (approved.some(leave => leave.leave_period === 'am')) coveredUntil = Math.max(coveredUntil, 13 * 60);
+
+    const hourlyRanges = approved
+        .filter(leave => leave.leave_period === 'hourly')
+        .map(leave => ({ start: leaveTimeToMinutes(leave.leave_start_time), end: leaveTimeToMinutes(leave.leave_end_time) }))
+        .filter(range => range.start !== null && range.end !== null && range.end > range.start)
+        .sort((a, b) => a.start - b.start);
+    hourlyRanges.forEach(range => {
+        if (range.start <= coveredUntil && range.end > coveredUntil) coveredUntil = range.end;
+    });
+
+    return Math.max(0, checkInMinutes - coveredUntil);
+}
+
+window.leaveTimeToMinutes = leaveTimeToMinutes;
+window.formatLeaveTimeRange = formatLeaveTimeRange;
+window.getLeaveHoursForAudit = getLeaveHoursForAudit;
+window.getLeaveAdjustedLateMinutes = getLeaveAdjustedLateMinutes;
+
 async function submitLeave() {
     if (!currentEmployee) return showToast('❌ 請先登入');
     const type = document.getElementById('leaveType')?.value;
     const start = document.getElementById('leaveStartDate')?.value;
     const end = document.getElementById('leaveEndDate')?.value;
     const period = document.getElementById('leavePeriod')?.value || 'full_day';
-    const leaveHours = Number(document.getElementById('leaveHours')?.value);
+    const leaveStartTime = document.getElementById('leaveStartTime')?.value || null;
+    const leaveEndTime = document.getElementById('leaveEndTime')?.value || null;
+    const leaveStartMinutes = leaveTimeToMinutes(leaveStartTime);
+    const leaveEndMinutes = leaveTimeToMinutes(leaveEndTime);
+    const leaveHours = leaveStartMinutes !== null && leaveEndMinutes !== null && leaveEndMinutes > leaveStartMinutes
+        ? Math.round(((leaveEndMinutes - leaveStartMinutes) / 60) * 100) / 100
+        : 0;
     const reason = document.getElementById('leaveReason')?.value;
     if (!start || !end || !reason) return showToast('請填寫完整');
 
     if (new Date(end) < new Date(start)) {
         return showToast('❌ 結束日期不能早於開始日期');
     }
-    if ((period === 'am' || period === 'pm') && start !== end) {
-        return showToast('❌ 半天請假只能選同一天');
+    if ((period === 'am' || period === 'pm' || period === 'hourly') && start !== end) {
+        return showToast('❌ 半天與時數假只能選同一天');
     }
-    if (period === 'hourly' && (!Number.isInteger(leaveHours) || leaveHours < 1)) {
-        return showToast('❌ 小時請假最低 1 小時，請填整數時數');
+    if (period === 'hourly' && (!leaveStartTime || !leaveEndTime || leaveEndMinutes - leaveStartMinutes < 60)) {
+        return showToast('❌ 時數假結束時間須晚於開始時間，且至少 1 小時');
     }
 
     const submitBtn = document.getElementById('leaveSubmitBtn');
@@ -1150,22 +1232,26 @@ async function submitLeave() {
         // 使用 SECURITY DEFINER RPC 繞過 RLS（048 SQL）
         const leavePayload = {
             p_line_user_id: liffProfile.userId,
+            p_company_id: window.currentCompanyId,
             p_leave_type: type,
             p_start_date: start,
             p_end_date: end,
             p_leave_period: period,
-            p_leave_hours: period === 'hourly' ? leaveHours : null,
+            p_leave_start_time: period === 'hourly' ? leaveStartTime : null,
+            p_leave_end_time: period === 'hourly' ? leaveEndTime : null,
             p_reason: reason || ''
         };
         let { data: rpcResult, error: rpcError } = await sb.rpc('submit_leave_request', leavePayload);
         const rpcMessage = rpcError?.message || '';
-        if (rpcError && /p_leave_period|p_leave_hours|schema cache|function .*submit_leave_request/i.test(rpcMessage)) {
-            if (period !== 'full_day') {
-                throw new Error('半天/小時請假資料庫尚未更新，請先執行 migrations/084_half_day_leave_and_pending_makeup.sql');
+        if (rpcError && /p_company_id|p_leave_start_time|p_leave_end_time|schema cache|function .*submit_leave_request/i.test(rpcMessage)) {
+            if (period === 'hourly') {
+                throw new Error('時數假資料庫尚未更新，請先由管理者套用 migrations/113_hourly_leave_time_range.sql');
             }
             const fallbackPayload = { ...leavePayload };
-            delete fallbackPayload.p_leave_period;
-            delete fallbackPayload.p_leave_hours;
+            delete fallbackPayload.p_company_id;
+            delete fallbackPayload.p_leave_start_time;
+            delete fallbackPayload.p_leave_end_time;
+            fallbackPayload.p_leave_hours = null;
             ({ data: rpcResult, error: rpcError } = await sb.rpc('submit_leave_request', fallbackPayload));
         }
         if (rpcError) throw rpcError;
@@ -1190,7 +1276,7 @@ async function submitLeave() {
         // 通知管理員
         const typeNames = { annual:'特休', sick:'病假', personal:'事假', compensatory:'補休' };
         const periodNames = { full_day:'全日', am:'上午半天', pm:'下午半天', hourly:'小時請假' };
-        const periodNote = period === 'hourly' ? `${leaveHours} 小時` : (periodNames[period] || '全日');
+        const periodNote = period === 'hourly' ? `${leaveStartTime}–${leaveEndTime}（${leaveHours} 小時）` : (periodNames[period] || '全日');
         sendAdminNotify(`🔔 ${currentEmployee.name} 申請${typeNames[type]||type}（${periodNote}）\n📅 ${start} ~ ${end}\n📝 ${reason || '無附原因'}`);
     } catch(e) {
         showToast('❌ 申請失敗：' + friendlyError(e));
@@ -1205,7 +1291,15 @@ async function loadLeaveHistory() {
     try {
         // 使用 SECURITY DEFINER RPC 繞過 RLS（048 SQL）
         let records = [];
-        const { data } = await sb.rpc('get_leave_history', { p_line_user_id: liffProfile.userId, p_limit: 10 });
+        let { data, error } = await sb.rpc('get_leave_history', {
+            p_line_user_id: liffProfile.userId,
+            p_company_id: window.currentCompanyId,
+            p_limit: 10
+        });
+        if (error && /p_company_id|schema cache|function .*get_leave_history/i.test(error.message || '')) {
+            ({ data, error } = await sb.rpc('get_leave_history', { p_line_user_id: liffProfile.userId, p_limit: 10 }));
+        }
+        if (error) throw error;
         if (data) records = data;
         
         if (!records || records.length === 0) { 
@@ -1230,8 +1324,8 @@ async function loadLeaveHistory() {
                 </div>
                 <div class="details">
                     <span>${escapeHTML(r.start_date)} ~ ${escapeHTML(r.end_date)}</span>
-                    <span>${r.leave_period === 'hourly' && r.leave_hours
-                        ? `${escapeHTML(String(r.leave_hours))} ${escapeHTML(typeof tEmployee === 'function' ? tEmployee('hourUnit') : '小時')} · ${escapeHTML(typeof tEmployee === 'function' ? tEmployee('leaveDeductDays') : '扣薪天數')} ${escapeHTML(String(r.days || 0))} ${escapeHTML(typeof tEmployee === 'function' ? tEmployee('dayUnit') : '天')}`
+                    <span>${r.leave_period === 'hourly' && getLeaveHoursForAudit(r)
+                        ? `${escapeHTML(formatLeaveTimeRange(r) ? `${formatLeaveTimeRange(r)} · ` : '')}${escapeHTML(String(getLeaveHoursForAudit(r)))} ${escapeHTML(typeof tEmployee === 'function' ? tEmployee('hourUnit') : '小時')} · ${escapeHTML(typeof tEmployee === 'function' ? tEmployee('leaveDeductDays') : '扣薪天數')} ${escapeHTML(String(r.days || 0))} ${escapeHTML(typeof tEmployee === 'function' ? tEmployee('dayUnit') : '天')}`
                         : `${r.days || 1} ${escapeHTML(typeof tEmployee === 'function' ? tEmployee('dayUnit') : '天')} · ${escapeHTML(getLeavePeriodLabel(r.leave_period))}`}</span>
                 </div>
                 <div class="text-sm-muted">${escapeHTML(r.reason)}</div>

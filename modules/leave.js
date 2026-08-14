@@ -28,11 +28,11 @@ function leavePeriodLabel(period) {
 }
 
 function leaveDurationLabel(request) {
-    const days = Number(request?.days || 0);
     if (request?.leave_period === 'hourly') {
-        const hours = Number.isFinite(days) && days > 0 ? days * 8 : 0;
+        const hours = window.getLeaveHoursForAudit?.(request) || 0;
         const hoursText = Number.isInteger(hours) ? String(hours) : hours.toFixed(1);
-        return `${hoursText} 小時 · ${leavePeriodLabel('hourly')}`;
+        const range = window.formatLeaveTimeRange?.(request);
+        return `${range ? `${range} · ` : ''}${hoursText} 小時 · ${leavePeriodLabel('hourly')}`;
     }
     return `${request?.days || 1} 天 · ${leavePeriodLabel(request?.leave_period)}`;
 }
@@ -49,11 +49,18 @@ export async function loadLeaveApprovals(status) {
     if (!listEl) return;
     listEl.innerHTML = '<p style="text-align:center;color:#666;">載入中...</p>';
     try {
-        const { data, error } = await sb.rpc('get_leave_approval_requests', {
+        let { data, error } = await sb.rpc('get_leave_approval_requests_v2', {
             p_company_id: window.currentCompanyId,
             p_status: status,
-            p_line_user_id: liffProfile?.userId || null   // 101 呼叫者身分驗證
+            p_line_user_id: liffProfile?.userId || null
         });
+        if (error && /get_leave_approval_requests_v2|schema cache|Could not find the function/i.test(error.message || '')) {
+            ({ data, error } = await sb.rpc('get_leave_approval_requests', {
+                p_company_id: window.currentCompanyId,
+                p_status: status,
+                p_line_user_id: liffProfile?.userId || null
+            }));
+        }
         if (error) throw error;
         const typeMap = { 'annual': '特休', 'sick': '病假', 'personal': '事假', 'compensatory': '補休' };
         const statusText = { 'pending': '待審核', 'approved': '已通過', 'rejected': '已拒絕' };
