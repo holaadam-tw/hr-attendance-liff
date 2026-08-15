@@ -76,15 +76,36 @@ check('公司下班設定有效時使用公司時間', defaultTime('18:30:00') =
 check('設定缺失時回退 17:00', defaultTime(null) === '17:00');
 check('設定格式錯誤時回退 17:00', defaultTime('5:00') === '17:00');
 
+const timeInputCode = [grab(recordsSrc, 'normalizeMpTimeValue'), grab(recordsSrc, 'isValidMpTime')].join('\n');
+function normalizeTime(value) {
+  return new Function('value', `${timeInputCode}; return { normalized: normalizeMpTimeValue(value), valid: isValidMpTime(normalizeMpTimeValue(value)) };`)(value);
+}
+check('手機欄位固定以 24 小時格式顯示 17:00', recordsSrc.includes('type="text" id="mpTime"')
+  && recordsSrc.includes('inputmode="numeric"') && normalizeTime('1700').normalized === '17:00');
+check('下午五點的 17:00 可通過格式檢查', normalizeTime('17:00').valid === true);
+check('沒有補零的 5:00 會正規化為 05:00', normalizeTime('5:00').normalized === '05:00');
+check('無效的 25:00 不可送出', normalizeTime('25:00').valid === false
+  && commonSrc.includes('時間格式不正確，請用 24 小時格式'));
+
+const scopedStatusCode = grab(recordsSrc, 'getScopedMakeupNeedStatus');
+function scopedStatus(row) {
+  return new Function('row', `${scopedStatusCode}; return getScopedMakeupNeedStatus(row);`)(row);
+}
+check('公司範圍資料把 Adam 8/10 只有上班卡列為缺下班', scopedStatus({
+  check_in_time: '2026-08-10T11:52:00Z', check_out_time: null, status: 'working'
+}) === 'missing_out');
+
 check('補打卡頁有待補日期清單', recordsSrc.includes('id="makeupNeededList"'));
 check('下班預設提示明示下午 5:00', recordsSrc.includes('下午 5:00'));
 check('提交按鈕可被衝突驗證停用', recordsSrc.includes("btn.disabled = !!conflict"));
 check('月曆先判斷不完整打卡再判定正常', recordsSrc.indexOf("getIncompletePunchStatus(ds, att")
   < recordsSrc.indexOf("if (att.is_late && att.is_early_leave)"));
 check('待補清單排除 pending／approved 重複申請', recordsSrc.includes("r.status === 'pending' || r.status === 'approved'"));
-check('多公司帳號不會呼叫舊的無公司參數月考勤 RPC', recordsSrc.includes('canSafelyUseLegacyMonthlyAttendance')
-  && recordsSrc.includes('makeupGuidanceScopeReady = canSafelyUseLegacyMonthlyAttendance()')
-  && recordsSrc.includes('? await Promise.all([loadMakeupHistory(), loadAttCal()])'));
+check('平台管理員改用具公司與呼叫者驗證的每日考勤 RPC', recordsSrc.includes('canUseCompanyScopedMakeupGuidance')
+  && recordsSrc.includes("sb.rpc('get_company_daily_attendance'")
+  && recordsSrc.includes('p_company_id: window.currentCompanyId')
+  && recordsSrc.includes('p_line_user_id: liffProfile.userId'));
+check('公司範圍考勤只保留目前員工資料', recordsSrc.includes('item.employee_id === currentEmployee.id'));
 check('多公司帳號清空既有月考勤資料避免跨公司殘留', recordsSrc.includes('if (!makeupGuidanceScopeReady)')
   && recordsSrc.includes('attData = [];') && recordsSrc.includes('lvData = [];'));
 check('多公司帳號顯示安全限制說明', recordsSrc.includes('為避免顯示錯誤公司的考勤'));
@@ -113,7 +134,7 @@ const commonRefs = fs.readdirSync(root)
   .filter(name => name.endsWith('.html'))
   .map(name => ({ name, src: fs.readFileSync(path.join(root, name), 'utf8') }))
   .filter(file => /<script\s+src="common\.js/.test(file.src));
-const staleRefs = commonRefs.filter(file => !file.src.includes('common.js?v=20260815-makeupguidance'));
+const staleRefs = commonRefs.filter(file => !file.src.includes('common.js?v=20260815-makeupguidance2'));
 check('所有 common.js 引用已同步升版', staleRefs.length === 0, staleRefs.map(file => file.name).join(', '));
 
 console.log(`\n  結果：✅ ${pass} 通過  ❌ ${fail} 失敗\n`);

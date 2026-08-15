@@ -186,8 +186,9 @@
 
                 <div class="form-group">
                     <label data-i18n="actualPunchTime">實際打卡時間</label>
-                    <input type="time" id="mpTime" oninput="markMpTimeManual();onMpFormChange()" onchange="markMpTimeManual();onMpFormChange()">
-                    <div id="mpTimeHint" style="font-size:11px;color:#94A3B8;margin-top:4px;">請填實際到班/離班時間，不是排班時間。</div>
+                    <input type="text" id="mpTime" inputmode="numeric" maxlength="5" placeholder="17:00" autocomplete="off"
+                        oninput="markMpTimeManual();onMpFormChange()" onchange="normalizeMpTimeInput();onMpFormChange()" onblur="normalizeMpTimeInput();onMpFormChange()">
+                    <div id="mpTimeHint" style="font-size:11px;color:#94A3B8;margin-top:4px;">請用 24 小時格式填寫，例如下午 5 點請填 17:00。</div>
                 </div>
 
                 <div id="mpConflictWarn" style="display:none;padding:12px 14px;border:2px solid #DC2626;background:#FEF2F2;color:#991B1B;border-radius:12px;margin-bottom:12px;font-size:12px;font-weight:800;line-height:1.6;"></div>
@@ -334,7 +335,7 @@
         </div>
     </div>
 
-<script src="common.js?v=20260815-makeupguidance"></script>
+<script src="common.js?v=20260815-makeupguidance2"></script>
     <script>
         // === 全域錯誤監控 ===
         window._errLogCount = 0; window._errLogResetTs = 0;
@@ -362,6 +363,7 @@
         let attMonth = new Date().getMonth();
         let attData = [], lvData = [], makeupRequests = [];
         let makeupGuidanceScopeReady = false;
+        let makeupGuidanceDayStatuses = {};
 
         function mountRecordsLanguageSwitch() {
             const host = document.getElementById('recordsLanguageSwitch');
@@ -487,6 +489,35 @@
             if (input) input.dataset.autoDefault = 'false';
         }
 
+        function normalizeMpTimeValue(rawValue) {
+            let value = String(rawValue || '').trim().replace(/[^0-9:]/g, '');
+            if (/^\d{3,4}$/.test(value)) value = value.padStart(4, '0').replace(/^(\d{2})(\d{2})$/, '$1:$2');
+            if (/^\d{1}:\d{2}$/.test(value)) value = `0${value}`;
+            return value;
+        }
+
+        function normalizeMpTimeInput() {
+            const input = document.getElementById('mpTime');
+            if (!input) return '';
+            const value = normalizeMpTimeValue(input.value);
+            input.value = value;
+            return value;
+        }
+
+        function isValidMpTime(value) {
+            return /^([01]\d|2[0-3]):[0-5]\d$/.test(String(value || ''));
+        }
+        window.normalizeMpTimeValue = normalizeMpTimeValue;
+        window.isValidMpTime = isValidMpTime;
+
+        function getScopedMakeupNeedStatus(scoped) {
+            if (!scoped) return null;
+            if (scoped.check_in_time && !scoped.check_out_time) return 'missing_out';
+            if (!scoped.check_in_time && scoped.check_out_time) return 'missing_in';
+            if (scoped.status === 'absent') return 'absent';
+            return 'none';
+        }
+
         function formatAttendanceTime(value) {
             if (!value) return '';
             try {
@@ -607,7 +638,11 @@
             for (let day = 1; day <= dim; day++) {
                 const date = monthPrefix + String(day).padStart(2, '0');
                 if (date < earliest || date >= today) continue;
-                const info = getStatus(date);
+                const scoped = makeupGuidanceDayStatuses[date];
+                const info = scoped ? {
+                    s: getScopedMakeupNeedStatus(scoped),
+                    att: scoped.check_in_time || scoped.check_out_time ? scoped : null
+                } : getStatus(date);
                 if (info.s === 'missing_in') needs.push({ date, type: 'clock_in', att: info.att });
                 if (info.s === 'missing_out') needs.push({ date, type: 'clock_out', att: info.att });
                 if (info.s === 'absent') {
@@ -660,18 +695,60 @@
                 && currentEmployee?.company_id === window.currentCompanyId;
         }
 
+        function canUseCompanyScopedMakeupGuidance() {
+            return !!(window.currentCompanyId
+                && currentEmployee?.id
+                && liffProfile?.userId
+                && (window.isPlatformAdmin || ['admin', 'manager'].includes(currentEmployee.role) || currentEmployee.is_kiosk === true));
+        }
+
+        async function loadCompanyScopedMakeupGuidance() {
+            const days = window.MAKEUP_PUNCH_WINDOW_DAYS || 7;
+            const dates = [];
+            for (let offset = -(days - 1); offset <= -1; offset++) dates.push(getTaiwanDate(offset));
+            const results = await Promise.all(dates.map(date => sb.rpc('get_company_daily_attendance', {
+                p_company_id: window.currentCompanyId,
+                p_date: date,
+                p_line_user_id: liffProfile.userId
+            })));
+            const nextStatuses = {};
+            results.forEach((result, index) => {
+                if (result.error) throw result.error;
+                const row = (result.data || []).find(item => item.employee_id === currentEmployee.id);
+                if (row) nextStatuses[dates[index]] = { ...row, date: dates[index] };
+            });
+            makeupGuidanceDayStatuses = nextStatuses;
+            attData = Object.values(nextStatuses).filter(row => row.check_in_time || row.check_out_time);
+            lvData = [];
+            makeupGuidanceScopeReady = true;
+        }
+
         async function prepareMakeupGuidance() {
             const [year, month] = getTaiwanDate().split('-').map(Number);
             attYear = year;
             attMonth = month - 1;
-            makeupGuidanceScopeReady = canSafelyUseLegacyMonthlyAttendance();
-            if (!makeupGuidanceScopeReady) {
+            makeupGuidanceScopeReady = false;
+            makeupGuidanceDayStatuses = {};
+            const useCompanyScoped = canUseCompanyScopedMakeupGuidance();
+            const useLegacy = !useCompanyScoped && canSafelyUseLegacyMonthlyAttendance();
+            if (!useCompanyScoped && !useLegacy) {
                 attData = [];
                 lvData = [];
             }
-            const [requests] = makeupGuidanceScopeReady
-                ? await Promise.all([loadMakeupHistory(), loadAttCal()])
-                : [await loadMakeupHistory()];
+            let requests;
+            if (useCompanyScoped) {
+                try {
+                    [requests] = await Promise.all([loadMakeupHistory(), loadCompanyScopedMakeupGuidance()]);
+                } catch (error) {
+                    console.error('[補打卡導引] 公司範圍考勤載入失敗:', error);
+                    makeupGuidanceScopeReady = false;
+                }
+            } else if (useLegacy) {
+                makeupGuidanceScopeReady = true;
+                [requests] = await Promise.all([loadMakeupHistory(), loadAttCal()]);
+            } else {
+                requests = await loadMakeupHistory();
+            }
             makeupRequests = Array.isArray(requests) ? requests : [];
             renderMakeupNeededList();
             onMpFormChange();

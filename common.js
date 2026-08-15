@@ -1355,6 +1355,9 @@ async function submitMakeupPunch() {
 
     if (!date || !time || !reasonType) return showToast('❌ 請填寫完整');
     if (!reasonText) return showToast('❌ 請填寫補充說明');
+    if (typeof window.isValidMpTime === 'function' && !window.isValidMpTime(time)) {
+        return showToast('❌ 時間格式不正確，請用 24 小時格式，例如 17:00');
+    }
 
     const knownConflict = typeof window.getMakeupPunchConflict === 'function'
         ? window.getMakeupPunchConflict(date, type, time)
