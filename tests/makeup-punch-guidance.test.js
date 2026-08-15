@@ -5,6 +5,7 @@ const path = require('path');
 const root = path.join(__dirname, '..');
 const recordsSrc = fs.readFileSync(path.join(root, 'records.html'), 'utf8');
 const commonSrc = fs.readFileSync(path.join(root, 'common.js'), 'utf8');
+const migration116Src = fs.readFileSync(path.join(root, 'migrations', '116_include_no_checkin_partial_attendance.sql'), 'utf8');
 let pass = 0, fail = 0;
 
 function check(name, condition, detail = '') {
@@ -106,6 +107,18 @@ check('免打卡人員已有上班卡時仍列補下班', JSON.stringify(needTyp
 check('只有管理員角色但未勾免打卡仍列整日缺卡', JSON.stringify(needTypes('absent', {
   role: 'admin', no_checkin: false
 })) === JSON.stringify(['clock_in', 'clock_out']));
+check('migration 116 保留每日考勤 RPC 簽章', migration116Src.includes('public.get_company_daily_attendance(')
+  && migration116Src.includes('p_company_id UUID')
+  && migration116Src.includes('p_date DATE')
+  && migration116Src.includes('p_line_user_id TEXT DEFAULT NULL'));
+check('migration 116 保留公司與管理者驗權', migration116Src.includes('has_company_access(p_line_user_id, p_company_id, true)')
+  && migration116Src.includes('e.company_id = p_company_id')
+  && migration116Src.includes("RAISE EXCEPTION 'access_denied'"));
+check('migration 116 只排除免打卡且整日無卡', /COALESCE\(e\.no_checkin, false\) = false\s+OR a\.check_in_time IS NOT NULL\s+OR a\.check_out_time IS NOT NULL/s.test(migration116Src));
+check('migration 116 的 SECURITY DEFINER 固定 search_path', migration116Src.includes('SECURITY DEFINER')
+  && migration116Src.includes('SET search_path = public'));
+check('migration 116 不寫考勤、不建排程、不發 LINE', !/\b(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+(?:public\.)?attendance\b/i.test(migration116Src)
+  && !/cron\.schedule|net\.http|sendLine|line_messaging_api/i.test(migration116Src));
 
 check('補打卡頁有待補日期清單', recordsSrc.includes('id="makeupNeededList"'));
 check('下班預設提示明示下午 5:00', recordsSrc.includes('下午 5:00'));
