@@ -20,6 +20,7 @@ const SUITES = [
   { name: '打卡環境自我檢查', file: 'checkin-health-check.test.js' },
   { name: '上班待審仍可下班', file: 'pending-checkout.test.js' },
   { name: '時數假與缺時稽核', file: 'leave-time-attendance-audit.test.js' },
+  { name: '缺時 LINE 通知安全開關', file: 'missing-work-hours-notification-control.test.js' },
   { name: '打卡總覽', file: 'attendance-overview.test.js' },
   { name: '薪資頁加班來源', file: 'payroll-overtime.test.js' },
   { name: 'RLS 已鎖定資料表', file: 'rls-locked-tables.test.js' },

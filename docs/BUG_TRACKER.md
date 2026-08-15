@@ -997,3 +997,7 @@ PostgREST（anon key，無寫入）另測兩種呼叫形狀都能正確解析：
 ## 2026-08-14 修復紀錄
 
 - **B51**（已實作、隔離測試庫驗證通過、正式庫尚未套用）：考勤核對把上午半天假後的下午到班誤算成從 08:00 遲到，時數假只能手填整數時數，整日假又以日曆天重算，造成遲到與請假時數失真。修法：`migrations/113_hourly_leave_time_range.sql` 新增實際起訖時間與具公司隔離的新 RPC；時數假限定同一天並由 DB 自動計算。共用前端計算規則為核准上午半天從 13:00 判斷遲到，連續銜接上班起點的時數假才延後基準，待審假不抵遲到；整日假採 DB 已排除休假日的 `days`。`migrations/114_missing_work_hours_audit.sql` 新增隔日晚到、早退、整日無打卡稽核，沿用公司容忍分鐘，排除休假日、免打卡、公務機、跨日班、待審補卡與既有未下班異常，並通知員工 LINE、彙總主管群組；員工私訊及主管彙總皆保存每日通知標記，人工重跑排程不重複發送。2026-08-15 已在獨立 Free Plan 測試專案 `vtlvjbwqrvhfgivbmmaa` 套用 113/114，以虛構資料通過自動時數、半天假容忍、晚到、早退、整日無卡、跨租戶拒絕、掃描冪等及通知冪等實測；假 LINE Token 只取得兩筆 401，無真人收訊，測後已移除假設定並取消 cron。正式資料庫未存取、未套用。
+
+## 2026-08-15 修復紀錄
+
+- **B52**（已實作、隔離測試庫驗證通過、正式庫尚未套用）：migration 114 原本套用後就建立每日 09:15 缺時掃描與 LINE 發送排程；正式環境已有公司開啟 `attendance_audit_enabled`，主管可能尚未核對新缺時名單就開始通知。修法：`migrations/115_gate_missing_work_hours_notifications.sql` 新增獨立的 `missing_work_hours_line_notifications_enabled`，設定不存在或非 true 一律不發 LINE；每日排程仍更新 anomaly，但在讀 Token 前先略過未啟用公司。新增三支公司／管理權限驗證 RPC，供管理端讀寫開關及「掃描但不通知」；人工掃描只更新 `attendance_anomalies`，不呼叫 pg_net、不改 attendance、不建立請假。專屬驗權 helper 只允許同公司 admin／manager 或受派平台管理員，並明確排除公務機。2026-08-15 已在隔離測試專案 `vtlvjbwqrvhfgivbmmaa` 套用 115；實測發現測試 schema 的 `system_settings` 無 description／updated_at、精簡環境無平台管理員表，已修成只依既有四欄寫入並在平台表不存在時安全退讓。資料庫交易驗證通過預設關閉、一般員工／跨公司／公務機拒絕、掃描通知 0、attendance／leave_requests 無變化、雙公司同名設定與同日第二次通知 0/0；假設定及 pg_net 佇列全數 ROLLBACK，測後 LINE 設定／開關／佇列／cron 均為 0。專用離線測試 34/34 通過；正式資料庫未存取、未套用。

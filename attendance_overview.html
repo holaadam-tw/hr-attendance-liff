@@ -142,6 +142,22 @@
                         <span style="font-weight:700;font-size:14px;color:#9A3412;">考勤異常追蹤</span>
                         <span id="anomalyPendingBadge" style="font-size:12px;font-weight:800;color:#C2410C;background:#FFEDD5;border-radius:999px;padding:4px 8px;"></span>
                     </div>
+                    <div id="missingWorkHoursControl" style="margin-top:10px;padding:12px;background:#fff;border:1px solid #FED7AA;border-radius:10px;">
+                        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+                            <span style="font-size:13px;font-weight:800;color:#7C2D12;">LINE 缺時提醒</span>
+                            <span id="missingWorkHoursNotifyStatus" style="font-size:12px;font-weight:800;border-radius:999px;padding:4px 9px;background:#F3F4F6;color:#475569;">讀取中…</span>
+                        </div>
+                        <div style="margin-top:7px;font-size:12px;line-height:1.65;color:#475569;">
+                            每天 09:15 檢查前一天到最近 3 天的晚到、早退與整日無打卡，扣除核准請假後，提醒員工缺少幾分鐘並彙總給主管。<b>不會自動扣薪、不會自動請假，也不會修改打卡紀錄。</b>
+                        </div>
+                        <div id="missingWorkHoursControlHint" style="margin-top:7px;padding:7px 9px;border-radius:8px;background:#FEF3C7;color:#92400E;font-size:12px;font-weight:700;">
+                            目前預設不發 LINE；請先掃描並核對名單。
+                        </div>
+                        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:9px;">
+                            <button id="missingWorkHoursScanBtn" type="button" onclick="previewMissingWorkHours()" disabled style="border:1px solid #F59E0B;background:#FFFBEB;color:#92400E;font-size:12px;font-weight:800;border-radius:9px;padding:7px 11px;cursor:pointer;font-family:inherit;">🔍 掃描但不通知</button>
+                            <button id="missingWorkHoursToggleBtn" type="button" onclick="toggleMissingWorkHoursNotifications()" disabled style="border:none;background:#64748B;color:#fff;font-size:12px;font-weight:800;border-radius:9px;padding:7px 11px;cursor:pointer;font-family:inherit;">開啟 LINE 提醒</button>
+                        </div>
+                    </div>
                     <div id="anomalyList" style="margin-top:10px;"></div>
                 </div>
             </div>
@@ -1150,6 +1166,13 @@
         // ===== 缺卡追蹤（下班未打卡，僅大正科技，DB 端 RPC 另驗 admin/manager）=====
         const ANOMALY_AUDIT_COMPANY_ID = '8a669e2c-7521-43e9-9300-5c004c57e9db';
         let anomalyData = [];
+        let missingWorkHoursControl = {
+            available: false,
+            enabled: false,
+            pendingCount: 0,
+            error: ''
+        };
+        let missingWorkHoursControlBusy = false;
 
         async function loadAnomalyData() {
             const card = document.getElementById('anomalyCard');
@@ -1158,17 +1181,141 @@
                 card.style.display = 'none';
                 return;
             }
-            const { data, error } = await sb.rpc('get_attendance_anomalies', {
-                p_company_id: window.currentCompanyId,
-                p_line_user_id: liffProfile.userId
-            });
+            const [anomalyResult, controlResult] = await Promise.all([
+                sb.rpc('get_attendance_anomalies', {
+                    p_company_id: window.currentCompanyId,
+                    p_line_user_id: liffProfile.userId
+                }),
+                sb.rpc('get_missing_work_hours_notification_control', {
+                    p_company_id: window.currentCompanyId,
+                    p_line_user_id: liffProfile.userId
+                })
+            ]);
+            const { data, error } = anomalyResult;
             if (error) {
                 console.warn('Load anomalies warning:', error);
                 card.style.display = 'none';
                 return;
             }
             anomalyData = data || [];
+            if (controlResult.error || !controlResult.data || !controlResult.data.success) {
+                console.warn('Load missing-work-hours control warning:', controlResult.error || controlResult.data);
+                missingWorkHoursControl = {
+                    available: false,
+                    enabled: false,
+                    pendingCount: 0,
+                    error: '資料庫功能尚未就緒，現在不會發送 LINE。'
+                };
+            } else {
+                missingWorkHoursControl = {
+                    available: true,
+                    enabled: controlResult.data.enabled === true,
+                    pendingCount: Number(controlResult.data.pending_count || 0),
+                    error: ''
+                };
+            }
             renderAnomalyCard();
+        }
+
+        function renderMissingWorkHoursControl() {
+            const status = document.getElementById('missingWorkHoursNotifyStatus');
+            const hint = document.getElementById('missingWorkHoursControlHint');
+            const scanBtn = document.getElementById('missingWorkHoursScanBtn');
+            const toggleBtn = document.getElementById('missingWorkHoursToggleBtn');
+            if (!status || !hint || !scanBtn || !toggleBtn) return;
+
+            scanBtn.disabled = missingWorkHoursControlBusy || !missingWorkHoursControl.available;
+            toggleBtn.disabled = missingWorkHoursControlBusy || !missingWorkHoursControl.available;
+
+            if (!missingWorkHoursControl.available) {
+                status.textContent = '⚠️ 尚未啟用';
+                status.style.background = '#FEE2E2';
+                status.style.color = '#B91C1C';
+                hint.textContent = missingWorkHoursControl.error || '資料庫功能尚未就緒，現在不會發送 LINE。';
+                hint.style.background = '#FEE2E2';
+                hint.style.color = '#991B1B';
+                toggleBtn.textContent = '開啟 LINE 提醒';
+                toggleBtn.style.background = '#94A3B8';
+                return;
+            }
+
+            if (missingWorkHoursControl.enabled) {
+                status.textContent = '🔔 已開啟';
+                status.style.background = '#DCFCE7';
+                status.style.color = '#166534';
+                hint.textContent = '每天 09:15 會通知目前仍待處理的員工，並彙總給主管。待處理 ' + missingWorkHoursControl.pendingCount + ' 筆。';
+                hint.style.background = '#DCFCE7';
+                hint.style.color = '#166534';
+                toggleBtn.textContent = '關閉 LINE 提醒';
+                toggleBtn.style.background = '#B91C1C';
+            } else {
+                status.textContent = '🔕 已關閉';
+                status.style.background = '#F3F4F6';
+                status.style.color = '#475569';
+                hint.textContent = '目前不會發 LINE。請先按「掃描但不通知」並核對下方名單；待處理 ' + missingWorkHoursControl.pendingCount + ' 筆。';
+                hint.style.background = '#FEF3C7';
+                hint.style.color = '#92400E';
+                toggleBtn.textContent = '開啟 LINE 提醒';
+                toggleBtn.style.background = '#15803D';
+            }
+        }
+
+        async function previewMissingWorkHours() {
+            if (!missingWorkHoursControl.available || missingWorkHoursControlBusy) return;
+            if (!confirm('確定掃描最近 3 天的缺時名單？\n\n這次只會更新異常清單，不會發 LINE、不會修改打卡或自動建立請假。')) return;
+            missingWorkHoursControlBusy = true;
+            renderMissingWorkHoursControl();
+            const scanBtn = document.getElementById('missingWorkHoursScanBtn');
+            if (scanBtn) scanBtn.textContent = '掃描中…';
+            try {
+                const { data, error } = await sb.rpc('preview_company_missing_work_hours', {
+                    p_company_id: window.currentCompanyId,
+                    p_line_user_id: liffProfile.userId,
+                    p_days_back: 3
+                });
+                if (error || !data || !data.success) {
+                    throw new Error((data && data.error) || (error && error.message) || '掃描失敗');
+                }
+                showToast('✅ 掃描完成：待處理 ' + Number(data.pending_count || 0) + ' 筆；本次通知 0 筆');
+                await loadAnomalyData();
+            } catch (e) {
+                console.error('Preview missing work hours error:', e);
+                showToast('掃描失敗：' + (e.message || ''));
+            } finally {
+                missingWorkHoursControlBusy = false;
+                if (scanBtn) scanBtn.textContent = '🔍 掃描但不通知';
+                renderMissingWorkHoursControl();
+            }
+        }
+
+        async function toggleMissingWorkHoursNotifications() {
+            if (!missingWorkHoursControl.available || missingWorkHoursControlBusy) return;
+            const nextEnabled = !missingWorkHoursControl.enabled;
+            if (nextEnabled && !confirm(
+                '確定開啟每天 09:15 的 LINE 缺時提醒？\n\n請先確認下方名單正確。開啟後，員工會收到缺少分鐘與補請假／補卡入口，主管群組會收到彙總。'
+            )) return;
+            if (!nextEnabled && !confirm('確定關閉 LINE 缺時提醒？關閉後仍會更新異常名單，但不再發送員工或主管訊息。')) return;
+
+            missingWorkHoursControlBusy = true;
+            renderMissingWorkHoursControl();
+            try {
+                const { data, error } = await sb.rpc('set_missing_work_hours_notification_enabled', {
+                    p_company_id: window.currentCompanyId,
+                    p_line_user_id: liffProfile.userId,
+                    p_enabled: nextEnabled
+                });
+                if (error || !data || !data.success) {
+                    throw new Error((data && data.error) || (error && error.message) || '設定失敗');
+                }
+                missingWorkHoursControl.enabled = data.enabled === true;
+                showToast(nextEnabled ? '✅ 已開啟每天 09:15 LINE 提醒' : '✅ 已關閉 LINE 提醒');
+            } catch (e) {
+                console.error('Toggle missing work hours notifications error:', e);
+                showToast('設定失敗：' + (e.message || ''));
+            } finally {
+                missingWorkHoursControlBusy = false;
+                renderMissingWorkHoursControl();
+            }
         }
 
         function anomalyActionChip(r) {
@@ -1191,14 +1338,14 @@
         function renderAnomalyCard() {
             const card = document.getElementById('anomalyCard');
             if (!card) return;
-            if (anomalyData.length === 0) { card.style.display = 'none'; return; }
             const pending = anomalyData.filter(r => r.status === 'pending');
             const resolved = anomalyData.filter(r => r.status === 'resolved');
             document.getElementById('anomalyPendingBadge').textContent = '待處理 ' + pending.length + ' 筆';
+            renderMissingWorkHoursControl();
 
             let html = '';
             if (pending.length === 0) {
-                html += '<div style="font-size:12px;color:#92400E;">目前沒有待處理的考勤異常</div>';
+                html += '<div style="font-size:12px;color:#92400E;">目前沒有待處理的考勤異常；可先按上方「掃描但不通知」重新核對。</div>';
             }
             pending.forEach(r => {
                 const notifyText = r.notify_count > 0 ? '已提醒 ' + r.notify_count + ' 次' : '尚未通知';
