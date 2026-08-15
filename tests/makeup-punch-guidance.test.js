@@ -1,0 +1,120 @@
+// 補打卡日期導引與 17:00 預設值回歸測試
+const fs = require('fs');
+const path = require('path');
+
+const root = path.join(__dirname, '..');
+const recordsSrc = fs.readFileSync(path.join(root, 'records.html'), 'utf8');
+const commonSrc = fs.readFileSync(path.join(root, 'common.js'), 'utf8');
+let pass = 0, fail = 0;
+
+function check(name, condition, detail = '') {
+  if (condition) { pass++; console.log(`  ✅ ${name}${detail ? `  → ${detail}` : ''}`); }
+  else { fail++; console.log(`  ❌ ${name}${detail ? `  → ${detail}` : ''}`); }
+}
+
+function grab(source, name) {
+  const start = source.indexOf('function ' + name + '(');
+  if (start < 0) throw new Error('找不到函式：' + name);
+  let depth = 0, opened = false;
+  for (let i = start; i < source.length; i++) {
+    if (source[i] === '{') { depth++; opened = true; }
+    if (source[i] === '}' && --depth === 0 && opened) return source.slice(start, i + 1);
+  }
+  throw new Error('函式括號不完整：' + name);
+}
+
+const incompleteCode = grab(recordsSrc, 'getIncompletePunchStatus');
+const conflictCode = [
+  grab(recordsSrc, 'timeToMinutes'),
+  grab(recordsSrc, 'formatAttendanceTime'),
+  grab(recordsSrc, 'getMakeupPunchConflict')
+].join('\n');
+
+function incomplete(date, att, today = '2026-08-15') {
+  return new Function('date', 'att', 'today', `${incompleteCode}; return getIncompletePunchStatus(date, att, today);`)(date, att, today);
+}
+
+function conflict(attendance, date, type, time) {
+  return new Function('attendance', 'date', 'type', 'time', `
+    const attData = attendance;
+    ${conflictCode}
+    return getMakeupPunchConflict(date, type, time);
+  `)(attendance, date, type, time);
+}
+
+console.log('\n═══════════════════════════════════════');
+console.log('  補打卡日期導引回歸測試');
+console.log('═══════════════════════════════════════');
+
+check('過去日期只有上班卡判定缺下班', incomplete('2026-08-10', {
+  check_in_time: '2026-08-10T11:52:00Z', check_out_time: null
+}) === 'missing_out');
+check('過去日期只有下班卡判定缺上班', incomplete('2026-08-10', {
+  check_in_time: null, check_out_time: '2026-08-10T09:00:00Z'
+}) === 'missing_in');
+check('完整上下班不列待補', incomplete('2026-08-10', {
+  check_in_time: '2026-08-10T00:00:00Z', check_out_time: '2026-08-10T09:00:00Z'
+}) === null);
+check('今天只有上班卡不誤報缺下班', incomplete('2026-08-15', {
+  check_in_time: '2026-08-15T00:00:00Z', check_out_time: null
+}) === null);
+
+const adam = [{ date: '2026-08-10', check_in_time: '2026-08-10T11:52:00Z', check_out_time: null }];
+const adamConflict = conflict(adam, '2026-08-10', 'clock_out', '17:00');
+check('Adam 19:52 上班、17:00 下班會被前端擋下', adamConflict?.code === 'checkout_before_checkin');
+check('衝突提示包含兩個具體時間與主管指引', adamConflict?.message.includes('17:00')
+  && adamConflict.message.includes('19:52') && adamConflict.message.includes('主管'));
+check('08:00 上班、17:00 下班可繼續送出', conflict([{
+  date: '2026-08-10', check_in_time: '2026-08-10T00:00:00Z', check_out_time: null
+}], '2026-08-10', 'clock_out', '17:00') === null);
+
+const defaultCode = grab(recordsSrc, 'getMpDefaultCheckoutTime');
+function defaultTime(setting) {
+  return new Function('setting', `const getCachedSetting = () => setting; ${defaultCode}; return getMpDefaultCheckoutTime();`)(setting);
+}
+check('公司下班設定有效時使用公司時間', defaultTime('18:30:00') === '18:30');
+check('設定缺失時回退 17:00', defaultTime(null) === '17:00');
+check('設定格式錯誤時回退 17:00', defaultTime('5:00') === '17:00');
+
+check('補打卡頁有待補日期清單', recordsSrc.includes('id="makeupNeededList"'));
+check('下班預設提示明示下午 5:00', recordsSrc.includes('下午 5:00'));
+check('提交按鈕可被衝突驗證停用', recordsSrc.includes("btn.disabled = !!conflict"));
+check('月曆先判斷不完整打卡再判定正常', recordsSrc.indexOf("getIncompletePunchStatus(ds, att")
+  < recordsSrc.indexOf("if (att.is_late && att.is_early_leave)"));
+check('待補清單排除 pending／approved 重複申請', recordsSrc.includes("r.status === 'pending' || r.status === 'approved'"));
+check('多公司帳號不會呼叫舊的無公司參數月考勤 RPC', recordsSrc.includes('canSafelyUseLegacyMonthlyAttendance')
+  && recordsSrc.includes('makeupGuidanceScopeReady = canSafelyUseLegacyMonthlyAttendance()')
+  && recordsSrc.includes('? await Promise.all([loadMakeupHistory(), loadAttCal()])'));
+check('多公司帳號清空既有月考勤資料避免跨公司殘留', recordsSrc.includes('if (!makeupGuidanceScopeReady)')
+  && recordsSrc.includes('attData = [];') && recordsSrc.includes('lvData = [];'));
+check('多公司帳號顯示安全限制說明', recordsSrc.includes('為避免顯示錯誤公司的考勤'));
+check('補打卡頁長錯誤提示允許完整換行', recordsSrc.includes('white-space: normal')
+  && recordsSrc.includes('overflow-wrap: anywhere')
+  && recordsSrc.includes('text-overflow: clip'));
+check('錯誤提示寬度保留手機左右邊界', recordsSrc.includes('max-width: calc(100vw - 32px)')
+  && recordsSrc.includes('env(safe-area-inset-bottom)'));
+const toastCode = grab(commonSrc, 'showToast');
+check('長訊息顯示時間延長到 6 秒', toastCode.includes('text.length > 32 ? 6000 : 3000')
+  && toastCode.includes('displayMs - 500') && toastCode.includes('}, displayMs)'));
+check('共用提交函式在 RPC 前執行已知衝突檢查', commonSrc.indexOf('window.getMakeupPunchConflict')
+  < commonSrc.indexOf("sb.rpc('submit_makeup_punch'"));
+check('後端 checkout_before_checkin 保護仍存在', fs.readFileSync(path.join(root, 'migrations', '106_makeup_punch_time_sanity.sql'), 'utf8')
+  .includes("'code', 'checkout_before_checkin'"));
+
+const guidanceFunctions = [
+  grab(recordsSrc, 'getIncompletePunchStatus'),
+  grab(recordsSrc, 'getMpDefaultCheckoutTime'),
+  grab(recordsSrc, 'getMakeupPunchConflict'),
+  grab(recordsSrc, 'renderMakeupNeededList')
+].join('\n');
+check('導引判斷本身沒有資料庫寫入或 LINE 推播', !/\.insert\(|\.update\(|\.upsert\(|\.delete\(|sendLine|sendAdminNotify|quick_check_in/i.test(guidanceFunctions));
+
+const commonRefs = fs.readdirSync(root)
+  .filter(name => name.endsWith('.html'))
+  .map(name => ({ name, src: fs.readFileSync(path.join(root, name), 'utf8') }))
+  .filter(file => /<script\s+src="common\.js/.test(file.src));
+const staleRefs = commonRefs.filter(file => !file.src.includes('common.js?v=20260815-makeupguidance'));
+check('所有 common.js 引用已同步升版', staleRefs.length === 0, staleRefs.map(file => file.name).join(', '));
+
+console.log(`\n  結果：✅ ${pass} 通過  ❌ ${fail} 失敗\n`);
+process.exit(fail ? 1 : 0);

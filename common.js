@@ -194,13 +194,16 @@ function showToast(msg) {
         oldToasts[0].remove();
     }
     
+    const text = String(msg ?? '');
+    const displayMs = text.length > 32 ? 6000 : 3000;
     const t = document.createElement('div'); 
     t.className = 'toast'; 
-    t.textContent = msg; 
+    t.textContent = text;
+    t.style.animation = `toastIn 0.3s ease, toastOut 0.3s ease ${displayMs - 500}ms forwards`;
     document.body.appendChild(t); 
     setTimeout(() => {
         if (t.parentNode) t.remove();
-    }, 3000); 
+    }, displayMs);
 }
 
 // 按鈕 loading 狀態（防重複提交）
@@ -1353,6 +1356,11 @@ async function submitMakeupPunch() {
     if (!date || !time || !reasonType) return showToast('❌ 請填寫完整');
     if (!reasonText) return showToast('❌ 請填寫補充說明');
 
+    const knownConflict = typeof window.getMakeupPunchConflict === 'function'
+        ? window.getMakeupPunchConflict(date, type, time)
+        : null;
+    if (knownConflict) return showToast(knownConflict.message);
+
     const today = getTaiwanDate(0);
     const earliest = getTaiwanDate(-(MAKEUP_PUNCH_WINDOW_DAYS - 1));
     if (date > today) return showToast('❌ 補打卡日期不能是未來日期');
@@ -1412,7 +1420,7 @@ async function submitMakeupPunch() {
 
 async function loadMakeupHistory() {
     const list = document.getElementById('makeupHistoryList');
-    if (!currentEmployee || !liffProfile || !list) return;
+    if (!currentEmployee || !liffProfile || !list) return [];
 
     try {
         // 使用 RPC 繞過 RLS
@@ -1422,16 +1430,21 @@ async function loadMakeupHistory() {
             p_company_id: window.currentCompanyId || null
         });
         
-        if (!data || data.length === 0) {
+        const requests = Array.isArray(data) ? data : [];
+        if (typeof window.onMakeupHistoryLoaded === 'function') {
+            window.onMakeupHistoryLoaded(requests);
+        }
+
+        if (requests.length === 0) {
             list.innerHTML = '<p class="text-center-muted-sm">尚無補打卡記錄</p>';
-            return;
+            return requests;
         }
 
         const statusMap = { 'pending': '⏳ 待審', 'approved': '✅ 通過', 'rejected': '❌ 拒絕' };
         const statusColor = { 'pending': '#F59E0B', 'approved': '#059669', 'rejected': '#DC2626' };
         const typeMap = { 'clock_in': '上班', 'clock_out': '下班' };
 
-        list.innerHTML = data.map(r => `
+        list.innerHTML = requests.map(r => `
             <div class="attendance-item" style="border-left-color:${statusColor[r.status] || '#ccc'};">
                 <div class="date">
                     <span>${escapeHTML(r.punch_date)} ${escapeHTML(typeMap[r.punch_type])} ${escapeHTML(r.punch_time)}</span>
@@ -1445,9 +1458,12 @@ async function loadMakeupHistory() {
                     `<div class="rejection-box">❌ ${escapeHTML(r.rejection_reason)}</div>` : ''}
             </div>
         `).join('');
+        return requests;
     } catch(e) {
         console.error(e);
         list.innerHTML = '<p class="text-center-error">載入失敗</p>';
+        if (typeof window.onMakeupHistoryLoaded === 'function') window.onMakeupHistoryLoaded([]);
+        return [];
     }
 }
 

@@ -51,6 +51,16 @@
         .att-detail-hdr h3 { font-size: 15px; font-weight: 800; color: var(--dark); margin: 0; }
         .adr { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--gray-light); font-size: 13px; }
         .adr:last-child { border-bottom: none; }
+        .makeup-needed-card { border: 1px solid #FCA5A5; background: #FEF2F2; border-radius: 12px; padding: 11px 12px; margin-top: 8px; }
+        .makeup-needed-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 9px; }
+        .makeup-needed-actions button { border: 0; border-radius: 9px; padding: 8px 11px; background: #DC2626; color: #fff; font-weight: 800; font-size: 12px; cursor: pointer; font-family: inherit; }
+        .makeup-needed-actions button[disabled] { background: #CBD5E1; color: #475569; cursor: default; }
+        .toast {
+            white-space: normal; overflow: visible; text-overflow: clip;
+            width: max-content; max-width: calc(100vw - 32px); box-sizing: border-box;
+            line-height: 1.55; overflow-wrap: anywhere; word-break: break-word; text-align: left;
+            bottom: calc(16px + env(safe-area-inset-bottom));
+        }
     </style>
 </head>
 <body>
@@ -146,20 +156,26 @@
                     ・上班、下班都忘記：送兩筆補打卡，分別填實際上班與下班時間。
                 </div>
 
+                <div id="makeupNeededPanel" style="background:#FFF7ED;border:2px solid #FB923C;border-radius:14px;padding:12px;margin-bottom:14px;">
+                    <div style="font-weight:900;color:#9A3412;margin-bottom:6px;">⚠️ 需要補打卡的日期</div>
+                    <div id="makeupNeededList" style="font-size:12px;color:#7C2D12;line-height:1.6;">載入中...</div>
+                    <div style="font-size:11px;color:#9A3412;margin-top:8px;">依目前考勤月曆與 7 天補卡期限整理；最終仍由主管審核。</div>
+                </div>
+
                 <div class="form-group">
                     <label data-i18n="makeupDate">補打卡日期</label>
-                    <input type="date" id="mpDate">
+                    <input type="date" id="mpDate" onchange="onMpFormChange()">
                 </div>
 
                 <div class="form-group">
                     <label data-i18n="makeupType">補打卡類型</label>
                     <div style="display:flex;gap:8px;">
-                        <label style="flex:1;display:flex;align-items:center;gap:8px;padding:12px;border:2px solid #E5E7EB;border-radius:10px;cursor:pointer;transition:all 0.2s;" onclick="selectMpType('clock_in',this)">
+                        <label id="mpTypeInLabel" style="flex:1;display:flex;align-items:center;gap:8px;padding:12px;border:2px solid #E5E7EB;border-radius:10px;cursor:pointer;transition:all 0.2s;" onclick="selectMpType('clock_in',this)">
                             <input type="radio" name="mpType" value="clock_in" id="mpTypeIn" checked style="display:none;">
                             <span style="font-size:20px;">☀️</span>
                             <span style="font-weight:700;font-size:13px;" data-i18n="makeupClockIn">上班補打卡</span>
                         </label>
-                        <label style="flex:1;display:flex;align-items:center;gap:8px;padding:12px;border:2px solid #E5E7EB;border-radius:10px;cursor:pointer;transition:all 0.2s;" onclick="selectMpType('clock_out',this)">
+                        <label id="mpTypeOutLabel" style="flex:1;display:flex;align-items:center;gap:8px;padding:12px;border:2px solid #E5E7EB;border-radius:10px;cursor:pointer;transition:all 0.2s;" onclick="selectMpType('clock_out',this)">
                             <input type="radio" name="mpType" value="clock_out" id="mpTypeOut" style="display:none;">
                             <span style="font-size:20px;">🌙</span>
                             <span style="font-weight:700;font-size:13px;" data-i18n="makeupClockOut">下班補打卡</span>
@@ -170,9 +186,11 @@
 
                 <div class="form-group">
                     <label data-i18n="actualPunchTime">實際打卡時間</label>
-                    <input type="time" id="mpTime">
-                    <div style="font-size:11px;color:#94A3B8;margin-top:4px;">請填實際到班/離班時間，不是排班時間。</div>
+                    <input type="time" id="mpTime" oninput="markMpTimeManual();onMpFormChange()" onchange="markMpTimeManual();onMpFormChange()">
+                    <div id="mpTimeHint" style="font-size:11px;color:#94A3B8;margin-top:4px;">請填實際到班/離班時間，不是排班時間。</div>
                 </div>
+
+                <div id="mpConflictWarn" style="display:none;padding:12px 14px;border:2px solid #DC2626;background:#FEF2F2;color:#991B1B;border-radius:12px;margin-bottom:12px;font-size:12px;font-weight:800;line-height:1.6;"></div>
 
                 <div class="form-group">
                     <label data-i18n="reasonCategory">原因分類</label>
@@ -191,7 +209,7 @@
                     <textarea id="mpReasonText" placeholder="例：10:30 已到班，但現場忙忘記按上班打卡"></textarea>
                 </div>
 
-                <button class="btn btn-primary" onclick="submitMakeupPunch()" data-i18n="submitMakeup">📤 提交補打卡申請</button>
+                <button class="btn btn-primary" id="mpSubmitBtn" onclick="submitMakeupPunch()" data-i18n="submitMakeup">📤 提交補打卡申請</button>
                 <div id="mpStatus" class="status-box"></div>
 
                 <div class="section-divider">
@@ -316,7 +334,7 @@
         </div>
     </div>
 
-<script src="common.js?v=20260814-leavetimeaudit"></script>
+<script src="common.js?v=20260815-makeupguidance"></script>
     <script>
         // === 全域錯誤監控 ===
         window._errLogCount = 0; window._errLogResetTs = 0;
@@ -342,7 +360,8 @@
         };
         let attYear = new Date().getFullYear();
         let attMonth = new Date().getMonth();
-        let attData = [], lvData = [];
+        let attData = [], lvData = [], makeupRequests = [];
+        let makeupGuidanceScopeReady = false;
 
         function mountRecordsLanguageSwitch() {
             const host = document.getElementById('recordsLanguageSwitch');
@@ -363,7 +382,7 @@
             }
             if (id === 'attendancePage') { attYear = new Date().getFullYear(); attMonth = new Date().getMonth(); loadAttCal(); }
             if (id === 'leavePage') { loadLeaveHistory(); initLeaveDates(); }
-            if (id === 'makeupPunchPage') { loadMakeupHistory(); initMpDate(); }
+            if (id === 'makeupPunchPage') { initMpDate(); prepareMakeupGuidance(); }
             if (id === 'overtimePage') { loadOvertimeHistory(); initOtDate(); }
             if (id === 'salaryPage') { document.getElementById('salaryYear').value = new Date().getFullYear(); loadAnnualSummary(); }
         }
@@ -410,10 +429,14 @@
         // 補打卡類型選擇
         function selectMpType(type, el) {
             document.getElementById('mpType').value = type;
+            const radio = document.querySelector(`input[name="mpType"][value="${type}"]`);
+            if (radio) radio.checked = true;
             el.closest('.form-group').querySelectorAll('label[onclick]').forEach(l => {
                 l.style.borderColor = '#E5E7EB'; l.style.background = '#fff';
             });
             el.style.borderColor = '#4F46E5'; el.style.background = '#F5F3FF';
+            applyMpDefaultTime(type);
+            onMpFormChange();
         }
         function initMpDate() {
             const mpDate = document.getElementById('mpDate');
@@ -424,6 +447,234 @@
                 mpDate.min = getTaiwanDate(-(days - 1));
                 mpDate.max = today;
             }
+            const currentType = document.getElementById('mpType')?.value || 'clock_in';
+            const label = document.getElementById(currentType === 'clock_out' ? 'mpTypeOutLabel' : 'mpTypeInLabel');
+            if (label) selectMpType(currentType, label);
+        }
+
+        function getMpDefaultCheckoutTime() {
+            const raw = typeof getCachedSetting === 'function' ? getCachedSetting('default_work_end') : null;
+            const hhmm = String(raw || '').slice(0, 5);
+            return /^([01]\d|2[0-3]):[0-5]\d$/.test(hhmm) ? hhmm : '17:00';
+        }
+
+        function applyMpDefaultTime(type) {
+            const input = document.getElementById('mpTime');
+            const hint = document.getElementById('mpTimeHint');
+            if (!input || !hint) return;
+            if (type === 'clock_out' && (!input.value || input.dataset.autoDefault === 'true')) {
+                const def = getMpDefaultCheckoutTime();
+                input.value = def;
+                input.dataset.autoDefault = 'true';
+                hint.textContent = `已帶入下班預設 ${def}（下午 5:00）；請依實際離班時間修改。`;
+                hint.style.color = '#C2410C';
+                hint.style.fontWeight = '800';
+                return;
+            }
+            if (type === 'clock_in') {
+                if (input.dataset.autoDefault === 'true') {
+                    input.value = '';
+                    input.dataset.autoDefault = 'false';
+                }
+                hint.textContent = '請填實際到班時間，不是排班時間。';
+                hint.style.color = '#94A3B8';
+                hint.style.fontWeight = '400';
+            }
+        }
+
+        function markMpTimeManual() {
+            const input = document.getElementById('mpTime');
+            if (input) input.dataset.autoDefault = 'false';
+        }
+
+        function formatAttendanceTime(value) {
+            if (!value) return '';
+            try {
+                return new Date(value).toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', hour12: false });
+            } catch (e) { return ''; }
+        }
+
+        function timeToMinutes(value) {
+            if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(String(value || ''))) return null;
+            const [hour, minute] = value.split(':').map(Number);
+            return hour * 60 + minute;
+        }
+
+        function getIncompletePunchStatus(ds, att, today) {
+            if (!att || ds >= today) return null;
+            const hasIn = !!att.check_in_time;
+            const hasOut = !!att.check_out_time;
+            if (hasIn && !hasOut) return 'missing_out';
+            if (!hasIn && hasOut) return 'missing_in';
+            return null;
+        }
+
+        function normalizeMakeupType(type) {
+            if (type === 'check_in') return 'clock_in';
+            if (type === 'check_out') return 'clock_out';
+            return type;
+        }
+
+        function isWithinMakeupWindow(date) {
+            const days = window.MAKEUP_PUNCH_WINDOW_DAYS || 7;
+            return date >= getTaiwanDate(-(days - 1)) && date <= getTaiwanDate();
+        }
+
+        function findExistingMakeup(date, type) {
+            const normalized = normalizeMakeupType(type);
+            return makeupRequests.find(r => String(r.punch_date).substring(0, 10) === date
+                && normalizeMakeupType(r.punch_type) === normalized
+                && (r.status === 'pending' || r.status === 'approved')) || null;
+        }
+
+        function getMakeupPunchConflict(date, type, time) {
+            if (!date || !type || !time) return null;
+            const att = attData.find(r => String(r.date).substring(0, 10) === date);
+            if (!att) return null;
+            const selectedMinutes = timeToMinutes(time);
+            if (selectedMinutes === null) return null;
+            if (type === 'clock_out' && att.check_in_time) {
+                const checkIn = formatAttendanceTime(att.check_in_time);
+                const checkInMinutes = timeToMinutes(checkIn);
+                if (checkInMinutes !== null && selectedMinutes <= checkInMinutes) {
+                    return {
+                        code: 'checkout_before_checkin',
+                        message: `❌ 下班 ${time} 早於當日上班 ${checkIn}。請主管先更正上班紀錄，再補下班卡。`
+                    };
+                }
+            }
+            if (type === 'clock_in' && att.check_out_time) {
+                const checkOut = formatAttendanceTime(att.check_out_time);
+                const checkOutMinutes = timeToMinutes(checkOut);
+                if (checkOutMinutes !== null && selectedMinutes >= checkOutMinutes) {
+                    return {
+                        code: 'checkin_after_checkout',
+                        message: `❌ 上班 ${time} 晚於當日下班 ${checkOut}。請確認實際時間或請主管更正紀錄。`
+                    };
+                }
+            }
+            return null;
+        }
+        window.getMakeupPunchConflict = getMakeupPunchConflict;
+
+        function onMpFormChange() {
+            const conflict = getMakeupPunchConflict(
+                document.getElementById('mpDate')?.value,
+                document.getElementById('mpType')?.value,
+                document.getElementById('mpTime')?.value
+            );
+            const warn = document.getElementById('mpConflictWarn');
+            const btn = document.getElementById('mpSubmitBtn');
+            if (warn) {
+                warn.style.display = conflict ? 'block' : 'none';
+                warn.textContent = conflict?.message || '';
+            }
+            if (btn) {
+                btn.disabled = !!conflict;
+                btn.style.opacity = conflict ? '0.5' : '1';
+            }
+            return conflict;
+        }
+
+        function prefillMakeupPunch(date, type) {
+            showPage('makeupPunchPage');
+            const dateInput = document.getElementById('mpDate');
+            const timeInput = document.getElementById('mpTime');
+            if (dateInput) dateInput.value = date;
+            if (timeInput && type === 'clock_out') {
+                timeInput.dataset.autoDefault = 'true';
+                timeInput.value = '';
+            }
+            const label = document.getElementById(type === 'clock_out' ? 'mpTypeOutLabel' : 'mpTypeInLabel');
+            if (label) selectMpType(type, label);
+            onMpFormChange();
+            document.getElementById('mpDate')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        function renderMakeupNeededList() {
+            const host = document.getElementById('makeupNeededList');
+            if (!host) return;
+            if (!makeupGuidanceScopeReady) {
+                host.innerHTML = '<div style="color:#92400E;font-weight:800;">⚠️ 此帳號有多個公司身分，為避免顯示錯誤公司的考勤，請由主管協助確認待補日期。</div>';
+                return;
+            }
+            const today = getTaiwanDate();
+            const earliest = getTaiwanDate(-((window.MAKEUP_PUNCH_WINDOW_DAYS || 7) - 1));
+            const monthPrefix = `${attYear}-${String(attMonth + 1).padStart(2, '0')}-`;
+            const needs = [];
+            const dim = new Date(attYear, attMonth + 1, 0).getDate();
+
+            for (let day = 1; day <= dim; day++) {
+                const date = monthPrefix + String(day).padStart(2, '0');
+                if (date < earliest || date >= today) continue;
+                const info = getStatus(date);
+                if (info.s === 'missing_in') needs.push({ date, type: 'clock_in', att: info.att });
+                if (info.s === 'missing_out') needs.push({ date, type: 'clock_out', att: info.att });
+                if (info.s === 'absent') {
+                    needs.push({ date, type: 'clock_in', att: null });
+                    needs.push({ date, type: 'clock_out', att: null });
+                }
+            }
+
+            if (!needs.length) {
+                host.innerHTML = '<div style="color:#059669;font-weight:800;">✅ 目前載入月份沒有可辨識的待補打卡日期</div>';
+                return;
+            }
+
+            const grouped = needs.reduce((map, item) => {
+                (map[item.date] ||= []).push(item);
+                return map;
+            }, {});
+            host.innerHTML = Object.entries(grouped).map(([date, items]) => {
+                const att = items.find(item => item.att)?.att;
+                const known = att?.check_in_time ? `已有上班 ${formatAttendanceTime(att.check_in_time)}`
+                    : att?.check_out_time ? `已有下班 ${formatAttendanceTime(att.check_out_time)}`
+                    : '整天沒有打卡紀錄';
+                const actions = items.map(item => {
+                    const existing = findExistingMakeup(date, item.type);
+                    const label = item.type === 'clock_out' ? '補下班卡' : '補上班卡';
+                    if (existing) {
+                        const state = existing.status === 'approved' ? '已通過' : '待審中';
+                        return `<button type="button" disabled>${label}・${state}</button>`;
+                    }
+                    return `<button type="button" onclick="prefillMakeupPunch('${date}','${item.type}')">${label}</button>`;
+                }).join('');
+                return `<div class="makeup-needed-card">
+                    <div style="font-size:14px;font-weight:900;color:#991B1B;">${escapeHTML(date)}</div>
+                    <div style="color:#7F1D1D;">${escapeHTML(known)}</div>
+                    <div class="makeup-needed-actions">${actions}</div>
+                </div>`;
+            }).join('');
+        }
+        window.renderMakeupNeededList = renderMakeupNeededList;
+        window.onMakeupHistoryLoaded = function(requests) {
+            makeupRequests = Array.isArray(requests) ? requests : [];
+            renderMakeupNeededList();
+        };
+
+        function canSafelyUseLegacyMonthlyAttendance() {
+            const options = Array.isArray(window.myCompanyOptions) ? window.myCompanyOptions : [];
+            return !window.isPlatformAdmin
+                && options.length === 1
+                && options[0]?.id === window.currentCompanyId
+                && currentEmployee?.company_id === window.currentCompanyId;
+        }
+
+        async function prepareMakeupGuidance() {
+            const [year, month] = getTaiwanDate().split('-').map(Number);
+            attYear = year;
+            attMonth = month - 1;
+            makeupGuidanceScopeReady = canSafelyUseLegacyMonthlyAttendance();
+            if (!makeupGuidanceScopeReady) {
+                attData = [];
+                lvData = [];
+            }
+            const [requests] = makeupGuidanceScopeReady
+                ? await Promise.all([loadMakeupHistory(), loadAttCal()])
+                : [await loadMakeupHistory()];
+            makeupRequests = Array.isArray(requests) ? requests : [];
+            renderMakeupNeededList();
+            onMpFormChange();
         }
 
         function changeAttMonth(d) {
@@ -454,6 +705,7 @@
             console.log('[考勤] attData:', attData.length, '筆, lvData:', lvData.length, '筆', attData);
 
             renderAttCal();
+            renderMakeupNeededList();
         }
 
         let _todayStr = ''; // renderAttCal 設定，避免 getStatus 重複呼叫
@@ -482,6 +734,9 @@
             const isFullDayLeave = !!lv && lvPeriod === 'full_day';
 
             if (ds > _todayStr) return { s: 'future', l: '' };
+            const incomplete = getIncompletePunchStatus(ds, att, _todayStr || getTaiwanDate());
+            if (incomplete === 'missing_out') return { s: 'missing_out', l: '缺下班', att, lv };
+            if (incomplete === 'missing_in') return { s: 'missing_in', l: '缺上班', att, lv };
             if (dow === 0 || dow === 6) return att ? { s: 'ok', l: '加班', att } : { s: 'off', l: '休' };
             if (isFullDayLeave && !att) {
                 return { s: 'leave', l: leaveTypeLabel(lv.leave_type, false), lv };
@@ -530,6 +785,7 @@
                 else if (info.s==='early') { cls+=' s-late'; cLate++; cOk++; }
                 else if (info.s==='leave') { cls+=' s-leave'; cLv++; }
                 else if (info.s==='absent') { cls+=' s-absent'; cAb++; }
+                else if (info.s==='missing_in' || info.s==='missing_out') { cls+=' s-absent'; cAb++; }
                 else if (info.s==='off') cls+=' s-off';
                 else if (info.s==='future') cls+=' s-future';
                 if (ds===todayS) cls+=' today-ring';
@@ -537,7 +793,7 @@
 
                 if (info.att) tH += parseFloat(info.att.total_work_hours) || 0;
 
-                const bc = {ok:'background:#D1FAE5;color:#059669;',late:'background:#FFEDD5;color:#EA580C;',early:'background:#FFEDD5;color:#EA580C;',leave:'background:#DBEAFE;color:#2563EB;',absent:'background:#FEE2E2;color:#DC2626;',off:'color:#94A3B8;'}[info.s] || '';
+                const bc = {ok:'background:#D1FAE5;color:#059669;',late:'background:#FFEDD5;color:#EA580C;',early:'background:#FFEDD5;color:#EA580C;',leave:'background:#DBEAFE;color:#2563EB;',absent:'background:#FEE2E2;color:#DC2626;',missing_in:'background:#FEE2E2;color:#DC2626;',missing_out:'background:#FEE2E2;color:#DC2626;',off:'color:#94A3B8;'}[info.s] || '';
                 el.innerHTML = `<span class="day-num">${d}</span>${info.l?`<span class="day-badge" style="${bc}">${info.l}</span>`:''}${info.att&&info.att.total_work_hours?`<span class="day-sub">${parseFloat(info.att.total_work_hours).toFixed(1)}h</span>`:''}`;
 
                 if (info.s!=='future' && info.s!=='off') el.onclick = () => showDetail(ds, info);
@@ -557,7 +813,7 @@
             const dd = new Date(ds);
             document.getElementById('adTitle').textContent = `${ds} 週${wd[dd.getDay()]}`;
 
-            const sm = {ok:'<span style="color:#059669;font-weight:700;">✅ 正常出勤</span>',late:'<span style="color:#EA580C;font-weight:700;">⚠️ 遲到</span>',early:'<span style="color:#EA580C;font-weight:700;">⚠️ 早退</span>',leave:'<span style="color:#2563EB;font-weight:700;">📝 請假</span>',absent:'<span style="color:#DC2626;font-weight:700;">❌ 缺勤</span>'};
+            const sm = {ok:'<span style="color:#059669;font-weight:700;">✅ 正常出勤</span>',late:'<span style="color:#EA580C;font-weight:700;">⚠️ 遲到</span>',early:'<span style="color:#EA580C;font-weight:700;">⚠️ 早退</span>',leave:'<span style="color:#2563EB;font-weight:700;">📝 請假</span>',absent:'<span style="color:#DC2626;font-weight:700;">❌ 缺勤</span>',missing_in:'<span style="color:#DC2626;font-weight:700;">❌ 缺上班卡</span>',missing_out:'<span style="color:#DC2626;font-weight:700;">❌ 缺下班卡</span>'};
             document.getElementById('adBadge').innerHTML = sm[info.s] || '';
 
             let r = '';
@@ -589,6 +845,23 @@
                 if (info.lv.reason) r += `<div class="adr"><span style="color:var(--gray)">${escapeHTML(tEmployee('leaveReason'))}</span><b>${escapeHTML(info.lv.reason)}</b></div>`;
             }
             if (info.s==='absent') r += `<div class="adr"><span style="color:#DC2626">說明</span><b style="color:#DC2626">未打卡且無請假紀錄</b></div>`;
+            if (info.s === 'missing_in' || info.s === 'missing_out') {
+                const type = info.s === 'missing_out' ? 'clock_out' : 'clock_in';
+                const label = info.s === 'missing_out' ? '補下班卡' : '補上班卡';
+                const existing = findExistingMakeup(ds, type);
+                r += isWithinMakeupWindow(ds) ? `<div style="margin-top:12px;">
+                    <button type="button" ${existing ? 'disabled' : ''} onclick="prefillMakeupPunch('${ds}','${type}')"
+                        style="width:100%;padding:12px;border:0;border-radius:10px;background:${existing ? '#CBD5E1' : '#DC2626'};color:#fff;font-weight:900;font-family:inherit;">
+                        ${existing ? `${label}・${existing.status === 'approved' ? '已通過' : '待審中'}` : `🔧 ${label}`}
+                    </button>
+                </div>` : '<div style="margin-top:10px;color:#9A3412;font-weight:800;">已超過員工自助補卡期限，請主管處理。</div>';
+            }
+            if (info.s === 'absent') {
+                r += isWithinMakeupWindow(ds) ? `<div class="makeup-needed-actions">
+                    <button type="button" onclick="prefillMakeupPunch('${ds}','clock_in')">補上班卡</button>
+                    <button type="button" onclick="prefillMakeupPunch('${ds}','clock_out')">補下班卡</button>
+                </div>` : '<div style="margin-top:10px;color:#9A3412;font-weight:800;">已超過員工自助補卡期限，請主管處理。</div>';
+            }
 
             document.getElementById('adRows').innerHTML = r;
             card.classList.add('show');

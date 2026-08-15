@@ -19,6 +19,7 @@ const SUITES = [
   { name: '打卡相機／照片重試', file: 'checkin-photo-retry.test.js' },
   { name: '打卡環境自我檢查', file: 'checkin-health-check.test.js' },
   { name: '上班待審仍可下班', file: 'pending-checkout.test.js' },
+  { name: '補打卡日期與時間導引', file: 'makeup-punch-guidance.test.js' },
   { name: '時數假與缺時稽核', file: 'leave-time-attendance-audit.test.js' },
   { name: '缺時 LINE 通知安全開關', file: 'missing-work-hours-notification-control.test.js' },
   { name: '打卡總覽', file: 'attendance-overview.test.js' },
