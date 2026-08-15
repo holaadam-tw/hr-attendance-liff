@@ -83,6 +83,47 @@ function normalizeTime(value) {
 }
 check('手機欄位固定以 24 小時格式顯示 17:00', recordsSrc.includes('type="text" id="mpTime"')
   && recordsSrc.includes('inputmode="numeric"') && normalizeTime('1700').normalized === '17:00');
+check('補打卡時間有不送出表單的時鐘入口', recordsSrc.includes('type="button" id="mpTimePickerButton"')
+  && recordsSrc.includes('aria-label="開啟時鐘選擇實際打卡時間"'));
+check('時鐘入口使用原生時間選取但不取代可見 24 小時欄位', recordsSrc.includes('type="time" id="mpTimeNativePicker"')
+  && recordsSrc.includes('function openMpTimePicker()') && recordsSrc.includes('picker.showPicker()')
+  && recordsSrc.includes('picker.focus();') && recordsSrc.includes('picker.click();'));
+
+const timePickerCode = [
+  grab(recordsSrc, 'getMpDefaultCheckoutTime'),
+  grab(recordsSrc, 'markMpTimeManual'),
+  grab(recordsSrc, 'normalizeMpTimeValue'),
+  grab(recordsSrc, 'isValidMpTime'),
+  grab(recordsSrc, 'openMpTimePicker'),
+  grab(recordsSrc, 'applyMpTimePickerValue')
+].join('\n');
+function simulateTimePicker() {
+  const elements = {
+    conflictChecks: 0,
+    pickerOpened: 0,
+    mpTime: { value: '1700', dataset: { autoDefault: 'true' } },
+    mpType: { value: 'clock_out' },
+    mpTimeNativePicker: {
+      value: '17:00',
+      showPicker() { elements.pickerOpened++; },
+      focus() {}, click() {}
+    }
+  };
+  const document = { getElementById: id => elements[id] || null };
+  return new Function('document', 'getCachedSetting', 'onMpFormChange', 'elements', `
+    ${timePickerCode}
+    openMpTimePicker();
+    applyMpTimePickerValue();
+    return { pickerValue: elements.mpTimeNativePicker.value, visibleValue: elements.mpTime.value,
+      autoDefault: elements.mpTime.dataset.autoDefault, pickerOpened: elements.pickerOpened,
+      conflictChecks: elements.conflictChecks };
+  `)(document, () => null, () => { elements.conflictChecks++; }, elements);
+}
+const timePickerSimulation = simulateTimePicker();
+check('時鐘選取會以 17:00 同步可見欄位', timePickerSimulation.pickerValue === '17:00'
+  && timePickerSimulation.visibleValue === '17:00' && timePickerSimulation.pickerOpened === 1);
+check('時鐘選取視同手動輸入並立即重跑衝突檢查', timePickerSimulation.autoDefault === 'false'
+  && timePickerSimulation.conflictChecks === 1);
 check('下午五點的 17:00 可通過格式檢查', normalizeTime('17:00').valid === true);
 check('沒有補零的 5:00 會正規化為 05:00', normalizeTime('5:00').normalized === '05:00');
 check('無效的 25:00 不可送出', normalizeTime('25:00').valid === false

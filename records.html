@@ -55,6 +55,11 @@
         .makeup-needed-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 9px; }
         .makeup-needed-actions button { border: 0; border-radius: 9px; padding: 8px 11px; background: #DC2626; color: #fff; font-weight: 800; font-size: 12px; cursor: pointer; font-family: inherit; }
         .makeup-needed-actions button[disabled] { background: #CBD5E1; color: #475569; cursor: default; }
+        .mp-time-row { display: flex; gap: 8px; align-items: stretch; position: relative; }
+        .mp-time-row #mpTime { flex: 1; min-width: 0; }
+        .mp-time-picker-button { width: 52px; flex: 0 0 52px; border: 2px solid #4F46E5; background: #F5F3FF; color: #3730A3; border-radius: 12px; cursor: pointer; font-size: 23px; line-height: 1; }
+        .mp-time-picker-button:active { transform: scale(0.96); background: #EDE9FE; }
+        .mp-time-native-picker { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
         .toast {
             white-space: normal; overflow: visible; text-overflow: clip;
             width: max-content; max-width: calc(100vw - 32px); box-sizing: border-box;
@@ -186,8 +191,12 @@
 
                 <div class="form-group">
                     <label data-i18n="actualPunchTime">實際打卡時間</label>
-                    <input type="text" id="mpTime" inputmode="numeric" maxlength="5" placeholder="17:00" autocomplete="off"
-                        oninput="markMpTimeManual();onMpFormChange()" onchange="normalizeMpTimeInput();onMpFormChange()" onblur="normalizeMpTimeInput();onMpFormChange()">
+                    <div class="mp-time-row">
+                        <input type="text" id="mpTime" inputmode="numeric" maxlength="5" placeholder="17:00" autocomplete="off"
+                            oninput="markMpTimeManual();onMpFormChange()" onchange="normalizeMpTimeInput();onMpFormChange()" onblur="normalizeMpTimeInput();onMpFormChange()">
+                        <button type="button" id="mpTimePickerButton" class="mp-time-picker-button" onclick="openMpTimePicker()" aria-label="開啟時鐘選擇實際打卡時間" title="選擇實際打卡時間">🕒</button>
+                        <input type="time" id="mpTimeNativePicker" class="mp-time-native-picker" tabindex="-1" aria-hidden="true" onchange="applyMpTimePickerValue()">
+                    </div>
                     <div id="mpTimeHint" style="font-size:11px;color:#94A3B8;margin-top:4px;">請用 24 小時格式填寫，例如下午 5 點請填 17:00。</div>
                 </div>
 
@@ -506,6 +515,38 @@
 
         function isValidMpTime(value) {
             return /^([01]\d|2[0-3]):[0-5]\d$/.test(String(value || ''));
+        }
+
+        function openMpTimePicker() {
+            const input = document.getElementById('mpTime');
+            const picker = document.getElementById('mpTimeNativePicker');
+            if (!input || !picker) return;
+            const current = normalizeMpTimeValue(input.value);
+            const fallback = document.getElementById('mpType')?.value === 'clock_out'
+                ? getMpDefaultCheckoutTime()
+                : '08:00';
+            picker.value = isValidMpTime(current) ? current : fallback;
+            try {
+                if (typeof picker.showPicker === 'function') {
+                    picker.showPicker();
+                    return;
+                }
+            } catch (e) {
+                // 部分 LINE WebView 不允許 showPicker；以下以原生 click 回退。
+            }
+            picker.focus();
+            picker.click();
+        }
+
+        function applyMpTimePickerValue() {
+            const input = document.getElementById('mpTime');
+            const picker = document.getElementById('mpTimeNativePicker');
+            if (!input || !picker) return;
+            const value = normalizeMpTimeValue(picker.value);
+            if (!isValidMpTime(value)) return;
+            input.value = value;
+            markMpTimeManual();
+            onMpFormChange();
         }
         window.normalizeMpTimeValue = normalizeMpTimeValue;
         window.isValidMpTime = isValidMpTime;
