@@ -622,6 +622,13 @@
             document.getElementById('mpDate')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
 
+        function getMakeupNeedTypes(status, employee) {
+            if (status === 'missing_in') return ['clock_in'];
+            if (status === 'missing_out') return ['clock_out'];
+            if (status === 'absent' && employee?.no_checkin !== true) return ['clock_in', 'clock_out'];
+            return [];
+        }
+
         function renderMakeupNeededList() {
             const host = document.getElementById('makeupNeededList');
             if (!host) return;
@@ -643,12 +650,9 @@
                     s: getScopedMakeupNeedStatus(scoped),
                     att: scoped.check_in_time || scoped.check_out_time ? scoped : null
                 } : getStatus(date);
-                if (info.s === 'missing_in') needs.push({ date, type: 'clock_in', att: info.att });
-                if (info.s === 'missing_out') needs.push({ date, type: 'clock_out', att: info.att });
-                if (info.s === 'absent') {
-                    needs.push({ date, type: 'clock_in', att: null });
-                    needs.push({ date, type: 'clock_out', att: null });
-                }
+                getMakeupNeedTypes(info.s, currentEmployee).forEach(type => {
+                    needs.push({ date, type, att: info.att });
+                });
             }
 
             if (!needs.length) {

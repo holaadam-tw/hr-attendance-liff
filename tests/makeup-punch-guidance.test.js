@@ -95,6 +95,18 @@ check('公司範圍資料把 Adam 8/10 只有上班卡列為缺下班', scopedSt
   check_in_time: '2026-08-10T11:52:00Z', check_out_time: null, status: 'working'
 }) === 'missing_out');
 
+const needTypesCode = grab(recordsSrc, 'getMakeupNeedTypes');
+function needTypes(status, employee) {
+  return new Function('status', 'employee', `${needTypesCode}; return getMakeupNeedTypes(status, employee);`)(status, employee);
+}
+check('免打卡人員不列整日無打卡日期', needTypes('absent', { role: 'admin', no_checkin: true }).length === 0);
+check('免打卡人員已有上班卡時仍列補下班', JSON.stringify(needTypes('missing_out', {
+  role: 'admin', no_checkin: true
+})) === JSON.stringify(['clock_out']));
+check('只有管理員角色但未勾免打卡仍列整日缺卡', JSON.stringify(needTypes('absent', {
+  role: 'admin', no_checkin: false
+})) === JSON.stringify(['clock_in', 'clock_out']));
+
 check('補打卡頁有待補日期清單', recordsSrc.includes('id="makeupNeededList"'));
 check('下班預設提示明示下午 5:00', recordsSrc.includes('下午 5:00'));
 check('提交按鈕可被衝突驗證停用', recordsSrc.includes("btn.disabled = !!conflict"));
