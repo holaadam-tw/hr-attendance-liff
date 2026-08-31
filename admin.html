@@ -1465,10 +1465,10 @@
                         </div>
                         <div style="flex:1;text-align:center;padding:10px;background:#FEF2F2;border-radius:12px;">
                             <div style="font-size:20px;font-weight:900;color:#DC2626;" id="lcMax">0</div>
-                            <div style="font-size:10px;font-weight:600;color:#DC2626;">上限</div>
+                            <div style="font-size:10px;font-weight:600;color:#DC2626;">警告門檻</div>
                         </div>
                     </div>
-                    <!-- 日期有超過上限的高亮 -->
+                    <!-- 日期有超過警告門檻的高亮 -->
                     <div id="lcOverWarn" style="display:none;padding:10px 14px;background:#FEF2F2;border-radius:10px;margin-bottom:12px;font-size:12px;color:#DC2626;font-weight:700;"></div>
                     <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
                         <table id="lcTable" style="width:100%;border-collapse:collapse;font-size:11px;min-width:600px;"><thead id="lcHead"></thead><tbody id="lcBody"></tbody></table>
@@ -1478,17 +1478,17 @@
                         <span style="font-size:11px;display:flex;align-items:center;gap:4px;"><span style="width:14px;height:14px;background:#FEE2E2;border-radius:3px;display:inline-block;"></span>病假</span>
                         <span style="font-size:11px;display:flex;align-items:center;gap:4px;"><span style="width:14px;height:14px;background:#FEF3C7;border-radius:3px;display:inline-block;"></span>事假</span>
                         <span style="font-size:11px;display:flex;align-items:center;gap:4px;"><span style="width:14px;height:14px;background:#E0E7FF;border-radius:3px;display:inline-block;"></span>補休</span>
-                        <span style="font-size:11px;display:flex;align-items:center;gap:4px;"><span style="width:14px;height:14px;background:#FCA5A5;border-radius:3px;display:inline-block;border:2px solid #DC2626;"></span>超限</span>
+                        <span style="font-size:11px;display:flex;align-items:center;gap:4px;"><span style="width:14px;height:14px;background:#FCA5A5;border-radius:3px;display:inline-block;border:2px solid #DC2626;"></span>超過警告門檻</span>
                     </div>
                 </div>
 
                 <!-- === 人力設定 TAB === -->
                 <div id="tabSetting" class="staffTabContent" style="display:none;">
-                    <p style="color:#6b7280;font-size:12px;margin-bottom:16px;">設定請假限制與人力規則</p>
+                    <p style="color:#6b7280;font-size:12px;margin-bottom:16px;">設定請假人力提醒與考勤規則</p>
 
                     <div style="background:#fff;border-radius:14px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,0.08);margin-bottom:16px;">
-                        <div style="font-size:14px;font-weight:800;color:#0F172A;margin-bottom:12px;">🚫 同時請假人數上限</div>
-                        <p style="font-size:12px;color:#94A3B8;margin-bottom:12px;">當某天已有 N 人請假，第 N+1 人提交申請時會被<b style="color:#DC2626;">自動駁回</b></p>
+                        <div style="font-size:14px;font-weight:800;color:#0F172A;margin-bottom:12px;">⚠️ 同時請假警告門檻</div>
+                        <p style="font-size:12px;color:#64748B;margin-bottom:12px;">超過設定人數時顯示人力警告；員工仍可送出，最後由主管審核決定。</p>
                         <div style="display:flex;align-items:center;gap:12px;">
                             <button onclick="adjustMaxLeave(-1)" style="width:44px;height:44px;border:2px solid #E5E7EB;border-radius:12px;background:#fff;font-size:20px;cursor:pointer;font-weight:700;">−</button>
                             <div style="flex:1;text-align:center;">
@@ -1550,9 +1550,10 @@
 
                     <div style="background:#FFF7ED;border-radius:14px;padding:14px;margin-top:16px;">
                         <div style="font-size:13px;color:#EA580C;line-height:1.6;">
-                            <b>💡 自動駁回規則說明</b><br>
+                            <b>💡 人力警告規則說明</b><br>
                             • 員工填入請假日期時，系統<b>即時檢查</b>該日已有幾人請假<br>
-                            • 若加上申請者會超過上限，<b>表單直接鎖定</b>無法提交<br>
+                            • 若加上申請者會超過門檻，系統顯示醒目警告，<b>但仍可提交</b><br>
+                            • 申請維持待審，最後由主管依當日人力核准或駁回<br>
                             • 已核准 + 待審核 的假都會被計入<br>
                             • 週末不計入衝突檢查
                         </div>
@@ -2247,8 +2248,8 @@
 
     </div>
 
-<script src="common.js?v=20260815-makeupguidance2"></script>
-<script type="module" src="modules/index.js?v=20260814-leavetimeaudit"></script>
+<script src="common.js?v=20260831-leaveadvisory"></script>
+<script type="module" src="modules/index.js?v=20260831-leaveadvisory"></script>
     <script type="module" src="admin_fixes.js?v=20260708-audit2"></script>
     <script>
     // ===== 公務機打卡 =====

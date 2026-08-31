@@ -1013,3 +1013,7 @@ PostgREST（anon key，無寫入）另測兩種呼叫形狀都能正確解析：
 - **B55 實機補強**（migration 116，隔離測試已通過、未套正式庫）：正式頁面確認 8/11～8/14 已消失，但 8/10「已有上班 19:52／補下班卡」也消失。根因不是前端判斷，而是 migration 100 的 `get_company_daily_attendance` 以 `no_checkin=false` 無條件排除免打卡人員，單邊 attendance 根本沒有傳到頁面。migration 116 保留原 RPC 簽章、管理者驗權、公司隔離與全部回傳欄位，只把篩選改為「免打卡且上下班都空才排除；任一側已有紀錄就回傳」。已確認隔離 Project Ref `vtlvjbwqrvhfgivbmmaa` 不等於正式 `nssuisyvlrqnqfxupklb`，並在隔離庫套用；部署後唯讀核對函式指紋、`SECURITY DEFINER`、`search_path=public`、公司／主管驗權及 anon/authenticated EXECUTE 權限，5 組 SQL 真值案例全數通過且未留下虛構資料。隔離庫為精簡 schema，缺少正式 RPC 的部分顯示欄位，因此未用永久 ALTER／測試資料直接呼叫完整 RPC；專項 39/39、完整 11 套、RLS 15/15、QA 0 FAIL／1 既有 WARN、OpenSpec strict 與 RLS 複審通過。正式資料庫仍未套用。
 
 - **B56**（已實作、待 LINE／手機實機驗收）：B54 為了讓 Android 明確顯示 `17:00`，把原生時間欄位改為文字輸入，造成「實際打卡時間」旁的時鐘選取入口消失。修法：保留固定 `HH:mm` 可編輯欄位，新增明確的 🕒 時鐘按鈕；按下後開啟原生時間選取器，LINE WebView 不支援時自動回退。選到的時間同步回 `HH:mm` 欄位、視為手動選擇，並立即重跑「下班不可早於已知上班時間」防呆。專項回歸 43/43；未新增資料庫讀寫、RPC、LINE、排程或 migration。
+
+## 2026-08-31 修復紀錄
+
+- **B57**（已實作、待驗收）：公司原本的 `max_concurrent_leave` 是硬性上限，超過時員工表單直接鎖定且無法送出，不符合多人確實需要同日請假的情境。修法：保留既有設定鍵與 1–10 人數值，但產品語意改為「同時請假警告門檻」；只有「既有重疊人數 + 本次申請人」大於門檻才顯示醒目人力警告，員工仍可送出為待審，最後由主管核准或駁回。衝突計算仍限定目前公司、其他員工、待審／已核准與既有重疊日期規則；送出仍只走 `submit_leave_request`。管理月曆同步移除「自動駁回」文案，超額日期改為主管人力提醒。新增 `tests/concurrent-leave-advisory.test.js` 並納入完整測試；未新增 migration、schema、RPC 或資料庫寫入路徑。

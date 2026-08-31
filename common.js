@@ -1017,7 +1017,7 @@ async function loadLunchSummary() {
 // ===== 請假功能 =====
 // ===== 請假可用性檢查 =====
 async function checkLeaveAvailability(startDate, endDate) {
-    if (!currentEmployee || !sb) return { ok: true };
+    if (!currentEmployee || !sb) return { ok: true, thresholdExceeded: false, conflicts: [], maxDayConflict: 0, staffWarning: '', message: '' };
     
     try {
         // 1. 從快取讀取最大同時請假人數設定
@@ -1064,24 +1064,27 @@ async function checkLeaveAvailability(startDate, endDate) {
             }
         } catch(e) { console.warn('查詢員工人數失敗', e); }
 
-        // 5. 判斷是否超過上限
-        const wouldExceed = (maxDayConflict + 1) > maxConcurrent;
+        // 5. 判斷是否超過警告門檻；只提醒，不阻止員工送出
+        const thresholdExceeded = (maxDayConflict + 1) > maxConcurrent;
+        const projectedConcurrent = maxDayConflict + 1;
+        const thresholdDate = conflicts.find(c => c.count >= maxConcurrent)?.date || '';
 
         return {
-            ok: !wouldExceed,
+            ok: true,
+            thresholdExceeded,
             maxConcurrent,
             conflicts,
             maxDayConflict,
             staffWarning,
-            message: wouldExceed 
-                ? `❌ 無法請假：${conflicts.find(c => c.count >= maxConcurrent)?.date || ''} 已有 ${maxDayConflict} 人請假（上限 ${maxConcurrent} 人）`
+            message: thresholdExceeded
+                ? `⚠️ 人力警告：${thresholdDate} 若核准將有 ${projectedConcurrent} 人同時請假（警告門檻 ${maxConcurrent} 人），仍可送出，由主管審核`
                 : conflicts.length > 0 
-                    ? `⚠️ 提醒：期間已有 ${maxDayConflict} 人請假（上限 ${maxConcurrent} 人）`
+                    ? `💡 提醒：期間已有 ${maxDayConflict} 人請假（警告門檻 ${maxConcurrent} 人）`
                     : '✅ 該期間無人請假，可正常申請'
         };
     } catch(e) {
         console.error('檢查請假可用性失敗', e);
-        return { ok: true, message: '' };
+        return { ok: true, thresholdExceeded: false, conflicts: [], maxDayConflict: 0, staffWarning: '', message: '' };
     }
 }
 
@@ -1217,18 +1220,11 @@ async function submitLeave() {
     const statusEl = document.getElementById('leaveStatus');
     if (statusEl) { statusEl.className = 'status-box show info'; statusEl.textContent = '⏳ 檢查人力狀態中...'; }
 
-    // 先檢查是否超過同時請假上限
+    // 先檢查是否超過同時請假警告門檻；超過仍可送出，由主管審核
     const check = await checkLeaveAvailability(start, end);
-    
-    if (!check.ok) {
-        // 自動駁回
-        if (statusEl) {
-            statusEl.className = 'status-box show error';
-            statusEl.innerHTML = `${escapeHTML(check.message)}<br><span style="font-size:12px;color:#94A3B8;margin-top:4px;display:block;">已有同事請假：${check.conflicts.map(c => `${escapeHTML(c.date)}(${c.names.map(n => escapeHTML(n)).join(',')})`).slice(0,3).join('、')}</span>`;
-        }
-        showToast('❌ 該日期請假人數已達上限');
-        setBtnLoading(submitBtn, false, '📤 提交申請');
-        return;
+    if (check.thresholdExceeded && statusEl) {
+        statusEl.className = 'status-box show info';
+        statusEl.innerHTML = `${escapeHTML(check.message)}<br><span style="font-size:12px;color:#92400E;margin-top:4px;display:block;">申請將照常送出為待審，請主管確認當日人力。</span>`;
     }
 
     try {
@@ -1269,7 +1265,12 @@ async function submitLeave() {
                 daysNote = `（計 ${rpcDays} 天${excludedOffDays > 0 ? `，已排除 ${excludedOffDays} 天休假日` : ''}）`;
             }
             statusEl.className = 'status-box show success';
-            statusEl.innerHTML = `✅ 申請已提交${daysNote}` + (check.conflicts.length > 0 ? `<br><span style="font-size:12px;color:#F59E0B;">💡 提醒：期間已有 ${check.maxDayConflict} 人請假</span>` : '');
+            statusEl.innerHTML = `✅ 申請已提交並等待主管審核${daysNote}`
+                + (check.thresholdExceeded
+                    ? `<br><span style="font-size:12px;color:#B45309;font-weight:700;">${escapeHTML(check.message)}</span>`
+                    : check.conflicts.length > 0
+                        ? `<br><span style="font-size:12px;color:#F59E0B;">💡 提醒：期間已有 ${check.maxDayConflict} 人請假</span>`
+                        : '');
         }
         if (document.getElementById('leaveReason')) document.getElementById('leaveReason').value = '';
         // 清除衝突提示
@@ -1280,7 +1281,8 @@ async function submitLeave() {
         const typeNames = { annual:'特休', sick:'病假', personal:'事假', compensatory:'補休' };
         const periodNames = { full_day:'全日', am:'上午半天', pm:'下午半天', hourly:'小時請假' };
         const periodNote = period === 'hourly' ? `${leaveStartTime}–${leaveEndTime}（${leaveHours} 小時）` : (periodNames[period] || '全日');
-        sendAdminNotify(`🔔 ${currentEmployee.name} 申請${typeNames[type]||type}（${periodNote}）\n📅 ${start} ~ ${end}\n📝 ${reason || '無附原因'}`);
+        const staffingNote = check.thresholdExceeded ? `\n⚠️ 超過同時請假警告門檻 ${check.maxConcurrent} 人，請確認人力` : '';
+        sendAdminNotify(`🔔 ${currentEmployee.name} 申請${typeNames[type]||type}（${periodNote}）\n📅 ${start} ~ ${end}\n📝 ${reason || '無附原因'}${staffingNote}`);
     } catch(e) {
         showToast('❌ 申請失敗：' + friendlyError(e));
     } finally {

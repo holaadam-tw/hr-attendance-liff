@@ -344,7 +344,7 @@
         </div>
     </div>
 
-<script src="common.js?v=20260815-makeupguidance2"></script>
+<script src="common.js?v=20260831-leaveadvisory"></script>
     <script>
         // === 全域錯誤監控 ===
         window._errLogCount = 0; window._errLogResetTs = 0;
@@ -1042,19 +1042,21 @@
 
             const check = await checkLeaveAvailability(start, end);
 
-            if (!check.ok) {
+            if (check.thresholdExceeded) {
                 warn.style.background = '#FEF2F2';
-                warn.style.color = '#DC2626';
+                warn.style.color = '#B91C1C';
                 let html = `<b>${escapeHTML(check.message)}</b>`;
-                if (check.conflicts.length > 0) {
+                if (check.conflicts && check.conflicts.length > 0) {
                     html += '<div style="margin-top:6px;font-size:12px;">';
                     check.conflicts.slice(0, 5).forEach(c => {
                         html += `<div style="padding:2px 0;">📅 ${escapeHTML(c.date)}：${c.names.map(n => escapeHTML(n)).join('、')}（${c.count}人）</div>`;
                     });
                     html += '</div>';
                 }
+                html += '<div style="margin-top:6px;font-weight:800;">✅ 仍可送出；申請會進入待審，由主管決定是否核准。</div>';
+                if (check.staffWarning) html += `<div style="margin-top:4px;font-weight:700;">${escapeHTML(check.staffWarning)}</div>`;
                 warn.innerHTML = html;
-                if (btn) { btn.disabled = true; btn.style.opacity = '0.5'; }
+                if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
             } else if (check.conflicts && check.conflicts.length > 0) {
                 warn.style.background = '#FFF7ED';
                 warn.style.color = '#EA580C';

@@ -180,7 +180,7 @@ export async function saveMaxLeave() {
     const statusEl = document.getElementById('maxLeaveSaveStatus');
     try {
         const val = { max: maxLeaveValue };
-        await saveSetting('max_concurrent_leave', val, '同時請假人數上限');
+        await saveSetting('max_concurrent_leave', val, '同時請假警告門檻');
         statusEl.style.display = 'block'; statusEl.style.color = '#059669'; statusEl.textContent = '✅ 已儲存';
         setTimeout(() => { statusEl.style.display = 'none'; }, 2000);
     } catch (e) {
@@ -377,7 +377,7 @@ export async function loadStaffOverview() {
                 <span style="padding:6px 12px;background:#FFF7ED;border-radius:8px;font-weight:700;color:#EA580C;">🏖️ 今日請假 ${onLeave} 人</span>
                 <span style="padding:6px 12px;background:#EFF6FF;border-radius:8px;font-weight:700;color:#2563EB;">💪 今日可用 ${total - onLeave} 人</span>
             </div>
-            <div style="font-size:12px;color:#94A3B8;">目前設定：同時最多 <b style="color:#DC2626;">${maxLeaveValue}</b> 人請假</div>`;
+            <div style="font-size:12px;color:#94A3B8;">目前警告門檻：同時請假超過 <b style="color:#DC2626;">${maxLeaveValue}</b> 人時提醒主管</div>`;
     } catch (e) { el.textContent = '載入失敗'; }
 }
 
@@ -447,11 +447,11 @@ export async function loadLeaveCal() {
         const dt = new Date(lcYear, lcMonth, d);
         const isW = dt.getDay() === 0 || dt.getDay() === 6;
         const ds = `${lcYear}-${String(lcMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-        const over = dayCount[ds] >= maxC && !isW;
+        const over = dayCount[ds] > maxC && !isW;
         const bg = over ? '#FEE2E2' : isW ? '#F1F5F9' : '#fff';
         headHtml += `<th style="padding:4px 2px;min-width:28px;text-align:center;border-bottom:2px solid ${over ? '#FCA5A5' : '#E5E7EB'};background:${bg};font-size:10px;">
             <div style="${over ? 'color:#DC2626;font-weight:900;' : ''}">${d}</div><div style="color:#94A3B8;font-size:9px;">${wd[dt.getDay()]}</div>
-            ${over ? '<div style="font-size:8px;color:#DC2626;font-weight:900;">滿</div>' : ''}
+            ${over ? '<div style="font-size:8px;color:#DC2626;font-weight:900;">警</div>' : ''}
         </th>`;
     }
     headHtml += '</tr>';
@@ -481,7 +481,7 @@ export async function loadLeaveCal() {
                 const emoji = typeEmoji[lv.leave_type] || '📝';
                 const pending = lv.status === 'pending' ? 'opacity:0.6;' : '';
                 const periodLabel = leavePeriodLabel(lv.leave_period);
-                bodyHtml += `<td style="text-align:center;background:${bg};border-bottom:1px solid #F1F5F9;${pending}font-size:10px;cursor:default;" title="${emp.name} ${lv.leave_type} ${periodLabel} ${lv.days || 1}天${lv.status === 'pending' ? ' (待審)' : ''}${over ? ' ⚠超限' : ''}">${emoji}${lv.leave_period && lv.leave_period !== 'full_day' ? '<span style="font-size:9px;">半</span>' : ''}</td>`;
+                bodyHtml += `<td style="text-align:center;background:${bg};border-bottom:1px solid #F1F5F9;${pending}font-size:10px;cursor:default;" title="${emp.name} ${lv.leave_type} ${periodLabel} ${lv.days || 1}天${lv.status === 'pending' ? ' (待審)' : ''}${over ? ' ⚠超過警告門檻' : ''}">${emoji}${lv.leave_period && lv.leave_period !== 'full_day' ? '<span style="font-size:9px;">半</span>' : ''}</td>`;
             } else if (isW) {
                 bodyHtml += `<td style="background:#F8FAFC;border-bottom:1px solid #F1F5F9;"></td>`;
             } else {
@@ -497,7 +497,7 @@ export async function loadLeaveCal() {
         const dt = new Date(lcYear, lcMonth, d);
         const isW = dt.getDay() === 0 || dt.getDay() === 6;
         const cnt = dayCount[ds] || 0;
-        const over = cnt >= maxC && !isW;
+        const over = cnt > maxC && !isW;
         if (over && !isW) overDays.push(`${lcMonth + 1}/${d}`);
         bodyHtml += `<td style="text-align:center;font-size:10px;font-weight:900;color:${over ? '#DC2626' : cnt > 0 ? '#EA580C' : '#CBD5E1'};border-bottom:1px solid #F1F5F9;background:${over ? '#FEF2F2' : '#F8FAFC'};">${cnt || '-'}</td>`;
     }
@@ -510,7 +510,7 @@ export async function loadLeaveCal() {
     const warnEl = document.getElementById('lcOverWarn');
     if (overDays.length > 0) {
         warnEl.style.display = 'block';
-        warnEl.innerHTML = `🚨 以下日期請假人數已達/超過上限（${maxC}人）：<br><b>${overDays.join('、')}</b><br><span style="font-size:11px;opacity:0.7;">員工在這些日期提交請假將被自動駁回</span>`;
+        warnEl.innerHTML = `⚠️ 以下日期已超過同時請假警告門檻（${maxC}人）：<br><b>${overDays.join('、')}</b><br><span style="font-size:11px;opacity:0.85;">員工仍可送出申請，請主管審核當日人力後決定</span>`;
     } else {
         warnEl.style.display = 'none';
     }
