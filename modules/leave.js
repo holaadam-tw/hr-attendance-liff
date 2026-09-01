@@ -114,16 +114,22 @@ export async function approveLeave(requestId, newStatus) {
         if (error) throw error;
         if (!result?.success) throw new Error(result?.error || '審核失敗');
 
+        let notifyResult = null;
         if (result.employee_id) {
             const typeMap = { annual: '特休', sick: '病假', personal: '事假', compensatory: '補休' };
             const typeName = typeMap[result.leave_type] || result.leave_type;
             if (newStatus === 'approved') {
-                sendUserNotify(result.employee_id, `✅ 您的${typeName}申請已通過\n📅 ${result.start_date} ~ ${result.end_date}`);
+                notifyResult = await sendUserNotify(result.employee_id, `✅ 您的${typeName}申請已通過\n📅 ${result.start_date} ~ ${result.end_date}`);
             } else {
-                sendUserNotify(result.employee_id, `❌ 您的${typeName}申請已被拒絕\n📅 ${result.start_date} ~ ${result.end_date}\n原因：${rejectionReason || '不符合規定'}`);
+                notifyResult = await sendUserNotify(result.employee_id, `❌ 您的${typeName}申請已被拒絕\n📅 ${result.start_date} ~ ${result.end_date}\n原因：${rejectionReason || '不符合規定'}`);
             }
         }
-        showToast(`✅ 請假申請已${newStatus === 'approved' ? '通過' : '拒絕'}`);
+        const actionText = newStatus === 'approved' ? '通過' : '拒絕';
+        if (notifyResult && !notifyResult.ok) {
+            showToast(`⚠️ 請假申請已${actionText}，但員工 LINE 通知失敗：${notifyResult.message || '請直接聯絡員工'}`);
+        } else {
+            showToast(`✅ 請假申請已${actionText}`);
+        }
         writeAuditLog(newStatus === 'approved' ? 'approve' : 'reject', 'leave_requests', requestId, result?.employee_name);
         loadLeaveApprovals('pending');
     } catch (err) {

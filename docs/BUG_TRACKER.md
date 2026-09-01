@@ -1017,3 +1017,7 @@ PostgREST（anon key，無寫入）另測兩種呼叫形狀都能正確解析：
 ## 2026-08-31 修復紀錄
 
 - **B57**（已實作、待驗收）：公司原本的 `max_concurrent_leave` 是硬性上限，超過時員工表單直接鎖定且無法送出，不符合多人確實需要同日請假的情境。修法：保留既有設定鍵與 1–10 人數值，但產品語意改為「同時請假警告門檻」；只有「既有重疊人數 + 本次申請人」大於門檻才顯示醒目人力警告，員工仍可送出為待審，最後由主管核准或駁回。衝突計算仍限定目前公司、其他員工、待審／已核准與既有重疊日期規則；送出仍只走 `submit_leave_request`。管理月曆同步移除「自動駁回」文案，超額日期改為主管人力提醒。新增 `tests/concurrent-leave-advisory.test.js` 並納入完整測試；未新增 migration、schema、RPC 或資料庫寫入路徑。
+
+## 2026-09-01 修復紀錄
+
+- **B58**（已實作、待 dev 實機驗收）：請假送出或審核後沒有收到 LINE，但管理端測試推播與畫面仍可能顯示成功。根因是正式 `line-push` Edge Function 會以 HTTP 200 包裝 LINE 的實際 400/401 等 status，舊版 `sendLineMessage()` 只檢查外層 HTTP 與 `result.error`，且三層 helper 吞掉失敗，導致 Token 無效、群組 ID 錯誤、員工未綁定或網路異常都被當成成功。修法：共用 helper 統一回傳不含 Token 的 `{ok,status,code,message}`，同時判斷外層 HTTP 與內層 LINE status；主管／員工 helper 傳遞結果，員工查詢補上 `company_id` 隔離。請假申請或審核資料成功後，LINE 失敗顯示獨立白話警告且不回滾資料；管理端「測試推播」只有真實成功才顯示綠色。本機 Edge Function 原始碼同步改為沿用 LINE HTTP status 與安全錯誤摘要，但本次未部署，前端已相容正式站舊格式。新增 `tests/line-notification-delivery.test.js`，離線涵蓋舊版包裝 401、HTTP 403、缺 Token、缺群組、網路失敗、無效回傳、員工公司隔離及畫面警告；未連線 LINE、未發送通知、未存取正式資料庫。

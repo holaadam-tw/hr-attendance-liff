@@ -13,7 +13,7 @@ serve(async (req) => {
   try {
     const { token, to, text } = await req.json()
     if (!token || !to || !text) {
-      return new Response(JSON.stringify({ error: '缺少參數' }), {
+      return new Response(JSON.stringify({ ok: false, status: 400, error: '缺少必要參數' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
@@ -22,12 +22,23 @@ serve(async (req) => {
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
       body: JSON.stringify({ to, messages: [{ type: 'text', text }] })
     })
-    const data = await res.text()
-    return new Response(JSON.stringify({ status: res.status, data }), {
+    const raw = await res.text()
+    let lineMessage = ''
+    try {
+      const parsed = raw ? JSON.parse(raw) : null
+      lineMessage = parsed?.message || parsed?.details?.[0]?.message || ''
+    } catch (_) {
+      lineMessage = ''
+    }
+    const payload = res.ok
+      ? { ok: true, status: res.status }
+      : { ok: false, status: res.status, error: lineMessage || 'LINE Messaging API 拒絕推播' }
+    return new Response(JSON.stringify(payload), {
+      status: res.status,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
-  } catch (e) {
-    return new Response(JSON.stringify({ error: e.message }), {
+  } catch (_) {
+    return new Response(JSON.stringify({ ok: false, status: 500, error: 'LINE 推播服務暫時無法使用' }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
   }

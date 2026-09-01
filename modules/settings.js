@@ -67,12 +67,18 @@ export async function testNotify() {
     const status = document.getElementById('notifyStatus');
     if (status) { status.style.display = 'block'; status.style.color = '#6D28D9'; status.textContent = '⏳ 發送測試...'; }
     try {
-        await sendAdminNotify('🔔 HR 系統推播測試\n如果您收到此訊息，表示 LINE Messaging API 設定成功！');
+        const result = await sendAdminNotify('🔔 HR 系統推播測試\n如果您收到此訊息，表示 LINE Messaging API 設定成功！');
+        if (!result?.ok) {
+            const message = result?.message || 'LINE 推播未送達，請檢查設定';
+            showToast('❌ 推播失敗：' + message);
+            if (status) { status.style.color = '#DC2626'; status.textContent = '❌ ' + message; }
+            return;
+        }
         showToast('✅ 測試推播已發送');
         if (status) { status.style.color = '#059669'; status.textContent = '✅ 推播成功！請查看 LINE 群組'; }
     } catch(e) {
-        showToast('❌ 推播失敗');
-        if (status) { status.style.color = '#DC2626'; status.textContent = '❌ 推播失敗，請檢查設定'; }
+        showToast('❌ 推播失敗：LINE 通知發生未預期錯誤');
+        if (status) { status.style.color = '#DC2626'; status.textContent = '❌ LINE 通知發生未預期錯誤，請稍後重試'; }
     }
 }
 

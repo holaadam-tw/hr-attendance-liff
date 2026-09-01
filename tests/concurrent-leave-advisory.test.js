@@ -128,13 +128,13 @@ const existingLeave = (id, name) => ({
   check('管理端不再宣稱自動駁回或表單鎖定', !/自動駁回|表單直接鎖定/.test(adminSrc + leaveModuleSrc));
   check('既有設定鍵保留以相容公司資料', /saveSetting\('max_concurrent_leave'/.test(leaveModuleSrc));
   check('管理月曆只在實際人數大於門檻時警告', /const over = dayCount\[ds\] > maxC/.test(leaveModuleSrc) && /const over = cnt > maxC/.test(leaveModuleSrc));
-  check('管理模組快取版本已更新', /leave\.js\?v=20260831-leaveadvisory/.test(moduleIndexSrc));
+  check('管理模組快取版本已更新', /leave\.js\?v=20260901-linenotify/.test(moduleIndexSrc));
 
   const htmlFiles = fs.readdirSync(root).filter(name => name.endsWith('.html'));
   const commonRefs = htmlFiles
     .map(name => ({ name, src: fs.readFileSync(path.join(root, name), 'utf8') }))
     .filter(file => file.src.includes('common.js'));
-  const staleRefs = commonRefs.filter(file => !file.src.includes('common.js?v=20260831-leaveadvisory'));
+  const staleRefs = commonRefs.filter(file => !file.src.includes('common.js?v=20260901-linenotify'));
   check('所有 common.js 引用已同步升版', staleRefs.length === 0, staleRefs.map(file => file.name).join(', '));
 
   console.log(`\n  結果：${pass} 通過，${fail} 失敗`);

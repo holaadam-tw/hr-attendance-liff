@@ -8,6 +8,7 @@
     "test:makeup-guidance": "node tests/makeup-punch-guidance.test.js",
     "test:leave-time-audit": "node tests/leave-time-attendance-audit.test.js",
     "test:leave-advisory": "node tests/concurrent-leave-advisory.test.js",
+    "test:line-notify": "node tests/line-notification-delivery.test.js",
     "test:missing-work-hours-control": "node tests/missing-work-hours-notification-control.test.js",
     "test:overview": "node tests/attendance-overview.test.js",
     "test:payroll-ot": "node tests/payroll-overtime.test.js",

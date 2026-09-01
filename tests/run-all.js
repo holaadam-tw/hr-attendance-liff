@@ -22,6 +22,7 @@ const SUITES = [
   { name: '補打卡日期與時間導引', file: 'makeup-punch-guidance.test.js' },
   { name: '時數假與缺時稽核', file: 'leave-time-attendance-audit.test.js' },
   { name: '同時請假警告門檻', file: 'concurrent-leave-advisory.test.js' },
+  { name: 'LINE 通知結果回饋', file: 'line-notification-delivery.test.js' },
   { name: '缺時 LINE 通知安全開關', file: 'missing-work-hours-notification-control.test.js' },
   { name: '打卡總覽', file: 'attendance-overview.test.js' },
   { name: '薪資頁加班來源', file: 'payroll-overtime.test.js' },

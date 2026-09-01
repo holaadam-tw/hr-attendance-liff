@@ -200,7 +200,7 @@ const commonRefs = fs.readdirSync(root)
   .filter(name => name.endsWith('.html'))
   .map(name => ({ name, src: fs.readFileSync(path.join(root, name), 'utf8') }))
   .filter(file => /<script\s+src="common\.js/.test(file.src));
-const staleRefs = commonRefs.filter(file => !file.src.includes('common.js?v=20260831-leaveadvisory'));
+const staleRefs = commonRefs.filter(file => !file.src.includes('common.js?v=20260901-linenotify'));
 check('所有 common.js 引用已同步升版', staleRefs.length === 0, staleRefs.map(file => file.name).join(', '));
 
 console.log(`\n  結果：✅ ${pass} 通過  ❌ ${fail} 失敗\n`);
