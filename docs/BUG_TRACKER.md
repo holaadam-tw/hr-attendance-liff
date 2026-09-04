@@ -5,6 +5,25 @@
 
 ---
 
+## 🟡 2026-09-04 假日維護畫面＋2027 假日種子＋核准請假呼叫者驗證（migration 119，**待業主授權部署**）
+
+業主指示：(5)「2027 年國定假日匯入，或做一個假日維護畫面，不必每年找我」→ 兩個都做；(6)「核准請假的 RPC 沒有驗證呼叫者身分」→ 修。
+
+### 修法
+- A. 匯入 116 年（2027）政府行政機關辦公日曆表 24 筆到大正（含 2/9、2/10 春節補假、3/1、4/6、4/30、10/11、12/24 補假與 12/31 的 2028 元旦補假）
+- B. `upsert_company_holiday` / `delete_company_holiday`（has_company_access(…, true)）；admin.html 地點管理頁新增「📅 公司假日」卡片（年度選單、清單、新增／修改／刪除），common.js 全走 RPC
+- C. `approve_leave_request` 新簽章 `(p_company_id, p_line_user_id, p_request_id, p_status, p_rejection_reason)`：管理員驗證、假單限同公司、approver_id 由呼叫者解析；保留 117 pending／重疊檢查；舊 4 參數簽章只回 `deprecated_signature`。`modules/leave.js` 改新簽章
+- 附：`docs/RLS_REMEDIATION_PLAN.md` 補上 2026-09-04 直接讀寫盤點與分階段計畫（第 5 節）
+
+### 驗證
+- `tests/holiday-admin-approve-auth.test.js` 51 項；反向對照壞 leave.js／壞 migration 皆有失敗
+- `npm test` 16 套件全過；`qa_check` 0 FAIL 1 WARN（既有）；Hook 6 筆既有、RLS bypass 0
+- SQL 未在資料庫實跑（Hard Block）；部署腳本 `.codex/deploy_migration_119_single_transaction_*.sql`，備份 `.codex/production_rpc_backup_before_119_*.sql`
+
+- **狀態：待業主結構化授權。**
+
+---
+
 ## 🔴→🟢 2026-09-04 公司假日納入計算＋缺時通知門檻＋月統計缺工分鐘（migration 118，**已套用正式庫**）
 
 業主指示三件事：(1) 請假跨國定假日不能算天數，要把整年假期算進去；(2) 早退／遲到的人要顯示、隔天要通知補請假（未滿 7 小時）；(3) 統計表要顯示缺工時間（遲到、早退分鐘）。

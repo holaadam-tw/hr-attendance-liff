@@ -43,7 +43,7 @@ function _doShowPage(id) {
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     document.getElementById(id).classList.add('active');
 
-    if (id === 'locationPage') window.renderLocationList?.();
+    if (id === 'locationPage') { window.renderLocationList?.(); window.loadHolidayList?.(); }
     if (id === 'employeePage') window.loadEmployeeList?.();
     if (id === 'approvalCenterPage') { window.switchApprovalType?.('leave', document.querySelector('.aprTab')); }
     if (id === 'announcementPage') window.loadAnnouncementList?.();

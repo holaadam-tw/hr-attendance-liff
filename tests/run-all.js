@@ -24,6 +24,7 @@ const SUITES = [
   { name: '同時請假警告門檻', file: 'concurrent-leave-advisory.test.js' },
   { name: '請假重疊防呆與天數觸發器', file: 'leave-overlap-guard.test.js' },
   { name: '公司假日與缺工分鐘', file: 'holidays-missing-minutes.test.js' },
+  { name: '假日維護與核准身分驗證', file: 'holiday-admin-approve-auth.test.js' },
   { name: 'LINE 通知結果回饋', file: 'line-notification-delivery.test.js' },
   { name: '缺時 LINE 通知安全開關', file: 'missing-work-hours-notification-control.test.js' },
   { name: '打卡總覽', file: 'attendance-overview.test.js' },

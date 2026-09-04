@@ -84,3 +84,75 @@ DROP POLICY IF EXISTS "allow_select_payroll" ON payroll;
 
 ## 8. 附帶：E818/E820 補卡來源（未解）
 `makeup_punch_requests` 核准只改 `status='approved'` 不刪除（049:100），note 仍在但 RLS 擋 anon 讀不到。`hr_audit_logs` 的 makeup 核准全是 `System/approve/details=null`，無來源記錄。7/2 有 ~20 筆集中在 17:11–17:14 核准，像主管批次通過。**要定論 GPS 定位是否為特定裝置問題，須以 admin/service-role 直接查那幾筆 note（有 accuracy/座標即 GPS 精度審核轉入）。**
+
+---
+
+## 9. 2026-09-04 更新：現況重盤與分階段執行計畫
+
+> 以下為 2026-09-04 依業主指示補上的執行計畫；上面第 1～4 節（2026-07-03 調查）的原則不變，特別是「RPC 不可只信任 client 傳入的 p_company_id」——118/119 新增的 RPC 一律以 `has_company_access(p_line_user_id, p_company_id, …)` 驗證呼叫者確實屬於該公司，符合此原則。
+>
+> 已完成 RPC 化的表（可當範本）：`leave_requests`（048/053/113/117/119）、`makeup_punch_requests`（085/086）、`overtime_requests`（109/110）、`attendance_anomalies`（092）、`holidays`（118/119）、`payroll`（111）。
+
+### 前端直接讀寫現況（2026-09-04 grep `sb.from('<table>')`）
+
+| 表 | select | 寫入（insert/update/upsert/delete） | 敏感度 | 備註 |
+|---|---|---|---|---|
+| employees | 14 | 10 | 🔴 個資、角色 | 角色欄位可被改 → 提權 |
+| attendance | 4 | 0 | 🔴 考勤 | 寫入已全走 RPC，只剩讀 |
+| leave_requests | 7 | 0 | 🔴 | 寫入已全走 RPC，只剩讀 |
+| system_settings | 7 | 1 | 🟠 含 LINE token、打卡地點 | `saveSetting` 直寫 |
+| companies | 14 | 7 | 🟠 租戶主檔 | |
+| schedules | 6 | 6 | 🟠 | 排班可被改 |
+| shift_swap_requests | 0 | 5 | 🟠 | |
+| requests | 0 | 4 | 🟠 | 雜項申請 |
+| insurance_brackets | 2 | 4 | 🟡 | |
+| hr_audit_logs | 1 | 1 | 🟡 稽核可被竄改 | |
+| platform_admins / platform_admin_companies | 2 | 6 | 🔴 平台管理員 | 提權路徑 |
+| lunch_orders | 2 | 6 | 🟢 | |
+| field_work_logs / trips / sales_* / clients | ~3 | ~20 | 🟡 業務資料 | |
+| store_* / booking_* / orders / menu_* / loyalty_* / service_* | ~40 | ~70 | 🟡 商店端（消費者頁面 anon 使用） | 本來就設計給匿名消費者，需另一套 RLS 思路 |
+
+### 分階段
+
+#### 階段 0：盤點與量測（1 天，唯讀）
+- `bash scripts/rls_audit.sh` 產出目前政策清單存檔
+- 用上表為每張表標「目標：RPC-only／anon 可讀不可寫／維持公開」
+- 補一支 `tests/rls-locked-tables.test.js` 的擴充：前端出現新的直接寫入就 FAIL（現在只擋既有鎖定表）
+
+#### 階段 1：先鎖「寫入」不鎖「讀取」（高風險、低工程量）
+對 employees、companies、system_settings、schedules、shift_swap_requests、requests、hr_audit_logs、platform_admins、platform_admin_companies、insurance_brackets：
+1. 每張表的寫入路徑改 RPC（employees 的 update 有 7 處，是最大工程；其餘每表 1～6 處）
+2. 撤掉 `INSERT/UPDATE/DELETE` 的 `USING(true)` 政策，**保留 SELECT 全開**
+3. 效果：外人仍能讀，但不能改角色、改薪資設定、改排班、改稽核紀錄
+- 預估：employees 2 天、其餘合計 2 天、驗證 1 天
+
+#### 階段 2：讀取改 RPC（高風險表）
+employees、attendance、leave_requests、system_settings、payroll_records、attendance_backup：
+- 每頁讀取改成帶 `p_line_user_id` 的 RPC（打卡總覽、薪資頁、員工管理已有大部分 RPC，可重用）
+- 撤 SELECT 全開政策
+- 預估：3～4 天，需逐頁回歸（CLAUDE.md 修改影響範圍對照表）
+
+#### 階段 3：商店端（消費者匿名頁）
+booking / order / loyalty / menu 是給匿名消費者用的，不能要求 LINE 身分。做法：
+- 讀：只開「is_active = true 的公開欄位」view，其餘欄位不暴露
+- 寫：改 RPC 並加 rate limit／欄位白名單（例如 orders 只能 insert 自己的、不能改 status）
+- 預估：3 天
+
+#### 階段 4：收尾
+- `attendance_backup`、`binding_attempts` 等純內部表：RLS 開、0 政策
+- 換 anon key（舊 key 已公開多時）
+- `scripts/qa_check.sh` 第 8 項改為：出現 `USING(true)` 直接 FAIL
+
+### 每階段的驗證方式
+- `bash scripts/rls_audit.sh` 前後比對（全開政策條數必須下降）
+- 用 anon key 對該表做 curl 寫入 → 必須 401/403 或 0 rows
+- `npm test` 全綠＋該表牽涉頁面的手動回歸（對照表在 CLAUDE.md）
+- 每階段一支 migration、單一交易、事前備份、業主結構化授權後套用
+
+### 建議順序與原因
+1. 階段 1 的 employees **寫入**（提權風險最高、且 role 欄位能被改；只鎖寫入不影響第 4 節提到的登入流程讀取，employees 的**讀取**仍依第 4 節「順序陷阱」放最後）
+2. 階段 1 其餘寫入
+3. 階段 2 的 employees／attendance／leave_requests 讀取（個資與考勤）
+4. 階段 3、4
+
+每完成一張表就在 `docs/BUG_TRACKER.md` 更新那張表的狀態，不必等整個階段結束。

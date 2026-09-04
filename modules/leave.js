@@ -105,10 +105,12 @@ export async function approveLeave(requestId, newStatus) {
         if (rejectionReason === null) return;
     }
     try {
+        // 119：核准人由 RPC 依 LINE 身分解析並驗證管理員權限，不再由前端傳 approver_id
         const { data: result, error } = await sb.rpc('approve_leave_request', {
+            p_company_id: window.currentCompanyId,
+            p_line_user_id: window.currentAdminEmployee?.line_user_id || liffProfile?.userId || null,
             p_request_id: requestId,
             p_status: newStatus,
-            p_approver_id: window.currentAdminEmployee?.id,
             p_rejection_reason: newStatus === 'rejected' ? (rejectionReason || '不符合規定') : null
         });
         if (error) throw error;

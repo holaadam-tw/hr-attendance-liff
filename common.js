@@ -2068,6 +2068,117 @@ async function saveLocationsToDB(newLocations) {
     }
 }
 
+// ===== 119：公司假日維護（admin.html 地點管理頁；holidays 有 RLS，一律走 RPC） =====
+function holidayAdminLineUserId() {
+    return window.currentAdminEmployee?.line_user_id || liffProfile?.userId || null;
+}
+
+function holidayTypeLabel(type) {
+    return ({ national: '國定假日', makeup: '補假', company: '公司自訂' })[type] || type || '';
+}
+
+function ensureHolidayYearOptions() {
+    const sel = document.getElementById('holidayYear');
+    if (!sel || sel.options.length > 0) return;
+    const thisYear = parseInt(getTaiwanDate().slice(0, 4), 10);
+    for (let y = thisYear - 1; y <= thisYear + 2; y++) {
+        const opt = document.createElement('option');
+        opt.value = String(y); opt.textContent = y + ' 年';
+        if (y === thisYear) opt.selected = true;
+        sel.appendChild(opt);
+    }
+}
+
+async function loadHolidayList() {
+    const listEl = document.getElementById('holidayList');
+    if (!listEl) return;
+    ensureHolidayYearOptions();
+    const year = document.getElementById('holidayYear')?.value || getTaiwanDate().slice(0, 4);
+    listEl.innerHTML = '<p class="text-center-muted">載入中...</p>';
+    try {
+        const { data, error } = await sb.rpc('get_company_holidays', {
+            p_company_id: window.currentCompanyId,
+            p_line_user_id: holidayAdminLineUserId(),
+            p_from: `${year}-01-01`,
+            p_to: `${year}-12-31`
+        });
+        if (error) throw error;
+        renderHolidayList(data || [], year);
+    } catch (e) {
+        listEl.innerHTML = `<p style="color:#DC2626;text-align:center;">載入失敗：${escapeHTML(friendlyError(e))}</p>`;
+    }
+}
+
+function renderHolidayList(rows, year) {
+    const listEl = document.getElementById('holidayList');
+    const countEl = document.getElementById('holidayCount');
+    if (!listEl) return;
+    if (countEl) countEl.textContent = rows.length ? `共 ${rows.length} 天` : '';
+    if (rows.length === 0) {
+        listEl.innerHTML = `<p class="text-center-muted">${escapeHTML(String(year))} 年尚未設定假日</p>`;
+        return;
+    }
+    const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
+    listEl.innerHTML = rows.map(h => {
+        const dow = weekdays[new Date(h.holiday_date + 'T00:00:00Z').getUTCDay()];
+        return `
+        <div style="display:flex;align-items:center;gap:10px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;padding:10px 12px;margin-bottom:6px;">
+            <div style="font-family:monospace;font-weight:700;color:#1E293B;white-space:nowrap;">${escapeHTML(h.holiday_date)}（${dow}）</div>
+            <div style="flex:1;font-size:14px;color:#334155;">${escapeHTML(h.holiday_name || '')}
+                <span style="font-size:11px;color:#64748B;background:#E2E8F0;border-radius:999px;padding:1px 8px;margin-left:6px;">${escapeHTML(holidayTypeLabel(h.holiday_type))}</span>
+            </div>
+            <button data-date="${escapeHTML(h.holiday_date)}" data-name="${escapeHTML(h.holiday_name || '')}" onclick="deleteHoliday(this.dataset.date, this.dataset.name)" style="font-size:12px;padding:5px 10px;border:1px solid #EF4444;border-radius:8px;background:#FEF2F2;color:#EF4444;cursor:pointer;">🗑️</button>
+        </div>`;
+    }).join('');
+}
+
+async function addHoliday() {
+    const dateEl = document.getElementById('newHolidayDate');
+    const nameEl = document.getElementById('newHolidayName');
+    const typeEl = document.getElementById('newHolidayType');
+    const date = dateEl?.value;
+    const name = (nameEl?.value || '').trim();
+    const type = typeEl?.value || 'national';
+    if (!date) return showToast('⚠️ 請選擇日期');
+    if (!name) return showToast('⚠️ 請輸入假日名稱');
+    try {
+        const { data, error } = await sb.rpc('upsert_company_holiday', {
+            p_company_id: window.currentCompanyId,
+            p_line_user_id: holidayAdminLineUserId(),
+            p_holiday_date: date,
+            p_holiday_name: name,
+            p_holiday_type: type
+        });
+        if (error) throw error;
+        if (!data?.success) throw new Error(data?.error || '儲存失敗');
+        showToast(data.updated_existing ? '✅ 已更新該日假日' : '✅ 已新增假日');
+        if (nameEl) nameEl.value = '';
+        const sel = document.getElementById('holidayYear');
+        if (sel && sel.value !== date.slice(0, 4)) sel.value = date.slice(0, 4);
+        loadHolidayList();
+    } catch (e) {
+        showToast('❌ ' + friendlyError(e));
+    }
+}
+
+async function deleteHoliday(date, name) {
+    if (!date) return;
+    if (!confirm(`確定刪除假日？\n${date} ${name || ''}\n\n刪除後該日會恢復為應出勤日。`)) return;
+    try {
+        const { data, error } = await sb.rpc('delete_company_holiday', {
+            p_company_id: window.currentCompanyId,
+            p_line_user_id: holidayAdminLineUserId(),
+            p_holiday_date: date
+        });
+        if (error) throw error;
+        if (!data?.success) throw new Error(data?.error || '刪除失敗');
+        showToast('✅ 已刪除');
+        loadHolidayList();
+    } catch (e) {
+        showToast('❌ ' + friendlyError(e));
+    }
+}
+
 // ===== 前端計算年資 =====
 function calculateAndUpdateMonthsWorked(hireDate, targetElement) {
     if (!hireDate || !targetElement) return;

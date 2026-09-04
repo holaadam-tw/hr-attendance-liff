@@ -273,6 +273,36 @@
                     </div>
                     <button class="btn btn-success" onclick="addNewLocation()">💾 儲存新地點</button>
                 </div>
+
+                <!-- 119：公司假日維護 -->
+                <div style="margin-top: 20px; background:#fff; border-radius:16px; padding:20px; box-shadow:0 2px 8px rgba(0,0,0,0.05);">
+                    <h3 style="margin-bottom:6px;">📅 公司假日（國定假日）</h3>
+                    <p style="font-size:12px;color:#64748B;margin-bottom:12px;">用於請假天數、應出勤與缺時稽核：沒有排班的假日不算工作日；有排班的日子以排班為準。每年年底請把下一年的假日補進來。</p>
+                    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;">
+                        <label style="margin:0;font-weight:700;">年度</label>
+                        <select id="holidayYear" onchange="loadHolidayList()" style="padding:8px 10px;border:1px solid #E2E8F0;border-radius:8px;font-size:14px;"></select>
+                        <span id="holidayCount" style="font-size:12px;color:#64748B;"></span>
+                    </div>
+                    <div id="holidayList"><p class="text-center-muted">載入中...</p></div>
+                    <h4 style="margin:16px 0 10px;">➕ 新增／修改假日</h4>
+                    <div class="form-group">
+                        <label>日期</label>
+                        <input type="date" id="newHolidayDate">
+                    </div>
+                    <div class="form-group">
+                        <label>名稱</label>
+                        <input type="text" id="newHolidayName" placeholder="例如：中秋節、公司旅遊">
+                    </div>
+                    <div class="form-group">
+                        <label>類型</label>
+                        <select id="newHolidayType" style="width:100%;padding:10px;border:1px solid #E2E8F0;border-radius:10px;font-size:14px;">
+                            <option value="national">國定假日</option>
+                            <option value="makeup">補假</option>
+                            <option value="company">公司自訂</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-success" onclick="addHoliday()">💾 儲存假日</button>
+                </div>
             </div>
         </div>
 
