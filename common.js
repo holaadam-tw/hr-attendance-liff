@@ -1188,6 +1188,46 @@ window.formatLeaveTimeRange = formatLeaveTimeRange;
 window.getLeaveHoursForAudit = getLeaveHoursForAudit;
 window.getLeaveAdjustedLateMinutes = getLeaveAdjustedLateMinutes;
 
+// ===== 117：請假重疊（同一天不可重複請假）=====
+// 純函式：兩段日期區間（yyyy-mm-dd 字串）是否有交集；end 缺省視同 start（單日）。
+function leaveDateRangesOverlap(aStart, aEnd, bStart, bEnd) {
+    if (!aStart || !bStart) return false;
+    const ae = aEnd || aStart;
+    const be = bEnd || bStart;
+    return aStart <= be && bStart <= ae;
+}
+
+function leavePeriodLabel(period) {
+    return ({ am: '上午半天', pm: '下午半天', hourly: '時數假' })[period] || '全日';
+}
+
+// 查申請者自己在該區間是否已有 pending/approved 假單（員工自查；RPC 端另有同樣的防線）
+async function findMyOverlappingLeave(start, end) {
+    if (!currentEmployee?.id || !window.currentCompanyId || !start) return null;
+    try {
+        const { data, error } = await sb.from('leave_requests')
+            .select('id, start_date, end_date, leave_period, status, employees!leave_requests_employee_id_fkey!inner(company_id)')
+            .eq('employees.company_id', window.currentCompanyId)
+            .eq('employee_id', currentEmployee.id)
+            .in('status', ['approved', 'pending'])
+            .lte('start_date', end || start)
+            .gte('end_date', start)
+            .order('start_date')
+            .limit(5);
+        if (error) return null;   // 查不到就交給 RPC 擋，不因此阻擋送出
+        return (data || []).find(r => leaveDateRangesOverlap(start, end, r.start_date, r.end_date)) || null;
+    } catch (e) {
+        return null;
+    }
+}
+
+function formatLeaveOverlapMessage(conflict, prefix) {
+    const range = conflict.end_date && conflict.end_date !== conflict.start_date
+        ? `${conflict.start_date} ~ ${conflict.end_date}` : conflict.start_date;
+    const status = conflict.status === 'approved' ? '已核准' : '待審核';
+    return `${prefix}（${range}，${leavePeriodLabel(conflict.leave_period)}，${status}），請勿重複送出`;
+}
+
 async function submitLeave() {
     if (!currentEmployee) return showToast('❌ 請先登入');
     const type = document.getElementById('leaveType')?.value;
@@ -1219,6 +1259,15 @@ async function submitLeave() {
 
     const statusEl = document.getElementById('leaveStatus');
     if (statusEl) { statusEl.className = 'status-box show info'; statusEl.textContent = '⏳ 檢查人力狀態中...'; }
+
+    // 117：同一天不可重複請假——先查自己是否已有 pending/approved 假單（RPC 端另有同樣防線）
+    const mine = await findMyOverlappingLeave(start, end);
+    if (mine) {
+        setBtnLoading(submitBtn, false);
+        const overlapMsg = formatLeaveOverlapMessage(mine, '❌ 同一天已有請假申請');
+        if (statusEl) { statusEl.className = 'status-box show error'; statusEl.textContent = overlapMsg; }
+        return showToast(overlapMsg);
+    }
 
     // 先檢查是否超過同時請假警告門檻；超過仍可送出，由主管審核
     const check = await checkLeaveAvailability(start, end);

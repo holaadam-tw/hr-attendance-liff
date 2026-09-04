@@ -1,7 +1,48 @@
 # RunPiston Bug 追蹤 & 測試清單
 
-> 更新日期：2026-08-06
+> 更新日期：2026-09-04
 > 每次修改後更新此檔案
+
+---
+
+## 🔴→🟡 2026-09-04 請假天數被正式庫殘留觸發器覆寫 ＋ 同一天可重複請假（migration 117，**待業主授權部署**）
+
+業主反映兩點：(1) 連續請假跨六日，六日不應算天數；(2) 同一個人同一天可以請假兩次，沒有阻擋。
+
+### 根因（正式庫實查，非推測）
+| 問題 | 根因 | 證據 |
+|------|------|------|
+| 六日被算進天數、半天假存 1.0 | 正式庫存在 **repo 從未納管**的觸發器 `calculate_leave_days_trigger`（BEFORE INSERT OR UPDATE OF start_date, end_date → `NEW.days := end_date - start_date + 1`），每次 INSERT 都把 095/113 RPC 算好的工作日數覆寫回純日曆天 | `pg_trigger` 查得；`count_employee_workdays(E820, 9/3~9/7)` 在正式庫回 3，但假單存 5.0 |
+| 同一天可重複請假 | `submit_leave_request`（113）、`approve_leave_request`（053）從未查既有假單；DB 無 UNIQUE/EXCLUDE；前端 `checkLeaveAvailability` 用 `.neq('employee_id', 自己)` 主動排除申請者 | E814 8/12 上午＋下午兩筆各 1.0；E809 8/21 特休＋事假兩筆 |
+
+095 部署時（7/16）驗證只跑了 `count_employee_workdays()` 本身，沒驗 INSERT 後的 `days`，所以觸發器一直沒被發現。
+
+### 受影響資料（2026-07-01 起 approved/pending，大正）
+15 筆 days 錯：13 筆半天假存 1.0（應 0.5：E819×5、E815×3、E814×2、TA-004×4）、E821 8/14~8/21 存 8.0（應 6）、E820 9/3~9/7 存 5.0（應 3）。
+另 2 組重疊：E814 8/12 上午＋下午（修正 days 後合計 1.0，可不退件）、E809 8/21 特休＋事假各 1.0（**需業主決定退哪一筆**）。
+
+### 修法（migration 117 `117_leave_overlap_guard.sql`）
+- A. `DROP TRIGGER calculate_leave_days_trigger` ＋ `DROP FUNCTION calculate_leave_days()`；之後 days 唯一來源＝RPC。
+- B. `find_overlapping_leave(employee, start, end, exclude_id, statuses)` 內部函式（REVOKE anon）＋ `leave_overlap_message()`。
+- C. `submit_leave_request` 9 參數版：送出前查同員工 pending/approved 日期交集 → 一律拒絕（**決策：同一天一律擋**，含上午＋下午、兩段時數假；業主要求）。`approve_leave_request`：只處理 pending；核准時同員工同區間已有 approved → 拒絕。
+- D. 資料修正：2026-07-01 起 approved/pending 且 days 與現行規則不符者重算（RETURNING 留證據）。不動 2026-07-01 前（095 前本就日曆天、薪資已結）。
+- 前端 `common.js` `submitLeave` 加自查重疊預檢（`findMyOverlappingLeave`，employee_id＋company_id 隔離），立即提示不必等 RPC。
+
+### 驗證
+- `tests/leave-overlap-guard.test.js` 49 項（純函式 8 案例、前端接線、migration 四段結構、資料修正範圍）；反向對照：壞 common.js 3 失敗、壞 migration 5 失敗。
+- `npm test` 14 套件全過；`qa_check` 0 FAIL 1 WARN（既有 RLS）；Hook 多租戶警告 6 筆與 HEAD 相同、RLS bypass 0。
+- SQL 未在資料庫實跑（正式庫 DDL 屬 Guardrails §1 Hard Block，本機無 Postgres），已逐段 review：RECORD 判斷用 `v_req.id IS NULL`、jsonb 用 `IS NOT NULL`。
+
+### 部署
+- 事前備份：`.codex/production_rpc_backup_before_117_*.sql`（5 函式＋3 觸發器定義）
+- 單一交易腳本：`.codex/deploy_migration_117_single_transaction_*.sql`（含 SHA256）
+- 部署後驗證：觸發器應為 0 列；`find_overlapping_leave` proacl 無 anon；重跑 D 段子查詢比對應 0 筆不符。
+- **狀態：待業主結構化授權後才套用正式庫。**
+
+### 順帶發現（未修，另案）
+- `holidays` 表在正式庫是空表、欄位為 `date`/`name`、無 `company_id`；`migration 114` 與 `attendance_public.html` 用 `holiday_date`/`company_id` 查它 → 114 缺時稽核在正式庫每次都會例外被吞。公司假日概念目前不存在於系統。
+- 月統計 RPC `leave_days` 型別 INTEGER，半天假算 1 整天；請假欄位四套口徑（月統計／public 月表／payroll／audit）。
+- `payroll.js` 整月 attendance/schedules 查詢無 `.limit()`，Supabase 預設 1000 筆會靜默截斷（大正 8 月 359 筆，目前安全）。
 
 ---
 
