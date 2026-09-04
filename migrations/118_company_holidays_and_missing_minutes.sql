@@ -3,7 +3,8 @@
 --
 -- 背景（2026-09-04 業主指示）：
 -- 1. 「請假跨國定假日不能算天數、要把整年假期算進去」：
---    正式庫 holidays 表是空表，欄位是 date/name/type，沒有 company_id；
+--    正式庫 holidays 表 2026-04-15 已匯入 22 筆 2026 假日，但欄位是 date/name/type、沒有 company_id、
+--    unique(date) 讓多公司無法各自維護；RLS 只給 authenticated，anon REST 讀到空陣列（曾誤判為空表）；
 --    migration 114 與 attendance_public.html 卻用 holiday_date/holiday_name/company_id 查它，
 --    114 的缺時稽核因此每次都拋 42703 被 EXCEPTION 吞掉。count_employee_workdays（請假天數）
 --    與 get_company_monthly_attendance（應出勤）從未看過假日。
@@ -11,9 +12,10 @@
 -- 3. 「統計表要顯示缺工時間（遲到／早退分鐘）」：月統計只有次數沒有分鐘。
 --
 -- 本檔：
--- A. holidays 表：date→holiday_date、name→holiday_name、加 company_id（NOT NULL）、唯一索引。
+-- A. holidays 表：date→holiday_date、name→holiday_name、加 company_id；既有 22 筆（無公司）指派給大正科技
+--    （本米為餐飲、假日照常營業，不套用）；unique(date) 改為 unique(company_id, holiday_date)。
 --    RLS 維持啟用、不新增 anon 政策；前端改走 RPC get_company_holidays。
--- B. 匯入 2026（民國 115 年）政府行政機關辦公日曆表放假日到大正科技（本米為餐飲、假日照常營業，不匯入）。
+-- B. 匯入 2026（民國 115 年）放假日到大正科技（與既有 22 筆相同，ON CONFLICT 不重複；作為新環境的種子）。
 -- C. is_company_holiday()；count_employee_workdays 與 get_company_monthly_attendance 的「無排班日」
 --    加上假日排除（有排班則排班優先，維持 083/095 原則）。
 -- D. get_missing_work_hours_min_minutes()（system_settings.missing_work_hours_min_minutes，預設 60）；
@@ -41,6 +43,11 @@ END $$;
 ALTER TABLE public.holidays ADD COLUMN IF NOT EXISTS company_id UUID REFERENCES public.companies(id);
 ALTER TABLE public.holidays ADD COLUMN IF NOT EXISTS type TEXT NOT NULL DEFAULT 'national';
 
+-- 既有無公司的假日（2026-04-15 匯入的 22 筆）指派給大正科技；本米假日營業，不套用
+UPDATE public.holidays
+SET company_id = '8a669e2c-7521-43e9-9300-5c004c57e9db'::uuid
+WHERE company_id IS NULL;
+
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM public.holidays WHERE company_id IS NULL) THEN
@@ -48,10 +55,13 @@ BEGIN
     END IF;
 END $$;
 
+-- unique(date) 會擋第二家公司放同一天假日，改為 (company_id, holiday_date)
+ALTER TABLE public.holidays DROP CONSTRAINT IF EXISTS holidays_date_key;   -- 若是 UNIQUE 約束要先卸約束
+DROP INDEX IF EXISTS public.holidays_date_key;                                -- 若只是索引
 CREATE UNIQUE INDEX IF NOT EXISTS holidays_company_date_uidx ON public.holidays (company_id, holiday_date);
 ALTER TABLE public.holidays ENABLE ROW LEVEL SECURITY;
 
--- ===== B. 2026 年放假日（大正科技） =====
+-- ===== B. 2026 年放假日（大正科技；正式庫已有相同 22 筆，此段為新環境種子） =====
 -- 來源：行政院人事行政總處 115 年政府行政機關辦公日曆表（含補假與調整放假）。
 INSERT INTO public.holidays (company_id, holiday_date, holiday_name, type)
 SELECT '8a669e2c-7521-43e9-9300-5c004c57e9db'::uuid, v.d, v.n, 'national'
@@ -600,7 +610,7 @@ REVOKE ALL ON FUNCTION public.get_company_monthly_missing_minutes(UUID, INTEGER,
 GRANT EXECUTE ON FUNCTION public.get_company_monthly_missing_minutes(UUID, INTEGER, INTEGER, TEXT) TO anon, authenticated;
 
 -- ===== 部署後驗證（唯讀） =====
--- 1. SELECT count(*) FROM holidays WHERE company_id='8a669e2c-...';                        → 22
+-- 1. SELECT count(*) FROM holidays WHERE company_id='8a669e2c-...';                        → 22；company_id IS NULL → 0
 -- 2. SELECT count_employee_workdays(<大正任一員工>, '2026-02-16', '2026-02-20');            → 0（整週春節）
 -- 3. SELECT calculate_missing_work_hours(<員工>, '2026-09-03') ->> 'reason';                → 不再是例外
 -- 4. SELECT get_missing_work_hours_min_minutes('8a669e2c-...');                           → 60

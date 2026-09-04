@@ -12,14 +12,14 @@
 ### 根因
 | 問題 | 根因 |
 |------|------|
-| 國定假日被算進請假天數與應出勤 | 正式庫 `holidays` 表是**空表**、欄位 `date/name/type`、無 `company_id`；`count_employee_workdays`（095）與 `get_company_monthly_attendance`（100）從未查假日 |
+| 國定假日被算進請假天數與應出勤 | 正式庫 `holidays` 表 2026-04-15 已匯入 22 筆 2026 假日，但欄位 `date/name/type`、無 `company_id`、`unique(date)`；RLS 只給 authenticated，anon REST 讀到 `[]`（我一度誤判為空表）；`count_employee_workdays`（095）與 `get_company_monthly_attendance`（100）從未查假日 |
 | 缺時稽核從未成功跑過 | migration 114 查 `holidays.company_id`／`holiday_date`（不存在的欄位）→ 每次 42703 → 被 `EXCEPTION WHEN OTHERS` 吞掉；`attendance_public.html` 同樣欄位錯（allSettled 靜默） |
 | 缺時通知門檻 | 114/115 是 `missing_minutes > 0`，大正早退容忍 0 分 → 早退 1 分鐘就會發 LINE |
 | 月統計無缺工時間 | RPC 只回 `late_days`／`early_leave_days` 次數 |
 
 ### 修法（migration 118）
-- A. `holidays`：`date→holiday_date`、`name→holiday_name`、加 `company_id NOT NULL`、唯一索引 `(company_id, holiday_date)`；RLS 維持、不加 anon 政策，前端改走 `get_company_holidays` RPC
-- B. 匯入 115 年（2026）政府行政機關辦公日曆表 22 筆到大正（本米為餐飲、假日營業，不匯入）
+- A. `holidays`：`date→holiday_date`、`name→holiday_name`、加 `company_id`，既有 22 筆指派給大正（本米為餐飲、假日營業，不套用），`unique(date)` 改 `(company_id, holiday_date)`；RLS 維持、不加 anon 政策，前端改走 `get_company_holidays` RPC
+- B. 115 年（2026）假日 22 筆種子（與既有相同，ON CONFLICT 不重複；供新環境）
 - C. `is_company_holiday()`；`count_employee_workdays`／`get_company_monthly_attendance` 的「無排班日」加假日排除（有排班則排班優先）；114 因欄位修正後自動生效
 - D. `get_missing_work_hours_min_minutes()`（`system_settings.missing_work_hours_min_minutes`，預設 60，大正寫入 60）；`scan_missing_work_hours`／`preview_company_missing_work_hours` 改用門檻
 - E. `get_company_monthly_missing_minutes()`：逐人逐日呼叫 `calculate_missing_work_hours` 加總遲到分鐘／早退分鐘／整日缺勤；打卡總覽月統計新增「遲到分／早退分／缺工分」三欄＋Excel 匯出
