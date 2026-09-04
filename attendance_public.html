@@ -1935,11 +1935,13 @@ async function loadCompanyPolicyAndHolidays() {
             .select('key, value')
             .eq('company_id', companyId)
             .in('key', ['default_weekend_work_start', 'default_weekend_work_end']),
-        sb.from('holidays')
-            .select('holiday_date, holiday_name')
-            .eq('company_id', companyId)
-            .gte('holiday_date', startDate)
-            .lte('holiday_date', endDate)
+        // 118：holidays 有 RLS（anon 無政策），改走 get_company_holidays RPC（has_company_access 驗證）
+        sb.rpc('get_company_holidays', {
+            p_company_id: companyId,
+            p_line_user_id: currentLineUserId || null,
+            p_from: startDate,
+            p_to: endDate
+        })
     ]);
 
     if (policyRes.status === 'fulfilled' && !policyRes.value.error && Array.isArray(policyRes.value.data)) {

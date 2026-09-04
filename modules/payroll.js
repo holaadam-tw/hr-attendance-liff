@@ -145,7 +145,7 @@ export async function loadAuditData() {
     if (btn) { btn.disabled = true; btn.textContent = '⏳ 計算中...'; }
 
     try {
-        const [empRes, salaryRes, attRes, leaveRes, otRes, schedRes] = await Promise.all([
+        const [empRes, salaryRes, attRes, leaveRes, otRes, schedRes, auditHolidaySet] = await Promise.all([
             sb.from('employees').select('id, name, employee_number, department, status, salary_type, resigned_date').eq('company_id', window.currentCompanyId).eq('no_checkin', false).in('status', ['approved', 'resigned']),
             sb.rpc('get_company_current_salaries', { p_company_id: window.currentCompanyId, p_line_user_id: window.currentAdminEmployee?.line_user_id }),
             sb.from('attendance').select('employee_id, date, check_in_time, is_manual, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).gte('date', startDate).lte('date', endDate),
@@ -162,7 +162,8 @@ export async function loadAuditData() {
                 p_line_user_id: window.currentAdminEmployee?.line_user_id || null,
                 p_from: startDate, p_to: endDate, p_status: 'approved', p_limit: 1000
             }).then(r => r).catch(() => ({ data: [] })),
-            sb.from('schedules').select('employee_id, date, is_off_day, employees!schedules_employee_id_fkey!inner(company_id)').eq('employees.company_id', window.currentCompanyId).gte('date', startDate).lte('date', endDate).then(r => r).catch(() => ({ data: [] }))
+            sb.from('schedules').select('employee_id, date, is_off_day, employees!schedules_employee_id_fkey!inner(company_id)').eq('employees.company_id', window.currentCompanyId).gte('date', startDate).lte('date', endDate).then(r => r).catch(() => ({ data: [] })),
+            loadCompanyHolidaySet(startDate, endDate)   // 118
         ]);
         if (empRes.error) throw empRes.error;
         if (leaveRes.error) throw leaveRes.error;
@@ -232,7 +233,7 @@ export async function loadAuditData() {
 
             let effEnd = endDate;
             if (emp.status === 'resigned' && emp.resigned_date && emp.resigned_date < endDate) effEnd = emp.resigned_date;
-            const expected = computeEmployeeExpectedDays(emp.id, startDate, effEnd, schedMap);
+            const expected = computeEmployeeExpectedDays(emp.id, startDate, effEnd, schedMap, auditHolidaySet);
             const salaryType = (salaryMap[emp.id]?.salary_type) || emp.salary_type || 'monthly';
             const monthly = salaryType === 'monthly';
             const absent = (monthly && !skipAutoAbsence) ? Math.max(0, Math.round((expected - actualDays - leaveDaysTotal) * 10) / 10) : null;
@@ -870,7 +871,7 @@ export async function loadPayrollData() {
     btn.disabled = true; btn.textContent = '⏳ 計算中...';
 
     try {
-        const [empRes, salaryRes, attRes, leaveRes, otRes, existRes, bracketRes, schedRes] = await Promise.all([
+        const [empRes, salaryRes, attRes, leaveRes, otRes, existRes, bracketRes, schedRes, payrollHolidaySet] = await Promise.all([
             sb.from('employees').select('id, name, employee_number, department, is_active, status, resigned_date').eq('company_id', window.currentCompanyId).eq('no_checkin', false).in('status', ['approved', 'resigned']),
             sb.rpc('get_company_current_salaries', { p_company_id: window.currentCompanyId, p_line_user_id: window.currentAdminEmployee?.line_user_id }),
             sb.from('attendance').select('employee_id, date, is_late, total_work_hours, overtime_hours, check_in_time, check_out_time, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).gte('date', startDate).lte('date', endDate),
@@ -883,7 +884,8 @@ export async function loadPayrollData() {
             }).then(r => r).catch(() => ({ data: [] })),
             sb.rpc('get_company_payroll', { p_company_id: window.currentCompanyId, p_line_user_id: window.currentAdminEmployee?.line_user_id, p_year: year, p_month: month }),
             sb.from('insurance_brackets').select('*').eq('is_active', true).order('salary_min').then(r => r).catch(() => ({ data: [] })),
-            sb.from('schedules').select('employee_id, date, is_off_day, shift_types(start_time,end_time,is_overnight), employees!schedules_employee_id_fkey!inner(company_id)').eq('employees.company_id', window.currentCompanyId).gte('date', startDate).lte('date', endDate).then(r => r).catch(() => ({ data: [] }))
+            sb.from('schedules').select('employee_id, date, is_off_day, shift_types(start_time,end_time,is_overnight), employees!schedules_employee_id_fkey!inner(company_id)').eq('employees.company_id', window.currentCompanyId).gte('date', startDate).lte('date', endDate).then(r => r).catch(() => ({ data: [] })),
+            loadCompanyHolidaySet(startDate, endDate)   // 118
         ]);
 
         if (empRes.error) throw empRes.error;
@@ -967,7 +969,7 @@ export async function loadPayrollData() {
             if (emp.status === 'resigned' && emp.resigned_date && emp.resigned_date < endDate) {
                 effectiveEndDate = emp.resigned_date;
             }
-            const expectedDays = skipAutoAbsence ? null : computeEmployeeExpectedDays(emp.id, startDate, effectiveEndDate, schedMap);
+            const expectedDays = skipAutoAbsence ? null : computeEmployeeExpectedDays(emp.id, startDate, effectiveEndDate, schedMap, payrollHolidaySet);
             return calcEmployeePayroll(emp, ss, atts, leaves, otHours, year, month, payrollSettings, expectedDays, { skipAutoAbsence });
         }).filter(Boolean);
         if (noSalaryPayroll.length > 0) {
@@ -1003,10 +1005,12 @@ function isBenmiPayrollCompany() {
 // 複製 get_company_monthly_attendance RPC 的 expected_days 邏輯 (migrations/059:156-172)
 // 差異: 不截到今天 → 月中 preview 可看到整月 expected_days
 // 對齊邏輯: 有排班且非休假日 → 應到; 無排班且非週末 → 應到
-function computeEmployeeExpectedDays(empId, startStr, endStr, schedMap) {
+// 118：holidaySet（Set<'yyyy-mm-dd'>）＝公司假日；無排班的假日不列應出勤，有排班則排班優先（對齊 migration 118）
+function computeEmployeeExpectedDays(empId, startStr, endStr, schedMap, holidaySet) {
     const start = new Date(startStr + 'T00:00:00+08:00');
     const end = new Date(endStr + 'T00:00:00+08:00');
     const empSched = schedMap[empId] || {};
+    const holidays = holidaySet instanceof Set ? holidaySet : new Set();
     let count = 0;
     const d = new Date(start);
     while (d <= end) {
@@ -1015,12 +1019,29 @@ function computeEmployeeExpectedDays(empId, startStr, endStr, schedMap) {
         if (sch) {
             if (!sch.is_off_day) count++;
         } else {
-            const dow = d.getDay();
-            if (dow !== 0 && dow !== 6) count++;
+            // 星期由台北日期字串本身推算，不受瀏覽器時區影響
+            const dow = new Date(ds + 'T00:00:00Z').getUTCDay();
+            if (dow !== 0 && dow !== 6 && !holidays.has(ds)) count++;
         }
         d.setDate(d.getDate() + 1);
     }
     return count;
+}
+
+// 118：讀公司假日 → Set；RPC 失敗回空 Set（應出勤退回舊行為，不擋頁面）
+async function loadCompanyHolidaySet(startDate, endDate) {
+    try {
+        const { data, error } = await sb.rpc('get_company_holidays', {
+            p_company_id: window.currentCompanyId,
+            p_line_user_id: window.currentAdminEmployee?.line_user_id || liffProfile?.userId || null,
+            p_from: startDate,
+            p_to: endDate
+        });
+        if (error) { console.warn('假日載入失敗：', error.message); return new Set(); }
+        return new Set((data || []).map(h => h.holiday_date).filter(Boolean));
+    } catch (e) {
+        return new Set();
+    }
 }
 
 function toTaipeiDate(value) {

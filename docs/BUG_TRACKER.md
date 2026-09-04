@@ -5,6 +5,39 @@
 
 ---
 
+## 🔴→🟡 2026-09-04 公司假日納入計算＋缺時通知門檻＋月統計缺工分鐘（migration 118，**待業主授權部署**）
+
+業主指示三件事：(1) 請假跨國定假日不能算天數，要把整年假期算進去；(2) 早退／遲到的人要顯示、隔天要通知補請假（未滿 7 小時）；(3) 統計表要顯示缺工時間（遲到、早退分鐘）。
+
+### 根因
+| 問題 | 根因 |
+|------|------|
+| 國定假日被算進請假天數與應出勤 | 正式庫 `holidays` 表是**空表**、欄位 `date/name/type`、無 `company_id`；`count_employee_workdays`（095）與 `get_company_monthly_attendance`（100）從未查假日 |
+| 缺時稽核從未成功跑過 | migration 114 查 `holidays.company_id`／`holiday_date`（不存在的欄位）→ 每次 42703 → 被 `EXCEPTION WHEN OTHERS` 吞掉；`attendance_public.html` 同樣欄位錯（allSettled 靜默） |
+| 缺時通知門檻 | 114/115 是 `missing_minutes > 0`，大正早退容忍 0 分 → 早退 1 分鐘就會發 LINE |
+| 月統計無缺工時間 | RPC 只回 `late_days`／`early_leave_days` 次數 |
+
+### 修法（migration 118）
+- A. `holidays`：`date→holiday_date`、`name→holiday_name`、加 `company_id NOT NULL`、唯一索引 `(company_id, holiday_date)`；RLS 維持、不加 anon 政策，前端改走 `get_company_holidays` RPC
+- B. 匯入 115 年（2026）政府行政機關辦公日曆表 22 筆到大正（本米為餐飲、假日營業，不匯入）
+- C. `is_company_holiday()`；`count_employee_workdays`／`get_company_monthly_attendance` 的「無排班日」加假日排除（有排班則排班優先）；114 因欄位修正後自動生效
+- D. `get_missing_work_hours_min_minutes()`（`system_settings.missing_work_hours_min_minutes`，預設 60，大正寫入 60）；`scan_missing_work_hours`／`preview_company_missing_work_hours` 改用門檻
+- E. `get_company_monthly_missing_minutes()`：逐人逐日呼叫 `calculate_missing_work_hours` 加總遲到分鐘／早退分鐘／整日缺勤；打卡總覽月統計新增「遲到分／早退分／缺工分」三欄＋Excel 匯出
+- 前端：`payroll.js` 應出勤排除假日（`loadCompanyHolidaySet`＋`computeEmployeeExpectedDays` 第 5 參數，星期改由日期字串推算不受瀏覽器時區影響）；`attendance_public.html` 假日改走 RPC
+
+### 驗證
+- `tests/holidays-missing-minutes.test.js` 65 項；反向對照：壞 payroll 掉 2、壞 migration 掉 2
+- `npm test` 15 套件全過；`qa_check` 0 FAIL 1 WARN（既有）；Hook 6 筆既有、RLS bypass 0
+- SQL 未在資料庫實跑（Hard Block），四個覆寫函式由 095/100/114/115 原文程式化抽出後只改一行，降低轉寫錯誤
+
+### 部署
+- 備份：`.codex/production_rpc_backup_before_118_*.sql`（4 函式＋holidays 表狀態）；腳本：`.codex/deploy_migration_118_single_transaction_*.sql`
+- 部署後：打卡總覽按「🔍 掃描但不通知」看名單 → 確認後才開 LINE 提醒（開關仍關閉）
+- **2027 年假日要再匯入一次**（目前無維護畫面，另案）
+- **狀態：待業主結構化授權。**
+
+---
+
 ## 🔴→🟢 2026-09-04 請假天數被正式庫殘留觸發器覆寫 ＋ 同一天可重複請假（migration 117，**已套用正式庫**）
 
 業主反映兩點：(1) 連續請假跨六日，六日不應算天數；(2) 同一個人同一天可以請假兩次，沒有阻擋。
