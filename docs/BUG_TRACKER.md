@@ -5,7 +5,7 @@
 
 ---
 
-## 🟡 2026-09-04 假日維護畫面＋2027 假日種子＋核准請假呼叫者驗證（migration 119，**待業主授權部署**）
+## 🟢 2026-09-04 假日維護畫面＋2027 假日種子＋核准請假呼叫者驗證（migration 119，**已套用正式庫、已合併 main**）
 
 業主指示：(5)「2027 年國定假日匯入，或做一個假日維護畫面，不必每年找我」→ 兩個都做；(6)「核准請假的 RPC 沒有驗證呼叫者身分」→ 修。
 
@@ -20,7 +20,10 @@
 - `npm test` 16 套件全過；`qa_check` 0 FAIL 1 WARN（既有）；Hook 6 筆既有、RLS bypass 0
 - SQL 未在資料庫實跑（Hard Block）；部署腳本 `.codex/deploy_migration_119_single_transaction_*.sql`，備份 `.codex/production_rpc_backup_before_119_*.sql`
 
-- **狀態：待業主結構化授權。**
+- **狀態：2026-09-04 業主授權「授權套用 migration 119 到正式庫」＋「授權合併 dev 到 main」後完成。**
+- 部署證據：大正 2027 假日 24 筆；舊簽章 PostgREST 呼叫回 `deprecated_signature`；新簽章假身分回 `access_denied`；`upsert/delete_company_holiday` 假身分回「需要管理員權限」；新 approve 定義含 `has_company_access(p_line_user_id, p_company_id, true)`；四支 RPC proacl 為 anon/authenticated。
+- main 合併：`af94f07..38cc29f`（今天全部前端改動：117 重複請假預檢、118 月統計缺工分／薪資頁假日排除／公開版假日 RPC、119 假日畫面與核准新簽章）。
+- 備註：platform_admin 核准時 `approver_id` 為 NULL（與 104 嚴格擋法不一致），另案討論。
 
 ---
 
