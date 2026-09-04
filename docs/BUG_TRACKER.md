@@ -5,7 +5,7 @@
 
 ---
 
-## 🔴→🟡 2026-09-04 公司假日納入計算＋缺時通知門檻＋月統計缺工分鐘（migration 118，**待業主授權部署**）
+## 🔴→🟢 2026-09-04 公司假日納入計算＋缺時通知門檻＋月統計缺工分鐘（migration 118，**已套用正式庫**）
 
 業主指示三件事：(1) 請假跨國定假日不能算天數，要把整年假期算進去；(2) 早退／遲到的人要顯示、隔天要通知補請假（未滿 7 小時）；(3) 統計表要顯示缺工時間（遲到、早退分鐘）。
 
@@ -34,7 +34,9 @@
 - 備份：`.codex/production_rpc_backup_before_118_*.sql`（4 函式＋holidays 表狀態）；腳本：`.codex/deploy_migration_118_single_transaction_*.sql`
 - 部署後：打卡總覽按「🔍 掃描但不通知」看名單 → 確認後才開 LINE 提醒（開關仍關閉）
 - **2027 年假日要再匯入一次**（目前無維護畫面，另案）
-- **狀態：待業主結構化授權。**
+- **狀態：2026-09-04 業主授權「授權套用 migration 118 到正式庫」後單一交易套用完成。**
+- 部署證據：`holidays` 欄位 `holiday_date/holiday_name/company_id`、`company_id IS NULL` 0 筆、大正 22 筆、`holidays_date_key` 已卸、`holidays_company_date_uidx` 建立；`count_employee_workdays(E820, 2/16~2/20)=0`、`(2026-02 整月)=14`、`(9/21~9/30)=6`；`calculate_missing_work_hours` 回 `covered_by_full_day_leave`／`complete`／`company_holiday`（不再例外）；`is_company_holiday(大正, 9/25)=true`、`(本米, 9/25)=false`；門檻 60；內部函式 proacl 無 anon；月統計 2026-02 全員 `expected_days=14`；`get_company_monthly_missing_minutes(2026-08)` 21 列（E820 遲到 16 次 358 分／早退 2 次 567 分）。
+- 順帶發現：E005 黃秀梅、E006 黃璿如 8 月 21 個工作日整日無打卡（6 月起 0 筆），非免打卡設定 → 缺時稽核與缺工分鐘會把她們列為每日整日缺勤，開 LINE 提醒前要先決定是否改為免打卡。
 
 ---
 
