@@ -5,7 +5,7 @@
 
 ---
 
-## 🔴→🟡 2026-09-04 請假天數被正式庫殘留觸發器覆寫 ＋ 同一天可重複請假（migration 117，**待業主授權部署**）
+## 🔴→🟢 2026-09-04 請假天數被正式庫殘留觸發器覆寫 ＋ 同一天可重複請假（migration 117，**已套用正式庫**）
 
 業主反映兩點：(1) 連續請假跨六日，六日不應算天數；(2) 同一個人同一天可以請假兩次，沒有阻擋。
 
@@ -37,7 +37,9 @@
 - 事前備份：`.codex/production_rpc_backup_before_117_*.sql`（5 函式＋3 觸發器定義）
 - 單一交易腳本：`.codex/deploy_migration_117_single_transaction_*.sql`（含 SHA256）
 - 部署後驗證：觸發器應為 0 列；`find_overlapping_leave` proacl 無 anon；重跑 D 段子查詢比對應 0 筆不符。
-- **狀態：待業主結構化授權後才套用正式庫。**
+- **狀態：2026-09-04 業主授權「授權套用 migration 117 到正式庫」後，以 `.codex/deploy_migration_117_single_transaction_20260904_1500.sql` 單一交易套用完成。**
+- 部署證據：D 段 RETURNING 15 筆（13 筆半天 1.0→0.5、E821 8.0→6.0、E820 5.0→3.0）；部署後驗證 `calculate_leave_days_trigger` 0 列、`calculate_leave_days()` 0 個、`find_overlapping_leave` proacl 只有 postgres/service_role、`submit_leave_request` 含 guard、`approve_leave_request` 含 pending 檢查、7/1 起 days 不符 0 筆、`find_overlapping_leave(E809, 8/21)` 實測回「同一天已有請假申請（08/21，全日，已核准），請勿重複送出」。
+- E809 8/21 重疊那組仍待業主決定退哪一筆（117 之後 `approve_leave_request` 不再處理非 pending 件，需以 SQL 直接改 status 並留紀錄）。
 
 ### 順帶發現（未修，另案）
 - `holidays` 表在正式庫是空表、欄位為 `date`/`name`、無 `company_id`；`migration 114` 與 `attendance_public.html` 用 `holiday_date`/`company_id` 查它 → 114 缺時稽核在正式庫每次都會例外被吞。公司假日概念目前不存在於系統。
