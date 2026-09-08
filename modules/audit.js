@@ -175,7 +175,7 @@ export async function exportReport(type) {
             fn = `出勤報表_${ms}.csv`;
         } else if (type === 'leave') {
             const { data } = await sb.from('leave_requests').select('*, employees!leave_requests_employee_id_fkey!inner(name, employee_number, department, company_id)').eq('employees.company_id', window.currentCompanyId).order('created_at', { ascending: false }).limit(200);
-            const tm = { annual: '特休', sick: '病假', personal: '事假', compensatory: '補休' };
+            const tm = { annual: '特休', sick: '病假', personal: '事假', compensatory: '補休', maternity: '產假', marriage: '婚假', bereavement: '喪假' };
             const periodLabel = (r) => {
                 if (r.leave_period === 'hourly') return `${r.leave_hours || 0} 小時`;
                 const periodMap = { full_day: '全日', am: '上午半天', pm: '下午半天' };

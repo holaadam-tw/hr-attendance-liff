@@ -1151,7 +1151,7 @@ function hasPendingLeave(row) {
 }
 
 function leaveTypeLabel(type) {
-    const zh = { annual:'特休', sick:'病假', personal:'事假', compensatory:'補休', maternity:'產假', marriage:'婚假' };
+    const zh = { annual:'特休', sick:'病假', personal:'事假', compensatory:'補休', maternity:'產假', marriage:'婚假', bereavement:'喪假' };
     const vi = { annual:'Phép năm', sick:'Nghỉ bệnh', personal:'Việc riêng', compensatory:'Nghỉ bù', maternity:'Thai sản', marriage:'Kết hôn' };
     return (currentLang === 'vi' ? vi : zh)[type] || type || '';
 }

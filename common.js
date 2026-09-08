@@ -1327,7 +1327,7 @@ async function submitLeave() {
         if (warn) warn.style.display = 'none';
 
         // 通知管理員
-        const typeNames = { annual:'特休', sick:'病假', personal:'事假', compensatory:'補休' };
+        const typeNames = { annual:'特休', sick:'病假', personal:'事假', compensatory:'補休', maternity:'產假', marriage:'婚假', bereavement:'喪假' };
         const periodNames = { full_day:'全日', am:'上午半天', pm:'下午半天', hourly:'小時請假' };
         const periodNote = period === 'hourly' ? `${leaveStartTime}–${leaveEndTime}（${leaveHours} 小時）` : (periodNames[period] || '全日');
         const staffingNote = check.thresholdExceeded ? `\n⚠️ 超過同時請假警告門檻 ${check.maxConcurrent} 人，請確認人力` : '';

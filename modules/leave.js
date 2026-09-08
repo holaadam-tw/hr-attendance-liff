@@ -62,7 +62,7 @@ export async function loadLeaveApprovals(status) {
             }));
         }
         if (error) throw error;
-        const typeMap = { 'annual': '特休', 'sick': '病假', 'personal': '事假', 'compensatory': '補休' };
+        const typeMap = { 'annual': '特休', 'sick': '病假', 'personal': '事假', 'compensatory': '補休', 'maternity': '產假', 'marriage': '婚假', 'bereavement': '喪假' };
         const statusText = { 'pending': '待審核', 'approved': '已通過', 'rejected': '已拒絕' };
         let html = '';
         (data || []).forEach(request => {
@@ -118,7 +118,7 @@ export async function approveLeave(requestId, newStatus) {
 
         let notifyResult = null;
         if (result.employee_id) {
-            const typeMap = { annual: '特休', sick: '病假', personal: '事假', compensatory: '補休' };
+            const typeMap = { annual: '特休', sick: '病假', personal: '事假', compensatory: '補休', maternity: '產假', marriage: '婚假', bereavement: '喪假' };
             const typeName = typeMap[result.leave_type] || result.leave_type;
             if (newStatus === 'approved') {
                 notifyResult = await sendUserNotify(result.employee_id, `✅ 您的${typeName}申請已通過\n📅 ${result.start_date} ~ ${result.end_date}`);

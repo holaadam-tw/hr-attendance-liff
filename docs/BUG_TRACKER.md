@@ -1,7 +1,35 @@
 # RunPiston Bug 追蹤 & 測試清單
 
-> 更新日期：2026-09-04
+> 更新日期：2026-09-09
 > 每次修改後更新此檔案
+
+---
+
+## 🟢 2026-09-09 115/08 手工出勤表對照：假單未進系統＋半天算整天＋加班未確認（migration 120，**已套用正式庫**）
+
+業主 9/8 提供 115/08 手工出勤表（正確）對照系統月統計（紅字）。查證結果三個根因＋一個算法差異：
+
+| 根因 | 內容 | 處理 |
+|------|------|------|
+| ① 假單沒進系統 | 黃秀娟 5 天（特休 4＋喪假 1）、湯煜騰 2.5、林駿璋 1.25（1 天特休＋2h 事假）、黃律瑋 2（8/19、8/21 特休）、Hoàng 1、范文林 5.5（8/3～8/7＋8/19 上午）＝17.25 天被算成缺勤 | 以各員工身分走 `submit_leave_request` 送出 19 張、再以 Adam 身分 `approve_leave_request` 核准（reason 註明後台補登） |
+| ② 月統計半天算 1 天 | `get_company_monthly_attendance.leave_days` 是 INTEGER 數「有假的日子」：宗元 1.5→2、邱順麟 1.0→2 | migration 120：leave_days／absent_days 改 double precision，整天 1、半天 0.5、時數假 hours/8，同日多張上限 1 |
+| ③ 加班完全沒進系統 | 8 月加班單 0 筆；打卡顯示謝秉夆 6 天、范文林 6 天、鄭世福 21 天下班卡 20:40 左右，與老闆記的 3hr×6／6／21 完全吻合，只是主管沒按「確認加班」 | 以 Adam 身分呼叫 `confirm_daily_overtime` 33 筆各 180 分（late_close_auto／approved） |
+| 算法差異：遲到 | 老闆算分鐘、從 08:00 一分不讓；系統 3 分鐘容忍（豐豪 5 天 08:01 → 系統 0）；黃秀娟 358 vs 197（她 8 天補登卡的遲到 202 分可能未被老闆計入）；邱順麟 399 vs 363−193 | **未改**，容忍分鐘與補登日是否計遲到待業主決定 |
+
+另：`valid_leave_type` 沒有喪假 → 120 加 `bereavement`，前端 leave.js／common.js／audit.js／attendance_public／attendance_overview 標籤＋records.html 選項＋i18n zh/vi。黃秀娟 8/10 一筆「補下班」卻寫進上班卡 17:00 且無下班卡的補登紀錄已刪除，當日改記喪假。
+
+### 修正後 8 月統計 vs 老闆表格
+范文林 請假 8.5 ✓、宗元 1.5 ✓（8/27 下午無打卡 → 缺勤 0.5，老闆表格無此項）、黃秀娟 請假 5 缺勤 0 ✓、湯煜騰 3.5 ✓、林駿璋 1.25 ✓、黃律瑋 3 ✓、Hoàng 1 ✓、邱順麟 1 ✓；加班 6／6／21 筆各 3 小時 ✓。
+
+### 假設（業主可改）
+- 黃秀娟 8/10 記為喪假、8/17、8/18、8/19、8/28 記為特休（老闆只寫 4＋1，未指明哪天）
+- 老闆「請假」欄一律記為事假（personal，扣薪）；若實為病假／特休請告知改
+- 林駿璋 2h 記為 8/13 15:00–17:00 時數事假
+
+### 驗證
+- `tests/leave-numeric-bereavement.test.js` 23 項；`npm test` 17 套件全過；qa_check 0 FAIL 1 WARN（既有）；Hook 6 筆既有、RLS bypass 0
+- 部署：`.codex/deploy_migration_120_single_transaction_*.sql`、備份 `.codex/production_rpc_backup_before_120_*.sql`；部署後 `valid_leave_type` 含 bereavement、回傳型別 leave_days/absent_days double precision、proacl 不變
+- hr_audit_logs 53 筆（19 核准＋33 加班確認＋1 刪除）
 
 ---
 
