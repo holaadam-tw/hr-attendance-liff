@@ -5,6 +5,20 @@
 
 ---
 
+## 🟢 2026-09-09 補登的打卡不算遲到／早退（migration 121，**已套用正式庫**）＋大正遲到容忍改 0
+
+業主：「遲到容忍改 0 分」、「補登日不算遲到，因為沒有事實去確認他遲到」。
+
+- 大正 `late_threshold_minutes` 3 → 0（system_settings，2026-09-09 00:05）。缺工分鐘即時重算；歷史 is_late 旗標不回溯。
+- migration 121 採**側別**判斷：上班卡是補登（`check_in_location IN ('makeup punch','admin makeup','補打卡')`）→ 不算遲到；下班卡是補登 → 不算早退。上班卡是真實 GPS 打卡、只有下班卡補登 → 遲到是事實照算（黃秀娟 8/3、8/4）。
+  - `is_makeup_location(text)`；`calculate_missing_work_hours` 補登側分鐘歸 0；`get_company_monthly_attendance` 遲到次／早退次排除補登側；`admin_makeup_punch`／`approve_makeup_request` 覆寫該側時清 `is_late`／`is_early_leave`；資料修正清掉既有 5 筆遲到＋2 筆早退旗標。
+  - 四支函式以正式庫現況定義為基底各加 1～2 行（`.codex/production_rpc_backup_before_121_*.sql` 同時是基底）。
+- 驗證：`tests/makeup-not-late.test.js` 21 項（反向 3 失敗）；npm test 18 套件；部署後補登側旗標 0 筆、黃秀娟 8/5（補登上班）遲到 0、8/3（真實上班）遲到 10。
+- 部署注意：腳本超過 Windows argv 上限會 `Argument list too long`，改用 `supabase db query --linked -f <file>`。
+- 修正後 8 月遲到分：黃秀娟 181（老闆 197，差 16）、邱順麟 399（老闆 170，扣的 193 不明）、黃律瑋 13（21）、豐豪 4（5）。
+
+---
+
 ## 🟢 2026-09-09 115/08 手工出勤表對照：假單未進系統＋半天算整天＋加班未確認（migration 120，**已套用正式庫**）
 
 業主 9/8 提供 115/08 手工出勤表（正確）對照系統月統計（紅字）。查證結果三個根因＋一個算法差異：
