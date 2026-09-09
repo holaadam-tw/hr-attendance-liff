@@ -5,6 +5,17 @@
 
 ---
 
+## 🟢 2026-09-09 早退判定不限「下班前 2 小時」＋月統計次數改以缺工計算為準（migration 122，**已套用正式庫；前端待合併 main**）
+
+業主：「中午走人，有請假算請假半天，沒有請假算早退」。黃秀娟 8/21、8/27 12 點多下班且無請假，舊規則（035）只在下班前 2 小時內判早退 → 月統計早退次 0。
+
+- migration 122：`quick_check_in` 一般班改為 check_out < shift_end − 容忍分鐘即早退（跨日班分支不動；以正式庫定義為基底只改一個條件）；回填大正 2026-06-01 起「完整上下班卡、下班側非補登、calculate_missing_work_hours 早退分鐘 > 0」的旗標，共 8 筆（→ 大正 6/1 起早退旗標 10 筆）。本米未回填（餐飲、容忍 9999，另議）。
+- `attendance_overview.html` 月統計「遲到次／早退次」改以 `get_company_monthly_missing_minutes` 的 late_count／early_count 為準（已扣請假、補登、容忍），RPC 失敗退回打卡旗標；匯出同步。
+- 驗證：`tests/early-leave-any-time.test.js` 18 項（反向 2＋1 失敗）；npm test 19 套件；qa_check 0 FAIL；Hook 6 筆既有；rls-checker PASS（注意：本米未回填為刻意限定）。部署後 quick_check_in 無 2 小時窗口、黃秀娟 8/21、8/27 is_early_leave=true。
+- 大檔部署改用 `supabase db query --linked -f`。
+
+---
+
 ## 🟢 2026-09-09 補登的打卡不算遲到／早退（migration 121，**已套用正式庫**）＋大正遲到容忍改 0
 
 業主：「遲到容忍改 0 分」、「補登日不算遲到，因為沒有事實去確認他遲到」。

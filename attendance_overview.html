@@ -1806,6 +1806,8 @@
             (Array.isArray(rows) ? rows : []).forEach(r => {
                 if (!r || !r.employee_id) return;
                 map[r.employee_id] = {
+                    late_count: Number(r.late_count) || 0,
+                    early_count: Number(r.early_count) || 0,
                     late_minutes: Number(r.late_minutes) || 0,
                     early_minutes: Number(r.early_minutes) || 0,
                     missing_minutes: Number(r.missing_minutes) || 0,
@@ -1814,6 +1816,10 @@
             });
             return map;
         }
+
+        // 122：有缺工計算結果時用它的次數（請假／補登／容忍都已處理），否則退回打卡旗標次數
+        function monthlyLateCount(r, mm) { return mm ? mm.late_count : (Number(r.late_days) || 0); }
+        function monthlyEarlyCount(r, mm) { return mm ? mm.early_count : (Number(r.early_leave_days) || 0); }
 
         function fmtMinutesCell(val, color) {
             if (val === null || val === undefined) return '<td style="text-align:center;color:#94A3B8;">--</td>';
@@ -1837,12 +1843,15 @@
 
             let html = '';
             monthlyData.forEach(r => {
+                const mm = monthlyMissingMap[r.employee_id];
+                // 122：遲到次／早退次以缺工計算為準（已扣請假、補登、容忍分鐘）；RPC 失敗才退回打卡當下的旗標
+                const lateCnt = monthlyLateCount(r, mm);
+                const earlyCnt = monthlyEarlyCount(r, mm);
                 totActual += r.actual_days;
-                totLate += r.late_days;
-                totEarly += r.early_leave_days;
+                totLate += lateCnt;
+                totEarly += earlyCnt;
                 totLeave += r.leave_days;
                 totHours += parseFloat(r.total_work_hours) || 0;
-                const mm = monthlyMissingMap[r.employee_id];
                 if (mm) { totLateMin += mm.late_minutes; totEarlyMin += mm.early_minutes; totMissingMin += mm.missing_minutes; }
 
                 html += '<tr style="cursor:pointer;" onclick="toggleMonthDetail(\'' + r.employee_id + '\')">' +
@@ -1850,8 +1859,8 @@
                     '<td style="color:#64748B;font-size:11px;">' + escapeHTML(r.department || '-') + '</td>' +
                     '<td style="text-align:center;color:#94A3B8;">' + fmtOptionalCount(r.expected_days) + '</td>' +
                     '<td style="text-align:center;color:#059669;font-weight:700;">' + r.actual_days + '</td>' +
-                    '<td style="text-align:center;' + (r.late_days > 0 ? 'color:#EA580C;font-weight:700;' : '') + '">' + r.late_days + '</td>' +
-                    '<td style="text-align:center;' + (r.early_leave_days > 0 ? 'color:#DC2626;font-weight:700;' : '') + '">' + r.early_leave_days + '</td>' +
+                    '<td style="text-align:center;' + (lateCnt > 0 ? 'color:#EA580C;font-weight:700;' : '') + '">' + lateCnt + '</td>' +
+                    '<td style="text-align:center;' + (earlyCnt > 0 ? 'color:#DC2626;font-weight:700;' : '') + '">' + earlyCnt + '</td>' +
                     fmtMinutesCell(mm ? mm.late_minutes : null, '#EA580C') +
                     fmtMinutesCell(mm ? mm.early_minutes : null, '#DC2626') +
                     fmtMinutesCell(mm ? mm.missing_minutes : null, '#B91C1C') +
@@ -1974,8 +1983,8 @@
                     '部門': r.department || '',
                     '應出勤': r.expected_days ?? '',
                     '實到': r.actual_days,
-                    '遲到': r.late_days,
-                    '早退': r.early_leave_days,
+                    '遲到': monthlyLateCount(r, monthlyMissingMap[r.employee_id]),
+                    '早退': monthlyEarlyCount(r, monthlyMissingMap[r.employee_id]),
                     '遲到分鐘': monthlyMissingMap[r.employee_id] ? monthlyMissingMap[r.employee_id].late_minutes : '',
                     '早退分鐘': monthlyMissingMap[r.employee_id] ? monthlyMissingMap[r.employee_id].early_minutes : '',
                     '缺工分鐘': monthlyMissingMap[r.employee_id] ? monthlyMissingMap[r.employee_id].missing_minutes : '',
