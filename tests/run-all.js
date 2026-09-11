@@ -28,6 +28,7 @@ const SUITES = [
   { name: '月統計請假小數與喪假', file: 'leave-numeric-bereavement.test.js' },
   { name: '補登不算遲到早退', file: 'makeup-not-late.test.js' },
   { name: '早退判定與月統計次數來源', file: 'early-leave-any-time.test.js' },
+  { name: '遲到早退以分為單位', file: 'late-minute-granularity.test.js' },
   { name: 'LINE 通知結果回饋', file: 'line-notification-delivery.test.js' },
   { name: '缺時 LINE 通知安全開關', file: 'missing-work-hours-notification-control.test.js' },
   { name: '打卡總覽', file: 'attendance-overview.test.js' },
