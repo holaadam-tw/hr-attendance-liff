@@ -946,7 +946,7 @@ export async function saveAllShiftModes() {
                 fixed_shift_start: mode === 'fixed' ? (start || '08:00') : null,
                 fixed_shift_end: mode === 'fixed' ? (end || '17:00') : null
             };
-            const { error } = await sb.from('employees').update(updates).eq('id', empId).eq('company_id', window.currentCompanyId);
+            const { error } = await rpcUpdateEmployee(empId, updates);   // 124
             if (error) throw error;
             count++;
         }

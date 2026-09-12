@@ -399,75 +399,28 @@ async function submitRegistration() {
             }
         }
 
-        // 檢查同手機+同公司是否已登記（用手機號碼防重複）
-        const { data: existing } = await sb.from('employees')
-            .select('id, name, status, is_active, phone')
-            .eq('phone', phone)
-            .eq('company_id', companyId)
-            .maybeSingle();
-
-        if (existing) {
-            if (existing.status === 'pending') {
-                showToast('此手機號碼已登記過，正在等待審核', true);
-                btn.disabled = false;
-                btn.textContent = tEmployee('submitRegistration');
-                return;
-            } else if (existing.status === 'approved' || existing.is_active) {
-                showToast('此手機號碼已是在職員工', true);
-                btn.disabled = false;
-                btn.textContent = tEmployee('submitRegistration');
-                return;
-            } else if (existing.status === 'rejected') {
-                // 被拒絕過的可以重新登記 → 更新資料（含 line_user_id）
-                const updateData = {
-                    name: name,
-                    phone: phone,
-                    department: department || null,
-                    position: position || null,
-                    hire_date: hireDate || null,
-                    emergency_contact: emergencyContact || null,
-                    emergency_phone: emergencyPhone || null,
-                    preferred_language: preferredLanguage,
-                    status: 'pending',
-                    is_active: false,
-                    updated_at: new Date().toISOString()
-                };
-                if (lineUserId) updateData.line_user_id = lineUserId;
-                const { error } = await sb.from('employees').update(updateData).eq('id', existing.id);
-
-                if (error) throw error;
-
-                document.getElementById('formView').classList.add('hidden');
-                document.getElementById('successView').classList.remove('hidden');
-                return;
+        // 124：重複檢查與寫入都在 register_employee RPC 內（強制 pending／user／inactive，company_id 須存在）
+        const { data: regRes, error } = await sb.rpc('register_employee', {
+            p_company_id: companyId,
+            p_line_user_id: lineUserId || null,
+            p_data: {
+                name: name,
+                phone: phone,
+                department: department || null,
+                position: position || null,
+                hire_date: hireDate || null,
+                emergency_contact: emergencyContact || null,
+                emergency_phone: emergencyPhone || null,
+                preferred_language: preferredLanguage
             }
-        }
-
-        // 新增登記（自動帶入 LINE userId）
-        // 產生臨時工號（審核通過後會被正式工號覆蓋）
-        const tempNumber = 'REG-' + Date.now().toString(36).toUpperCase();
-
-        const employeeData = {
-            name: name,
-            phone: phone,
-            employee_number: tempNumber,
-            department: department || null,
-            position: position || null,
-            hire_date: hireDate || null,
-            emergency_contact: emergencyContact || null,
-            emergency_phone: emergencyPhone || null,
-            preferred_language: preferredLanguage,
-            line_user_id: lineUserId,
-            company_id: companyId,
-            is_active: false,
-            status: 'pending',
-            role: 'user',
-            employment_type: 'fulltime',
-            created_at: new Date().toISOString()
-        };
-
-        const { error } = await sb.from('employees').insert([employeeData]);
+        });
         if (error) throw error;
+        if (!regRes?.success) {
+            showToast(regRes?.error || '送出失敗', true);
+            btn.disabled = false;
+            btn.textContent = tEmployee('submitRegistration');
+            return;
+        }
 
         // 顯示成功
         document.getElementById('formView').classList.add('hidden');

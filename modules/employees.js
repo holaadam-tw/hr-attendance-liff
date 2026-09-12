@@ -62,10 +62,7 @@ export function initEmployeeFormHandler() {
             position: document.getElementById('newEmployeePosition').value.trim() || '員工',
             id_card_last_4: document.getElementById('newEmployeeCode').value.trim(),
             hire_date: document.getElementById('newEmployeeHireDate').value,
-            role: document.getElementById('newEmployeeRole').value,
-            is_active: true,
-            company_id: window.currentAdminEmployee?.company_id || window.currentCompanyId,
-            created_at: new Date().toISOString()
+            role: document.getElementById('newEmployeeRole').value
         };
 
         if (!employeeData.name || !employeeData.employee_number || !employeeData.id_card_last_4) {
@@ -74,7 +71,8 @@ export function initEmployeeFormHandler() {
         }
 
         try {
-            const { data, error } = await sb.from('employees').insert([employeeData]);
+            // 124：走 RPC（company_id 由函式以 p_company_id 為準，不由前端指定）
+            const { error } = await rpcCreateEmployee(employeeData, window.currentAdminEmployee?.company_id || window.currentCompanyId);
             if (error) throw error;
 
             showToast('✅ 員工新增成功！');
@@ -210,11 +208,7 @@ export async function updateEmployeeRoleAdmin(employeeId, newRole, employeeName)
     const roleNames = { 'admin': '管理員', 'manager': '主管', 'user': '一般員工' };
 
     try {
-        const { error } = await sb.from('employees')
-            .update({ role: newRole })
-            .eq('id', employeeId)
-            .eq('company_id', window.currentCompanyId);
-
+        const { error } = await rpcUpdateEmployee(employeeId, { role: newRole });   // 124
         if (error) throw error;
         showToast(`✅ ${employeeName} → ${roleNames[newRole]}`);
         loadEmployeeList();
@@ -228,10 +222,7 @@ export async function updateEmployeeRoleAdmin(employeeId, newRole, employeeName)
 export async function updateEmployeeGpsRelaxed(employeeId, newVal, employeeName) {
     const on = newVal === 'true' || newVal === true;
     try {
-        const { error } = await sb.from('employees')
-            .update({ gps_relaxed: on })
-            .eq('id', employeeId)
-            .eq('company_id', window.currentCompanyId);
+        const { error } = await rpcUpdateEmployee(employeeId, { gps_relaxed: on });   // 124
         if (error) throw error;
         showToast(`${on ? '🛰️ 已開啟' : '已關閉'} ${employeeName} 的寬鬆定位`);
         loadEmployeeList();
@@ -504,12 +495,8 @@ export async function quickBindLine(empId, empName) {
             return;
         }
 
-        const { error } = await sb.from('employees').update({
-            line_user_id: lineUserId,
-            is_bound: true,
-            updated_at: new Date().toISOString()
-        }).eq('id', empId);
-
+        // 124：RPC 內另有同公司 LINE ID 重複檢查
+        const { error } = await rpcUpdateEmployee(empId, { line_user_id: lineUserId, is_bound: true });
         if (error) throw error;
         showToast(`✅ ${empName} 已綁定 LINE`);
         loadUnbindEmployees();
@@ -615,16 +602,15 @@ export async function approveEmployee(empId, empName) {
                 nextNum = 'E' + String(maxN + 1 + attempt).padStart(3, '0');
             }
 
-            const { error } = await sb.from('employees').update({
+            const { data: apRes, error } = await rpcUpdateEmployee(empId, {   // 124
                 is_active: true,
                 is_bound: true,
                 status: 'approved',
-                employee_number: nextNum,
-                updated_at: new Date().toISOString()
-            }).eq('id', empId);
+                employee_number: nextNum
+            });
 
             if (error) {
-                if (error.code === '23505' && attempt < 2) continue;
+                if ((error.code === '23505' || apRes?.error_code === 'duplicate_number') && attempt < 2) continue;
                 throw error;
             }
 
@@ -646,8 +632,7 @@ export async function rejectEmployee(empId, empName) {
     if (!confirm(`確定拒絕「${empName}」的登記申請？\n拒絕後該筆資料將被刪除。`)) return;
 
     try {
-        const { error } = await sb.from('employees').delete().eq('id', empId);
-
+        const { error } = await rpcDeletePendingEmployee(empId);   // 124：只能刪 pending
         if (error) throw error;
 
         showToast(`❌ 已拒絕 ${empName} 的登記`);
@@ -794,15 +779,13 @@ export async function confirmResign() {
     if (!reason) { showToast('⚠️ 請選擇離職原因'); return; }
 
     try {
-        const { error } = await sb.from('employees').update({
+        const { error } = await rpcUpdateEmployee(empId, {   // 124
             is_active: false,
             status: 'resigned',
             resigned_date: resignDate,
             resign_reason: reason,
-            resign_note: note || null,
-            updated_at: new Date().toISOString()
-        }).eq('id', empId);
-
+            resign_note: note || null
+        });
         if (error) throw error;
 
         showToast('✅ 已設為離職');
@@ -818,15 +801,13 @@ export async function restoreEmployee(empId, empName) {
     if (!confirm(`確定將「${empName}」恢復為在職？`)) return;
 
     try {
-        const { error } = await sb.from('employees').update({
+        const { error } = await rpcUpdateEmployee(empId, {   // 124
             is_active: true,
             status: 'approved',
             resigned_date: null,
             resign_reason: null,
-            resign_note: null,
-            updated_at: new Date().toISOString()
-        }).eq('id', empId);
-
+            resign_note: null
+        });
         if (error) throw error;
         showToast(`✅ ${empName} 已恢復在職`);
         loadResignedEmployees();
@@ -1033,10 +1014,7 @@ export async function saveEditEmployee() {
     }
     if (!updates.name) { showToast('⚠️ 姓名不可為空'); return; }
     try {
-        const { error } = await sb.from('employees')
-            .update(updates)
-            .eq('id', empId)
-            .eq('company_id', window.currentCompanyId);
+        const { error } = await rpcUpdateEmployee(empId, updates);   // 124
         if (error) throw error;
         showToast('✅ 員工資料已更新');
         closeEditEmployeeModal();

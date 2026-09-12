@@ -5,6 +5,30 @@
 
 ---
 
+## 🟡 2026-09-12 RLS 收斂階段 1 ／ employees 寫入鎖定（migration 124，**待業主授權部署**）
+
+依 `docs/RLS_REMEDIATION_PLAN.md` §9，業主 9/12「開始 RLS 階段」。第一張表 employees：**只鎖寫入、不鎖讀取**，頁面不會壞。
+
+### 現況風險
+政策「Allow RPC access employees」（ALL, USING true/CHECK true）與「允許更新員工資料」（UPDATE, USING true）對 anon 全開；anon table grant 含 INSERT/UPDATE/DELETE。任何人拿公開 anon key 可把自己 role 改成 admin、停用他人、改別公司員工。員工自助登記頁雖然前端寫死 role=user，但直接打 REST 即可塞 role=admin、is_active=true（**真實提權漏洞，本次順手補掉**）。
+
+### 修法
+- 新 RPC：`admin_create_employee`／`admin_update_employee`（26 欄白名單，company_id 永遠以 p_company_id 為準；role 僅公司 admin 或平台管理員可改且限 user/manager/admin；同公司 LINE ID／工號重複檢查）／`admin_delete_pending_employee`（只能刪 pending）／`register_employee`（公開自助登記，伺服器端強制 pending/inactive/user）／`set_my_preferred_language`（員工自助，限本人）
+- DROP 兩條全開寫入政策；REVOKE anon/authenticated 的 INSERT/UPDATE/DELETE/TRUNCATE/REFERENCES/TRIGGER；讀取政策不動
+- 前端 13 處直接寫入全改 RPC：common.js（helper）、employees.js×9、schedules.js、attendance_public.html、employee_register.html×2、i18n.js
+- `tests/rls-locked-tables.test.js` 加 WRITE_LOCKED 區（多行鏈式寫入偵測）；`tests/rls-employees-write-lock.test.js` 41 項
+
+### 驗證
+- npm test 21 套件全過；反向對照壞 migration 掉 2；qa_check 0 FAIL 1 WARN（既有 95 條，未變多）；Hook 6 筆既有（employees.js 601→588 純位移）
+- rls-checker 六項 PASS。注意：(1) `has_company_access(…, true)` 讓 is_kiosk 裝置也拿得到 admin_update_employee（role 仍擋，其他欄位不擋），既有共用 helper 設計，記錄待議；(2) `generate_verification_code` 是 invoker-rights 且引用不存在的欄位，早已壞掉、無前端呼叫，建議另案 DROP
+- 既有 SECURITY DEFINER RPC（bind_*、upsert_salary_setting、quick_check_in）以 owner 執行，不受 REVOKE 影響；protect_admin_trigger 仍在
+- 備份／回滾：`.codex/production_rls_backup_employees_before_124_*.sql`（含兩條政策定義、grant 現況與還原 SQL）
+- **部署後仍要做的手動回歸**（CLAUDE.md 對照表：common.js → 所有頁面）：admin 新增員工、編輯、設管理員、寬鬆定位、綁 LINE、審核／拒絕登記、離職／恢復；排班頁工時模式；公開版工時模式；QR 自助登記；員工切換語言
+
+- **狀態：待業主結構化授權。**
+
+---
+
 ## 🟢 2026-09-12 08:00 打卡被記遲到：判定改以「分」為單位（migration 123，**已套用正式庫**）
 
 業主 9/11：「08:00 打卡出現遲到？8:01 才算遲到。」容忍改 0 後 `quick_check_in` 用 `v_tw_time > v_shift_start` 帶秒比較，08:00:47 被記遲到（9/10 豐豪、簡杏如，9/11 黃律瑋共 3 筆）。缺時計算本來就 FLOOR 到分鐘、算 0 分，只有打卡當下旗標錯。

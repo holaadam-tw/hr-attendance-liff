@@ -2370,12 +2370,49 @@ function getAdminInfo() {
     return currentEmployee;
 }
 
+// ===== 124：employees 寫入一律走 RPC（RLS 已收掉 anon 的 INSERT/UPDATE/DELETE） =====
+function adminCallerLineUserId() {
+    return window.currentAdminEmployee?.line_user_id || liffProfile?.userId || window.currentLineUserId || null;
+}
+
+// 回傳 { data, error }，error 為 Error 或 null，方便既有 try/throw 寫法直接沿用
+async function rpcUpdateEmployee(employeeId, updates, companyId) {
+    const { data, error } = await sb.rpc('admin_update_employee', {
+        p_company_id: companyId || window.currentCompanyId,
+        p_line_user_id: adminCallerLineUserId(),
+        p_employee_id: employeeId,
+        p_updates: updates
+    });
+    if (error) return { data: null, error };
+    if (!data?.success) return { data, error: new Error(data?.error || '更新失敗') };
+    return { data, error: null };
+}
+
+async function rpcCreateEmployee(fields, companyId) {
+    const { data, error } = await sb.rpc('admin_create_employee', {
+        p_company_id: companyId || window.currentCompanyId,
+        p_line_user_id: adminCallerLineUserId(),
+        p_data: fields
+    });
+    if (error) return { data: null, error };
+    if (!data?.success) return { data, error: new Error(data?.error || '新增失敗') };
+    return { data, error: null };
+}
+
+async function rpcDeletePendingEmployee(employeeId, companyId) {
+    const { data, error } = await sb.rpc('admin_delete_pending_employee', {
+        p_company_id: companyId || window.currentCompanyId,
+        p_line_user_id: adminCallerLineUserId(),
+        p_employee_id: employeeId
+    });
+    if (error) return { data: null, error };
+    if (!data?.success) return { data, error: new Error(data?.error || '刪除失敗') };
+    return { data, error: null };
+}
+
 async function updateEmployeeRole(employeeId, newRole) {
     try {
-        const { error } = await sb.from('employees')
-            .update({ role: newRole })
-            .eq('id', employeeId);
-        
+        const { error } = await rpcUpdateEmployee(employeeId, { role: newRole });
         if (error) throw error;
         return { success: true };
     } catch (err) {

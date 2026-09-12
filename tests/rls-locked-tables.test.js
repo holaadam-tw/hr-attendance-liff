@@ -111,6 +111,43 @@ LOCKED.forEach(({ table, migration, rpcs, note }) => {
   console.log('');
 });
 
+// 2b. 只鎖「寫入」的表（RLS 階段 1）：讀取仍允許直接 select，但 insert/update/upsert/delete 必須走 RPC
+const WRITE_LOCKED = [
+  {
+    table: 'employees',
+    migration: '124',
+    rpcs: ['admin_create_employee', 'admin_update_employee', 'admin_delete_pending_employee', 'register_employee', 'set_my_preferred_language'],
+    note: '13 處寫入改 RPC；anon 的 INSERT/UPDATE/DELETE grant 與全開政策已撤',
+  },
+];
+const writeRe = table => new RegExp("sb\\s*\\.\\s*from\\(\\s*['\"`]" + table + "['\"`]\\s*\\)[^;]{0,400}?\\.(insert|update|upsert|delete)\\(");
+WRITE_LOCKED.forEach(({ table, migration, rpcs, note }) => {
+  console.log('--- ' + table + '（migration ' + migration + '，只鎖寫入）' + note + ' ---');
+  const offenders = sources.filter(s => writeRe(table).test(s.text)).map(s => s.rel);
+  check(table + ' 前端 0 處直接寫入（insert/update/upsert/delete）', offenders.length === 0,
+    offenders.length ? '違規：' + offenders.join(', ') : undefined);
+  rpcs.forEach(rpc => {
+    const users = sources.filter(s => new RegExp("rpc\\(\\s*['\"`]" + rpc + "['\"`]").test(s.text));
+    check(rpc + ' 有被前端呼叫', users.length > 0, users.map(u => u.rel).join(', '));
+    const missingCompany = [], missingCaller = [];
+    users.forEach(s => {
+      let i = -1;
+      while ((i = s.text.indexOf(rpc, i + 1)) !== -1) {
+        const before = s.text.slice(Math.max(0, i - 40), i);
+        if (!/rpc\(\s*['"`]$/.test(before)) continue;
+        const win = s.text.slice(i, i + 600);
+        if (!win.includes('p_company_id')) missingCompany.push(s.rel);
+        if (!win.includes('p_line_user_id')) missingCaller.push(s.rel);
+      }
+    });
+    check(rpc + ' 每個呼叫都帶 p_company_id', missingCompany.length === 0, missingCompany.length ? '缺漏：' + [...new Set(missingCompany)].join(', ') : undefined);
+    check(rpc + ' 每個呼叫都帶 p_line_user_id', missingCaller.length === 0, missingCaller.length ? '缺漏：' + [...new Set(missingCaller)].join(', ') : undefined);
+  });
+  console.log('');
+});
+check('寫入偵測探針：多行鏈式 update 抓得到', writeRe('employees').test("sb.from('employees')\n  .update({ role: 1 })\n  .eq('id', x)"));
+check('寫入偵測探針：純 select 不誤判', !writeRe('employees').test("sb.from('employees').select('id').eq('id', x);"));
+
 // 3. 反向健全性檢查：測試本身要有偵測能力，否則清單寫錯也不會有人發現
 console.log('--- 測試自身健全性 ---');
 const probe = "sb.from('overtime_requests')";
