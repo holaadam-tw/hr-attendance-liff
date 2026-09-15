@@ -27,7 +27,7 @@
 
 - **狀態：2026-09-15 業主授權「授權套用 migration 124 到正式庫並合併 dev 到 main」後完成。** 先套 migration、60 秒內前端上線（空窗期內舊網頁員工管理寫入會失敗）。
 - 部署後實測（anon key）：直接 PATCH role／INSERT／DELETE 皆 `42501 permission denied`；讀取仍可；假身分呼叫 `admin_update_employee` → access_denied；管理員呼叫 → success；非白名單欄位 company_id → field_not_allowed；大正管理員改本米員工 → 找不到員工；自助登記假公司 → company_not_found。全開寫入政策 0 條、anon grant 只剩 SELECT、6 支新函式就位。
-- **待業主／黃小如手動回歸**：後台新增員工、編輯、設管理員、寬鬆定位、綁 LINE、審核／拒絕登記、離職／恢復；排班頁工時模式；QR 自助登記；員工切換語言。
+- **瀏覽器回歸（2026-09-15，Puppeteer＋LIFF mock 走正式站，以 Adam 身分）**：新增員工、編輯電話、寬鬆定位、設管理員／取消、綁 LINE（未綁定分頁）、離職／恢復、人力管理頁工時模式儲存、QR 自助登記×2（以不存在的 LINE 身分）、審核通過（改派工號 E826）、拒絕登記（刪除）、員工切換語言 vi-VN→zh-TW，**全部 DB 驗證通過**（腳本 scratchpad e2e_124*.js；toast 攔截未成功但以 DB 結果為準）。測試員工 TEST-124／E826 與 makeup 軌跡已清除，在職 23 人不變，Adam 語言還原 zh-TW。
 - 下一張：schedules（排班）。
 
 ---
