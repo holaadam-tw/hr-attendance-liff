@@ -15,6 +15,7 @@ SELECT json_agg(json_build_object(
   'secdef', p.prosecdef,
   'strict', p.proisstrict,
   'volatility', p.provolatile,
+  'prosrc_md5', md5(p.prosrc),
   'parallel', p.proparallel,
   'lang', (SELECT lanname FROM pg_language WHERE oid=p.prolang),
   'config', p.proconfig,

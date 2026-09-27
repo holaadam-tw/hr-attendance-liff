@@ -18,7 +18,8 @@ window.sb = sb;
 //   在 soft mode 只記錄、照常執行。這裡讓有 session 的頁面帶著 session 呼叫，紀錄才看得出真正的覆蓋率。
 // - 名單＝scripts/line-auth/wrapped_rpcs.json 的 rpc_names（產生器產生；測試逐一比對）
 // - 只在 LINE session 已建立且屬於目前 LIFF 帳號、access token 還沒到期時切換（_lineAuthRpcReady／_lineAuthExpiresAt，
-//   由下方 Phase 1 區塊設定；refresh 失敗時 token 會過期 → 自動回到 anon，不會讓呼叫因 JWT 過期而失敗）；
+//   由下方 Phase 1 區塊設定；refresh 失敗時 token 會過期 → 自動回到 anon）；本機時鐘不準等原因仍被伺服器以 401 拒絕時，
+//   自動改用 anon 重送一次並把 session 標為 stale（見 lineAuthSessionRpc）；
 //   其他情況、其他 RPC、所有 from() 查詢一律照舊用 anon 的 sb
 // - wrapper 與原函式的權限相同（anon 與 authenticated 都可執行）、原函式都是 SECURITY DEFINER（不受 RLS 角色差異影響）
 // - 關閉：CONFIG.LINE_AUTH_RPC = 'anon'（或單機 localStorage line_auth_rpc=anon）；CONFIG.LINE_AUTH_MODE = 'off' 也會一併關閉
@@ -40,18 +41,56 @@ const LINE_AUTH_SESSION_RPCS = new Set([
     'upsert_company_holiday', 'upsert_salary_setting'
 ]);
 let _lineAuthRpcReady = false;
+let _lineAuthRpcStale = false;  // session client 的 JWT 曾被伺服器拒絕（401）→ 等 refresh／重新建立 session 前都走 anon
 let _lineAuthExpiresAt = 0;   // 秒（Supabase session.expires_at）
-window.lineAuthRpcCounts = { session: 0, anon: 0 };
+window.lineAuthRpcCounts = { session: 0, anon: 0, retried: 0 };
 const _anonRpc = sb.rpc.bind(sb);
 function lineAuthRpcEnabled() {
     try { if (localStorage.getItem('line_auth_rpc') === 'anon') return false; } catch (e) {}
     return CONFIG.LINE_AUTH_RPC !== 'anon' && lineAuthMode() !== 'off';
 }
+// JWT 被 PostgREST 拒絕（過期、簽章或格式不符）：HTTP 401，code PGRST301／302／303
+function lineAuthJwtRejected(r) {
+    if (!r) return false;
+    const code = r.error ? r.error.code : r.code;
+    return r.status === 401 || code === 'PGRST301' || code === 'PGRST302' || code === 'PGRST303';
+}
+// 裝置時鐘不準、LINE 內建瀏覽器從背景回來還沒 refresh 時，本機判斷「未過期」的 token 可能已被伺服器視為過期。
+// 這時改用 anon 重送一次（soft mode 下 wrapper 對 anon 的結果相同），並把 session 標為 stale。
+// 回傳的物件行為同 supabase-js 的 builder：可接 .single() 等方法（重送時原樣重放）、可 await／then／catch。
+function lineAuthSessionRpc(fn, args, options) {
+    const chain = [];
+    const replay = (b) => chain.reduce((acc, [m, a]) => acc[m](...a), b);
+    let promise = null;
+    const run = () => promise || (promise = (async () => {
+        let r, thrown = null;
+        try { r = await replay(getLineAuthClient().rpc(fn, args, options)); }
+        catch (e) { thrown = e; }   // 呼叫端用了 throwOnError() 時錯誤會丟出
+        if (lineAuthJwtRejected(thrown || r)) {
+            _lineAuthRpcStale = true;
+            window.lineAuthRpcCounts.retried++;
+            try { console.info('[line-auth] rpc_jwt_rejected_retry_anon', fn); } catch (e) {}
+            return await replay(_anonRpc(fn, args, options));
+        }
+        if (thrown) throw thrown;
+        return r;
+    })());
+    const proxy = new Proxy({}, {
+        get(_, prop) {
+            if (prop === 'then') return (a, b) => run().then(a, b);
+            if (prop === 'catch') return (b) => run().catch(b);
+            if (prop === 'finally') return (f) => run().finally(f);
+            if (typeof prop === 'symbol') return undefined;
+            return (...a) => { chain.push([prop, a]); return proxy; };
+        }
+    });
+    return proxy;
+}
 sb.rpc = function (fn, args, options) {
     if (LINE_AUTH_SESSION_RPCS.has(fn)) {
-        if (_lineAuthRpcReady && Date.now() / 1000 < _lineAuthExpiresAt - 30 && lineAuthRpcEnabled()) {
+        if (_lineAuthRpcReady && !_lineAuthRpcStale && Date.now() / 1000 < _lineAuthExpiresAt - 30 && lineAuthRpcEnabled()) {
             window.lineAuthRpcCounts.session++;
-            return getLineAuthClient().rpc(fn, args, options);
+            return lineAuthSessionRpc(fn, args, options);
         }
         window.lineAuthRpcCounts.anon++;
     }
@@ -197,7 +236,7 @@ function getLineAuthClient() {
         });
         try {
             _lineAuthClient.auth.onAuthStateChange((evt, session) => {
-                if (evt === 'TOKEN_REFRESHED') { _lineAuthExpiresAt = Number(session && session.expires_at) || 0; lineAuthLog('refreshed'); }
+                if (evt === 'TOKEN_REFRESHED') { _lineAuthExpiresAt = Number(session && session.expires_at) || 0; _lineAuthRpcStale = false; lineAuthLog('refreshed'); }
                 if (evt === 'SIGNED_OUT') { _lineAuthRpcReady = false; lineAuthLog('signed_out'); }
             });
         } catch (e) {}
@@ -229,6 +268,7 @@ async function establishLineAuthSession() {
             if (check && !check.error && check.data && check.data.user && check.data.user.id === current.user.id) {
                 _lineAuthExpiresAt = Number(current.expires_at) || 0;
                 _lineAuthRpcReady = true;
+                _lineAuthRpcStale = false;
                 lineAuthLog('reused', { user: current.user.id });
                 return { ok: true, reason: 'reused' };
             }
@@ -276,6 +316,7 @@ async function establishLineAuthSession() {
         }
         _lineAuthExpiresAt = Number(setResult.data.session && setResult.data.session.expires_at) || 0;
         _lineAuthRpcReady = true;
+        _lineAuthRpcStale = false;
         lineAuthLog('established', { user: user.id, created: !!out.created, mode: out.mode || 'session' });
         // 記錄用：確認 DB 端從 JWT 讀得到 line_user_id（138 的 line_auth_whoami；失敗不影響）
         Promise.resolve(client.rpc('line_auth_whoami')).then((w) => {

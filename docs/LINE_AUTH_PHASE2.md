@@ -12,9 +12,18 @@
 
 ### wrapper
 - 原函式改名 `<name>_impl`（本體、owner、search_path 設定不變），撤掉 PUBLIC／anon／authenticated 的執行權（service role 保留）
-- 新的 `<name>`：參數（含預設值）、回傳型別、proacl 與原函式逐項相同；`SECURITY DEFINER`、`VOLATILE`；不設 search_path（原函式沿用呼叫端的 search_path，行為不變）
+- 新的 `<name>`：參數（含預設值）、回傳型別、proacl 與原函式逐項相同；`SECURITY DEFINER`、`VOLATILE`、擁有者與原函式相同（正式庫＝postgres，檔尾自我檢查）
+- **刻意不設 search_path**：原函式有些沒有自己的 search_path，會沿用呼叫端的；wrapper 若設了就會改變它們看到的 search_path。wrapper 本身只用完整限定名稱與 `$n` 參數。
+  Supabase Advisor 會對這 54 支顯示 `function_search_path_mutable` 警告——**這是預期的，請勿「修正」**
 - 內容：`PERFORM public.assert_caller(p_line_user_id, '<name>')` → 原樣轉呼叫 `<name>_impl`
 - ⚠️ 套用後要改某支 RPC 的邏輯，**請改 `<name>_impl`**；對 `<name>` 做 `CREATE OR REPLACE` 會把 wrapper 蓋掉
+
+### 套用時的防呆（141 開頭）
+- 138 已套；「anon／authenticated 可執行、帶 `p_line_user_id` 的函式」**恰好**是這 54 支
+- 每支的**完整指紋**與產生時的正式庫快照相同：本體 `md5(prosrc)`、參數與預設值、回傳型別、proacl（擁有者以外的 grantee:權限）、proconfig、擁有者（＝public.employees 的擁有者）、非 STRICT、volatility、SECURITY DEFINER
+- 任何一項不同 → 中止、不改任何東西（wrapper 的 GRANT 由快照產生，這個檢查保證與實際 proacl 相同）
+- 回滾前：每支 wrapper 必須仍呼叫 `assert_caller` 與 `<name>_impl`，否則中止（避免刪掉被別人改過的函式）
+- `tests/line-auth-phase2-guard.test.js`：編號 > 141 的 migration 只要出現 `FUNCTION public.<wrapper 名稱>(` 就失敗（要改邏輯請改 `<name>_impl`）
 
 ### assert_caller(p_line_user_id, fn)
 1. 呼叫者不是 anon／authenticated（service role、pg_cron、DB 內部）→ 放行、不記錄
@@ -39,6 +48,7 @@
 - **不載入 `common.js` 的頁面仍是 anon**（soft 紀錄會一直有「沒有 session」）：
   - `attendance_public.html`：`create_shift_type`、`delete_shift_type`、`update_shift_type`、`get_attendance_anomalies`、`get_company_daily_attendance`、`get_company_holidays`、`get_company_leave_requests_for_audit`、`get_company_monthly_attendance`、`get_company_shift_types`、`get_makeup_review_requests`、`get_pending_makeup_requests`、`get_weekly_schedules`、`resolve_attendance_anomaly`
   - `employee_register.html`：`register_employee`（還沒綁定的新員工本來就沒有 session → 預先設為 soft）
+- 伺服器以 401（PGRST301／302／303，例如裝置時鐘不準、LINE 內建瀏覽器從背景回來還沒 refresh）拒絕 session 的 JWT 時：自動改用 anon 重送一次（soft 下結果相同；`.single()` 等接續方法原樣重放），並把 session 標為 stale，直到 refresh 成功或重新建立 session（`window.lineAuthRpcCounts.retried` 可看次數）
 - 關閉：`CONFIG.LINE_AUTH_RPC = 'anon'`（或單機 `localStorage.setItem('line_auth_rpc','anon')`）；`CONFIG.LINE_AUTH_MODE = 'off'` 也會一併關閉
 
 ## 上線步驟（業主執行）
@@ -47,22 +57,29 @@
 3. 合併前端（本 PR）
 4. 觀察（唯讀，service role／SQL Editor）：
    ```sql
-   -- 每支 RPC 每天：沒有 session 的次數、有 session 但不符的次數
+   -- 每支 RPC 每天，分四類（互斥）：
+   --   not_passed      ：呼叫端根本沒傳 p_line_user_id（NULL；多為 p_line_user_id 有預設 NULL 的公司層級查詢）
+   --   no_session      ：有傳，但呼叫者沒有 LINE session（anon）
+   --   real_mismatch   ：有傳、有 LINE session，但兩者不同（真正需要追查的「冒用／傳錯人」）
+   --   no_line_claim   ：authenticated 但 JWT 沒有 LINE claim（非 LINE 帳號）
    SELECT fn_name, date_trunc('day', created_at) AS d,
-          count(*) FILTER (WHERE NOT claim_present) AS no_session,
-          count(*) FILTER (WHERE claim_present) AS mismatch
+          count(*) FILTER (WHERE provided_id_hash IS NULL)                                                   AS not_passed,
+          count(*) FILTER (WHERE provided_id_hash IS NOT NULL AND caller_role = 'anon')                      AS no_session,
+          count(*) FILTER (WHERE provided_id_hash IS NOT NULL AND claim_present)                             AS real_mismatch,
+          count(*) FILTER (WHERE provided_id_hash IS NOT NULL AND caller_role = 'authenticated' AND NOT claim_present) AS no_line_claim
    FROM public.line_auth_caller_log
    WHERE created_at > now() - interval '7 days'
-   GROUP BY 1, 2 ORDER BY 2 DESC, 3 DESC;
+   GROUP BY 1, 2 ORDER BY 2 DESC, 5 DESC, 4 DESC;
    ```
-   - `mismatch` 應接近 0；不是 0 的要逐一查（前端傳了別人的 LINE userId？換帳號？）
+   - `real_mismatch` 應為 0；不是 0 的要逐一查（前端傳了別人的 LINE userId？換帳號？）——**只有這一欄代表身分不符**
+   - `not_passed` 不是冒用，是呼叫端沒帶身分；但 enforce 下會被擋（NULL ≠ claim），切 enforce 前要先讓前端帶上
    - `no_session` 會隨 line-auth 普及下降；剩下的主要來自上面列的兩個頁面
 5. 紀錄清理（可選，service role）：`DELETE FROM public.line_auth_caller_log WHERE created_at < now() - interval '30 days';`
 
 ## 切 enforce 之前（本 PR 不做）
 1. Phase 1 文件列的前置條件：離職／停用時停用 Auth 帳號、評估關閉自設密碼登入（否則 enforce 只證明「曾經通過 LINE 驗證的那個人」）
 2. `attendance_public.html`、`employee_register.html` 改用 session（或另設計）
-3. 紀錄顯示該支 RPC 近 7 天 `no_session`＝0、`mismatch`＝0
+3. 紀錄顯示該支 RPC 近 7 天：`real_mismatch`＝0（判斷有沒有身分不符，只看這一欄）；且 `no_session`、`not_passed`、`no_line_claim` 也都＝0（否則那些合法呼叫在 enforce 下會被擋）
 4. 逐支切：`INSERT INTO public.line_auth_caller_settings (fn_name, mode) VALUES ('get_my_payslip', 'enforce') ON CONFLICT (fn_name) DO UPDATE SET mode = EXCLUDED.mode, updated_at = now();`
    全部切：`UPDATE public.line_auth_caller_settings SET mode = 'enforce', updated_at = now() WHERE fn_name = '*';`
    （`register_employee`、`log_checkin_failure` 已預先設為 soft，全部切時不受影響）
@@ -73,6 +90,10 @@
 - enforce 出問題：把 mode 改回 soft（見上）
 - DB：`migrations/141_line_auth_rpc_wrappers_rollback.sql`——還原 54 支原函式的名稱與權限（正式庫 proacl），刪掉 wrapper、`assert_caller`、兩張表（紀錄會一起刪；需要的話先匯出）
 - 測試證明回滾後所有 public 函式的定義、SECURITY DEFINER、volatility、設定、權限與套用前逐項相同
+
+## 不在範圍
+- `kiosk_*`（公務機）以 `p_kiosk_line_user_id` 當身分（參數名不同），本產生器不包；公務機的身分收斂需另案
+- 其他以員工 ID（`p_employee_id`、`p_approver_id` 等）當身分的舊 RPC：多數已在 131／132 撤權，其餘另案
 
 ## 已知限制／未驗證
 - 未在正式環境實跑（不得套用／部署）；PGlite 以正式庫簽名／proacl 建立替身，正式庫原文只有打卡／補卡 4 支

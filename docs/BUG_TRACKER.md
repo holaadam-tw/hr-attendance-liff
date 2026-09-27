@@ -11,7 +11,8 @@
 - `assert_caller`：JWT 的 LINE userId（138 `caller_line_user_id()`）與 p_line_user_id 相符就放行；不符或沒有 session → soft 記一筆（只存雜湊）後放行、enforce 拒絕；模式在 `line_auth_caller_settings`（預設 soft，只有 service role 能改，可逐支覆寫）
 - 前端：名單內 RPC 在 LINE session 已建立、屬於目前帳號且未過期時改用 session client；`CONFIG.LINE_AUTH_RPC='anon'` 可關
 - 138 回滾加防呆：141 還在時中止
-- 測試：PGlite 70 項（141 換空檔 → 失敗）、前端 jsdom＋真 supabase-js 28 項（舊 common.js → 失敗）；詳見 `docs/LINE_AUTH_PHASE2.md`
+- 審查補強：141 套用時逐支比對正式庫快照的完整指紋（本體 md5、proacl、proconfig、擁有者、STRICT、volatility）；回滾前確認 wrapper 未被改掉；編號 > 141 的 migration 直接改 wrapper → 測試失敗；前端遇 401（PGRST301／302／303）自動改用 anon 重送一次並標為 stale；觀察 SQL 區分「沒傳身分」與「真正不符」
+- 測試：PGlite 78 項（141 換空檔 → 失敗）、前端 jsdom＋真 supabase-js 46 項（舊 common.js → 失敗）、migration 防呆 5 項；詳見 `docs/LINE_AUTH_PHASE2.md`
 - **狀態：PR 待審，未套正式庫、未部署；enforce 未開。**
 
 ---

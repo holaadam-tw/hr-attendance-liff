@@ -4,7 +4,8 @@
 //   - 名單與 scripts/line-auth/wrapped_rpcs.json 逐一相同
 //   - session 未建立／建立失敗／換帳號／登出／關閉開關 → 照舊用 anon 的 sb
 //   - 只影響名單內的 RPC；from() 查詢與其他 RPC 不動
-//   - 另用「真的」supabase-js 驗證：切換後請求帶使用者 access token，名單外仍只帶 anon key
+//   - 伺服器以 401（PGRST301／302／303）拒絕 session 的 JWT → 改用 anon 重送一次（含 .single() 等接續方法）、標為 stale
+//   - 另用「真的」supabase-js 驗證：切換後請求帶使用者 access token，名單外仍只帶 anon key；401 時自動改用 anon
 // 反向對照：COMMON_JS_FILE 指向舊版 common.js（PR #7）→ 失敗
 // ============================================================
 const fs = require('fs');
@@ -43,15 +44,20 @@ const OTHER = 'U' + 'f'.repeat(32);
 const userOf = (line, id = 'auth-1') => ({ id, app_metadata: { line_user_id: line } });
 const okSession = { ok: true, mode: 'session', created: true, session: { access_token: 'at', refresh_token: 'rt' }, user: { id: 'auth-1', line_user_id: LINE } };
 
-function page({ session = null, reply = okSession, setUser, mode, rpcMode, storage = {}, serverKnows = true } = {}) {
+function page({ session = null, reply = okSession, setUser, mode, rpcMode, storage = {}, serverKnows = true, sessionReply = null, sessionThrows = null } = {}) {
   const dom = new JSDOM('<!doctype html><body></body>', { url: 'https://example.test/index.html', runScripts: 'outside-only' });
   const w = dom.window;
   for (const [k, v] of Object.entries(storage)) w.localStorage.setItem(k, v);
-  const log = { anonRpc: [], sessionRpc: [], anonFrom: [], created: 0 };
+  const log = { anonRpc: [], sessionRpc: [], anonFrom: [], created: 0, chained: [] };
   const exp = () => Math.floor(Date.now() / 1000) + 3600;
   let current = session && !('expires_at' in session) ? { ...session, expires_at: exp() } : session;
   let authListener = null;
-  const builder = (who, fn) => ({ who, fn, then: (res) => Promise.resolve({ data: who, error: null }).then(res) });
+  const builder = (who, fn, result, throws) => {
+    const b = { who, fn, chained: [] };
+    for (const m of ['single', 'maybeSingle', 'select', 'order', 'limit', 'throwOnError']) b[m] = (...a) => { b.chained.push(m); log.chained.push(who + '.' + m); return b; };
+    b.then = (res, rej) => (throws ? Promise.reject(throws) : Promise.resolve(result || { data: who, error: null, status: 200 })).then(res, rej);
+    return b;
+  };
   const anonClient = {
     rpc: (fn, args, opts) => { log.anonRpc.push({ fn, args, opts }); return builder('anon', fn); },
     from: (t) => { log.anonFrom.push(t); return { select: () => ({}) }; },
@@ -65,7 +71,7 @@ function page({ session = null, reply = okSession, setUser, mode, rpcMode, stora
       signOut: async () => { current = null; if (authListener) authListener('SIGNED_OUT'); return { error: null }; },
       onAuthStateChange: (cb) => { authListener = cb; return { data: { subscription: { unsubscribe() {} } } }; },
     },
-    rpc: (fn, args, opts) => { if (fn !== 'line_auth_whoami') log.sessionRpc.push({ fn, args, opts }); return builder('session', fn); },
+    rpc: (fn, args, opts) => { if (fn !== 'line_auth_whoami') log.sessionRpc.push({ fn, args, opts }); return fn === 'line_auth_whoami' ? builder('session', fn) : builder('session', fn, sessionReply, sessionThrows); },
   };
   w.supabase = { createClient: (url, key, opts) => { log.created++; return opts && opts.auth && opts.auth.storageKey === 'hr-line-auth-v1' ? sessionClient : anonClient; } };
   w.liff = { getAccessToken: () => 'liff-at' };
@@ -108,9 +114,9 @@ window.__establish = establishLineAuthSession;`);
     let r = sb.rpc('get_my_payslip', args);
     check('session 建立前：名單內 RPC 照舊走 anon', log.anonRpc.length === 1 && log.sessionRpc.length === 0 && r.who === 'anon');
     await w.__establish();
-    r = sb.rpc('get_my_payslip', args, { count: 'exact' });
-    check('session 建立後：名單內 RPC 改走 session client，參數與選項原樣傳入、回傳的就是該 client 的 builder',
-      log.sessionRpc.length === 1 && log.sessionRpc[0].fn === 'get_my_payslip' && log.sessionRpc[0].args === args && log.sessionRpc[0].opts.count === 'exact' && r.who === 'session' && log.anonRpc.length === 1);
+    r = await sb.rpc('get_my_payslip', args, { count: 'exact' });
+    check('session 建立後：名單內 RPC 改走 session client，參數與選項原樣傳入、結果來自 session client',
+      log.sessionRpc.length === 1 && log.sessionRpc[0].fn === 'get_my_payslip' && log.sessionRpc[0].args === args && log.sessionRpc[0].opts.count === 'exact' && r.data === 'session' && log.anonRpc.length === 1);
     const res = await sb.rpc('quick_check_in', { p_line_user_id: LINE, p_latitude: 1, p_longitude: 2 });
     check('await 結果來自 session client（then 鏈照常）', res.data === 'session');
     sb.rpc('kiosk_check_in', { p_kiosk_line_user_id: LINE });
@@ -120,13 +126,13 @@ window.__establish = establishLineAuthSession;`);
     check('from() 查詢仍走 anon', log.anonFrom.length === 1);
     check('統計（開發者主控台可看）：session／anon 次數', w.lineAuthRpcCounts.session === 2 && w.lineAuthRpcCounts.anon === 1, JSON.stringify(w.lineAuthRpcCounts));
     w.__signOutEvent();
-    sb.rpc('get_my_payslip', args);
+    await sb.rpc('get_my_payslip', args);
     check('session 被登出（SIGNED_OUT，例如 refresh 失效）：回到 anon', log.sessionRpc.length === 2 && log.anonRpc.filter(x => x.fn === 'get_my_payslip').length === 2);
   }
   {
     const { w, log, sb } = page({ session: { user: userOf(LINE) } });
     const r = await w.__establish();
-    sb.rpc('get_weekly_schedules', {});
+    await sb.rpc('get_weekly_schedules', {});
     check('沿用既有 session（reused）：切到 session client', r.reason === 'reused' && log.sessionRpc.length === 1);
   }
 
@@ -134,21 +140,68 @@ window.__establish = establishLineAuthSession;`);
     const past = Math.floor(Date.now() / 1000) - 10;
     const { w, log, sb } = page({ session: { user: userOf(LINE), expires_at: past } });
     const r = await w.__establish();
-    sb.rpc('get_weekly_schedules', {});
+    await sb.rpc('get_weekly_schedules', {});
     check('access token 已過期（例如 refresh 失敗）：照舊 anon，不會送出過期的 JWT', r.reason === 'reused' && log.sessionRpc.length === 0 && log.anonRpc.length === 1);
     w.__refreshedEvent(Math.floor(Date.now() / 1000) + 3600);
-    sb.rpc('get_weekly_schedules', {});
+    await sb.rpc('get_weekly_schedules', {});
     check('之後 refresh 成功（TOKEN_REFRESHED）：恢復走 session client', log.sessionRpc.length === 1);
     w.__refreshedEvent(Math.floor(Date.now() / 1000) + 20);
-    sb.rpc('get_weekly_schedules', {});
+    await sb.rpc('get_weekly_schedules', {});
     check('剩不到 30 秒就到期：先走 anon', log.sessionRpc.length === 1 && log.anonRpc.length === 2);
+  }
+
+  console.log('\n=== 伺服器拒絕 session 的 JWT（401）→ 改用 anon 重送一次 ===');
+  for (const [label, rej] of [
+    ['PGRST303（JWT expired）', { data: null, error: { code: 'PGRST303', message: 'JWT expired' }, status: 401 }],
+    ['PGRST301', { data: null, error: { code: 'PGRST301', message: 'JWSError' }, status: 401 }],
+    ['PGRST302', { data: null, error: { code: 'PGRST302', message: 'No suitable key' }, status: 401 }],
+    ['HTTP 401（沒有 code）', { data: null, error: { message: 'Unauthorized' }, status: 401 }],
+  ]) {
+    const { w, log, sb } = page({ sessionReply: rej });
+    await w.__establish();
+    const res = await sb.rpc('quick_check_in', { p_line_user_id: LINE, p_latitude: 1, p_longitude: 2 }, { count: 'exact' }).single();
+    check(`${label}：改用 anon 重送、回傳 anon 的結果（打卡不會因時鐘不準失敗）`, res.data === 'anon' && !res.error && log.sessionRpc.length === 1 && log.anonRpc.length === 1
+      && log.anonRpc[0].fn === 'quick_check_in' && log.anonRpc[0].args.p_line_user_id === LINE && log.anonRpc[0].opts.count === 'exact', JSON.stringify(res));
+    check(`${label}：接在 rpc() 後的 .single() 在重送時原樣重放`, log.chained.join() === 'session.single,anon.single', log.chained.join());
+    if (label.startsWith('PGRST303')) {
+      check('重送計數（lineAuthRpcCounts.retried）', w.lineAuthRpcCounts.retried === 1);
+      await sb.rpc('submit_makeup_punch', { p_line_user_id: LINE });
+      check('被拒一次後標為 stale：之後直接走 anon，不再先送會被拒的 JWT', log.sessionRpc.length === 1 && log.anonRpc.length === 2);
+      w.__refreshedEvent(Math.floor(Date.now() / 1000) + 3600);
+      await sb.rpc('submit_makeup_punch', { p_line_user_id: LINE });
+      check('refresh 成功（TOKEN_REFRESHED）後解除 stale、恢復走 session client', log.sessionRpc.length === 2);
+    }
+  }
+  {
+    const { w, log, sb } = page({ sessionThrows: Object.assign(new Error('JWT expired'), { code: 'PGRST303' }) });
+    await w.__establish();
+    const res = await sb.rpc('quick_check_in', { p_line_user_id: LINE }).throwOnError();
+    check('呼叫端用 throwOnError()（錯誤以例外丟出）：同樣改用 anon 重送', res.data === 'anon' && log.anonRpc.length === 1 && log.chained.join() === 'session.throwOnError,anon.throwOnError', log.chained.join());
+  }
+  {
+    const bizErr = { data: null, error: { code: 'P0001', message: '業務錯誤' }, status: 400 };
+    const { w, log, sb } = page({ sessionReply: bizErr });
+    await w.__establish();
+    const res = await sb.rpc('quick_check_in', { p_line_user_id: LINE });
+    check('非 JWT 的錯誤（400 業務錯誤）：照原樣回傳、不重送、不標 stale', res === bizErr && log.anonRpc.length === 0 && w.lineAuthRpcCounts.retried === 0);
+    await sb.rpc('quick_check_in', { p_line_user_id: LINE });
+    check('（之後仍走 session client）', log.sessionRpc.length === 2);
+  }
+  {
+    const { w, log, sb } = page({ sessionThrows: Object.assign(new Error('network'), { code: '' }) });
+    await w.__establish();
+    let thrown = null;
+    try { await sb.rpc('quick_check_in', { p_line_user_id: LINE }); } catch (e) { thrown = e; }
+    check('非 JWT 的例外（網路錯誤）：照原樣丟出、不重送', thrown && thrown.message === 'network' && log.anonRpc.length === 0);
+    const caught = await sb.rpc('quick_check_in', { p_line_user_id: LINE }).catch(e => 'caught:' + e.message);
+    check('.catch() 可用', caught === 'caught:network');
   }
 
   console.log('\n=== 不切換的情況 ===');
   const stays = async (name, opts) => {
     const { w, log, sb } = page(opts);
     const r = await w.__establish();
-    sb.rpc('get_my_payslip', args);
+    await sb.rpc('get_my_payslip', args);
     check(name, log.sessionRpc.length === 0 && log.anonRpc.length === 1, JSON.stringify(r));
   };
   await stays('line-auth 失敗（not_linked）：照舊 anon', { reply: { ok: false, status: 403, code: 'not_linked' } });
@@ -160,7 +213,7 @@ window.__establish = establishLineAuthSession;`);
   {
     const { w, log, sb } = page({ session: { user: userOf(OTHER, 'auth-2') } });
     const p = w.__establish();
-    sb.rpc('get_my_payslip', args);
+    await sb.rpc('get_my_payslip', args);
     await p;
     check('換了 LINE 帳號、新 session 建立完成前：照舊 anon（不會用舊帳號的 session）', log.anonRpc.length === 1 && log.sessionRpc.length === 0);
   }
@@ -173,11 +226,15 @@ window.__establish = establishLineAuthSession;`);
     const now = Math.floor(Date.now() / 1000);
     const ACCESS = `${b64({ alg: 'HS256', typ: 'JWT' })}.${b64({ sub: 'auth-1', role: 'authenticated', exp: now + 3600, app_metadata: { line_user_id: LINE } })}.sig`;
     const calls = [];
+    let rejectUser = false;
     const fakeFetch = async (input, init = {}) => {
       const url = typeof input === 'string' ? input : input.url;
       const headers = new Headers(init.headers || (typeof input !== 'string' ? input.headers : undefined));
       calls.push({ url, auth: headers.get('authorization'), body: init.body });
       if (url.includes('/auth/v1/user')) return new Response(JSON.stringify({ id: 'auth-1', aud: 'authenticated', role: 'authenticated', app_metadata: { line_user_id: LINE } }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      if (url.includes('/rest/v1/') && rejectUser && headers.get('authorization') !== `Bearer ${ANON}`) {
+        return new Response(JSON.stringify({ code: 'PGRST303', details: null, hint: null, message: 'JWT expired' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
+      }
       if (url.includes('/rest/v1/')) return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'Content-Type': 'application/json' } });
       return new Response('{}', { status: 404 });
     };
@@ -207,6 +264,15 @@ return { sb, client: getLineAuthClient, setReady: (v, e) => { _lineAuthRpcReady 
     check('真 supabase-js：名單外 RPC 仍只帶 anon key', calls.at(-1).auth === `Bearer ${ANON}`);
     await h.sb.from('employees').select('id');
     check('真 supabase-js：from() 查詢仍只帶 anon key', calls.at(-1).auth === `Bearer ${ANON}` && /\/rest\/v1\/employees/.test(calls.at(-1).url));
+    rejectUser = true;
+    calls.length = 0;
+    const rr = await h.sb.rpc('quick_check_in', { p_line_user_id: LINE, p_latitude: 1, p_longitude: 2 });
+    check('真 supabase-js：伺服器以 401 PGRST303 拒絕使用者 token → 自動改用 anon key 重送、結果成功',
+      !rr.error && rr.data?.ok === true && calls.length === 2 && calls[0].auth === `Bearer ${ACCESS}` && calls[1].auth === `Bearer ${ANON}` && calls[1].body === calls[0].body,
+      JSON.stringify(calls.map(c => c.auth.slice(0, 20))));
+    await h.sb.rpc('quick_check_in', { p_line_user_id: LINE });
+    check('真 supabase-js：之後標為 stale、直接用 anon key', calls.at(-1).auth === `Bearer ${ANON}` && calls.length === 3);
+    rejectUser = false;
     await h.client().auth.signOut({ scope: 'local' });
     await h.sb.rpc('get_my_payslip', args);
     check('真 supabase-js：登出後回到 anon key', calls.at(-1).auth === `Bearer ${ANON}`);

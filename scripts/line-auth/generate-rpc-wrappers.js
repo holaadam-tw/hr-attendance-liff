@@ -15,7 +15,10 @@
 //   原函式 RENAME 成 <name>_impl（本體、owner、設定不變；撤掉 PUBLIC／anon／authenticated 的執行權）
 //   新的 <name>：同樣的參數（含預設值）、同樣的回傳型別、SECURITY DEFINER、VOLATILE（soft mode 要寫紀錄）
 //     wrapper 不設 search_path：原函式（有些沒有自己的 search_path）照舊沿用呼叫端的 search_path，行為不變；
-//     wrapper 本身只用完整限定名稱（public.assert_caller／public.<name>_impl）與 $n 參數
+//     wrapper 本身只用完整限定名稱（public.assert_caller／public.<name>_impl）與 $n 參數。
+//     ⚠️ 刻意不設 search_path：Supabase Advisor 的「function_search_path_mutable」警告是預期的，請勿「修正」
+//     （設了會改變沒有自己 search_path 的原函式看到的 search_path）
+// 不在範圍：kiosk_* 以 p_kiosk_line_user_id 當身分（參數名不同），本產生器不包；需另案處理
 //     → PERFORM public.assert_caller(p_line_user_id, '<name>') → 原樣轉呼叫 <name>_impl
 //   權限＝正式庫原函式的 proacl（逐項）
 // ⚠️ 141 套用後，若要修改某支 RPC 的邏輯，請改 <name>_impl（CREATE OR REPLACE <name> 會把 wrapper 蓋掉）。
@@ -73,6 +76,7 @@ for (const f of wrapped) {
   if (f.uses_auth_schema || f.uses_role_guc) problems.push(`${key(f)} 本體用到 auth.*／角色（anon 與 authenticated 結果可能不同）`);
   if (f.deps && f.deps.length) problems.push(`${key(f)} 有其他物件依賴（${f.deps}）`);
   if (f.owner !== 'postgres') problems.push(`${key(f)} 擁有者不是 postgres`);
+  if (!/^[0-9a-f]{32}$/.test(f.prosrc_md5 || '')) problems.push(`${key(f)} 缺少 prosrc_md5（請用新版 inventory.sql 重新查詢）`);
   if ((f.argmodes || []).some(m => !['i', 't'].includes(m))) problems.push(`${key(f)} 有 OUT／INOUT／VARIADIC 參數`);
   if (!/^[a-z_][a-z0-9_]*$/.test(f.name) || f.name.length > 58) problems.push(`${key(f)} 名稱不適合加 _impl`);
 }
@@ -154,22 +158,64 @@ BEGIN
   END IF;
 END $$;`;
 
+// 權限指紋：擁有者以外的 grantee:權限，依 C 排序（與 SQL 端 ORDER BY … COLLATE "C" 相同）
+const aclFingerprint = f => aclGrantees(f.acl).map(g => `${g.grantee}:EXECUTE`).sort().join(',');
+// 套用當下逐支比對正式庫快照的完整指紋：本體 md5、參數、回傳型別、proacl、proconfig、擁有者、STRICT、volatility、DEFINER
+// 任何一項不同 → 中止（wrapper 的 GRANT 由快照產生，這裡保證與實際 proacl 相同）
+// 擁有者：必須與 public.employees 的擁有者相同（正式庫＝postgres；產生器已確認快照 owner 為 postgres）
 const sigCheck = `DO $$
 DECLARE
   r record;
-  v_oid oid;
+  p record;
+  v_owner oid := (SELECT relowner FROM pg_class WHERE oid = 'public.employees'::regclass);
+  v_acl text;
 BEGIN
   FOR r IN SELECT * FROM (VALUES
-${wrapped.map(f => `    (${q(f.name)}, ${q(f.identity_args)}, ${q(f.args)}, ${q(f.result)})`).join(',\n')}
-  ) v(n, ident, args, res) LOOP
-    SELECT p.oid INTO v_oid FROM pg_proc p
-    WHERE p.pronamespace = 'public'::regnamespace AND p.proname = r.n AND pg_get_function_identity_arguments(p.oid) = r.ident;
-    IF v_oid IS NULL THEN
+${wrapped.map(f => `    (${q(f.name)}, ${q(f.identity_args)}, ${q(f.args)}, ${q(f.result)}, ${q(f.prosrc_md5)}, ${q(aclFingerprint(f))}, ${q((f.config || []).join(';'))}, ${q(f.volatility)})`).join(',\n')}
+  ) v(n, ident, args, res, src_md5, acl, cfg, vol) LOOP
+    SELECT pp.oid, pp.prosrc, pp.proowner, pp.proisstrict, pp.provolatile, pp.prosecdef, pp.proacl,
+           coalesce(array_to_string(pp.proconfig, ';'), '') AS cfg
+      INTO p
+      FROM pg_proc pp
+     WHERE pp.pronamespace = 'public'::regnamespace AND pp.proname = r.n AND pg_get_function_identity_arguments(pp.oid) = r.ident;
+    IF p.oid IS NULL THEN
       RAISE EXCEPTION '找不到 %(%)', r.n, r.ident;
     END IF;
-    IF pg_get_function_arguments(v_oid) <> r.args OR pg_get_function_result(v_oid) <> r.res
-       OR NOT (SELECT prosecdef FROM pg_proc WHERE oid = v_oid) THEN
-      RAISE EXCEPTION '%(%) 的參數／回傳型別／SECURITY DEFINER 與產生時不同；請重新產生 141', r.n, r.ident;
+    SELECT coalesce(string_agg(coalesce(g.rolname, 'PUBLIC') || ':' || a.privilege_type, ',' ORDER BY coalesce(g.rolname, 'PUBLIC') || ':' || a.privilege_type COLLATE "C"), '')
+      INTO v_acl
+      FROM aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a LEFT JOIN pg_roles g ON g.oid = a.grantee
+     WHERE a.grantee <> p.proowner;
+    IF pg_get_function_arguments(p.oid) <> r.args OR pg_get_function_result(p.oid) <> r.res THEN
+      RAISE EXCEPTION '%(%) 的參數／回傳型別與產生時不同；請重新產生 141', r.n, r.ident;
+    END IF;
+    IF md5(p.prosrc) <> r.src_md5 THEN
+      RAISE EXCEPTION '%(%) 的函式本體與產生時不同（md5）；請重新查詢清單並重新產生 141', r.n, r.ident;
+    END IF;
+    IF v_acl <> r.acl THEN
+      RAISE EXCEPTION '%(%) 的執行權限與產生時不同（現在 %，產生時 %）；請重新產生 141', r.n, r.ident, v_acl, r.acl;
+    END IF;
+    IF p.cfg <> r.cfg OR p.proowner <> v_owner OR p.proisstrict OR p.provolatile::text <> r.vol OR NOT p.prosecdef THEN
+      RAISE EXCEPTION '%(%) 的設定／擁有者／STRICT／volatility／SECURITY DEFINER 與產生時不同；請重新產生 141', r.n, r.ident;
+    END IF;
+  END LOOP;
+END $$;`;
+
+// 回滾前：每支 wrapper 必須仍是 141 產生的 wrapper（有呼叫 assert_caller 與 <name>_impl），否則中止（避免把別人改過的函式刪掉）
+const rbCheck = `DO $$
+DECLARE
+  r record;
+  v_src text;
+BEGIN
+  FOR r IN SELECT * FROM (VALUES
+${wrapped.map(f => `    (${q(f.name)}, ${q(f.identity_args)})`).join(',\n')}
+  ) v(n, ident) LOOP
+    SELECT pp.prosrc INTO v_src FROM pg_proc pp
+     WHERE pp.pronamespace = 'public'::regnamespace AND pp.proname = r.n AND pg_get_function_identity_arguments(pp.oid) = r.ident;
+    IF v_src IS NULL OR position('public.assert_caller(' IN v_src) = 0 OR position('public.' || r.n || '_impl(' IN v_src) = 0 THEN
+      RAISE EXCEPTION '%(%) 已不是 141 的 wrapper（可能被 CREATE OR REPLACE 蓋掉）；請先人工確認再回滾', r.n, r.ident;
+    END IF;
+    IF to_regprocedure('public.' || r.n || '_impl(' || regexp_replace(r.ident, '(^|, )p_[a-z0-9_]+ ', '\\1', 'g') || ')') IS NULL THEN
+      RAISE EXCEPTION '找不到 %_impl(%)', r.n, r.ident;
     END IF;
   END LOOP;
 END $$;`;
@@ -194,10 +240,14 @@ ${excluded.map(e => `--   - ${key(e.f)}：${e.reason}`).join('\n')}
 ${listSql(wrapped)}
 --
 -- 前提：138 已套（caller_line_user_id）；131、132 已套（上面「已撤」的函式）。本檔開頭會逐項檢查：
---   「anon／authenticated 可執行、帶 p_line_user_id 的函式」必須恰好是上面 ${wrapped.length} 支，參數／回傳型別與產生時相同，否則中止。
+--   「anon／authenticated 可執行、帶 p_line_user_id 的函式」必須恰好是上面 ${wrapped.length} 支，
+--   且每支的本體 md5、參數、回傳型別、proacl、proconfig、擁有者、STRICT、volatility、SECURITY DEFINER 與產生時的正式庫快照相同，否則中止。
 -- 預設 soft：套用後任何呼叫的結果都與套用前相同（測試逐支比對）。切 enforce 前必須先看紀錄、並完成 docs/LINE_AUTH_PHASE2.md 的前置條件。
 -- 回滾：migrations/141_line_auth_rpc_wrappers_rollback.sql（還原原函式名稱與權限、刪掉 wrapper／assert_caller／兩張表）
 -- ⚠️ 套用後要改某支 RPC 的邏輯，請改 <name>_impl；對 <name> 做 CREATE OR REPLACE 會把 wrapper 蓋掉（身分檢查消失）。
+--    tests/line-auth-phase2-guard.test.js 會擋下編號 > 141 的 migration 直接改 wrapper。
+-- wrapper 刻意不設 search_path（Advisor 的 function_search_path_mutable 警告是預期的，請勿修正：設了會改變原函式的行為）。
+-- 不在範圍：kiosk_* 以 p_kiosk_line_user_id 當身分，本檔不包。
 -- 只建立 migration 檔，不得由開發流程直接套用正式資料庫。
 -- ============================================================
 `;
@@ -314,7 +364,7 @@ DECLARE
   r record;
 BEGIN
   FOR r IN
-    SELECT w.oid AS w_oid, i.oid AS i_oid, w.proname
+    SELECT w.oid AS w_oid, i.oid AS i_oid, w.proname, w.proowner AS w_owner, i.proowner AS i_owner
     FROM pg_proc w
     JOIN pg_proc i ON i.pronamespace = w.pronamespace AND i.proname = w.proname || '_impl'
       AND pg_get_function_identity_arguments(i.oid) = pg_get_function_identity_arguments(w.oid)
@@ -330,6 +380,9 @@ BEGIN
     END IF;
     IF has_function_privilege('anon', r.w_oid, 'EXECUTE') <> true OR has_function_privilege('authenticated', r.w_oid, 'EXECUTE') <> true THEN
       RAISE EXCEPTION '% 的 wrapper 權限與原函式不同', r.proname;
+    END IF;
+    IF r.w_owner <> r.i_owner OR r.w_owner <> (SELECT relowner FROM pg_class WHERE oid = 'public.employees'::regclass) THEN
+      RAISE EXCEPTION '% 的 wrapper 擁有者應與原函式、資料表相同（正式庫＝postgres）', r.proname;
     END IF;
   END LOOP;
   IF (SELECT count(*) FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace AND p.proname LIKE '%\\_impl' ESCAPE '\\'
@@ -357,6 +410,7 @@ const down = `-- ============================================================
 -- 141 回滾：還原 ${wrapped.length} 支 RPC 的原名稱與權限（正式庫 2026-09-28 proacl），刪掉 wrapper、assert_caller、設定與紀錄表
 -- ⚠️ 本檔由 scripts/line-auth/generate-rpc-wrappers.js 產生，請勿手改
 -- ⚠️ line_auth_caller_log 的紀錄會一起刪除；需要的話先匯出
+-- 回滾前會確認每支 wrapper 仍是 141 產生的（有呼叫 assert_caller 與 <name>_impl），否則中止
 -- ============================================================
 
 BEGIN;
@@ -366,6 +420,8 @@ DO $$ BEGIN
     RAISE EXCEPTION '141 未套用（line_auth_caller_settings 不存在），不需要回滾';
   END IF;
 END $$;
+
+${rbCheck}
 
 ${wrapped.map(f => `-- ${key(f)}
 DROP FUNCTION public.${f.name}(${f.identity_args});
