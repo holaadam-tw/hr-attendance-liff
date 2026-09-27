@@ -48,7 +48,7 @@ import {
     loadShiftTypeList, showAddShiftTypeForm, editShiftTypeById, deleteShiftTypeById, saveShiftType, deleteShiftType,
     loadEmployeeShiftModes, toggleShiftModeRow, saveAllShiftModes, smMarkChanged, smClearChanged, smHasUnsavedChanges,
     clearSchedulesState
-} from './schedules.js?v=20260927-linebudget';
+} from './schedules.js?v=20260927-verified130';
 
 import {
     BONUS_MATRIX, loadHybridBonusData, renderSelectedBonusCard,
@@ -108,7 +108,7 @@ import {
     closeCompanyModal, editCompany, saveCompany,
     initSalesTargetPage, stChangeWeek, saveDefaultTarget,
     switchSysTab
-} from './settings.js?v=20260927-linesecure2';
+} from './settings.js?v=20260927-verified130';
 
 // ===== 綁定 window（供 HTML onclick 使用）=====
 

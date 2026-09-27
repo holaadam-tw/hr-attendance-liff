@@ -8,7 +8,10 @@
 //   3. 送 LINE push → line_push_complete 回寫結果
 //   另有幾個 action（都先驗 LIFF，身分來自 LINE，再以 service role 呼叫對應 RPC，由 DB 做權限判斷）：
 //     save_config（LINE token／groupId）、save_setting／save_settings（其他公司設定，單筆／批次）、get_line_config（設定頁顯示末 4 碼）、
-//     platform_admin_save／platform_link_company（平台頁維護平台管理員，129 起前端不能直接寫那兩張表）
+//     platform_admin_save／platform_link_company（平台頁維護平台管理員，129 起前端不能直接寫那兩張表）、
+//     company_save／company_set_status／company_delete_pending（平台頁維護公司，130 起前端不能直接寫 companies）、
+//     employee_create／employee_update／employee_delete_pending、makeup_review、overtime_review、schedule_save
+//     （131／132：員工管理、補卡／加班審核、排班；核准人／排班人＝LINE 驗證的 userId，不採信前端傳的員工 ID）
 //   員工發的訊息，DB 回傳寄件人前綴（［姓名 送出］），這裡一定加在最前面。
 //
 // 舊模式（相容還沒更新的頁面，前端帶 token）：必須帶 company_id，且 token 必須等於該公司設定
@@ -198,22 +201,134 @@ function rpcResult(saved: { ok: boolean; data: any }, extra: (d: any) => Record<
   }
   if (saved.data.success !== true) {
     const code = typeof saved.data.error_code === 'string' ? saved.data.error_code : 'failed'
-    const status = ['access_denied', 'admin_only'].includes(code) ? 403 : 400
+    const status = ['access_denied', 'admin_only', 'role_denied', 'target_protected'].includes(code) ? 403 : 400
     return json({ ok: false, status, code, error: typeof saved.data.error === 'string' ? saved.data.error : '操作失敗' }, status)
   }
   return json({ ok: true, status: 200, ...extra(saved.data) }, 200)
 }
 
-const VERIFIED_ACTIONS = ['save_config', 'save_setting', 'save_settings', 'get_line_config', 'platform_admin_save', 'platform_link_company'] as const
+const VERIFIED_ACTIONS = [
+  'save_config', 'save_setting', 'save_settings', 'get_line_config', 'platform_admin_save', 'platform_link_company',
+  // 131／132：員工管理、補卡／加班審核、排班（身分＝LINE 驗證的 userId；前端報的核准人／排班人一律不採信）
+  'employee_create', 'employee_update', 'employee_delete_pending', 'makeup_review', 'overtime_review', 'schedule_save',
+  // 130：平台頁的公司維護（限在職平台管理員）
+  'company_save', 'company_set_status', 'company_delete_pending',
+] as const
 export const MAX_BATCH_SETTINGS = 30
+export const MAX_BATCH_REVIEWS = 50
+export const MAX_BATCH_SCHEDULES = 400
+
+const isObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
+const uuidOrNull = (v: unknown): string | null => (typeof v === 'string' && UUID_RE.test(v) ? v : null)
+const withResult = (d: any) => ({ result: d })
 
 async function handleVerifiedAction(body: any, deps: Deps): Promise<Response> {
   const action = String(body.action)
-  const companyId = typeof body.company_id === 'string' && UUID_RE.test(body.company_id) ? body.company_id : null
-  const needsCompany = action !== 'platform_admin_save'
+  const companyId = uuidOrNull(body.company_id)
+  // company_save 的 company_id 可省略（＝新增）；有帶就必須是 UUID
+  const needsCompany = action !== 'platform_admin_save' && action !== 'company_save'
   if (!body.liff_access_token || (needsCompany && !companyId)) return badRequest()
+  if (action === 'company_save' && body.company_id != null && !companyId) return badRequest()
   const lineUserId = await verifyLiffAccessToken(deps, String(body.liff_access_token))
   if (!lineUserId) return unauthenticated()
+
+  // ---- 員工管理（131：admin_* 由 DB 判斷公司、角色、公務機、受保護帳號）----
+  if (action === 'employee_create') {
+    if (!isObject(body.data)) return badRequest()
+    return rpcResult(await callRpc(deps, 'admin_create_employee', {
+      p_company_id: companyId, p_line_user_id: lineUserId, p_data: body.data,
+    }), withResult)
+  }
+  if (action === 'employee_update') {
+    const employeeId = uuidOrNull(body.employee_id)
+    if (!employeeId || !isObject(body.updates)) return badRequest()
+    return rpcResult(await callRpc(deps, 'admin_update_employee', {
+      p_company_id: companyId, p_line_user_id: lineUserId, p_employee_id: employeeId, p_updates: body.updates,
+    }), withResult)
+  }
+  if (action === 'employee_delete_pending') {
+    const employeeId = uuidOrNull(body.employee_id)
+    if (!employeeId) return badRequest()
+    return rpcResult(await callRpc(deps, 'admin_delete_pending_employee', {
+      p_company_id: companyId, p_line_user_id: lineUserId, p_employee_id: employeeId,
+    }), withResult)
+  }
+
+  // ---- 補卡審核：可一次多筆（一鍵全批），每筆各自由 DB 驗權限與公司 ----
+  if (action === 'makeup_review') {
+    const decision = body.decision === 'approve' || body.decision === 'reject' ? body.decision : null
+    const ids = Array.isArray(body.request_ids) ? body.request_ids : []
+    if (!decision || ids.length === 0 || ids.length > MAX_BATCH_REVIEWS || ids.some((i: unknown) => !uuidOrNull(i))) return badRequest()
+    const reason = typeof body.reason === 'string' ? body.reason.slice(0, 500) : null
+    const review = (id: string) => callRpc(deps, 'review_makeup_request', {
+      p_company_id: companyId, p_line_user_id: lineUserId, p_request_id: id, p_decision: decision, p_reason: reason,
+    })
+    if (ids.length === 1) return rpcResult(await review(ids[0]), withResult)
+    const results: Array<Record<string, unknown>> = []
+    for (const id of ids) {
+      const r = await review(id)
+      if (!r.ok || !r.data || typeof r.data !== 'object' || r.data.error_code === 'access_denied') return rpcResult(r)
+      results.push({
+        id, success: r.data.success === true, error: r.data.success === true ? null : (r.data.error ?? null),
+        closed_duplicates: r.data.closed_duplicates ?? 0,
+      })
+    }
+    return json({ ok: true, status: 200, results, approved_count: results.filter((x) => x.success).length }, 200)
+  }
+
+  // ---- 加班認列 ----
+  if (action === 'overtime_review') {
+    const decision = body.decision === 'approve' || body.decision === 'reject' ? body.decision : null
+    const requestId = uuidOrNull(body.request_id)
+    if (!decision || !requestId) return badRequest()
+    const hours = body.approved_hours == null || body.approved_hours === '' ? null : Number(body.approved_hours)
+    if (hours !== null && !Number.isFinite(hours)) return badRequest('核認時數不正確')
+    return rpcResult(await callRpc(deps, 'review_overtime_request', {
+      p_company_id: companyId, p_line_user_id: lineUserId, p_request_id: requestId, p_decision: decision,
+      p_approved_hours: hours,
+      p_reason_category: typeof body.reason_category === 'string' ? body.reason_category.slice(0, 60) : null,
+      p_note: typeof body.note === 'string' ? body.note.slice(0, 500) : '',
+      p_reason: typeof body.reason === 'string' ? body.reason.slice(0, 500) : null,
+    }), withResult)
+  }
+
+  // ---- 排班批次儲存（整批成功或整批不存）----
+  if (action === 'schedule_save') {
+    const items = Array.isArray(body.items) ? body.items : []
+    if (items.length === 0 || items.length > MAX_BATCH_SCHEDULES) return badRequest('排班筆數不正確')
+    if (items.some((i: any) => !isObject(i) || !uuidOrNull(i.employee_id) || typeof i.date !== 'string'
+      || !/^\d{4}-\d{2}-\d{2}$/.test(i.date) || (i.shift_type_id != null && !uuidOrNull(i.shift_type_id)))) {
+      return badRequest('排班資料不正確')
+    }
+    const clean = items.map((i: any) => ({
+      employee_id: i.employee_id, date: i.date, shift_type_id: i.shift_type_id ?? null,
+      is_off_day: i.is_off_day === true, delete: i.delete === true,
+      notes: typeof i.notes === 'string' ? i.notes.slice(0, 200) : null,
+    }))
+    return rpcResult(await callRpc(deps, 'save_schedules_verified', {
+      p_company_id: companyId, p_line_user_id: lineUserId, p_items: clean,
+    }), (d) => ({ saved_count: d.saved_count ?? 0 }))
+  }
+
+  // ---- 平台頁：公司維護（130，限在職平台管理員）----
+  if (action === 'company_save') {
+    if (!isObject(body.fields)) return badRequest()
+    return rpcResult(await callRpc(deps, 'platform_company_save', {
+      p_caller_line_user_id: lineUserId, p_company_id: companyId, p_fields: body.fields,
+    }), withResult)
+  }
+  if (action === 'company_set_status') {
+    const status = ['pending', 'active', 'suspended'].includes(body.status) ? body.status : null
+    if (!status) return badRequest()
+    return rpcResult(await callRpc(deps, 'platform_company_set_status', {
+      p_caller_line_user_id: lineUserId, p_company_id: companyId, p_status: status,
+    }), withResult)
+  }
+  if (action === 'company_delete_pending') {
+    return rpcResult(await callRpc(deps, 'platform_company_delete_pending', {
+      p_caller_line_user_id: lineUserId, p_company_id: companyId,
+    }), withResult)
+  }
 
   if (action === 'save_config') {
     // 管理員存新 token／groupId（前端讀不到舊 token；token 留空＝沿用）

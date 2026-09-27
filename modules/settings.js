@@ -937,20 +937,20 @@ export async function saveCompany() {
     const row = { code, name, is_active: isActive };
 
     try {
+        // 130：companies 前端不能直接寫；經 line-push 驗 LIFF（限在職平台管理員），新增時 DB 自動把自己綁成 owner
+        const res = await callVerifiedAction('company_save', { company_id: id || null, fields: row });
+        if (!res.ok) {
+            if (res.code === 'relogin_redirect') return;
+            throw new Error(res.code === 'duplicate_code' ? 'unique' : (res.message || '儲存失敗'));
+        }
+        const newComp = res.data?.result?.company || { id: res.data?.result?.id, name };
         if (id) {
-            const { error } = await sb.from('companies').update(row).eq('id', id);
-            if (error) throw error;
             writeAuditLog('update', 'companies', id, name);
         } else {
-            const { data: newComp, error } = await sb.from('companies').insert(row).select().single();
-            if (error) throw error;
             writeAuditLog('create', 'companies', newComp.id, `${name} (${code})`);
 
-            // 平台管理員建立公司 → 自動連結為 owner
+            // 平台管理員建立公司 → DB 已自動連結為 owner
             if (window.isPlatformAdmin && window.currentPlatformAdmin?.id && newComp.id) {
-                // 129：平台管理員表前端不能直接寫，經 Edge Function 驗 LIFF 後綁定
-                const link = await callVerifiedAction('platform_link_company', { company_id: newComp.id });
-                if (!link.ok) showToast('⚠️ 公司已建立，但未能自動綁定為管理公司：' + (link.message || ''));
                 // 更新記憶中的公司列表
                 if (window.managedCompanies) {
                     window.managedCompanies.push({

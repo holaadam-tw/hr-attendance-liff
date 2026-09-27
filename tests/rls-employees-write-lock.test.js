@@ -84,8 +84,12 @@ check('is_company_admin_caller REVOKE anon', /REVOKE ALL ON FUNCTION public\.is_
 console.log('\n=== 前端 helper ===');
 let helper = '';
 try { helper = grab(commonSrc, 'rpcUpdateEmployee'); } catch (e) { check('找得到 rpcUpdateEmployee', false, e.message); }
-check('helper 走 admin_update_employee 並帶公司與身分', /rpc\('admin_update_employee'/.test(helper) && /p_company_id: companyId \|\| window\.currentCompanyId/.test(helper) && /p_line_user_id: adminCallerLineUserId\(\)/.test(helper));
-check('helper 把 success=false 轉成 error（沿用既有 throw 寫法）', /if \(!data\?\.success\) return \{ data, error: new Error\(data\?\.error/.test(helper));
+// 131／132：改經 line-push 驗 LIFF 身分（employee_update），前端不再自己報 line_user_id
+let verifiedHelper = '';
+try { verifiedHelper = grab(commonSrc, 'verifiedEmployeeCall'); } catch (e) { check('找得到 verifiedEmployeeCall', false, e.message); }
+check('helper 經 line-push 驗證動作 employee_update 並帶公司', /verifiedEmployeeCall\('employee_update'/.test(helper) && /company_id: companyId \|\| window\.currentCompanyId/.test(helper));
+check('helper 不再由前端帶 p_line_user_id／不直接呼叫 RPC', !/p_line_user_id/.test(helper) && !/sb\.rpc\(/.test(helper) && /callVerifiedAction\(action, payload\)/.test(verifiedHelper));
+check('helper 把失敗轉成 error（沿用既有 throw 寫法）', /if \(!result\.ok\)/.test(verifiedHelper) && /error: err/.test(verifiedHelper));
 check('employees.js 不再直接寫 employees', !/from\('employees'\)[^;]{0,400}?\.(insert|update|delete)\(/.test(empSrc));
 check('employees.js 新增員工不再由前端帶 company_id／is_active', !/company_id: window\.currentAdminEmployee\?\.company_id \|\| window\.currentCompanyId,\s*created_at/.test(empSrc));
 check('employee_register 改走 register_employee', /rpc\('register_employee'/.test(regSrc) && !/from\('employees'\)\.insert/.test(regSrc));

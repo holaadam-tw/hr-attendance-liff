@@ -264,7 +264,7 @@
         </div>
     </div>
 
-<script src="common.js?v=20260927-linesecure2"></script>
+<script src="common.js?v=20260927-verified130"></script>
     <script>
         // === 全域錯誤監控 ===
         window._errLogCount = 0; window._errLogResetTs = 0;
@@ -874,6 +874,10 @@
                         // localStorage：讓打卡總覽在同一裝置記住登入，關閉分頁後重開不必再跑一次 LINE 驗證
                         localStorage.setItem('attendance_public_line_user_id_' + _pubCompany, liffProfile.userId);
                         localStorage.setItem('attendance_public_line_name_' + _pubCompany, liffProfile.displayName || '');
+                        // 131／132：打卡總覽的排班／工時模式儲存要經 line-push 驗 LIFF 身分，帶著本次登入的 access token 過去
+                        const _pubToken = typeof getLiffAccessTokenSafe === 'function' ? getLiffAccessTokenSafe() : null;
+                        if (_pubToken) localStorage.setItem('attendance_public_liff_token_' + _pubCompany, _pubToken);
+                        else localStorage.removeItem('attendance_public_liff_token_' + _pubCompany);
                     }
                     window.location.href = 'attendance_public.html?company=' + encodeURIComponent(_pubCompany);
                     return;

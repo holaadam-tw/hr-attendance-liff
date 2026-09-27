@@ -232,7 +232,7 @@
         </div>
     </div>
 
-<script src="common.js?v=20260927-linesecure2"></script>
+<script src="common.js?v=20260927-verified130"></script>
     <script>
         // === 全域錯誤監控 ===
         window._errLogCount = 0; window._errLogResetTs = 0;
@@ -511,40 +511,25 @@
                 features
             };
 
-            try {
-                if (id) {
-                    const { error } = await sb.from('companies').update(row).eq('id', id);
-                    if (error) throw error;
-                } else {
-                    const { data: newComp, error } = await sb.from('companies').insert(row).select().single();
-                    if (error) throw error;
-                    // 自動連結平台管理員為 owner（129：經 Edge Function 驗 LIFF 後由 DB 寫入）
-                    if (currentPlatformAdmin?.id && newComp?.id) {
-                        const link = await callVerifiedAction('platform_link_company', { company_id: newComp.id });
-                        if (!link.ok) showToast('⚠️ 公司已建立，但未能自動綁定：' + (link.message || ''));
-                    }
-                }
-                closePCompanyModal();
-                showToast('✅ 已儲存');
-                loadPCompanyList();
-            } catch(e) {
-                if (String(e?.message || e).includes('unique')) {
-                    showToast('⚠️ 公司代碼已存在');
-                } else {
-                    showToast('❌ 儲存失敗'); console.error(e);
-                }
+            // 130：companies 前端不能直接寫；經 line-push 驗 LIFF（限在職平台管理員），新增時 DB 自動把自己綁成 owner
+            const res = await callVerifiedAction('company_save', { company_id: id || null, fields: row });
+            if (!res.ok) {
+                if (res.code === 'duplicate_code') showToast('⚠️ 公司代碼已存在');
+                else if (res.code !== 'relogin_redirect') { showToast('❌ 儲存失敗：' + (res.message || '')); console.error(res); }
+                return;
             }
+            closePCompanyModal();
+            showToast('✅ 已儲存');
+            loadPCompanyList();
         }
 
         async function togglePCompanyStatus(id, newStatus) {
             const labels = { active: '啟用', suspended: '暫停' };
             if (!confirm(`確定將此公司設為「${labels[newStatus]}」？`)) return;
-            try {
-                const { error } = await sb.from('companies').update({ status: newStatus }).eq('id', id);
-                if (error) throw error;
-                showToast('✅ 已更新');
-                loadPCompanyList();
-            } catch(e) { showToast('❌ 更新失敗'); console.error(e); }
+            const res = await callVerifiedAction('company_set_status', { company_id: id, status: newStatus });   // 130
+            if (!res.ok) { if (res.code !== 'relogin_redirect') showToast('❌ 更新失敗：' + (res.message || '')); return; }
+            showToast('✅ 已更新');
+            loadPCompanyList();
         }
 
         function showPCompanyQR(id) {
@@ -584,24 +569,20 @@
 
         async function approvePCompany(id) {
             if (!confirm('確定核准此公司？')) return;
-            try {
-                const { error } = await sb.from('companies').update({ status: 'active' }).eq('id', id);
-                if (error) throw error;
-                showToast('✅ 已核准');
-                loadPendingCompanies();
-                loadDashboard();
-            } catch(e) { showToast('❌ 操作失敗'); }
+            const res = await callVerifiedAction('company_set_status', { company_id: id, status: 'active' });   // 130
+            if (!res.ok) { if (res.code !== 'relogin_redirect') showToast('❌ 操作失敗：' + (res.message || '')); return; }
+            showToast('✅ 已核准');
+            loadPendingCompanies();
+            loadDashboard();
         }
 
         async function rejectPCompany(id) {
             if (!confirm('確定拒絕此公司申請？（將刪除此記錄）')) return;
-            try {
-                const { error } = await sb.from('companies').delete().eq('id', id);
-                if (error) throw error;
-                showToast('✅ 已拒絕');
-                loadPendingCompanies();
-                loadDashboard();
-            } catch(e) { showToast('❌ 操作失敗'); }
+            const res = await callVerifiedAction('company_delete_pending', { company_id: id });   // 130：只能刪待審、沒有員工的公司
+            if (!res.ok) { if (res.code !== 'relogin_redirect') showToast('❌ 操作失敗：' + (res.message || '')); return; }
+            showToast('✅ 已拒絕');
+            loadPendingCompanies();
+            loadDashboard();
         }
 
         // ===== 管理員管理 =====
