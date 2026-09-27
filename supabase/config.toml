@@ -386,3 +386,7 @@ s3_region = "env(S3_REGION)"
 s3_access_key = "env(S3_ACCESS_KEY)"
 # Configures AWS_SECRET_ACCESS_KEY for S3 bucket
 s3_secret_key = "env(S3_SECRET_KEY)"
+
+# LINE 平台呼叫 webhook 不帶 Supabase JWT；部署時需關閉 JWT 驗證（改驗 X-Line-Signature）
+[functions.line-webhook]
+verify_jwt = false

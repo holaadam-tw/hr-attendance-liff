@@ -106,7 +106,7 @@
         </div>
     </div>
 
-<script src="common.js?v=20260901-linenotify"></script>
+<script src="common.js?v=20260927-linebudget"></script>
     <script>
         // === 全域錯誤監控 ===
         window._errLogCount = 0; window._errLogResetTs = 0;
@@ -201,7 +201,9 @@
                 // 推播通知
                 var typeLabel = type === 'repair' ? '🔧 報修' : '🛒 採購';
                 var urgencyLabel = urgency === 'urgent' ? '🔴急迫' : urgency === 'high' ? '⚡緊急' : '';
-                sendAdminNotify(typeLabel + '申請\n' + currentEmployee.name + '：' + title + (urgencyLabel ? '\n' + urgencyLabel : ''));
+                // 急迫件照舊即時推群組（高優先）；一般件列入每日 09:10 主管彙總（migration 125）
+                sendAdminNotify(typeLabel + '申請\n' + currentEmployee.name + '：' + title + (urgencyLabel ? '\n' + urgencyLabel : ''),
+                    urgency === 'urgent' ? { category: 'request_urgent', priority: 'high' } : { category: 'request' });
 
                 loadMyRequests();
             } catch(e) {

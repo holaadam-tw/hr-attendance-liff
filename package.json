@@ -22,6 +22,7 @@
     "puppeteer": "^24.37.5"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "jsdom": "^29.1.1"
   }
 }

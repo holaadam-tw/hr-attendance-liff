@@ -735,8 +735,8 @@ export async function approveSwap(id) {
                 throw approveError;
             }
             writeAuditLog('approve', 'shift_swap_requests', id, `${req.requester?.name} ↔ ${req.target?.name}`, { date });
-            if (req.requester?.id) sendUserNotify(req.requester.id, `✅ 換班已核准\n📅 ${date} 班表已自動更新`);
-            if (req.target?.id) sendUserNotify(req.target.id, `✅ 換班已核准\n📅 ${date} 班表已自動更新`);
+            if (req.requester?.id) sendUserNotify(req.requester.id, `✅ 換班已核准\n📅 ${date} 班表已自動更新`, { category: 'shift_swap_result' });
+            if (req.target?.id) sendUserNotify(req.target.id, `✅ 換班已核准\n📅 ${date} 班表已自動更新`, { category: 'shift_swap_result' });
         }
         showToast('✅ 已核准，班表已交換');
         loadSwapApprovals();
