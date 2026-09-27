@@ -20,7 +20,8 @@
 - `tests/payroll-password-frontend.test.js` 25 項（反向對照：舊 common.js／salary.html → 10 項失敗）
 - `tests/line-edge-functions.test.js` +10 項（舊 handler → payroll_unlock 失敗）
 
-- **限制**：仍只是畫面鎖，薪資資料本身另有讀取路徑；要真正擋資料需 P1 身分根治之後讓薪資 RPC 檢查 unlock。
+- **限制**：仍只是畫面鎖，薪資資料本身另有讀取路徑；要真正擋資料需 P1 身分根治之後讓薪資 RPC 檢查 unlock（同時要檢查角色）；解鎖是本機旗標、不綁人（同舊版）。
+- **上線必做**：套 137 後兩家公司管理員立刻改薪酬密碼（舊密碼曾公開可讀，且明碼會留在舊資料列版本／WAL／PITR 直到保存期過）；不要用 4 位數字。
 
 ---
 
