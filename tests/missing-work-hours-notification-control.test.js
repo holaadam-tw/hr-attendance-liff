@@ -74,7 +74,7 @@ check('每日函式仍保留主管彙總冪等', /group_notified_date/.test(dail
 check('每日函式維持 service_role only', /REVOKE ALL ON FUNCTION public\.run_daily_missing_work_hours_audit\(\) FROM PUBLIC, anon, authenticated/.test(migration));
 
 check('考勤卡有通知狀態、掃描與開關按鈕', /missingWorkHoursNotifyStatus/.test(overview) && /missingWorkHoursScanBtn/.test(overview) && /missingWorkHoursToggleBtn/.test(overview));
-check('介面白話說明每日 09:15 提醒內容', /每天 09:15 檢查前一天到最近 3 天/.test(overview));
+check('介面白話說明工作日 09:10 提醒內容', /每個工作日 09:10 檢查前一天到最近 3 天/.test(overview));
 check('介面明示不扣薪、不請假、不改打卡', /不會自動扣薪/.test(overview) && /不會自動請假/.test(overview) && /不會修改打卡紀錄/.test(overview));
 
 const previewJs = jsFunctionBody('previewMissingWorkHours');

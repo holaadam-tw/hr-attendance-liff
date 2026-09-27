@@ -148,7 +148,7 @@
                             <span id="missingWorkHoursNotifyStatus" style="font-size:12px;font-weight:800;border-radius:999px;padding:4px 9px;background:#F3F4F6;color:#475569;">讀取中…</span>
                         </div>
                         <div style="margin-top:7px;font-size:12px;line-height:1.65;color:#475569;">
-                            每天 09:15 檢查前一天到最近 3 天的晚到、早退與整日無打卡，扣除核准請假後，提醒員工缺少幾分鐘並彙總給主管。<b>不會自動扣薪、不會自動請假，也不會修改打卡紀錄。</b>
+                            每個工作日 09:10 檢查前一天到最近 3 天的晚到、早退與整日無打卡，扣除核准請假後，提醒員工缺少幾分鐘（同一筆只在第 1、3 個工作天各提醒一次），並併入主管每日彙總。<b>不會自動扣薪、不會自動請假，也不會修改打卡紀錄。</b>
                         </div>
                         <div id="missingWorkHoursControlHint" style="margin-top:7px;padding:7px 9px;border-radius:8px;background:#FEF3C7;color:#92400E;font-size:12px;font-weight:700;">
                             目前預設不發 LINE；請先掃描並核對名單。
@@ -158,6 +158,8 @@
                             <button id="missingWorkHoursToggleBtn" type="button" onclick="toggleMissingWorkHoursNotifications()" disabled style="border:none;background:#64748B;color:#fff;font-size:12px;font-weight:800;border-radius:9px;padding:7px 11px;cursor:pointer;font-family:inherit;">開啟 LINE 提醒</button>
                         </div>
                     </div>
+                    <!-- LINE 推播額度與失敗（migration 125；未套用時整塊隱藏） -->
+                    <div id="linePushStatus" style="display:none;margin-top:10px;padding:10px 12px;background:#fff;border:1px solid #FED7AA;border-radius:10px;font-size:12px;line-height:1.6;color:#475569;"></div>
                     <div id="anomalyList" style="margin-top:10px;"></div>
                 </div>
             </div>
@@ -466,7 +468,7 @@
         </div>
     </div>
 
-<script src="common.js?v=20260901-linenotify"></script>
+<script src="common.js?v=20260927-linebudget"></script>
     <script>
         let dailyData = [];
         let monthlyData = [];
@@ -1202,6 +1204,7 @@
                 return;
             }
             anomalyData = data || [];
+            loadLinePushStatus();
             if (controlResult.error || !controlResult.data || !controlResult.data.success) {
                 console.warn('Load missing-work-hours control warning:', controlResult.error || controlResult.data);
                 missingWorkHoursControl = {
@@ -1219,6 +1222,35 @@
                 };
             }
             renderAnomalyCard();
+        }
+
+        // LINE 免費方案 200 則/月：顯示本月估計用量與最近 7 天沒送出的推播（429、預算擋下）
+        async function loadLinePushStatus() {
+            const box = document.getElementById('linePushStatus');
+            if (!box || !liffProfile?.userId) return;
+            try {
+                const { data, error } = await sb.rpc('get_line_push_status', {
+                    p_company_id: window.currentCompanyId,
+                    p_line_user_id: liffProfile.userId
+                });
+                if (error || !data || !data.success) { box.style.display = 'none'; return; }
+                const used = Number(data.used || 0), budget = Number(data.budget || 0), quota = Number(data.quota || 0);
+                const problems = Array.isArray(data.recent_problems) ? data.recent_problems : [];
+                const warn = used >= budget * 0.8 || problems.length > 0;
+                box.style.borderColor = warn ? '#FCA5A5' : '#FED7AA';
+                let html = '<div style="font-weight:800;color:' + (warn ? '#B91C1C' : '#7C2D12') + ';">📨 LINE 推播額度（' + escapeHTML(String(data.quota_month || '')) + '）：估計已用 '
+                    + used + '／' + quota + '（一般訊息上限 ' + budget + '）</div>';
+                if (problems.length > 0) {
+                    html += '<div style="margin-top:4px;color:#991B1B;">近 7 天有 ' + problems.length + ' 則沒送出：'
+                        + problems.slice(0, 3).map(p => escapeHTML((p.status === 'blocked_budget' ? '預算擋下' : 'HTTP ' + (p.http_status || '?')) + ' ' + (p.category || ''))).join('、')
+                        + '</div>';
+                }
+                html += '<div style="margin-top:4px;">請假／補卡／GPS 待核認改列在每日 09:10 彙總；隨時可私訊官方帳號輸入「#待辦」（不計額度）。</div>';
+                box.innerHTML = html;
+                box.style.display = 'block';
+            } catch (e) {
+                box.style.display = 'none';
+            }
         }
 
         function renderMissingWorkHoursControl() {
@@ -1247,7 +1279,7 @@
                 status.textContent = '🔔 已開啟';
                 status.style.background = '#DCFCE7';
                 status.style.color = '#166534';
-                hint.textContent = '每天 09:15 會通知目前仍待處理的員工，並彙總給主管。待處理 ' + missingWorkHoursControl.pendingCount + ' 筆。';
+                hint.textContent = '每個工作日 09:10 提醒員工（同一筆最多 2 次），並併入主管每日彙總。待處理 ' + missingWorkHoursControl.pendingCount + ' 筆。';
                 hint.style.background = '#DCFCE7';
                 hint.style.color = '#166534';
                 toggleBtn.textContent = '關閉 LINE 提醒';
@@ -1296,7 +1328,7 @@
             if (!missingWorkHoursControl.available || missingWorkHoursControlBusy) return;
             const nextEnabled = !missingWorkHoursControl.enabled;
             if (nextEnabled && !confirm(
-                '確定開啟每天 09:15 的 LINE 缺時提醒？\n\n請先確認下方名單正確。開啟後，員工會收到缺少分鐘與補請假／補卡入口，主管群組會收到彙總。'
+                '確定開啟工作日 09:10 的 LINE 缺時提醒？\n\n請先確認下方名單正確。開啟後，員工會收到缺少分鐘與補請假／補卡入口（同一筆最多 2 次），主管每日彙總會列出。'
             )) return;
             if (!nextEnabled && !confirm('確定關閉 LINE 缺時提醒？關閉後仍會更新異常名單，但不再發送員工或主管訊息。')) return;
 
@@ -1312,7 +1344,7 @@
                     throw new Error((data && data.error) || (error && error.message) || '設定失敗');
                 }
                 missingWorkHoursControl.enabled = data.enabled === true;
-                showToast(nextEnabled ? '✅ 已開啟每天 09:15 LINE 提醒' : '✅ 已關閉 LINE 提醒');
+                showToast(nextEnabled ? '✅ 已開啟工作日 09:10 LINE 提醒' : '✅ 已關閉 LINE 提醒');
             } catch (e) {
                 console.error('Toggle missing work hours notifications error:', e);
                 showToast('設定失敗：' + (e.message || ''));

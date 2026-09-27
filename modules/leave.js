@@ -121,9 +121,9 @@ export async function approveLeave(requestId, newStatus) {
             const typeMap = { annual: '特休', sick: '病假', personal: '事假', compensatory: '補休', maternity: '產假', marriage: '婚假', bereavement: '喪假' };
             const typeName = typeMap[result.leave_type] || result.leave_type;
             if (newStatus === 'approved') {
-                notifyResult = await sendUserNotify(result.employee_id, `✅ 您的${typeName}申請已通過\n📅 ${result.start_date} ~ ${result.end_date}`);
+                notifyResult = await sendUserNotify(result.employee_id, `✅ 您的${typeName}申請已通過\n📅 ${result.start_date} ~ ${result.end_date}`, { category: 'leave_result' });
             } else {
-                notifyResult = await sendUserNotify(result.employee_id, `❌ 您的${typeName}申請已被拒絕\n📅 ${result.start_date} ~ ${result.end_date}\n原因：${rejectionReason || '不符合規定'}`);
+                notifyResult = await sendUserNotify(result.employee_id, `❌ 您的${typeName}申請已被拒絕\n📅 ${result.start_date} ~ ${result.end_date}\n原因：${rejectionReason || '不符合規定'}`, { category: 'leave_result' });
             }
         }
         const actionText = newStatus === 'approved' ? '通過' : '拒絕';

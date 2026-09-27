@@ -37,7 +37,7 @@ import {
     loadAdminLunchStats, loadStaffOverview, changeLeaveCal,
     resetLeaveCal, loadLeaveCal,
     clearLeaveState
-} from './leave.js?v=20260901-linenotify';
+} from './leave.js?v=20260927-linebudget';
 
 import {
     changeShiftWeek, resetShiftWeek, loadShiftMgr, cycleShift,
@@ -48,7 +48,7 @@ import {
     loadShiftTypeList, showAddShiftTypeForm, editShiftTypeById, deleteShiftTypeById, saveShiftType, deleteShiftType,
     loadEmployeeShiftModes, toggleShiftModeRow, saveAllShiftModes, smMarkChanged, smClearChanged, smHasUnsavedChanges,
     clearSchedulesState
-} from './schedules.js?v=20260803-rpcauth';
+} from './schedules.js?v=20260927-linebudget';
 
 import {
     BONUS_MATRIX, loadHybridBonusData, renderSelectedBonusCard,
@@ -95,7 +95,7 @@ import {
 
 import {
     INDUSTRY_TEMPLATES,
-    loadNotifyToken, saveNotifyToken, testNotify,
+    loadNotifyToken, saveNotifyToken, testNotify, loadLinePushPolicy, saveLinePushPolicy,
     toggleAnnCheck, publishAnnouncement, loadAnnouncementList,
     toggleAnnouncement, deleteAnnouncement, loadClientList, filterClients,
     showClientModal, closeClientModal, editClient, getClientGPS,
@@ -108,7 +108,7 @@ import {
     closeCompanyModal, editCompany, saveCompany,
     initSalesTargetPage, stChangeWeek, saveDefaultTarget,
     switchSysTab
-} from './settings.js?v=20260716-tripmap';
+} from './settings.js?v=20260927-linebudget';
 
 // ===== 綁定 window（供 HTML onclick 使用）=====
 
@@ -357,6 +357,8 @@ window.INDUSTRY_TEMPLATES = INDUSTRY_TEMPLATES;
 window.loadNotifyToken = loadNotifyToken;
 window.saveNotifyToken = saveNotifyToken;
 window.testNotify = testNotify;
+window.loadLinePushPolicy = loadLinePushPolicy;
+window.saveLinePushPolicy = saveLinePushPolicy;
 window.toggleAnnCheck = toggleAnnCheck;
 window.publishAnnouncement = publishAnnouncement;
 window.loadAnnouncementList = loadAnnouncementList;

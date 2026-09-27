@@ -1,7 +1,31 @@
 # RunPiston Bug 追蹤 & 測試清單
 
-> 更新日期：2026-09-12
+> 更新日期：2026-09-27
 > 每次修改後更新此檔案
+
+---
+
+## 🟡 2026-09-27 LINE 推播減量＋推播紀錄＋月預算閘門（migration 125，**待業主套用／合併／部署**）
+
+業主：「想辦法減少發送量」，維持 LINE 官方帳號免費方案（200 則/月）。9/11 額度用完，之後全部 429（9/27 正式庫 net._http_response 12 筆全 429）。
+
+### 根因（正式庫唯讀實查）
+- 09:10 `run_daily_attendance_audit` 沒過濾 anomaly_type：缺時被套成「下班補卡」文字、把 notified_at 蓋掉 → 09:15 正確版被跳過；主管群組每天兩則彙總（群組按人數計費 ×4）
+- 每筆異常每天提醒（含週末）直到結案：8/10 那筆提醒 47 次
+- 請假／補卡／GPS 待核認／換班每件即時推 4 人群組（9 月 68 件 ×4 ≈ 272）
+- 429 仍 notify_count+1；沒有任何失敗紀錄
+
+### 修法
+- migration 125：`line_push_log`＋`line_push_reserve/complete`（月預算閘門，一般 180、高優先到 200；LINE 以日本時間月初重置）、`reconcile_line_push_log`（每 10 分鐘回填 pg_net 結果，失敗不算已通知）、`line_daily_notify`（工作日才發：週一到週五扣公司假日，或當天 ≥3 人打上班卡；員工只在第 1、3 工作天各提醒一次；主管一則合併彙總含缺卡／缺時／待審核／推播失敗）、09:15 排程移除、`line_pull_todo`、`get_line_push_status`
+- line-push Edge Function：帶 company_id 時先預約額度、送完回寫 HTTP 狀態；DB 未套 125 時 fail-open
+- line-webhook：新增「#待辦」（reply 免費），驗 X-Line-Signature（需設 LINE_CHANNEL_SECRET），群組內不回個資
+- 前端：請假／補卡／GPS／加班／換班／一般報修 預設列入彙總（可改私訊審核人或回群組）；緊急公告、急迫報修、測試推播照舊即時；後台「LINE 省額度設定」；打卡總覽顯示本月用量與失敗
+
+### 驗證
+- `tests/line-push-reduction.pglite.test.js`（PGlite 實跑 70 項：舊版 bug 重現 → 套 125 → 工作日／提醒節奏／429 不算已通知／預算／合併彙總／#待辦／權限／排程 → 回滾 → 重套）；反向對照 4 個壞 migration 各掉 1–5 項
+- `tests/line-edge-functions.test.js` 17 項；npm test 23 套件全過；qa_check 0 FAIL（WARN 同既有）
+
+- **狀態：PR 待審，未套正式庫、未合併 main、未部署 Edge Function。**
 
 ---
 

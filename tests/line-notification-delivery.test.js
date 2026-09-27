@@ -6,7 +6,7 @@ const root = path.join(__dirname, '..');
 const commonSrc = fs.readFileSync(path.join(root, 'common.js'), 'utf8');
 const settingsSrc = fs.readFileSync(path.join(root, 'modules', 'settings.js'), 'utf8');
 const leaveSrc = fs.readFileSync(path.join(root, 'modules', 'leave.js'), 'utf8');
-const edgeSrc = fs.readFileSync(path.join(root, 'supabase', 'functions', 'line-push', 'index.ts'), 'utf8');
+const edgeSrc = fs.readFileSync(path.join(root, 'supabase', 'functions', 'line-push', 'handler.ts'), 'utf8');
 const moduleIndexSrc = fs.readFileSync(path.join(root, 'modules', 'index.js'), 'utf8');
 
 let pass = 0;
@@ -34,10 +34,12 @@ function grabFunction(source, name) {
   throw new Error(`函式括號不完整：${name}`);
 }
 
-function buildLineHelpers({ setting, response, fetchError, employeeResult } = {}) {
+function buildLineHelpers({ setting, response, fetchError, employeeResult, extraSettings = {} } = {}) {
   let fetchCalls = 0;
-  const fetch = async () => {
+  const bodies = [];
+  const fetch = async (url, init = {}) => {
     fetchCalls++;
+    if (init.body) bodies.push(JSON.parse(init.body));
     if (fetchError) throw fetchError;
     return response || { ok: true, status: 200, json: async () => ({ status: 200 }) };
   };
@@ -47,8 +49,10 @@ function buildLineHelpers({ setting, response, fetchError, employeeResult } = {}
     eq(column, value) { filters.push([column, value]); return chain; },
     maybeSingle() { return Promise.resolve(employeeResult || { data: { line_user_id: 'U123' }, error: null }); }
   };
-  const source = [
+  const routesConst = (commonSrc.match(/const ADMIN_NOTIFY_DEFAULT_ROUTES = \{[\s\S]*?\};/) || [''])[0];
+  const source = routesConst + '\n' + [
     'lineNotifyFailure',
+    'resolveAdminNotifyRoute',
     'lineNotifyMessageForStatus',
     'sendLineMessage',
     'sendAdminNotify',
@@ -59,14 +63,14 @@ function buildLineHelpers({ setting, response, fetchError, employeeResult } = {}
     `${source}; return { sendLineMessage, sendAdminNotify, sendUserNotify };`
   );
   const helpers = factory(
-    () => setting === undefined ? { token: 'token-value', groupId: 'C123' } : setting,
+    (key) => key in extraSettings ? extraSettings[key] : (setting === undefined ? { token: 'token-value', groupId: 'C123' } : setting),
     fetch,
     { SUPABASE_ANON_KEY: 'anon-key' },
     { error() {}, warn() {} },
     { currentCompanyId: 'company-a' },
     { from(table) { if (table !== 'employees') throw new Error('未預期資料表'); return chain; } }
   );
-  return { ...helpers, fetchCalls: () => fetchCalls, filters };
+  return { ...helpers, fetchCalls: () => fetchCalls, filters, bodies };
 }
 
 (async () => {
@@ -118,6 +122,37 @@ function buildLineHelpers({ setting, response, fetchError, employeeResult } = {}
     userNotify.filters.some(([key, value]) => key === 'id' && value === 'employee-a') &&
     userNotify.filters.some(([key, value]) => key === 'company_id' && value === 'company-a'));
 
+  // ---- 125：主管通知路由與預算 ----
+  const digest = buildLineHelpers({ extraSettings: { line_admin_notify_routes: null } });
+  const digestResult = await digest.sendAdminNotify('請假', { category: 'leave' });
+  check('請假通知預設列入每日彙總：不打網路、回 ok＋deferred', digestResult.ok === true && digestResult.deferred === true && digest.fetchCalls() === 0);
+  for (const cat of ['makeup', 'gps_review', 'overtime', 'shift_swap', 'request']) {
+    const h = buildLineHelpers({ extraSettings: { line_admin_notify_routes: null } });
+    const r = await h.sendAdminNotify('x', { category: cat });
+    check(`${cat} 預設列入彙總（不推群組）`, r.deferred === true && h.fetchCalls() === 0);
+  }
+  const urgent = buildLineHelpers({ extraSettings: { line_admin_notify_routes: null } });
+  const urgentResult = await urgent.sendAdminNotify('🚨', { category: 'urgent_announcement', priority: 'high' });
+  check('緊急公告照舊即時推群組、標高優先、帶公司與類別', urgentResult.ok === true && urgent.bodies[0].to === 'C123' && urgent.bodies[0].priority === 'high' && urgent.bodies[0].category === 'urgent_announcement' && urgent.bodies[0].company_id === 'company-a');
+  const overridden = buildLineHelpers({ extraSettings: { line_admin_notify_routes: { leave: 'group' } } });
+  await overridden.sendAdminNotify('請假', { category: 'leave' });
+  check('line_admin_notify_routes 可把請假改回即時群組', overridden.fetchCalls() === 1 && overridden.bodies[0].to === 'C123');
+  const approver = buildLineHelpers({ extraSettings: { line_admin_notify_routes: { gps_review: 'approver' }, line_admin_approver_employee_id: 'emp-approver' }, employeeResult: { data: { line_user_id: 'Uapprover' }, error: null } });
+  const approverResult = await approver.sendAdminNotify('GPS', { category: 'gps_review' });
+  check('approver 模式：私訊指定審核人（1 則），不推群組', approverResult.ok === true && approver.bodies.length === 1 && approver.bodies[0].to === 'Uapprover' && approver.bodies[0].recipient_ref === 'emp-approver');
+  const approverMissing = buildLineHelpers({ extraSettings: { line_admin_notify_routes: { gps_review: 'approver' }, line_admin_approver_employee_id: 'emp-approver' }, employeeResult: { data: { line_user_id: null }, error: null } });
+  await approverMissing.sendAdminNotify('GPS', { category: 'gps_review' });
+  check('審核人沒綁 LINE → 退回群組，不會默默不發', approverMissing.bodies.length === 1 && approverMissing.bodies[0].to === 'C123');
+  const offRoute = buildLineHelpers({ extraSettings: { line_admin_notify_routes: { request: 'off' } } });
+  const offResult = await offRoute.sendAdminNotify('x', { category: 'request' });
+  check('off 模式：不通知', offResult.code === 'disabled' && offRoute.fetchCalls() === 0);
+  const budget = buildLineHelpers({ response: { ok: true, status: 200, json: async () => ({ ok: false, status: 429, code: 'budget_blocked', error: '本月…' }) } });
+  const budgetResult = await budget.sendLineMessage('U1', 'x');
+  check('Edge 回 budget_blocked → 明確失敗訊息（額度）', budgetResult.ok === false && budgetResult.code === 'budget_blocked' && /額度/.test(budgetResult.message));
+  const userMeta = buildLineHelpers();
+  await userMeta.sendUserNotify('employee-a', '核准', { category: 'leave_result' });
+  check('員工通知帶 category 與 recipient_ref', userMeta.bodies[0].category === 'leave_result' && userMeta.bodies[0].recipient_ref === 'employee-a');
+
   const submitLeaveSrc = grabFunction(commonSrc, 'submitLeave');
   const approveLeaveStart = leaveSrc.indexOf('export async function approveLeave(');
   const approveLeaveSrc = grabFunction(leaveSrc.slice(approveLeaveStart).replace(/^export\s+/, ''), 'approveLeave');
@@ -132,12 +167,12 @@ function buildLineHelpers({ setting, response, fetchError, employeeResult } = {}
   check('本機 Edge Function 回傳不包含 Channel Token', !/JSON\.stringify\([^\n]*token/.test(edgeSrc));
   check('本機 Edge Function 例外訊息不直接外洩', /LINE 推播服務暫時無法使用/.test(edgeSrc) && !/error:\s*e\.message/.test(edgeSrc));
 
-  check('管理模組快取版本已更新', /leave\.js\?v=20260901-linenotify/.test(moduleIndexSrc));
+  check('管理模組快取版本已更新', /leave\.js\?v=20260927-linebudget/.test(moduleIndexSrc));
   const htmlFiles = fs.readdirSync(root).filter(name => name.endsWith('.html'));
   const commonRefs = htmlFiles
     .map(name => ({ name, src: fs.readFileSync(path.join(root, name), 'utf8') }))
     .filter(file => file.src.includes('common.js'));
-  const staleRefs = commonRefs.filter(file => !file.src.includes('common.js?v=20260901-linenotify'));
+  const staleRefs = commonRefs.filter(file => !file.src.includes('common.js?v=20260927-linebudget'));
   check('所有 common.js 引用已同步升版', staleRefs.length === 0, staleRefs.map(file => file.name).join(', '));
 
   console.log(`\n  結果：${pass} 通過，${fail} 失敗`);

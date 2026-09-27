@@ -1333,7 +1333,7 @@ async function submitLeave() {
         const staffingNote = check.thresholdExceeded ? `\n⚠️ 超過同時請假警告門檻 ${check.maxConcurrent} 人，請確認人力` : '';
         let notifyResult;
         try {
-            notifyResult = await sendAdminNotify(`🔔 ${currentEmployee.name} 申請${typeNames[type]||type}（${periodNote}）\n📅 ${start} ~ ${end}\n📝 ${reason || '無附原因'}${staffingNote}`);
+            notifyResult = await sendAdminNotify(`🔔 ${currentEmployee.name} 申請${typeNames[type]||type}（${periodNote}）\n📅 ${start} ~ ${end}\n📝 ${reason || '無附原因'}${staffingNote}`, { category: 'leave' });
         } catch (notifyError) {
             console.error('[LINE Push] 請假主管通知發生未預期錯誤');
             notifyResult = lineNotifyFailure('unexpected_error', 'LINE 通知發生未預期錯誤，請稍後重試');
@@ -1344,6 +1344,8 @@ async function submitLeave() {
             if (statusEl) {
                 statusEl.innerHTML += `<br><span style="font-size:12px;color:#B91C1C;font-weight:700;">⚠️ 主管 LINE 通知失敗：${escapeHTML(notifyMessage)}；申請資料已保留。</span>`;
             }
+        } else if (notifyResult.deferred && statusEl) {
+            statusEl.innerHTML += `<br><span style="font-size:12px;color:#475569;">📋 主管會在每日 09:10 的待辦彙總看到這筆申請</span>`;
         }
     } catch(e) {
         showToast('❌ 申請失敗：' + friendlyError(e));
@@ -1473,7 +1475,7 @@ async function submitMakeupPunch() {
         loadMakeupHistory();
 
         // 通知管理員
-        sendAdminNotify(`🔔 ${currentEmployee.name} 申請補打卡\n📅 ${date} ${type === 'clock_in' ? '上班' : '下班'} ${time}\n📝 ${reason}`);
+        sendAdminNotify(`🔔 ${currentEmployee.name} 申請補打卡\n📅 ${date} ${type === 'clock_in' ? '上班' : '下班'} ${time}\n📝 ${reason}`, { category: 'makeup' });
 
         // 清空表單
         if (document.getElementById('mpReasonText')) document.getElementById('mpReasonText').value = '';
@@ -1549,7 +1551,32 @@ function lineNotifyMessageForStatus(status) {
     return code > 0 ? `LINE 推播失敗（狀態 ${code}）` : 'LINE 推播失敗，請檢查設定後重試';
 }
 
-async function sendLineMessage(to, text) {
+// 主管逐筆通知的預設路由（migration 125：LINE 免費方案 200 則/月，群組推播按成員數計費）
+//   digest   → 不即時推，列入每日 09:10 主管彙總（預設）
+//   approver → 即時私訊 system_settings.line_admin_approver_employee_id 指定的審核人（1 則）
+//   group    → 舊行為，即時推主管群組（× 群組人數）
+//   off      → 不通知
+// 可用 system_settings.line_admin_notify_routes（JSON 物件）逐類覆寫；
+// 沒列到的類別（緊急公告、急迫報修、測試推播）走 group。
+const ADMIN_NOTIFY_DEFAULT_ROUTES = {
+    leave: 'digest',
+    makeup: 'digest',
+    gps_review: 'digest',
+    overtime: 'digest',
+    shift_swap: 'digest',
+    request: 'digest'
+};
+
+function resolveAdminNotifyRoute(category) {
+    if (!category) return 'group';
+    const custom = getCachedSetting('line_admin_notify_routes');
+    const configured = custom && typeof custom === 'object' ? custom[category] : undefined;
+    const route = configured || ADMIN_NOTIFY_DEFAULT_ROUTES[category] || 'group';
+    return ['digest', 'approver', 'group', 'off'].includes(route) ? route : 'group';
+}
+
+async function sendLineMessage(to, text, meta) {
+    meta = meta || {};
     const setting = getCachedSetting('line_messaging_api');
     if (!setting?.token) return lineNotifyFailure('missing_token', '尚未設定 LINE Channel Access Token');
     if (!to) return lineNotifyFailure('missing_target', '尚未設定 LINE 收件群組或員工尚未綁定 LINE');
@@ -1560,12 +1587,23 @@ async function sendLineMessage(to, text) {
                 'Content-Type': 'application/json',
                 'Authorization': 'Bearer ' + CONFIG.SUPABASE_ANON_KEY
             },
-            body: JSON.stringify({ token: setting.token, to, text })
+            // company_id/category/priority 給 Edge Function 記推播紀錄與月預算閘門（125）；舊版 Edge Function 會忽略
+            body: JSON.stringify({
+                token: setting.token, to, text,
+                company_id: window.currentCompanyId || null,
+                category: meta.category || 'frontend_other',
+                priority: meta.priority === 'high' ? 'high' : 'normal',
+                recipient_ref: meta.recipientRef || null
+            })
         });
         const result = await res.json().catch(() => null);
         if (!result) {
             console.error('[LINE Push] 無法辨識 Edge Function 回傳內容');
             return lineNotifyFailure('invalid_response', 'LINE 推播服務回傳無法辨識的結果', res.status);
+        }
+        if (result.code === 'budget_blocked') {
+            console.warn('[LINE Push] 本月推播預算已用完，未送出');
+            return lineNotifyFailure('budget_blocked', '本月 LINE 推播額度快用完，這則沒有送出；請直接到系統查看', 429);
         }
         const wrappedStatus = Number(result.status);
         const effectiveStatus = Number.isFinite(wrappedStatus) && wrappedStatus > 0 ? wrappedStatus : res.status;
@@ -1581,19 +1619,40 @@ async function sendLineMessage(to, text) {
     }
 }
 
-async function sendAdminNotify(message) {
+// options: { category, priority }；沒給 category 視為舊呼叫 → 即時推群組
+async function sendAdminNotify(message, options) {
+    options = options || {};
     try {
+        const category = options.category || null;
+        const priority = options.priority === 'high' ? 'high' : 'normal';
+        const route = resolveAdminNotifyRoute(category);
+        if (route === 'digest') {
+            return { ok: true, status: 0, code: 'deferred_to_digest', deferred: true, message: '已列入每日 09:10 主管彙總' };
+        }
+        if (route === 'off') {
+            return { ok: true, status: 0, code: 'disabled', deferred: true, message: '此類通知已關閉' };
+        }
         const setting = getCachedSetting('line_messaging_api');
         if (!setting?.token) return lineNotifyFailure('missing_token', '尚未設定 LINE Channel Access Token');
+        if (route === 'approver') {
+            const approverId = getCachedSetting('line_admin_approver_employee_id');
+            if (approverId) {
+                const direct = await sendUserNotify(approverId, message, { category, priority });
+                // 審核人沒綁 LINE / 查不到 → 退回群組，不要默默不發
+                if (direct.ok || !['missing_user_line', 'employee_lookup_failed'].includes(direct.code)) return direct;
+            }
+        }
         if (!setting?.groupId) return lineNotifyFailure('missing_group', '尚未設定主管 LINE 群組 ID');
-        return await sendLineMessage(setting.groupId, message);
+        return await sendLineMessage(setting.groupId, message, { category: category || 'admin_other', priority });
     } catch(e) {
         console.warn('LINE 推播失敗（非必要）');
         return lineNotifyFailure('unexpected_error', 'LINE 通知發生未預期錯誤，請稍後重試');
     }
 }
 
-async function sendUserNotify(employeeId, message) {
+// options: { category, priority }
+async function sendUserNotify(employeeId, message, options) {
+    options = options || {};
     try {
         const setting = getCachedSetting('line_messaging_api');
         if (!setting?.token) return lineNotifyFailure('missing_token', '尚未設定 LINE Channel Access Token');
@@ -1606,7 +1665,11 @@ async function sendUserNotify(employeeId, message) {
             .maybeSingle();
         if (error) return lineNotifyFailure('employee_lookup_failed', '無法確認員工 LINE 綁定資料');
         if (!emp?.line_user_id) return lineNotifyFailure('missing_user_line', '該員工尚未綁定 LINE');
-        return await sendLineMessage(emp.line_user_id, message);
+        return await sendLineMessage(emp.line_user_id, message, {
+            category: options.category || 'user_other',
+            priority: options.priority,
+            recipientRef: employeeId
+        });
     } catch(e) {
         console.warn('員工 LINE 推播失敗');
         return lineNotifyFailure('unexpected_error', 'LINE 通知發生未預期錯誤，請稍後重試');
@@ -2785,7 +2848,7 @@ async function submitOvertime() {
         loadOvertimeHistory();
 
         const compLabel = compType === 'pay' ? '加班費' : '補休';
-        sendAdminNotify(`🔔 ${currentEmployee.name} 申請加班\n📅 ${date} ${hours}小時\n💰 ${compLabel}\n📝 ${reason || '無附原因'}`);
+        sendAdminNotify(`🔔 ${currentEmployee.name} 申請加班\n📅 ${date} ${hours}小時\n💰 ${compLabel}\n📝 ${reason || '無附原因'}`, { category: 'overtime' });
     } catch(e) {
         showToast('❌ ' + tr('overtimeSubmitFailed') + '：' + friendlyError(e));
     } finally {

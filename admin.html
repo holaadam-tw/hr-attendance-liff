@@ -1316,7 +1316,7 @@
                 <!-- LINE Messaging API 推播設定 -->
                 <div style="padding:0 0 20px;">
                     <h3 style="margin-bottom:12px;">🔔 LINE 推播設定（Messaging API）</h3>
-                    <p style="color:#94A3B8;font-size:12px;margin-bottom:12px;">設定後，請假/補打卡/換班申請會自動推播通知管理員群組</p>
+                    <p style="color:#94A3B8;font-size:12px;margin-bottom:12px;">設定後，考勤待辦每日 09:10 彙總給主管；緊急公告即時推播管理員群組</p>
                     <div class="form-group">
                         <label>Channel Access Token</label>
                         <div style="position:relative;">
@@ -1339,6 +1339,43 @@
                         2. 取得 <b>Channel Access Token</b>（長效）<br>
                         3. 把 Bot 加入管理員群組<br>
                         4. 透過 Webhook 或測試工具取得 <b>Group ID</b>
+                    </div>
+
+                    <!-- LINE 省額度設定（migration 125） -->
+                    <div id="linePushPolicy" style="margin-top:16px;padding:12px;background:#F8FAFC;border:1px solid #E2E8F0;border-radius:12px;">
+                        <h4 style="margin:0 0 6px;">📉 LINE 省額度設定</h4>
+                        <p style="color:#64748B;font-size:12px;margin:0 0 10px;line-height:1.6;">免費方案每月 200 則；推到群組會按群組人數計算（4 人群組 = 4 則）。員工私訊官方帳號輸入「#待辦」查詢不計額度。</p>
+                        <div class="form-group">
+                            <label>請假／補打卡／GPS 待核認／加班／換班／報修的主管通知</label>
+                            <select id="lineAdminRoute">
+                                <option value="digest">列入每日 09:10 彙總（最省，建議）</option>
+                                <option value="approver">即時私訊指定審核人（每件 1 則）</option>
+                                <option value="group">即時推主管群組（舊做法，每件 × 群組人數）</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>每日 09:10 主管彙總送到</label>
+                            <select id="lineSummaryTarget">
+                                <option value="group">主管群組（每天 × 群組人數）</option>
+                                <option value="approver">只私訊指定審核人（每天 1 則）</option>
+                                <option value="off">不發（只看打卡總覽／#待辦）</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>指定審核人</label>
+                            <select id="lineApproverId"><option value="">（讀取中…）</option></select>
+                        </div>
+                        <div style="display:flex;gap:8px;">
+                            <div class="form-group" style="flex:1;">
+                                <label>主管群組人數</label>
+                                <input type="number" id="lineGroupMembers" min="1" max="500" value="4">
+                            </div>
+                            <div class="form-group" style="flex:1;">
+                                <label>一般訊息月預算</label>
+                                <input type="number" id="lineMonthlyBudget" min="0" value="180">
+                            </div>
+                        </div>
+                        <button class="btn btn-primary" onclick="saveLinePushPolicy()" style="width:100%;">💾 儲存省額度設定</button>
                     </div>
                 </div>
 
@@ -2278,8 +2315,8 @@
 
     </div>
 
-<script src="common.js?v=20260901-linenotify"></script>
-<script type="module" src="modules/index.js?v=20260901-linenotify"></script>
+<script src="common.js?v=20260927-linebudget"></script>
+<script type="module" src="modules/index.js?v=20260927-linebudget"></script>
     <script type="module" src="admin_fixes.js?v=20260708-audit2"></script>
     <script>
     // ===== 公務機打卡 =====

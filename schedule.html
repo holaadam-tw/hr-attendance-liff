@@ -161,7 +161,7 @@
 
 
 
-<script src="common.js?v=20260901-linenotify"></script>
+<script src="common.js?v=20260927-linebudget"></script>
     <script>
         // === 全域錯誤監控 ===
         window._errLogCount = 0; window._errLogResetTs = 0;
@@ -455,7 +455,7 @@
                 loadSwapRequests();
                 
                 // 通知對方
-                sendUserNotify(targetId, `🔄 ${currentEmployee.name} 想跟您換 ${date} 的班\n您的班：${targetShift} → ${myShift}\n請到班表頁面確認`);
+                sendUserNotify(targetId, `🔄 ${currentEmployee.name} 想跟您換 ${date} 的班\n您的班：${targetShift} → ${myShift}\n請到班表頁面確認`, { category: 'shift_swap_request' });
             } catch(e) { showToast('❌ 申請失敗：' + friendlyError(e)); }
         }
 
@@ -502,7 +502,7 @@
                 await sb.from('shift_swap_requests').update({ target_agreed: true, status: 'pending_admin' }).eq('id', id);
                 showToast('✅ 已同意，等待主管審核');
                 loadSwapRequests();
-                sendAdminNotify('🔄 換班申請：雙方已同意，請審核');
+                sendAdminNotify('🔄 換班申請：雙方已同意，請審核', { category: 'shift_swap' });
             } catch(e) { showToast('❌ 操作失敗'); }
         }
 

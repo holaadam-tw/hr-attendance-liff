@@ -34,7 +34,7 @@ export function switchSysTab(tab, btn) {
         btn.style.boxShadow = '0 1px 4px rgba(0,0,0,0.08)';
     }
     // 載入對應資料
-    if (tab === 'setting') { loadNotifyToken(); }
+    if (tab === 'setting') { loadNotifyToken(); loadLinePushPolicy(); }
     if (tab === 'audit') loadAuditLogs();
 }
 
@@ -67,7 +67,7 @@ export async function testNotify() {
     const status = document.getElementById('notifyStatus');
     if (status) { status.style.display = 'block'; status.style.color = '#6D28D9'; status.textContent = '⏳ 發送測試...'; }
     try {
-        const result = await sendAdminNotify('🔔 HR 系統推播測試\n如果您收到此訊息，表示 LINE Messaging API 設定成功！');
+        const result = await sendAdminNotify('🔔 HR 系統推播測試\n如果您收到此訊息，表示 LINE Messaging API 設定成功！', { category: 'test', priority: 'high' });
         if (!result?.ok) {
             const message = result?.message || 'LINE 推播未送達，請檢查設定';
             showToast('❌ 推播失敗：' + message);
@@ -82,6 +82,69 @@ export async function testNotify() {
     }
 }
 
+
+// ===== LINE 推播省額度設定（migration 125；免費方案 200 則/月，群組推播按人數計費）=====
+const LINE_ROUTE_CATEGORIES = ['leave', 'makeup', 'gps_review', 'overtime', 'shift_swap', 'request'];
+
+export async function loadLinePushPolicy() {
+    const box = document.getElementById('linePushPolicy');
+    if (!box) return;
+    const routes = getCachedSetting('line_admin_notify_routes') || {};
+    const firstRoute = LINE_ROUTE_CATEGORIES.map(c => routes[c]).find(Boolean) || 'digest';
+    const setVal = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
+    setVal('lineAdminRoute', firstRoute);
+    setVal('lineSummaryTarget', getCachedSetting('line_daily_summary_target') || 'group');
+    setVal('lineGroupMembers', getCachedSetting('line_admin_group_member_count') ?? 4);
+    setVal('lineMonthlyBudget', getCachedSetting('line_monthly_budget') ?? 180);
+
+    const sel = document.getElementById('lineApproverId');
+    if (!sel || !window.currentCompanyId) return;
+    try {
+        const { data, error } = await sb.from('employees')
+            .select('id, name, role')
+            .eq('company_id', window.currentCompanyId)
+            .eq('is_active', true)
+            .in('role', ['admin', 'manager'])
+            .order('name');
+        if (error) throw error;
+        const current = getCachedSetting('line_admin_approver_employee_id') || '';
+        sel.innerHTML = '<option value="">（未指定）</option>' + (data || []).map(e =>
+            `<option value="${escapeHTML(e.id)}"${e.id === current ? ' selected' : ''}>${escapeHTML(e.name)}</option>`).join('');
+    } catch (e) {
+        sel.innerHTML = '<option value="">（讀取主管名單失敗）</option>';
+    }
+}
+
+export async function saveLinePushPolicy() {
+    const route = document.getElementById('lineAdminRoute')?.value || 'digest';
+    const target = document.getElementById('lineSummaryTarget')?.value || 'group';
+    const approver = document.getElementById('lineApproverId')?.value || '';
+    const members = parseInt(document.getElementById('lineGroupMembers')?.value, 10);
+    const budget = parseInt(document.getElementById('lineMonthlyBudget')?.value, 10);
+    if ((route === 'approver' || target === 'approver') && !approver) {
+        return showToast('❌ 選了「私訊審核人」請先指定審核人');
+    }
+    if (!Number.isFinite(members) || members < 1 || members > 500) return showToast('❌ 群組人數請填 1–500');
+    if (!Number.isFinite(budget) || budget < 0 || budget > 100000) return showToast('❌ 月預算請填 0 以上的整數');
+    try {
+        const routes = {};
+        LINE_ROUTE_CATEGORIES.forEach(c => { routes[c] = route; });
+        await saveSetting('line_admin_notify_routes', routes, 'LINE 主管逐筆通知路由（digest/approver/group/off）');
+        await saveSetting('line_daily_summary_target', target, 'LINE 每日主管彙總收件（group/approver/off）');
+        await saveSetting('line_admin_approver_employee_id', approver || null, 'LINE 指定審核人 employees.id');
+        await saveSetting('line_admin_group_member_count', members, 'LINE 主管群組人數（群組推播按人數計費）');
+        await saveSetting('line_monthly_budget', budget, 'LINE 一般訊息月預算（估計則數）');
+        // saveSetting 不回報寫入錯誤（例如權限被擋）；存完重讀快取確認真的寫進去
+        const saved = getCachedSetting('line_admin_notify_routes') || {};
+        if (saved.leave !== route || (getCachedSetting('line_daily_summary_target') || 'group') !== target
+            || Number(getCachedSetting('line_monthly_budget')) !== budget) {
+            return showToast('❌ 儲存後讀回的值不一致，可能沒有權限；請重新整理再試');
+        }
+        showToast('✅ LINE 省額度設定已儲存');
+    } catch (e) {
+        showToast('❌ 儲存失敗');
+    }
+}
 
 // ===== 公告管理 =====
 export function toggleAnnCheck(id) {
@@ -140,7 +203,7 @@ export async function publishAnnouncement() {
 
         // 緊急公告推播 LINE 群組
         if (type === 'urgent') {
-            sendAdminNotify('🚨 緊急公告\n' + title + (content ? '\n' + content : ''));
+            sendAdminNotify('🚨 緊急公告\n' + title + (content ? '\n' + content : ''), { category: 'urgent_announcement', priority: 'high' });
         }
 
         loadAnnouncementList();
