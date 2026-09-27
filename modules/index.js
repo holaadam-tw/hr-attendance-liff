@@ -48,7 +48,7 @@ import {
     loadShiftTypeList, showAddShiftTypeForm, editShiftTypeById, deleteShiftTypeById, saveShiftType, deleteShiftType,
     loadEmployeeShiftModes, toggleShiftModeRow, saveAllShiftModes, smMarkChanged, smClearChanged, smHasUnsavedChanges,
     clearSchedulesState
-} from './schedules.js?v=20260927-verified130';
+} from './schedules.js?v=20260928-attlock133';
 
 import {
     BONUS_MATRIX, loadHybridBonusData, renderSelectedBonusCard,

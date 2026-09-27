@@ -11,7 +11,8 @@
 //     platform_admin_save／platform_link_company（平台頁維護平台管理員，129 起前端不能直接寫那兩張表）、
 //     company_save／company_set_status／company_delete_pending（平台頁維護公司，130 起前端不能直接寫 companies）、
 //     employee_create／employee_update／employee_delete_pending、makeup_review、overtime_review、schedule_save
-//     （131／132：員工管理、補卡／加班審核、排班；核准人／排班人＝LINE 驗證的 userId，不採信前端傳的員工 ID）
+//     （131／132：員工管理、補卡／加班審核、排班；核准人／排班人＝LINE 驗證的 userId，不採信前端傳的員工 ID）、
+//     shift_swap_review（133：換班核准／拒絕；135 起前端不能直接寫 schedules）
 //   員工發的訊息，DB 回傳寄件人前綴（［姓名 送出］），這裡一定加在最前面。
 //
 // 舊模式（相容還沒更新的頁面，前端帶 token）：必須帶 company_id，且 token 必須等於該公司設定
@@ -59,6 +60,7 @@ function json(payload: unknown, status: number): Response {
 const RPC_MIGRATION: Record<string, string> = {
   platform_company_save: '130', platform_company_set_status: '130', platform_company_delete_pending: '130',
   review_makeup_request: '131', review_overtime_request: '131', save_schedules_verified: '131',
+  review_shift_swap_request: '133',
 }
 
 async function callRpc(deps: Deps, fn: string, args: Record<string, unknown>): Promise<{ ok: boolean; data: any; missing?: string }> {
@@ -223,6 +225,8 @@ const VERIFIED_ACTIONS = [
   'employee_create', 'employee_update', 'employee_delete_pending', 'makeup_review', 'overtime_review', 'schedule_save',
   // 130：平台頁的公司維護（限在職平台管理員）
   'company_save', 'company_set_status', 'company_delete_pending',
+  // 133：換班審核（審核人＝LINE 驗證的 userId；核准時同一交易互換班別）
+  'shift_swap_review',
 ] as const
 export const MAX_BATCH_SETTINGS = 30
 export const MAX_BATCH_REVIEWS = 50
@@ -327,6 +331,17 @@ async function handleVerifiedAction(body: any, deps: Deps): Promise<Response> {
     return rpcResult(await callRpc(deps, 'save_schedules_verified', {
       p_company_id: companyId, p_line_user_id: lineUserId, p_items: clean,
     }), (d) => ({ saved_count: d.saved_count ?? 0 }))
+  }
+
+  // ---- 換班審核（133：核准＝同一交易互換兩人班別並結案；拒絕＝記錄原因）----
+  if (action === 'shift_swap_review') {
+    const decision = body.decision === 'approve' || body.decision === 'reject' ? body.decision : null
+    const requestId = uuidOrNull(body.request_id)
+    if (!decision || !requestId) return badRequest()
+    return rpcResult(await callRpc(deps, 'review_shift_swap_request', {
+      p_company_id: companyId, p_line_user_id: lineUserId, p_request_id: requestId, p_decision: decision,
+      p_reason: typeof body.reason === 'string' ? body.reason.slice(0, 500) : null,
+    }), withResult)
   }
 
   // ---- 平台頁：公司維護（130，限在職平台管理員）----

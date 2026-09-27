@@ -39,6 +39,8 @@ const SUITES = [
   { name: 'LINE token 伺服器端化＋設定／平台管理員寫入收斂（126／127／129，PGlite 實跑）', file: 'line-token-server-side.pglite.test.js' },
   { name: 'companies 寫入鎖＋管理動作改由 LINE 驗證身分（130／131／132，PGlite 實跑）', file: 'phase0-verified-admin.pglite.test.js' },
   { name: '前端管理動作改走 LIFF 驗證（130／131／132）', file: 'phase0-frontend-verified-calls.test.js' },
+  { name: 'attendance／schedules 只能經伺服器端函式寫入（133／134／135，PGlite 實跑）', file: 'attendance-schedules-write-lock.pglite.test.js' },
+  { name: '前端不直接寫 attendance／schedules、換班審核走 LIFF 驗證（133／135）', file: 'attendance-schedules-frontend.test.js' },
   { name: '打卡總覽', file: 'attendance-overview.test.js' },
   { name: '薪資頁加班來源', file: 'payroll-overtime.test.js' },
   { name: 'RLS 已鎖定資料表', file: 'rls-locked-tables.test.js' },

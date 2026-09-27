@@ -311,6 +311,7 @@ const post = (url, body, headers = {}) => new Request(url, { method: 'POST', bod
       ['/rpc/review_makeup_request', (b) => ({ body: b.p_request_id === REQ2 ? { success: false, error: '此申請已處理過', error_code: 'not_pending' } : { success: true, closed_duplicates: 1 } })],
       ['/rpc/review_overtime_request', { body: { success: true } }],
       ['/rpc/save_schedules_verified', { body: { success: true, saved_count: 2 } }],
+      ['/rpc/review_shift_swap_request', { body: { success: true, status: 'approved', requester_id: EMP, target_id: EMP, swap_date: '2026-10-05' } }],
       ['/rpc/platform_company_save', { body: { success: true, id: COMPANY, company: { id: COMPANY, code: 'NEW', name: '新公司' } } }],
       ['/rpc/platform_company_set_status', { body: { success: true, id: COMPANY, status: 'active' } }],
       ['/rpc/platform_company_delete_pending', { body: { success: true, name: '待審公司' } }],
@@ -384,6 +385,29 @@ const post = (url, body, headers = {}) => new Request(url, { method: 'POST', bod
       rpcRoutes([['/rpc/save_schedules_verified', { body: { success: false, error: '沒有排班權限', error_code: 'access_denied' } }]]));
     check('schedule_save：DB 拒絕 → 403', t.res.status === 403 && t.out.code === 'access_denied');
 
+    // 133：換班審核
+    t = await run({ action: 'shift_swap_review', company_id: COMPANY, request_id: REQ, decision: 'approve', approver_id: EMP, p_line_user_id: 'Uadmin' });
+    c = call(t.f, 'review_shift_swap_request');
+    check('shift_swap_review：審核人＝LINE userId，前端夾帶的 approver_id／p_line_user_id 不會送進 DB',
+      t.res.status === 200 && c.body.p_line_user_id === LIFF_USER && c.body.p_company_id === COMPANY && c.body.p_request_id === REQ && c.body.p_decision === 'approve'
+      && c.body.p_reason === null && !('p_approver_id' in c.body) && !JSON.stringify(c.body).includes('Uadmin') && t.out.result?.status === 'approved', JSON.stringify(c?.body));
+    t = await run({ action: 'shift_swap_review', company_id: COMPANY, request_id: REQ, decision: 'reject', reason: '人手不足' });
+    check('shift_swap_review：拒絕帶原因', t.res.status === 200 && call(t.f, 'review_shift_swap_request').body.p_reason === '人手不足');
+    t = await run({ action: 'shift_swap_review', company_id: COMPANY, request_id: 'bad', decision: 'approve' });
+    check('shift_swap_review：申請 ID 不是 UUID → 400、不呼叫 RPC', t.res.status === 400 && !t.f.calls.some(x => x.url.includes('/rpc/')));
+    t = await run({ action: 'shift_swap_review', company_id: COMPANY, request_id: REQ, decision: 'swap' });
+    check('shift_swap_review：decision 不合法 → 400、不呼叫 RPC', t.res.status === 400 && !t.f.calls.some(x => x.url.includes('/rpc/')));
+    t = await run({ action: 'shift_swap_review', request_id: REQ, decision: 'approve' });
+    check('shift_swap_review：沒帶 company_id → 400', t.res.status === 400 && t.f.calls.length === 0);
+    t = await run({ action: 'shift_swap_review', company_id: COMPANY, request_id: REQ, decision: 'approve' }, rpcRoutes([['/v2/profile', { status: 401, body: {} }]]));
+    check('shift_swap_review：LIFF token 驗不過 → 401、不呼叫 RPC', t.res.status === 401 && !call(t.f, 'review_shift_swap_request'));
+    t = await run({ action: 'shift_swap_review', company_id: COMPANY, request_id: REQ, decision: 'approve' },
+      rpcRoutes([['/rpc/review_shift_swap_request', { body: { success: false, error: '需要管理員權限', error_code: 'access_denied' } }]]));
+    check('shift_swap_review：DB 拒絕 → 403', t.res.status === 403 && t.out.code === 'access_denied');
+    t = await run({ action: 'shift_swap_review', company_id: COMPANY, request_id: REQ, decision: 'approve' },
+      rpcRoutes([['/rpc/review_shift_swap_request', { body: { success: false, error: '雙方當天都必須已有排班，才能核准換班', error_code: 'schedule_missing' } }]]));
+    check('shift_swap_review：缺排班 → 400、訊息照傳', t.res.status === 400 && t.out.code === 'schedule_missing' && /雙方當天/.test(t.out.error));
+
     t = await run({ action: 'company_save', fields: { code: 'NEW', name: '新公司' } });
     c = call(t.f, 'platform_company_save');
     check('company_save（新增，不帶 company_id）：呼叫者＝LINE userId', t.res.status === 200 && c.body.p_caller_line_user_id === LIFF_USER && c.body.p_company_id === null && c.body.p_fields.code === 'NEW' && t.out.result?.company?.code === 'NEW');
@@ -423,6 +447,8 @@ const post = (url, body, headers = {}) => new Request(url, { method: 'POST', bod
     check('RPC 不存在（131 未套）：503 db_not_migrated「資料庫尚未更新（131）」', t.res.status === 503 && t.out.code === 'db_not_migrated' && /資料庫尚未更新（131）/.test(t.out.error), JSON.stringify(t.out));
     t = await run({ action: 'company_save', fields: { code: 'X', name: 'x' } }, missingRoute('platform_company_save'));
     check('RPC 不存在（130 未套）：「資料庫尚未更新（130）」', t.res.status === 503 && /資料庫尚未更新（130）/.test(t.out.error));
+    t = await run({ action: 'shift_swap_review', company_id: COMPANY, request_id: REQ, decision: 'approve' }, missingRoute('review_shift_swap_request'));
+    check('RPC 不存在（133 未套）：「資料庫尚未更新（133）」', t.res.status === 503 && t.out.code === 'db_not_migrated' && /資料庫尚未更新（133）/.test(t.out.error));
     n = 0;
     t = await run({ action: 'makeup_review', company_id: COMPANY, request_ids: [REQ, REQ3], decision: 'approve' }, missingRoute('review_makeup_request'));
     check('批次第 1 筆就發現 RPC 不存在：db_not_migrated、0 筆核准、其餘列為未處理', t.res.status === 503 && t.out.code === 'db_not_migrated' && t.out.approved_count === 0 && t.out.failed_id === REQ && t.out.not_processed_ids[0] === REQ3);
