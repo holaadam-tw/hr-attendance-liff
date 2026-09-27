@@ -39,8 +39,18 @@ const post = (url, body, headers = {}) => new Request(url, { method: 'POST', bod
   console.log('  LINE Edge Functions（handler.ts 實跑）');
   console.log('═══════════════════════════════════════');
 
-  const push = await import(pathToFileURL(path.join(__dirname, '..', 'supabase', 'functions', 'line-push', 'handler.ts')).href);
-  const hook = await import(pathToFileURL(path.join(__dirname, '..', 'supabase', 'functions', 'line-webhook', 'handler.ts')).href);
+  let push, hook;
+  try {
+    push = await import(pathToFileURL(path.join(__dirname, '..', 'supabase', 'functions', 'line-push', 'handler.ts')).href);
+    hook = await import(pathToFileURL(path.join(__dirname, '..', 'supabase', 'functions', 'line-webhook', 'handler.ts')).href);
+  } catch (e) {
+    if (e && e.code === 'ERR_UNKNOWN_FILE_EXTENSION') {
+      // Node < 22.18 不能直接載入 .ts（CI 已改用 Node 22）；本機舊版 Node 只提示、不算失敗
+      console.log(`  ⚠️ 略過：Node ${process.version} 無法直接載入 .ts，請用 Node 22.18 以上執行`);
+      process.exit(0);
+    }
+    throw e;
+  }
   const env = envOf({ SUPABASE_URL: 'https://db.test', SUPABASE_SERVICE_ROLE_KEY: 'service-key', LINE_CHANNEL_TOKEN: 'line-token' });
 
   console.log('\n=== line-push ===');
