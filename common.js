@@ -97,6 +97,8 @@ async function initializeLiff(options) {
         }
 
         liffProfile = await liff.getProfile();
+        // 登入過期重登回來：把剛才沒存成功的表單值填回（M-2）
+        try { restoreFormDraft(); } catch (e) { console.warn('還原表單失敗', e); }
         // 登入後跳轉到原始目標頁面（從 admin.html 等頁面觸發的登入）
         const pendingPage = sessionStorage.getItem('liff_redirect_page');
         if (pendingPage) {
@@ -559,6 +561,22 @@ async function saveSetting(key, value, description) {
         throw new Error(result.message || '設定儲存失敗');
     }
 
+    invalidateSettingsCache();
+    await loadSettings(true);
+}
+
+// 一次存多個設定（一次 LIFF 驗證、一次重讀快取）：items = [{ key, value, description }]
+// 失敗會 throw，訊息帶第一個失敗的 key
+async function saveSettings(items) {
+    const companyId = window.currentCompanyId || window.currentEmployee?.company_id || currentEmployee?.company_id;
+    if (!companyId) throw new Error('目前公司資料尚未就緒');
+    const list = (items || []).map(i => ({ key: i.key, value: i.value === undefined ? null : i.value, description: i.description || i.key }));
+    if (list.some(i => SECRET_SETTING_KEYS.includes(i.key))) throw new Error('LINE 設定請用 saveLineMessagingConfig 儲存');
+    const result = await callVerifiedAction('save_settings', { company_id: companyId, items: list });
+    if (!result.ok) {
+        const failedKey = result.data && result.data.failed_key ? '（' + result.data.failed_key + '）' : '';
+        throw new Error((result.message || '設定儲存失敗') + failedKey);
+    }
     invalidateSettingsCache();
     await loadSettings(true);
 }
@@ -1700,13 +1718,131 @@ async function sendUserNotify(employeeId, message, options) {
     }
 }
 
+// ===== LIFF 登入過期：保存表單 → 重新登入 → 回來還原（M-2）=====
+// 管理員多半用電腦瀏覽器（liff.login 轉址登入），頁面開著很久 access token 會過期；
+// 這時存設定會被 line-push 回 unauthenticated。與其只顯示訊息讓人重打，先把目前頁面上的表單值
+// 存進 sessionStorage（以頁面為 key），再重新登入並回到同一個網址，回來後自動填回。
+// - 不保存密碼欄、檔案欄、LINE token 欄（秘密不落地）
+// - 防無限迴圈：2 分鐘內只自動重登一次；成功做完一次驗證動作就清掉記號
+const FORM_DRAFT_PREFIX = 'form_draft:';
+const LIFF_RELOGIN_MARKER = 'liff_relogin_attempt';
+const FORM_DRAFT_MAX_AGE_MS = 30 * 60 * 1000;
+const FORM_DRAFT_SECRET_IDS = ['lineChannelToken', 'payrollNewPw', 'payrollPwInput', 'payrollPasswordInput'];
+
+function formDraftKey() {
+    return FORM_DRAFT_PREFIX + window.location.pathname;
+}
+
+function collectFormDraft(root) {
+    const values = {};
+    (root || document).querySelectorAll('input[id], select[id], textarea[id]').forEach(el => {
+        const type = (el.type || '').toLowerCase();
+        if (type === 'password' || type === 'file' || type === 'hidden' || FORM_DRAFT_SECRET_IDS.includes(el.id)) return;
+        values[el.id] = (type === 'checkbox' || type === 'radio') ? { checked: !!el.checked } : { value: el.value };
+    });
+    return values;
+}
+
+function saveFormDraft() {
+    try {
+        sessionStorage.setItem(formDraftKey(), JSON.stringify({ ts: Date.now(), hash: window.location.hash, values: collectFormDraft() }));
+        return true;
+    } catch (e) { return false; }
+}
+
+// 把草稿值套回欄位；使用者自己動過的欄位（userTouched）不再覆蓋。回傳這次實際改了幾格
+function applyFormDraftValues(values, userTouched) {
+    let applied = 0;
+    Object.keys(values || {}).forEach(id => {
+        if (userTouched && userTouched.has(id)) return;
+        const el = document.getElementById(id);
+        if (!el) return;
+        const v = values[id];
+        if ('checked' in v) {
+            if (el.checked !== v.checked) { el.checked = v.checked; applied++; }
+        } else if (el.value !== v.value) {
+            el.value = v.value;
+            if (el.value === v.value) applied++;   // select 沒有該選項時不算
+        }
+    });
+    return applied;
+}
+
+// initializeLiff 成功後呼叫：有草稿就填回。
+// 頁面之後會從 DB 載入設定、切分頁才渲染欄位，會把剛填回的值蓋掉 → 20 秒內持續補填
+// （DOM 變動時＋0.8/2/5 秒各一次），但使用者自己改過的欄位就不再動。
+function restoreFormDraft() {
+    let draft = null;
+    try { draft = JSON.parse(sessionStorage.getItem(formDraftKey()) || 'null'); } catch (e) { draft = null; }
+    if (!draft || !draft.values) return 0;
+    if (!(Date.now() - Number(draft.ts) < FORM_DRAFT_MAX_AGE_MS)) {
+        try { sessionStorage.removeItem(formDraftKey()); } catch (e) {}
+        return 0;
+    }
+    const touched = new Set();
+    // 程式設定 .value 不會觸發 input/change，所以收到這兩個事件就是使用者自己在改
+    const onUserEdit = (ev) => { if (ev.target && ev.target.id) touched.add(ev.target.id); };
+    document.addEventListener('input', onUserEdit, true);
+    document.addEventListener('change', onUserEdit, true);
+    let total = applyFormDraftValues(draft.values, touched);
+    let notified = false;
+    const notify = () => {
+        if (notified || total === 0) return;
+        notified = true;
+        if (typeof showToast === 'function') showToast('已還原您剛才輸入的內容，請再按一次「儲存」');
+    };
+    const reapply = () => { total += applyFormDraftValues(draft.values, touched); notify(); };
+    notify();
+    let obs = null;
+    if (typeof MutationObserver === 'function' && document.body) {
+        obs = new MutationObserver(reapply);
+        obs.observe(document.body, { childList: true, subtree: true });
+    }
+    [800, 2000, 5000].forEach(ms => setTimeout(reapply, ms));
+    setTimeout(() => {
+        if (obs) obs.disconnect();
+        document.removeEventListener('input', onUserEdit, true);
+        document.removeEventListener('change', onUserEdit, true);
+        try { sessionStorage.removeItem(formDraftKey()); } catch (e) {}
+    }, 20000);
+    return total;
+}
+
+function clearReloginMarker() {
+    try { sessionStorage.removeItem(LIFF_RELOGIN_MARKER); } catch (e) {}
+}
+
+// 回傳 true = 已開始重新登入（頁面即將跳走）；false = 不重登（剛重登過、或 LIFF 不可用）
+function handleLiffSessionExpired() {
+    try {
+        const last = Number(sessionStorage.getItem(LIFF_RELOGIN_MARKER) || 0);
+        if (last && Date.now() - last < 2 * 60 * 1000) return false;   // 剛重登過還是失敗 → 不再轉圈
+        if (typeof liff === 'undefined' || !liff) return false;
+        saveFormDraft();
+        sessionStorage.setItem(LIFF_RELOGIN_MARKER, String(Date.now()));
+        if (typeof liff.isInClient === 'function' && liff.isInClient()) {
+            // LINE App 內：liff.login 不可用，重新整理即重新取得 token
+            window.location.reload();
+        } else {
+            try { if (typeof liff.logout === 'function') liff.logout(); } catch (e) {}
+            liff.login({ redirectUri: window.location.href });
+        }
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
 // 需要「真實身分」的動作一律經 line-push Edge Function：它先向 LINE 驗證 LIFF access token 取得 userId，
 // 再以 service role 呼叫對應的 RPC（126／129）。前端自己報的 line_user_id 不會被採信。
 // action：save_setting／save_config／get_line_config／platform_admin_save／platform_link_company
 // 回傳 { ok, code, message, data }
 async function callVerifiedAction(action, payload) {
+    const expired = () => handleLiffSessionExpired()
+        ? { ok: false, code: 'relogin_redirect', message: 'LINE 登入已過期，正在重新登入；您輸入的內容會自動保留' }
+        : { ok: false, code: 'unauthenticated', message: LINE_PUSH_DENY_MESSAGES.unauthenticated };
     const accessToken = getLiffAccessTokenSafe();
-    if (!accessToken) return { ok: false, code: 'unauthenticated', message: LINE_PUSH_DENY_MESSAGES.unauthenticated };
+    if (!accessToken) return expired();
     try {
         const res = await fetch('https://nssuisyvlrqnqfxupklb.supabase.co/functions/v1/line-push', {
             method: 'POST',
@@ -1717,8 +1853,10 @@ async function callVerifiedAction(action, payload) {
         if (!result) return { ok: false, code: 'invalid_response', message: '伺服器回傳無法辨識的結果' };
         if (!result.ok) {
             const code = result.code || 'failed';
+            if (code === 'unauthenticated') return expired();
             return { ok: false, code, message: result.error || LINE_PUSH_DENY_MESSAGES[code] || '操作失敗', data: result };
         }
+        clearReloginMarker();
         return { ok: true, code: 'ok', data: result };
     } catch (e) {
         return { ok: false, code: 'network_error', message: '目前無法連線伺服器，請檢查網路後重試' };

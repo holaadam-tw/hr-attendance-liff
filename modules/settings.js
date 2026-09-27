@@ -2,7 +2,7 @@
 // modules/settings.js — 功能管理、公告、客戶、外勤審核、公司、業務目標
 // 依賴 common.js 全域: sb, showToast, escapeHTML, friendlyError,
 //   writeAuditLog, sendAdminNotify, getGPS, getTaiwanDate,
-//   invalidateSettingsCache, fmtDate, saveLineMessagingConfig, callVerifiedAction
+//   invalidateSettingsCache, fmtDate, saveLineMessagingConfig, callVerifiedAction, saveSettings
 // ============================================================
 
 // 產業別模板（common.js getFeatureVisibility 使用）
@@ -147,11 +147,13 @@ export async function saveLinePushPolicy() {
     try {
         const routes = {};
         LINE_ROUTE_CATEGORIES.forEach(c => { routes[c] = route; });
-        await saveSetting('line_admin_notify_routes', routes, 'LINE 主管逐筆通知路由（digest/approver/group/off）');
-        await saveSetting('line_daily_summary_target', target, 'LINE 每日主管彙總收件（group/approver/off）');
-        await saveSetting('line_admin_approver_employee_id', approver || null, 'LINE 指定審核人 employees.id');
-        await saveSetting('line_admin_group_member_count', members, 'LINE 主管群組人數（群組推播按人數計費）');
-        await saveSetting('line_monthly_budget', budget, 'LINE 一般訊息月預算（估計則數）');
+        await saveSettings([
+            { key: 'line_admin_notify_routes', value: routes, description: 'LINE 主管逐筆通知路由（digest/approver/group/off）' },
+            { key: 'line_daily_summary_target', value: target, description: 'LINE 每日主管彙總收件（group/approver/off）' },
+            { key: 'line_admin_approver_employee_id', value: approver || null, description: 'LINE 指定審核人 employees.id' },
+            { key: 'line_admin_group_member_count', value: members, description: 'LINE 主管群組人數（群組推播按人數計費）' },
+            { key: 'line_monthly_budget', value: budget, description: 'LINE 一般訊息月預算（估計則數）' },
+        ]);
         // saveSetting 不回報寫入錯誤（例如權限被擋）；存完重讀快取確認真的寫進去
         const saved = getCachedSetting('line_admin_notify_routes') || {};
         if (saved.leave !== route || (getCachedSetting('line_daily_summary_target') || 'group') !== target

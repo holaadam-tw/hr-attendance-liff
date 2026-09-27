@@ -299,15 +299,17 @@ export async function saveAttendanceSettings() {
     if (!weekendStart) return showToast('\u8acb\u8a2d\u5b9a\u516d\u65e5\u9810\u8a2d\u4e0a\u73ed\u6642\u9593');
     if (!weekendEnd) return showToast('\u8acb\u8a2d\u5b9a\u516d\u65e5\u9810\u8a2d\u4e0b\u73ed\u6642\u9593');
     try {
-    await saveSetting('default_work_start', weekdayStart, '\u9810\u8a2d\u4e0a\u73ed\u6642\u9593\uff08\u5e73\u65e5 fallback\uff09');
-    await saveSetting('default_work_end', weekdayEnd, '\u9810\u8a2d\u4e0b\u73ed\u6642\u9593\uff08\u5e73\u65e5 fallback\uff09');
-    await saveSetting('default_weekday_work_start', weekdayStart, '\u5e73\u65e5\u9810\u8a2d\u4e0a\u73ed\u6642\u9593');
-    await saveSetting('default_weekday_work_end', weekdayEnd, '\u5e73\u65e5\u9810\u8a2d\u4e0b\u73ed\u6642\u9593');
-    await saveSetting('default_weekend_work_start', weekendStart, '\u516d\u65e5\u9810\u8a2d\u4e0a\u73ed\u6642\u9593');
-    await saveSetting('default_weekend_work_end', weekendEnd, '\u516d\u65e5\u9810\u8a2d\u4e0b\u73ed\u6642\u9593');
-    await saveSetting('late_threshold_minutes', 9999, '\u66ab\u4e0d\u6a19\u8a18\u9072\u5230');
-    await saveSetting('early_leave_threshold_minutes', parseInt(earlyThreshold) || 0, '\u65e9\u9000\u5bb9\u5fcd\u5206\u9418');
-    await saveSetting('checkout_time_limit_hours', parseFloat(checkoutLimit) || 4, '\u4e0b\u73ed\u6253\u5361\u5ef6\u5f8c\u4e0a\u9650\uff08\u5c0f\u6642\uff09');
+        await saveSettings([
+            { key: 'default_work_start', value: weekdayStart, description: '\u9810\u8a2d\u4e0a\u73ed\u6642\u9593\uff08\u5e73\u65e5 fallback\uff09' },
+            { key: 'default_work_end', value: weekdayEnd, description: '\u9810\u8a2d\u4e0b\u73ed\u6642\u9593\uff08\u5e73\u65e5 fallback\uff09' },
+            { key: 'default_weekday_work_start', value: weekdayStart, description: '\u5e73\u65e5\u9810\u8a2d\u4e0a\u73ed\u6642\u9593' },
+            { key: 'default_weekday_work_end', value: weekdayEnd, description: '\u5e73\u65e5\u9810\u8a2d\u4e0b\u73ed\u6642\u9593' },
+            { key: 'default_weekend_work_start', value: weekendStart, description: '\u516d\u65e5\u9810\u8a2d\u4e0a\u73ed\u6642\u9593' },
+            { key: 'default_weekend_work_end', value: weekendEnd, description: '\u516d\u65e5\u9810\u8a2d\u4e0b\u73ed\u6642\u9593' },
+            { key: 'late_threshold_minutes', value: 9999, description: '\u66ab\u4e0d\u6a19\u8a18\u9072\u5230' },
+            { key: 'early_leave_threshold_minutes', value: parseInt(earlyThreshold) || 0, description: '\u65e9\u9000\u5bb9\u5fcd\u5206\u9418' },
+            { key: 'checkout_time_limit_hours', value: parseFloat(checkoutLimit) || 4, description: '\u4e0b\u73ed\u6253\u5361\u5ef6\u5f8c\u4e0a\u9650\uff08\u5c0f\u6642\uff09' },
+        ]);
     } catch (e) {
         return showToast('❌ 考勤設定儲存失敗：' + (e?.message || ''));
     }

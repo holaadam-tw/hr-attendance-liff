@@ -52,10 +52,12 @@ function buildLineHelpers({ response, fetchError, extraSettings = {}, liffToken 
     return response || { ok: true, status: 200, json: async () => ({ ok: true, status: 200 }) };
   };
   const settings = { line_messaging_api: { token: TOKEN, groupId: 'C123' }, ...extraSettings };
-  const source = [grabConst(commonSrc, 'ADMIN_NOTIFY_DEFAULT_ROUTES'), grabConst(commonSrc, 'LINE_PUSH_DENY_MESSAGES'), grabConst(commonSrc, 'SECRET_SETTING_KEYS')].join('\n') + '\n' + [
+  const source = [grabConst(commonSrc, 'ADMIN_NOTIFY_DEFAULT_ROUTES'), grabConst(commonSrc, 'LINE_PUSH_DENY_MESSAGES'), grabConst(commonSrc, 'SECRET_SETTING_KEYS'), grabConst(commonSrc, 'FORM_DRAFT_SECRET_IDS'),
+    ...['FORM_DRAFT_PREFIX', 'LIFF_RELOGIN_MARKER'].map(n => (commonSrc.match(new RegExp(`const ${n} = [^;]*;`)) || [''])[0])].join('\n') + '\n' + [
     'lineNotifyFailure', 'resolveAdminNotifyRoute', 'lineNotifyMessageForStatus', 'getLiffAccessTokenSafe',
     'requestLinePush', 'sendLineMessage', 'sendAdminNotify', 'sendUserNotify', 'saveLineMessagingConfig',
-    'stripSecretSettings', 'saveSetting', 'adminCallerLineUserId', 'callVerifiedAction'
+    'stripSecretSettings', 'saveSetting', 'adminCallerLineUserId', 'callVerifiedAction',
+    'clearReloginMarker', 'handleLiffSessionExpired', 'formDraftKey', 'collectFormDraft', 'saveFormDraft'
   ].map(name => tryGrab(commonSrc, name)).join('\n');
   const factory = new Function(
     'getCachedSetting', 'fetch', 'CONFIG', 'console', 'window', 'sb', 'liff', 'invalidateSettingsCache', 'loadSettings', 'currentEmployee', 'liffProfile',
@@ -207,7 +209,7 @@ function buildLineHelpers({ response, fetchError, extraSettings = {}, liffToken 
   const employeesSrc = fs.readFileSync(path.join(root, 'modules', 'employees.js'), 'utf8');
   const bookingSrc = fs.readFileSync(path.join(root, 'booking_service_admin.html'), 'utf8');
   const exported = (src, name) => grabFunction(src.slice(src.indexOf('export async function ' + name + '(')).replace(/^export\s+/, ''), name);
-  const guarded = (fnSrc) => /try\s*\{[\s\S]*saveSetting\([\s\S]*\}\s*catch\s*\(\s*e\s*\)\s*\{[\s\S]*showToast\('❌/.test(fnSrc);
+  const guarded = (fnSrc) => /try\s*\{[\s\S]*saveSettings?\([\s\S]*\}\s*catch\s*\(\s*e\s*\)\s*\{[\s\S]*showToast\('❌/.test(fnSrc);
   check('saveLunchDeadline 有 try/catch＋錯誤提示', guarded(exported(leaveSrc, 'saveLunchDeadline')));
   check('saveAttendanceSettings 有 try/catch＋錯誤提示', guarded(exported(leaveSrc, 'saveAttendanceSettings')));
   check('addNewDepartment 有 try/catch＋錯誤提示', guarded(exported(employeesSrc, 'addNewDepartment')));

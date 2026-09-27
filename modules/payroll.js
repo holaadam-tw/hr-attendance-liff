@@ -631,10 +631,12 @@ export async function loadPayrollConfig() {
 
 export async function savePayrollConfig() {
     try {
-        await saveSetting('late_deduction_per_time', parseInt(document.getElementById('cfgLateDeduction')?.value) || 100, '遲到每次扣款金額');
-        await saveSetting('overtime_rate', parseFloat(document.getElementById('cfgOtRate1')?.value) || 1.34, '加班費倍率（前2h）');
-        await saveSetting('overtime_rate_2', parseFloat(document.getElementById('cfgOtRate2')?.value) || 1.67, '加班費倍率（2h後）');
-        await saveSetting('work_days_per_month', parseInt(document.getElementById('cfgWorkDays')?.value) || 22, '每月工作天數');
+        await saveSettings([
+            { key: 'late_deduction_per_time', value: parseInt(document.getElementById('cfgLateDeduction')?.value) || 100, description: '遲到每次扣款金額' },
+            { key: 'overtime_rate', value: parseFloat(document.getElementById('cfgOtRate1')?.value) || 1.34, description: '加班費倍率（前2h）' },
+            { key: 'overtime_rate_2', value: parseFloat(document.getElementById('cfgOtRate2')?.value) || 1.67, description: '加班費倍率（2h後）' },
+            { key: 'work_days_per_month', value: parseInt(document.getElementById('cfgWorkDays')?.value) || 22, description: '每月工作天數' },
+        ]);
         showToast('✅ 薪資計算參數已儲存');
     } catch(e) { showToast('❌ 儲存失敗'); console.error(e); }
 }

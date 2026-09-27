@@ -32,6 +32,7 @@ const SUITES = [
   { name: 'RLS 階段1 employees 寫入鎖定', file: 'rls-employees-write-lock.test.js' },
   { name: '員工 RPC 補強：公務機／管理員帳號保護（128，PGlite 實跑）', file: 'employee-rpc-guard.pglite.test.js' },
   { name: 'LINE 通知結果回饋', file: 'line-notification-delivery.test.js' },
+  { name: 'LIFF 過期重登保留表單＋批次存設定（jsdom 實跑）', file: 'liff-relogin-draft.test.js' },
   { name: '缺時 LINE 通知安全開關', file: 'missing-work-hours-notification-control.test.js' },
   { name: 'LINE 推播減量（125，PGlite 實跑）', file: 'line-push-reduction.pglite.test.js' },
   { name: 'LINE Edge Functions（push／webhook）', file: 'line-edge-functions.test.js' },

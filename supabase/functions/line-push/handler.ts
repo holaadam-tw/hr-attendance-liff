@@ -7,7 +7,7 @@
 //      回傳 token（只在伺服器端使用，絕不回給前端）
 //   3. 送 LINE push → line_push_complete 回寫結果
 //   另有幾個 action（都先驗 LIFF，身分來自 LINE，再以 service role 呼叫對應 RPC，由 DB 做權限判斷）：
-//     save_config（LINE token／groupId）、save_setting（其他公司設定）、get_line_config（設定頁顯示末 4 碼）、
+//     save_config（LINE token／groupId）、save_setting／save_settings（其他公司設定，單筆／批次）、get_line_config（設定頁顯示末 4 碼）、
 //     platform_admin_save／platform_link_company（平台頁維護平台管理員，129 起前端不能直接寫那兩張表）
 //   員工發的訊息，DB 回傳寄件人前綴（［姓名 送出］），這裡一定加在最前面。
 //
@@ -204,7 +204,8 @@ function rpcResult(saved: { ok: boolean; data: any }, extra: (d: any) => Record<
   return json({ ok: true, status: 200, ...extra(saved.data) }, 200)
 }
 
-const VERIFIED_ACTIONS = ['save_config', 'save_setting', 'get_line_config', 'platform_admin_save', 'platform_link_company'] as const
+const VERIFIED_ACTIONS = ['save_config', 'save_setting', 'save_settings', 'get_line_config', 'platform_admin_save', 'platform_link_company'] as const
+export const MAX_BATCH_SETTINGS = 30
 
 async function handleVerifiedAction(body: any, deps: Deps): Promise<Response> {
   const action = String(body.action)
@@ -233,6 +234,27 @@ async function handleVerifiedAction(body: any, deps: Deps): Promise<Response> {
       p_value: body.value === undefined ? null : body.value,
       p_description: typeof body.description === 'string' ? body.description.slice(0, 200) : key,
     }))
+  }
+  if (action === 'save_settings') {
+    // 一次驗證、逐筆呼叫 admin_save_setting（每筆各自驗權限）；遇到第一筆失敗就停，回報 failed_key 與已存筆數
+    const items = Array.isArray(body.items) ? body.items : []
+    if (items.length === 0 || items.length > MAX_BATCH_SETTINGS) return badRequest('設定筆數不正確')
+    if (items.some((i: any) => !i || typeof i.key !== 'string' || !i.key || i.key === 'line_messaging_api')) return badRequest('設定名稱不正確')
+    let saved = 0
+    for (const i of items) {
+      const r = await callRpc(deps, 'admin_save_setting', {
+        p_company_id: companyId, p_line_user_id: lineUserId, p_key: i.key,
+        p_value: i.value === undefined ? null : i.value,
+        p_description: typeof i.description === 'string' ? i.description.slice(0, 200) : i.key,
+      })
+      if (!r.ok || !r.data || r.data.success !== true) {
+        const res = rpcResult(r)
+        const payload = await res.json()
+        return json({ ...payload, failed_key: i.key, saved_count: saved }, res.status)
+      }
+      saved++
+    }
+    return json({ ok: true, status: 200, saved_count: saved }, 200)
   }
   if (action === 'get_line_config') {
     return rpcResult(await callRpc(deps, 'get_line_messaging_config', { p_company_id: companyId, p_line_user_id: lineUserId }),

@@ -2979,10 +2979,14 @@ window.saveBookingSettings = async function(storeId) {
     localStorage.setItem('bk_settings', JSON.stringify(bookingSettings));
     localStorage.setItem('bk_interval', bookingInterval);
 
-    // 同步儲存 open_days 到 Supabase（供消費者頁面讀取）
+    // 同步儲存 open_days 到 Supabase（供消費者頁面讀取）；失敗要讓使用者知道，不能顯示「已儲存」
     try {
         await saveSetting('booking_open_days', selectedDays, '預約開放星期');
-    } catch(e) { console.log('儲存 open_days 到 DB 失敗', e); }
+    } catch(e) {
+        console.log('儲存 open_days 到 DB 失敗', e);
+        showToast('⚠️ 本機設定已儲存，但「開放星期」沒有同步到系統（顧客頁面仍是舊的）：' + (e && e.message ? e.message : ''));
+        return;
+    }
 
     showToast('✅ 設定已儲存');
 };

@@ -274,6 +274,31 @@ const post = (url, body, headers = {}) => new Request(url, { method: 'POST', bod
     check('LIFF 驗證失敗：平台管理員動作 401、不碰 DB', res.status === 401 && !f.calls.some(c => c.url.includes('/rpc/')));
   }
 
+  console.log('\n=== save_settings（批次）===');
+  {
+    let n = 0;
+    const f = fakeFetch(liffRoutes({ save: () => { n++; return { body: n === 2 ? { success: false, error_code: 'admin_only', error: '只有管理員可以修改此設定' } : { success: true } }; } }));
+    const res = await push.handleLinePush(post('https://fn/line-push', { action: 'save_settings', liff_access_token: 'liff-at', company_id: COMPANY,
+      items: [{ key: 'a', value: 1 }, { key: 'line_monthly_budget', value: 2 }, { key: 'c', value: 3 }] }), { fetch: f.fn, env });
+    const out = await res.json().catch(() => ({}));
+    const verifies = f.calls.filter(c => c.url.includes('/oauth2/v2.1/verify')).length;
+    const saves = f.calls.filter(c => c.url.includes('/rpc/admin_save_setting'));
+    check('批次：只驗一次 LIFF，每筆都以驗出的 userId 呼叫 admin_save_setting', verifies === 1 && saves.length === 2 && saves.every(c => c.body.p_line_user_id === LIFF_USER));
+    check('批次：遇到第一筆失敗就停，回報 failed_key 與已存筆數', res.status === 403 && out.code === 'admin_only' && out.failed_key === 'line_monthly_budget' && out.saved_count === 1);
+  }
+  {
+    const f = fakeFetch(liffRoutes());
+    const res = await push.handleLinePush(post('https://fn/line-push', { action: 'save_settings', liff_access_token: 'liff-at', company_id: COMPANY,
+      items: [{ key: 'a', value: 1 }, { key: 'line_messaging_api', value: { token: 'x' } }] }), { fetch: f.fn, env });
+    check('批次不能夾帶 LINE token', res.status === 400 && !f.calls.some(c => c.url.includes('/rpc/')));
+  }
+  {
+    const f = fakeFetch(liffRoutes());
+    const items = Array.from({ length: 31 }, (_, i) => ({ key: 'k' + i, value: i }));
+    const res = await push.handleLinePush(post('https://fn/line-push', { action: 'save_settings', liff_access_token: 'liff-at', company_id: COMPANY, items }), { fetch: f.fn, env });
+    check('批次超過 30 筆：400', res.status === 400 && !f.calls.some(c => c.url.includes('/rpc/')));
+  }
+
   console.log('\n=== line-webhook ===');
   const secret = 'channel-secret';
   const envS = envOf({ SUPABASE_URL: 'https://db.test', SUPABASE_SERVICE_ROLE_KEY: 'service-key', LINE_CHANNEL_TOKEN: 'line-token', LINE_CHANNEL_SECRET: secret });
