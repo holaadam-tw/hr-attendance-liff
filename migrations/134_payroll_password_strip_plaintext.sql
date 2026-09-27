@@ -32,6 +32,11 @@ BEGIN
        AND NOT EXISTS (SELECT 1 FROM public.payroll_password_secrets s
                         WHERE s.company_id = ss.company_id
                           AND extensions.crypt(ss.value->>'password', s.password_hash) = s.password_hash);
+    IF EXISTS (SELECT 1 FROM public.system_settings ss
+                WHERE ss.key = 'payroll_password' AND ss.company_id IS NULL
+                  AND jsonb_typeof(ss.value) = 'object' AND COALESCE(ss.value->>'password', '') <> '') THEN
+        RAISE EXCEPTION '有不屬於任何公司的 payroll_password 明碼（正式庫 9/28 沒有），請先人工處理再套 134';
+    END IF;
     IF v_missing > 0 THEN
         RAISE EXCEPTION '有 % 家公司的薪酬密碼還沒有對應雜湊，中止（請重跑 133 的回填）', v_missing;
     END IF;
@@ -60,6 +65,9 @@ BEGIN
     END IF;
 
     v_pw := CASE WHEN jsonb_typeof(NEW.value) = 'object' THEN NULLIF(NEW.value->>'password', '') END;
+    IF octet_length(v_pw) > 72 THEN
+        RAISE EXCEPTION '薪酬密碼太長（最多 72 bytes，約 24 個中文字）' USING ERRCODE = '22001';
+    END IF;
     IF NEW.company_id IS NOT NULL AND v_pw IS NOT NULL THEN
         INSERT INTO public.payroll_password_secrets (company_id, password_hash, updated_at)
         VALUES (NEW.company_id, extensions.crypt(v_pw, extensions.gen_salt('bf', 10)), now())

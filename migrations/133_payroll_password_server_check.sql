@@ -20,7 +20,9 @@
 --   D. payroll_password_unlock(company_id, line_user_id, password)：**只給 service role**
 --        line-push Edge Function（action=payroll_unlock）向 LINE 驗證 LIFF access token 取得真實 userId 後呼叫。
 --        - 呼叫者必須是該公司在職員工或綁定的平台管理員（has_company_access；薪資頁每位員工都會被要求輸入）
---        - 每人每公司 15 分鐘內錯 5 次 → rate_limited；每家公司 15 分鐘內錯 30 次 → rate_limited（防撞庫）
+--        - 每人每公司 15 分鐘內錯 5 次 → rate_limited；每家公司 15 分鐘內有 10 個不同帳號打錯 → rate_limited（防換帳號撞庫）
+--          同一家公司的嘗試以 advisory lock 排隊（並行請求不能繞過次數上限）
+--        - 密碼最多 72 bytes（bcrypt 上限）
 --        - 公司沒設密碼：沿用舊前端的預設 '0000'（common.js 舊行為；salary.html 沒設密碼時前端根本不會問）
 --        - 成功：回傳隨機 unlock_token（DB 只存 SHA-256）＋ expires_at（最多 12 小時，且不跨台北午夜；
 --          等同舊 salary.html「當日有效」）
@@ -123,6 +125,9 @@ BEGIN
 
     IF NEW.company_id IS NOT NULL AND jsonb_typeof(NEW.value) = 'object' THEN
         v_pw := NULLIF(NEW.value->>'password', '');
+        IF octet_length(v_pw) > 72 THEN
+            RAISE EXCEPTION '薪酬密碼太長（最多 72 bytes，約 24 個中文字）' USING ERRCODE = '22001';
+        END IF;
         IF v_pw IS NOT NULL THEN
             INSERT INTO public.payroll_password_secrets (company_id, password_hash, updated_at)
             VALUES (NEW.company_id, extensions.crypt(v_pw, extensions.gen_salt('bf', 10)), now())
@@ -175,19 +180,24 @@ BEGIN
     IF NOT public.has_company_access(p_line_user_id, p_company_id, false) THEN
         RETURN jsonb_build_object('success', false, 'error', '您不是這家公司的成員', 'error_code', 'access_denied');
     END IF;
-    IF p_password IS NULL OR length(p_password) = 0 OR length(p_password) > 100 THEN
+    -- bcrypt 只看前 72 bytes → 超過就拒絕（避免「前 72 bytes 相同就能解鎖」）
+    IF p_password IS NULL OR length(p_password) = 0 OR octet_length(p_password) > 72 THEN
         RETURN jsonb_build_object('success', false, 'error', '請輸入密碼', 'error_code', 'bad_request');
     END IF;
+
+    -- 同一家公司的嘗試排隊處理：否則並行請求都在「寫入失敗紀錄前」數次數，可繞過錯誤次數上限
+    PERFORM pg_advisory_xact_lock(hashtextextended('payroll_unlock:' || p_company_id::text, 0));
 
     -- 舊紀錄順手清掉（只留 1 天，夠算頻率限制與事後查）
     DELETE FROM public.payroll_unlock_attempts WHERE created_at < now() - interval '1 day';
     DELETE FROM public.payroll_unlock_grants WHERE expires_at < now();
 
-    SELECT count(*) FILTER (WHERE a.line_user_id = p_line_user_id), count(*)
+    -- 公司層級：算「有錯的不同帳號數」，避免單一員工故意打錯就把全公司鎖住
+    SELECT count(*) FILTER (WHERE a.line_user_id = p_line_user_id), count(DISTINCT a.line_user_id)
       INTO v_user_fail, v_company_fail
       FROM public.payroll_unlock_attempts a
      WHERE a.company_id = p_company_id AND a.success = false AND a.created_at > now() - interval '15 minutes';
-    IF v_user_fail >= 5 OR v_company_fail >= 30 THEN
+    IF v_user_fail >= 5 OR v_company_fail >= 10 THEN
         RETURN jsonb_build_object('success', false, 'error', '密碼錯誤次數太多，請 15 分鐘後再試', 'error_code', 'rate_limited');
     END IF;
 

@@ -9,6 +9,17 @@
 
 BEGIN;
 
+-- 防呆：134 還在（明碼已移除、只剩雜湊）時直接回滾 133 會把密碼整個弄丟 → 必須先回滾 134 並請管理員重設密碼
+DO $$
+BEGIN
+    IF to_regclass('public.payroll_password_secrets') IS NOT NULL
+       AND EXISTS (SELECT 1 FROM public.payroll_password_secrets s
+                   JOIN public.system_settings ss ON ss.company_id = s.company_id AND ss.key = 'payroll_password'
+                   WHERE COALESCE(ss.value->>'password', '') = '') THEN
+        RAISE EXCEPTION '有公司的薪酬密碼只剩雜湊（134 已套用過）：請先回滾 134，並由管理員在設定頁重設密碼後再回滾 133';
+    END IF;
+END $$;
+
 DROP TRIGGER IF EXISTS trg_payroll_password_sync_ins ON public.system_settings;
 DROP TRIGGER IF EXISTS trg_payroll_password_sync_upd ON public.system_settings;
 DROP TRIGGER IF EXISTS trg_payroll_password_sync_del ON public.system_settings;

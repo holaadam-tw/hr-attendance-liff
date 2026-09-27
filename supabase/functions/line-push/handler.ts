@@ -253,7 +253,8 @@ async function handleVerifiedAction(body: any, deps: Deps): Promise<Response> {
   // ---- 薪酬密碼（133）：比對在 DB（bcrypt），錯誤次數限制也在 DB；密碼不記 log、不回傳 ----
   if (action === 'payroll_unlock') {
     const password = typeof body.password === 'string' ? body.password : ''
-    if (!password || password.length > 100) return badRequest('請輸入密碼')
+    // bcrypt 只看前 72 bytes（DB 端同樣檢查）
+    if (!password || new TextEncoder().encode(password).length > 72) return badRequest('請輸入密碼（最多 72 bytes）')
     const r = await callRpc(deps, 'payroll_password_unlock', {
       p_company_id: companyId, p_line_user_id: lineUserId, p_password: password,
     })

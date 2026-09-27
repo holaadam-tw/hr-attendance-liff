@@ -32,6 +32,9 @@ BEGIN
 
     IF NEW.company_id IS NOT NULL AND jsonb_typeof(NEW.value) = 'object' THEN
         v_pw := NULLIF(NEW.value->>'password', '');
+        IF octet_length(v_pw) > 72 THEN
+            RAISE EXCEPTION '薪酬密碼太長（最多 72 bytes，約 24 個中文字）' USING ERRCODE = '22001';
+        END IF;
         IF v_pw IS NOT NULL THEN
             INSERT INTO public.payroll_password_secrets (company_id, password_hash, updated_at)
             VALUES (NEW.company_id, extensions.crypt(v_pw, extensions.gen_salt('bf', 10)), now())

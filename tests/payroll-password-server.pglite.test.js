@@ -197,9 +197,20 @@ const PW_B = '4321';
   check('15 分鐘後恢復', r?.success === true);
   await sx(`DELETE FROM public.payroll_unlock_attempts;
     INSERT INTO public.payroll_unlock_attempts (company_id, line_user_id, success)
-    SELECT '${A}', 'Ux' || g, false FROM generate_series(1, 30) g`);
+    SELECT '${A}', 'Ux' || g, false FROM generate_series(1, 10) g`);
   r = await unlock('U1', A, PW_A);
-  check('整家公司 15 分鐘內錯 30 次（換帳號撞庫）：全公司暫停', r?.error_code === 'rate_limited');
+  check('整家公司 15 分鐘內有 10 個不同帳號打錯（換帳號撞庫）：全公司暫停', r?.error_code === 'rate_limited');
+  await sx(`DELETE FROM public.payroll_unlock_attempts;
+    INSERT INTO public.payroll_unlock_attempts (company_id, line_user_id, success)
+    SELECT '${A}', 'U2', false FROM generate_series(1, 30) g`);
+  r = await unlock('U1', A, PW_A);
+  check('單一員工故意錯 30 次：只鎖他自己，不會把全公司（含管理員）鎖住', r?.success === true && (await unlock('U2', A, PW_A))?.error_code === 'rate_limited');
+  r = await unlock('U1', A, '密'.repeat(25));
+  check('密碼超過 72 bytes（bcrypt 上限）：bad_request', r?.error_code === 'bad_request');
+  r = await save('Uadmin', A, 'payroll_password', { password: '密'.repeat(25) });
+  check('管理員設定超過 72 bytes 的密碼：拒絕、原密碼不變', r?.success !== true && (await unlock('U1', A, PW_A))?.success === true);
+  check('解鎖以 advisory lock 排隊（並行請求不能繞過次數上限；PGlite 單連線無法實測並行）',
+    /pg_advisory_xact_lock\(hashtextextended\('payroll_unlock:'/.test(m133));
   check('嘗試紀錄不含密碼欄位', !(await q(`SELECT column_name FROM information_schema.columns WHERE table_name = 'payroll_unlock_attempts'`)).some(c => /pass/.test(c.column_name)));
   await sx(`DELETE FROM public.payroll_unlock_attempts`);
 
@@ -252,6 +263,13 @@ const PW_B = '4321';
   r = await save('Uadmin', A, 'payroll_password', { password: 'rb-pw' });
   check('回滾 134 後：admin 重設密碼會存回明碼（舊版前端可用）＋同步雜湊', r?.success === true && (await setting(A, 'payroll_password'))?.password === 'rb-pw'
     && (await unlock('U1', A, 'rb-pw'))?.success === true);
+  r = null;
+  try { await db.exec(m133rb); } catch (e) { r = e.message; await db.exec('ROLLBACK').catch(() => {}); }
+  check('B 公司密碼只剩雜湊時回滾 133：中止（不會默默把密碼弄丟）', !!r && /134/.test(r) && (await tableExists('payroll_password_secrets')), r);
+  await save('Uadmin', B, 'payroll_password', { password: 'rb-pw-b' });
+  await db.exec(`INSERT INTO public.employees (company_id, employee_number, name, line_user_id, role, is_kiosk, is_active) VALUES ('${B}', 'B09', 'B 管理員', 'UBadmin', 'admin', false, true)`);
+  r = await save('UBadmin', B, 'payroll_password', { password: 'rb-pw-b' });
+  check('B 管理員重設密碼後（存回明碼）', r?.success === true && (await setting(B, 'payroll_password'))?.password === 'rb-pw-b');
   await db.exec(m133rb);
   const leftovers = await q(`SELECT tgname FROM pg_trigger WHERE tgrelid = 'public.system_settings'::regclass AND tgname LIKE 'trg_payroll%'`);
   check('回滾 133：trigger、表、函式全部移除', leftovers.length === 0 && !(await tableExists('payroll_password_secrets'))
