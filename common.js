@@ -97,6 +97,8 @@ async function initializeLiff(options) {
         }
 
         liffProfile = await liff.getProfile();
+        // 登入過期重登回來：把剛才沒存成功的表單值填回（M-2）
+        try { restoreFormDraft(); } catch (e) { console.warn('還原表單失敗', e); }
         // 登入後跳轉到原始目標頁面（從 admin.html 等頁面觸發的登入）
         const pendingPage = sessionStorage.getItem('liff_redirect_page');
         if (pendingPage) {
@@ -471,6 +473,14 @@ function updateUserInfo(data) {
 // ===== 系統設定（含快取） =====
 let _settingsCache = null; // { key: value, ... }
 
+// 前端不保存秘密設定（126／127）：LINE Channel token 只在伺服器端使用。
+// 127 套用前 DB 仍讀得到這列 → 讀到就丟掉，不放進記憶體或 sessionStorage。
+const SECRET_SETTING_KEYS = ['line_messaging_api'];
+function stripSecretSettings(cache) {
+    if (cache && typeof cache === 'object') SECRET_SETTING_KEYS.forEach(k => { delete cache[k]; });
+    return cache;
+}
+
 async function loadSettings(forceRefresh) {
     try {
         const _loadCompanyId = window.currentCompanyId || window.currentEmployee?.company_id || currentEmployee?.company_id;
@@ -481,7 +491,7 @@ async function loadSettings(forceRefresh) {
             const cached = sessionStorage.getItem('system_settings_cache');
             if (cached) {
                 try {
-                    _settingsCache = JSON.parse(cached);
+                    _settingsCache = stripSecretSettings(JSON.parse(cached));
                     officeLocations = _settingsCache['office_locations'] || [];
                 } catch(e) { sessionStorage.removeItem('system_settings_cache'); }
                 // 即使有快取，也要從 DB 讀取最新的 feature_visibility
@@ -508,6 +518,7 @@ async function loadSettings(forceRefresh) {
         if (!error && data) {
             _settingsCache = {};
             data.forEach(row => { _settingsCache[row.key] = row.value; });
+            stripSecretSettings(_settingsCache);
             officeLocations = _settingsCache['office_locations'] || [];
             // 寫入 sessionStorage，排除 feature_visibility（確保每次從 DB 讀最新值）
             try {
@@ -532,26 +543,40 @@ function getCachedSetting(key) {
     return _settingsCache ? _settingsCache[key] : null;
 }
 
-// 統一儲存 system_settings（先查再更新，避免重複 insert）
+// 統一儲存 system_settings（126 起經 line-push Edge Function 驗 LIFF 身分 → admin_save_setting；
+// 127 起前端不能直接寫表）。失敗會 throw（以前寫入被擋也會顯示「已儲存」），呼叫端要 try/catch 顯示錯誤。
 async function saveSetting(key, value, description) {
     const companyId = window.currentCompanyId || window.currentEmployee?.company_id || currentEmployee?.company_id;
-    if (!companyId) { console.warn('saveSetting: no companyId'); return; }
+    if (!companyId) { console.warn('saveSetting: no companyId'); throw new Error('目前公司資料尚未就緒'); }
+    if (SECRET_SETTING_KEYS.includes(key)) throw new Error('LINE 設定請用 saveLineMessagingConfig 儲存');
 
-    const { data: existing } = await sb.from('system_settings')
-        .select('id')
-        .eq('key', key)
-        .eq('company_id', companyId)
-        .maybeSingle();
-
-    if (existing) {
-        await sb.from('system_settings')
-            .update({ value: value, updated_at: new Date().toISOString() })
-            .eq('id', existing.id);
-    } else {
-        await sb.from('system_settings')
-            .insert({ key: key, value: value, company_id: companyId, description: description || key });
+    const result = await callVerifiedAction('save_setting', {
+        company_id: companyId,
+        key,
+        value: value === undefined ? null : value,
+        description: description || key
+    });
+    if (!result.ok) {
+        console.error('saveSetting 失敗:', key, result.code);
+        throw new Error(result.message || '設定儲存失敗');
     }
 
+    invalidateSettingsCache();
+    await loadSettings(true);
+}
+
+// 一次存多個設定（一次 LIFF 驗證、一次重讀快取）：items = [{ key, value, description }]
+// 失敗會 throw，訊息帶第一個失敗的 key
+async function saveSettings(items) {
+    const companyId = window.currentCompanyId || window.currentEmployee?.company_id || currentEmployee?.company_id;
+    if (!companyId) throw new Error('目前公司資料尚未就緒');
+    const list = (items || []).map(i => ({ key: i.key, value: i.value === undefined ? null : i.value, description: i.description || i.key }));
+    if (list.some(i => SECRET_SETTING_KEYS.includes(i.key))) throw new Error('LINE 設定請用 saveLineMessagingConfig 儲存');
+    const result = await callVerifiedAction('save_settings', { company_id: companyId, items: list });
+    if (!result.ok) {
+        const failedKey = result.data && result.data.failed_key ? '（' + result.data.failed_key + '）' : '';
+        throw new Error((result.message || '設定儲存失敗') + failedKey);
+    }
     invalidateSettingsCache();
     await loadSettings(true);
 }
@@ -564,8 +589,14 @@ async function initCompanySettings(companyId) {
         { key: 'check_in_radius', value: {meters:1000}, description: '打卡距離' },
         { key: 'departments', value: ['管理部','生產部','業務部','倉管部'], description: '部門列表' }
     ];
+    // 舊行為是「只新增、不覆蓋」（insert 撞 unique 就略過）；RPC 是 upsert，所以先查已有哪些 key
+    const { data: existingRows } = await sb.from('system_settings')
+        .select('key').eq('company_id', companyId).in('key', defaults.map(d => d.key));
+    const existingKeys = (existingRows || []).map(r => r.key);
     for (const d of defaults) {
-        await sb.from('system_settings').insert({ ...d, company_id: companyId }).catch(function() {});
+        if (existingKeys.includes(d.key)) continue;
+        const r = await callVerifiedAction('save_setting', { company_id: companyId, key: d.key, value: d.value, description: d.description });
+        if (!r.ok) console.warn('初始化設定失敗', d.key, r.code);
     }
 }
 
@@ -1575,11 +1606,37 @@ function resolveAdminNotifyRoute(category) {
     return ['digest', 'approver', 'group', 'off'].includes(route) ? route : 'group';
 }
 
-async function sendLineMessage(to, text, meta) {
+// LIFF access token：line-push Edge Function 會拿去向 LINE 驗證真實身分（126 起不再由前端送 Channel token）
+function getLiffAccessTokenSafe() {
+    try {
+        if (typeof liff !== 'undefined' && liff && typeof liff.getAccessToken === 'function') {
+            return liff.getAccessToken() || null;
+        }
+    } catch (e) { /* LIFF 尚未初始化 */ }
+    return null;
+}
+
+const LINE_PUSH_DENY_MESSAGES = {
+    unauthenticated: 'LINE 登入已過期，請重新開啟頁面後再試',
+    not_company_member: '您不是這家公司的在職員工，無法發送通知',
+    manager_required: '只有主管可以發送此通知',
+    category_not_allowed: '不支援的通知類型',
+    target_not_allowed: '不支援的通知對象',
+    missing_token: '尚未設定 LINE Channel Access Token',
+    missing_group: '尚未設定主管 LINE 群組 ID',
+    missing_user_line: '該員工尚未綁定 LINE',
+    employee_not_found: '找不到該員工',
+    rate_limited: '短時間內發送太多通知，請稍後再試（主管仍會在每日彙總看到）',
+    authorize_unavailable: 'LINE 推播服務暫時無法使用，請稍後再試'
+};
+
+// target: 'admin_group' | 'admin_approver' | 'employee'（收件人由伺服器依公司設定決定，前端不能指定任意 LINE ID）
+async function requestLinePush(target, text, meta) {
     meta = meta || {};
-    const setting = getCachedSetting('line_messaging_api');
-    if (!setting?.token) return lineNotifyFailure('missing_token', '尚未設定 LINE Channel Access Token');
-    if (!to) return lineNotifyFailure('missing_target', '尚未設定 LINE 收件群組或員工尚未綁定 LINE');
+    const companyId = window.currentCompanyId;
+    if (!companyId) return lineNotifyFailure('missing_company', '目前公司資料尚未就緒');
+    const accessToken = getLiffAccessTokenSafe();
+    if (!accessToken) return lineNotifyFailure('unauthenticated', LINE_PUSH_DENY_MESSAGES.unauthenticated);
     try {
         const res = await fetch('https://nssuisyvlrqnqfxupklb.supabase.co/functions/v1/line-push', {
             method: 'POST',
@@ -1587,13 +1644,14 @@ async function sendLineMessage(to, text, meta) {
                 'Content-Type': 'application/json',
                 'Authorization': 'Bearer ' + CONFIG.SUPABASE_ANON_KEY
             },
-            // company_id/category/priority 給 Edge Function 記推播紀錄與月預算閘門（125）；舊版 Edge Function 會忽略
             body: JSON.stringify({
-                token: setting.token, to, text,
-                company_id: window.currentCompanyId || null,
-                category: meta.category || 'frontend_other',
-                priority: meta.priority === 'high' ? 'high' : 'normal',
-                recipient_ref: meta.recipientRef || null
+                liff_access_token: accessToken,
+                company_id: companyId,
+                target,
+                employee_id: meta.employeeId || null,
+                text,
+                category: meta.category || (target === 'employee' ? 'user_other' : 'admin_other'),
+                priority: meta.priority === 'high' ? 'high' : 'normal'
             })
         });
         const result = await res.json().catch(() => null);
@@ -1605,14 +1663,17 @@ async function sendLineMessage(to, text, meta) {
             console.warn('[LINE Push] 本月推播預算已用完，未送出');
             return lineNotifyFailure('budget_blocked', '本月 LINE 推播額度快用完，這則沒有送出；請直接到系統查看', 429);
         }
+        if (result.code && LINE_PUSH_DENY_MESSAGES[result.code]) {
+            return lineNotifyFailure(result.code, LINE_PUSH_DENY_MESSAGES[result.code], result.status || res.status);
+        }
         const wrappedStatus = Number(result.status);
         const effectiveStatus = Number.isFinite(wrappedStatus) && wrappedStatus > 0 ? wrappedStatus : res.status;
         const wrappedOk = effectiveStatus >= 200 && effectiveStatus < 300 && result.ok !== false && !result.error;
         if (!res.ok || !wrappedOk) {
-            console.error('[LINE Push] 推播失敗:', { status: effectiveStatus, code: 'line_rejected' });
+            console.error('[LINE Push] 推播失敗:', { status: effectiveStatus, code: result.code || 'line_rejected' });
             return lineNotifyFailure('line_rejected', lineNotifyMessageForStatus(effectiveStatus), effectiveStatus);
         }
-        return { ok: true, status: effectiveStatus, code: 'sent', message: 'LINE 已接受推播' };
+        return { ok: true, status: effectiveStatus, code: 'sent', message: 'LINE 已接受推播', recipientKind: result.recipient_kind || null };
     } catch(e) {
         console.error('[LINE Push] 無法連線推播服務');
         return lineNotifyFailure('network_error', '目前無法連線 LINE 推播服務，請檢查網路後重試');
@@ -1632,18 +1693,9 @@ async function sendAdminNotify(message, options) {
         if (route === 'off') {
             return { ok: true, status: 0, code: 'disabled', deferred: true, message: '此類通知已關閉' };
         }
-        const setting = getCachedSetting('line_messaging_api');
-        if (!setting?.token) return lineNotifyFailure('missing_token', '尚未設定 LINE Channel Access Token');
-        if (route === 'approver') {
-            const approverId = getCachedSetting('line_admin_approver_employee_id');
-            if (approverId) {
-                const direct = await sendUserNotify(approverId, message, { category, priority });
-                // 審核人沒綁 LINE / 查不到 → 退回群組，不要默默不發
-                if (direct.ok || !['missing_user_line', 'employee_lookup_failed'].includes(direct.code)) return direct;
-            }
-        }
-        if (!setting?.groupId) return lineNotifyFailure('missing_group', '尚未設定主管 LINE 群組 ID');
-        return await sendLineMessage(setting.groupId, message, { category: category || 'admin_other', priority });
+        // approver：伺服器私訊指定審核人；審核人沒設定／沒綁 LINE 時伺服器自動退回主管群組
+        return await requestLinePush(route === 'approver' ? 'admin_approver' : 'admin_group', message,
+            { category: category || 'admin_other', priority });
     } catch(e) {
         console.warn('LINE 推播失敗（非必要）');
         return lineNotifyFailure('unexpected_error', 'LINE 通知發生未預期錯誤，請稍後重試');
@@ -1654,26 +1706,173 @@ async function sendAdminNotify(message, options) {
 async function sendUserNotify(employeeId, message, options) {
     options = options || {};
     try {
-        const setting = getCachedSetting('line_messaging_api');
-        if (!setting?.token) return lineNotifyFailure('missing_token', '尚未設定 LINE Channel Access Token');
-        const companyId = window.currentCompanyId;
-        if (!companyId) return lineNotifyFailure('missing_company', '目前公司資料尚未就緒');
-        const { data: emp, error } = await sb.from('employees')
-            .select('line_user_id')
-            .eq('id', employeeId)
-            .eq('company_id', companyId)
-            .maybeSingle();
-        if (error) return lineNotifyFailure('employee_lookup_failed', '無法確認員工 LINE 綁定資料');
-        if (!emp?.line_user_id) return lineNotifyFailure('missing_user_line', '該員工尚未綁定 LINE');
-        return await sendLineMessage(emp.line_user_id, message, {
+        if (!employeeId) return lineNotifyFailure('missing_target', '尚未指定收件員工');
+        return await requestLinePush('employee', message, {
             category: options.category || 'user_other',
             priority: options.priority,
-            recipientRef: employeeId
+            employeeId
         });
     } catch(e) {
         console.warn('員工 LINE 推播失敗');
         return lineNotifyFailure('unexpected_error', 'LINE 通知發生未預期錯誤，請稍後重試');
     }
+}
+
+// ===== LIFF 登入過期：保存表單 → 重新登入 → 回來還原（M-2）=====
+// 管理員多半用電腦瀏覽器（liff.login 轉址登入），頁面開著很久 access token 會過期；
+// 這時存設定會被 line-push 回 unauthenticated。與其只顯示訊息讓人重打，先把目前頁面上的表單值
+// 存進 sessionStorage（以頁面為 key），再重新登入並回到同一個網址，回來後自動填回。
+// - 不保存密碼欄、檔案欄、LINE token 欄（秘密不落地）
+// - 防無限迴圈：2 分鐘內只自動重登一次；成功做完一次驗證動作就清掉記號
+const FORM_DRAFT_PREFIX = 'form_draft:';
+const LIFF_RELOGIN_MARKER = 'liff_relogin_attempt';
+const FORM_DRAFT_MAX_AGE_MS = 30 * 60 * 1000;
+const FORM_DRAFT_SECRET_IDS = ['lineChannelToken', 'payrollNewPw', 'payrollPwInput', 'payrollPasswordInput'];
+
+function formDraftKey() {
+    return FORM_DRAFT_PREFIX + window.location.pathname;
+}
+
+function collectFormDraft(root) {
+    const values = {};
+    (root || document).querySelectorAll('input[id], select[id], textarea[id]').forEach(el => {
+        const type = (el.type || '').toLowerCase();
+        if (type === 'password' || type === 'file' || type === 'hidden' || FORM_DRAFT_SECRET_IDS.includes(el.id)) return;
+        values[el.id] = (type === 'checkbox' || type === 'radio') ? { checked: !!el.checked } : { value: el.value };
+    });
+    return values;
+}
+
+function saveFormDraft() {
+    try {
+        sessionStorage.setItem(formDraftKey(), JSON.stringify({ ts: Date.now(), hash: window.location.hash, values: collectFormDraft() }));
+        return true;
+    } catch (e) { return false; }
+}
+
+// 把草稿值套回欄位；使用者自己動過的欄位（userTouched）不再覆蓋。回傳這次實際改了幾格
+function applyFormDraftValues(values, userTouched) {
+    let applied = 0;
+    Object.keys(values || {}).forEach(id => {
+        if (userTouched && userTouched.has(id)) return;
+        const el = document.getElementById(id);
+        if (!el) return;
+        const v = values[id];
+        if ('checked' in v) {
+            if (el.checked !== v.checked) { el.checked = v.checked; applied++; }
+        } else if (el.value !== v.value) {
+            el.value = v.value;
+            if (el.value === v.value) applied++;   // select 沒有該選項時不算
+        }
+    });
+    return applied;
+}
+
+// initializeLiff 成功後呼叫：有草稿就填回。
+// 頁面之後會從 DB 載入設定、切分頁才渲染欄位，會把剛填回的值蓋掉 → 20 秒內持續補填
+// （DOM 變動時＋0.8/2/5 秒各一次），但使用者自己改過的欄位就不再動。
+function restoreFormDraft() {
+    let draft = null;
+    try { draft = JSON.parse(sessionStorage.getItem(formDraftKey()) || 'null'); } catch (e) { draft = null; }
+    if (!draft || !draft.values) return 0;
+    if (!(Date.now() - Number(draft.ts) < FORM_DRAFT_MAX_AGE_MS)) {
+        try { sessionStorage.removeItem(formDraftKey()); } catch (e) {}
+        return 0;
+    }
+    const touched = new Set();
+    // 程式設定 .value 不會觸發 input/change，所以收到這兩個事件就是使用者自己在改
+    const onUserEdit = (ev) => { if (ev.target && ev.target.id) touched.add(ev.target.id); };
+    document.addEventListener('input', onUserEdit, true);
+    document.addEventListener('change', onUserEdit, true);
+    let total = applyFormDraftValues(draft.values, touched);
+    let notified = false;
+    const notify = () => {
+        if (notified || total === 0) return;
+        notified = true;
+        if (typeof showToast === 'function') showToast('已還原您剛才輸入的內容，請再按一次「儲存」');
+    };
+    const reapply = () => { total += applyFormDraftValues(draft.values, touched); notify(); };
+    notify();
+    let obs = null;
+    if (typeof MutationObserver === 'function' && document.body) {
+        obs = new MutationObserver(reapply);
+        obs.observe(document.body, { childList: true, subtree: true });
+    }
+    [800, 2000, 5000].forEach(ms => setTimeout(reapply, ms));
+    setTimeout(() => {
+        if (obs) obs.disconnect();
+        document.removeEventListener('input', onUserEdit, true);
+        document.removeEventListener('change', onUserEdit, true);
+        try { sessionStorage.removeItem(formDraftKey()); } catch (e) {}
+    }, 20000);
+    return total;
+}
+
+function clearReloginMarker() {
+    try { sessionStorage.removeItem(LIFF_RELOGIN_MARKER); } catch (e) {}
+}
+
+// 回傳 true = 已開始重新登入（頁面即將跳走）；false = 不重登（剛重登過、或 LIFF 不可用）
+function handleLiffSessionExpired() {
+    try {
+        const last = Number(sessionStorage.getItem(LIFF_RELOGIN_MARKER) || 0);
+        if (last && Date.now() - last < 2 * 60 * 1000) return false;   // 剛重登過還是失敗 → 不再轉圈
+        if (typeof liff === 'undefined' || !liff) return false;
+        saveFormDraft();
+        sessionStorage.setItem(LIFF_RELOGIN_MARKER, String(Date.now()));
+        if (typeof liff.isInClient === 'function' && liff.isInClient()) {
+            // LINE App 內：liff.login 不可用，重新整理即重新取得 token
+            window.location.reload();
+        } else {
+            try { if (typeof liff.logout === 'function') liff.logout(); } catch (e) {}
+            liff.login({ redirectUri: window.location.href });
+        }
+        return true;
+    } catch (e) {
+        return false;
+    }
+}
+
+// 需要「真實身分」的動作一律經 line-push Edge Function：它先向 LINE 驗證 LIFF access token 取得 userId，
+// 再以 service role 呼叫對應的 RPC（126／129）。前端自己報的 line_user_id 不會被採信。
+// action：save_setting／save_config／get_line_config／platform_admin_save／platform_link_company
+// 回傳 { ok, code, message, data }
+async function callVerifiedAction(action, payload) {
+    const expired = () => handleLiffSessionExpired()
+        ? { ok: false, code: 'relogin_redirect', message: 'LINE 登入已過期，正在重新登入；您輸入的內容會自動保留' }
+        : { ok: false, code: 'unauthenticated', message: LINE_PUSH_DENY_MESSAGES.unauthenticated };
+    const accessToken = getLiffAccessTokenSafe();
+    if (!accessToken) return expired();
+    try {
+        const res = await fetch('https://nssuisyvlrqnqfxupklb.supabase.co/functions/v1/line-push', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + CONFIG.SUPABASE_ANON_KEY },
+            body: JSON.stringify(Object.assign({}, payload || {}, { action, liff_access_token: accessToken }))
+        });
+        const result = await res.json().catch(() => null);
+        if (!result) return { ok: false, code: 'invalid_response', message: '伺服器回傳無法辨識的結果' };
+        if (!result.ok) {
+            const code = result.code || 'failed';
+            if (code === 'unauthenticated') return expired();
+            return { ok: false, code, message: result.error || LINE_PUSH_DENY_MESSAGES[code] || '操作失敗', data: result };
+        }
+        clearReloginMarker();
+        return { ok: true, code: 'ok', data: result };
+    } catch (e) {
+        return { ok: false, code: 'network_error', message: '目前無法連線伺服器，請檢查網路後重試' };
+    }
+}
+
+// 管理員儲存 LINE 設定：token 只送到 Edge Function（驗 LIFF 身分後寫 DB），前端之後也讀不回來
+// channelToken 留空 = 沿用目前的 token（只改群組 ID）
+async function saveLineMessagingConfig(channelToken, groupId) {
+    const companyId = window.currentCompanyId;
+    if (!companyId) return { ok: false, code: 'missing_company', message: '目前公司資料尚未就緒' };
+    const result = await callVerifiedAction('save_config', { company_id: companyId, channel_token: channelToken || '', group_id: groupId || '' });
+    if (!result.ok) return result;
+    invalidateSettingsCache();
+    await loadSettings(true);
+    return { ok: true };
 }
 
 // ===== 公告系統（使用 announcements 資料表） =====
@@ -2384,7 +2583,12 @@ window.verifyPayrollPw = function() {
 window.savePayrollPassword = async function() {
     const pw = document.getElementById('payrollNewPw')?.value.trim();
     if (!pw) { showToast('⚠️ 請輸入密碼'); return; }
-    await saveSetting('payroll_password', { password: pw }, '薪酬管理密碼');
+    try {
+        await saveSetting('payroll_password', { password: pw }, '薪酬管理密碼');
+    } catch (e) {
+        showToast('❌ 儲存失敗：' + (e?.message || ''));
+        return;
+    }
     showToast('✅ 密碼已更新');
     document.getElementById('payrollNewPw').value = '';
     window._payrollUnlocked = false;

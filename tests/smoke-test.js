@@ -250,7 +250,7 @@ function testCommonFunctions() {
     'calculateDistance',
     'getGPS',
     'preloadGPS',
-    'sendLineMessage',
+    'requestLinePush',
     'sendAdminNotify',
     'setBtnLoading',
     'formatNT',

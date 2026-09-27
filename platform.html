@@ -232,7 +232,7 @@
         </div>
     </div>
 
-<script src="common.js?v=20260927-linebudget"></script>
+<script src="common.js?v=20260927-linesecure2"></script>
     <script>
         // === 全域錯誤監控 ===
         window._errLogCount = 0; window._errLogResetTs = 0;
@@ -518,13 +518,10 @@
                 } else {
                     const { data: newComp, error } = await sb.from('companies').insert(row).select().single();
                     if (error) throw error;
-                    // 自動連結平台管理員為 owner
+                    // 自動連結平台管理員為 owner（129：經 Edge Function 驗 LIFF 後由 DB 寫入）
                     if (currentPlatformAdmin?.id && newComp?.id) {
-                        await sb.from('platform_admin_companies').insert({
-                            platform_admin_id: currentPlatformAdmin.id,
-                            company_id: newComp.id,
-                            role: 'owner'
-                        });
+                        const link = await callVerifiedAction('platform_link_company', { company_id: newComp.id });
+                        if (!link.ok) showToast('⚠️ 公司已建立，但未能自動綁定：' + (link.message || ''));
                     }
                 }
                 closePCompanyModal();
@@ -925,22 +922,15 @@
             if (!editId && !/^U[0-9a-f]{32}$/i.test(lineId)) return showToast('❌ LINE User ID 格式不正確（U + 32 碼）');
 
             try {
-                let adminId = editId;
-                if (editId) {
-                    const { error } = await sb.from('platform_admins').update({ name, is_active: isActive }).eq('id', editId);
-                    if (error) throw error;
-                } else {
-                    const { data, error } = await sb.from('platform_admins').insert({ line_user_id: lineId, name, is_active: isActive }).select('id').single();
-                    if (error) throw error;
-                    adminId = data.id;
-                }
-
-                await sb.from('platform_admin_companies').delete().eq('platform_admin_id', adminId);
-                if (companyIds.length > 0) {
-                    const rows = companyIds.map(cid => ({ platform_admin_id: adminId, company_id: cid, role: 'owner' }));
-                    const { error } = await sb.from('platform_admin_companies').insert(rows);
-                    if (error) throw error;
-                }
+                // 129：平台管理員表前端不能直接寫；經 Edge Function 驗 LIFF（呼叫者必須是在職平台管理員）後由 DB 寫入
+                const result = await callVerifiedAction('platform_admin_save', {
+                    admin_id: editId || null,
+                    line_user_id: editId ? null : lineId,
+                    name,
+                    is_active: isActive,
+                    company_ids: companyIds
+                });
+                if (!result.ok) throw new Error(result.message || '儲存失敗');
 
                 showToast(editId ? '✅ 已更新管理員' : '✅ 已新增管理員');
                 closeAdminModal();

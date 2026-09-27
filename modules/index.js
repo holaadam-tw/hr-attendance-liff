@@ -25,7 +25,7 @@ import {
     loadUnbindEmployees, quickBindLine,
     showResignModal, closeResignModal, confirmResign, restoreEmployee,
     loadResignedEmployees, loadAllEmployees
-} from './employees.js?v=20260806-batchfix';
+} from './employees.js?v=20260927-linesecure2';
 
 import {
     switchApprovalType, switchLeaveTab, loadLeaveApprovals, approveLeave,
@@ -37,7 +37,7 @@ import {
     loadAdminLunchStats, loadStaffOverview, changeLeaveCal,
     resetLeaveCal, loadLeaveCal,
     clearLeaveState
-} from './leave.js?v=20260927-linebudget';
+} from './leave.js?v=20260927-linesecure2';
 
 import {
     changeShiftWeek, resetShiftWeek, loadShiftMgr, cycleShift,
@@ -64,7 +64,7 @@ import {
     editInsBracket, saveInsBracket, deleteInsBracket, updateAllInsRates,
     switchPayTab,
     initAuditPage, loadAuditData
-} from './payroll.js?v=20260814-leavetimeaudit';
+} from './payroll.js?v=20260927-linesecure2';
 
 import {
     loadRestaurantList, openRestaurantDetail, previewStoreOrder, openKDS,
@@ -91,7 +91,7 @@ import {
     loadTransactions, toggleLoyalty, loadMemberList,
     loadBookingForStore, loadBookingStoreList,
     loadMembersForStore, toggleMemberLoyalty, searchMemberByPhone, loadMemberStoreList
-} from './store.js?v=20260712-leavefk';
+} from './store.js?v=20260927-linesecure2';
 
 import {
     INDUSTRY_TEMPLATES,
@@ -108,7 +108,7 @@ import {
     closeCompanyModal, editCompany, saveCompany,
     initSalesTargetPage, stChangeWeek, saveDefaultTarget,
     switchSysTab
-} from './settings.js?v=20260927-linebudget';
+} from './settings.js?v=20260927-linesecure2';
 
 // ===== 綁定 window（供 HTML onclick 使用）=====
 
