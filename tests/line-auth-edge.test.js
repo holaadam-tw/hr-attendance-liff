@@ -107,7 +107,20 @@ function routes(o = {}) {
     && cr.body.email === LINE_USER.toLowerCase() + '@line-auth.invalid', JSON.stringify(cr?.body));
   check('建立後同樣換到 session、created=true', t.out.ok && t.out.created === true && t.out.session.access_token === 'access-SECRET');
   t = await run({ liff_access_token: 'liff-at-SECRET' }, { resolve: { body: { success: true, known: true, company_ids: [], auth_user_id: null } }, create: { status: 422, body: { error_code: 'email_exists' } } });
-  check('email 已被別的帳號占用（app_metadata 沒對上）：409 identity_conflict、不接管、不換 session', t.res.status === 409 && t.out.code === 'identity_conflict' && !find(t.f, 'POST', 'generate_link'));
+  check('email 已被別的帳號占用（再查一次仍對不上）：409 identity_conflict、不接管、不換 session', t.res.status === 409 && t.out.code === 'identity_conflict' && !find(t.f, 'POST', 'generate_link')
+    && t.f.calls.filter(c => c.url.includes('line_auth_resolve')).length === 2);
+  {
+    let n = 0;
+    t = await run({ liff_access_token: 'liff-at-SECRET' }, {
+      resolve: () => (++n === 1 ? { body: { success: true, known: true, company_ids: [COMPANY], auth_user_id: null } }
+        : { body: { success: true, known: true, company_ids: [COMPANY], auth_user_id: AUTH_ID, auth_email: LINE_USER.toLowerCase() + '@line-auth.invalid' } }),
+      create: { status: 422, body: { error_code: 'email_exists' } },
+    });
+    check('兩個分頁同時第一次登入（另一個剛建好帳號）：再查一次就沿用，不誤報衝突', t.res.status === 200 && t.out.ok && t.out.user.id === AUTH_ID && t.out.created === false, JSON.stringify(t.out));
+  }
+  t = await run({ liff_access_token: 'liff-at-SECRET' }, { resolve: { body: { success: true, known: true, company_ids: [], auth_user_id: null } }, create: { status: 422, body: { error_code: 'email_address_invalid' } } });
+  check('其他 422（例如 email 網域被限制）：503 create_user_rejected、log 記 error_code，不誤報身分衝突', t.res.status === 503 && t.out.code === 'create_user_rejected'
+    && logs.some(l => /email_address_invalid/.test(l)));
 
   console.log('\n=== 拒絕 ===');
   t = await run({ liff_access_token: 'liff-at-SECRET' }, { resolve: { body: { success: true, known: false, company_ids: [], auth_user_id: null } } });

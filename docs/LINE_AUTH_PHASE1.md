@@ -74,3 +74,4 @@ holidays／binding_audit_log 有只給 authenticated 的政策，另有 7 條政
   以及假 fetch 測試驗證。第一次部署後請依步驟 5 實機確認。
 - LINE 帳號被停用／離職：Phase 1 不撤銷已發的 session（refresh token 仍有效到被刪或過期）；Phase 2 授權一律 DB 現查，
   不依賴 session 存在與否。需要時可在 Dashboard 刪該使用者。
+  Phase 3 之前要補：line-auth 遇到 not_linked 但已有 Auth 帳號 → admin API 停用（ban）或登出該帳號。

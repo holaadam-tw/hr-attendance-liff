@@ -176,10 +176,15 @@ async function establishLineAuthSession() {
         const current = data && data.session;
         const currentLine = current && current.user && current.user.app_metadata ? current.user.app_metadata.line_user_id : null;
         if (current && currentLine === lineUserId) {
-            lineAuthLog('reused', { user: current.user.id });
-            return { ok: true, reason: 'reused' };
-        }
-        if (current) {
+            // 本機存的 session 不代表伺服器還認：問一次 Auth（帳號被刪／refresh 失效 → 清掉重換）
+            const check = await client.auth.getUser().catch((e) => ({ error: e }));
+            if (check && !check.error && check.data && check.data.user && check.data.user.id === current.user.id) {
+                lineAuthLog('reused', { user: current.user.id });
+                return { ok: true, reason: 'reused' };
+            }
+            await client.auth.signOut({ scope: 'local' }).catch(() => {});
+            lineAuthLog('stale_session_cleared');
+        } else if (current) {
             // 同一台裝置換了 LINE 帳號（或舊 session 不屬於這個 LINE 帳號）→ 只清本機，不動伺服器上的 session
             await client.auth.signOut({ scope: 'local' }).catch(() => {});
             lineAuthLog('mismatch_signed_out');

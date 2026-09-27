@@ -96,16 +96,31 @@ export async function handleLineAuth(req: Request, deps: Deps): Promise<Response
         method: 'POST', key: 'service',
         body: { email, email_confirm: true, app_metadata: appMetadata, user_metadata: {} },
       })
-      if (c.status === 422) {
-        // 同 email 已有帳號、但 app_metadata 沒對上這個 LINE userId → 不接管，交給人處理
-        log('line-auth: email exists without matching line_user_id')
-        return fail(409, 'identity_conflict', '登入帳號資料異常，請通知系統管理員')
+      const emailExists = c.status === 422 && (c.data?.error_code === 'email_exists' || /already been registered/i.test(String(c.data?.msg || c.data?.message || '')))
+      if (emailExists) {
+        // 可能是同一人兩個分頁同時第一次登入（另一個剛建好）→ 再查一次；對上了就沿用
+        const again = await call(deps, '/rest/v1/rpc/line_auth_resolve', { method: 'POST', key: 'service', body: { p_line_user_id: lineUserId } })
+        const againId = again.ok && again.data && again.data.success === true && typeof again.data.auth_user_id === 'string' ? again.data.auth_user_id : null
+        if (!againId) {
+          // 同 email 已有帳號、但 app_metadata 沒對上這個 LINE userId → 不接管，交給人處理
+          log('line-auth: email exists without matching line_user_id')
+          return fail(409, 'identity_conflict', '登入帳號資料異常，請通知系統管理員')
+        }
+        userId = againId
+        email = typeof again.data.auth_email === 'string' && again.data.auth_email ? again.data.auth_email : email
+      } else if (c.status === 422) {
+        // 其他驗證錯誤（例如 email 網域被限制）：照實記錄 error_code，別誤報成身分衝突
+        log('line-auth: create user rejected ' + String(c.data?.error_code || 'validation_failed'))
+        return fail(503, 'create_user_rejected', '登入服務設定有誤，請通知系統管理員')
+      } else if (!c.ok || !c.data || typeof c.data.id !== 'string') {
+        return fail(503, 'service_unavailable', '登入服務暫時無法使用')
+      } else {
+        userId = c.data.id
+        email = typeof c.data.email === 'string' ? c.data.email : email
+        created = true
       }
-      if (!c.ok || !c.data || typeof c.data.id !== 'string') return fail(503, 'service_unavailable', '登入服務暫時無法使用')
-      userId = c.data.id
-      email = typeof c.data.email === 'string' ? c.data.email : email
-      created = true
-    } else {
+    }
+    if (!created) {
       const u = await call(deps, `/auth/v1/admin/users/${userId}`, { method: 'GET', key: 'service' })
       if (!u.ok || !u.data) return fail(503, 'service_unavailable', '登入服務暫時無法使用')
       if (!sameIds(u.data.app_metadata?.company_ids, companyIds)) {

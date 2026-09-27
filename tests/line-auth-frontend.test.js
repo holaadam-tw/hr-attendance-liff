@@ -35,7 +35,7 @@ const LINE = 'U' + 'ab12'.repeat(8);
 const OTHER = 'U' + 'f'.repeat(32);
 const userOf = (line, id = 'auth-1') => ({ id, app_metadata: { line_user_id: line } });
 
-function page({ session = null, reply, setUser, verifyUser, mode, liffToken = 'liff-at', storage = {}, fetchThrows = false } = {}) {
+function page({ session = null, reply, setUser, verifyUser, mode, liffToken = 'liff-at', storage = {}, fetchThrows = false, serverKnows = true } = {}) {
   const dom = new JSDOM('<!doctype html><body></body>', { url: 'https://example.test/index.html', runScripts: 'outside-only' });
   const w = dom.window;
   for (const [k, v] of Object.entries(storage)) w.localStorage.setItem(k, v);
@@ -44,6 +44,7 @@ function page({ session = null, reply, setUser, verifyUser, mode, liffToken = 'l
   const authClient = {
     auth: {
       getSession: async () => ({ data: { session: current }, error: null }),
+      getUser: async () => { log.getUser = (log.getUser || 0) + 1; return serverKnows && current ? { data: { user: current.user }, error: null } : { data: { user: null }, error: { status: 401, message: 'User not found' } }; },
       setSession: async (s) => { log.setSession.push(s); const u = setUser === undefined ? userOf(LINE) : setUser; current = { user: u }; return { data: { user: u, session: current }, error: null }; },
       verifyOtp: async (p) => { log.verifyOtp.push(p); const u = verifyUser === undefined ? userOf(LINE) : verifyUser; current = { user: u }; return { data: { user: u, session: current }, error: null }; },
       signOut: async (o) => { log.signOut.push(o); current = null; return { error: null }; },
@@ -95,7 +96,12 @@ const okSession = { ok: true, mode: 'session', created: true, session: { access_
   {
     const { w, log } = page({ session: { user: userOf(LINE) }, reply: okSession });
     const r = await w.__establish();
-    check('已有同一個 LINE 帳號的 session：沿用、不打 line-auth（refresh 交給 supabase-js）', r.reason === 'reused' && log.fetch.length === 0 && log.signOut.length === 0);
+    check('已有同一個 LINE 帳號的 session：向 Auth 確認（getUser）後沿用、不打 line-auth', r.reason === 'reused' && log.getUser === 1 && log.fetch.length === 0 && log.signOut.length === 0);
+  }
+  {
+    const { w, log } = page({ session: { user: userOf(LINE) }, reply: okSession, serverKnows: false });
+    const r = await w.__establish();
+    check('本機 session 伺服器已不認（帳號被刪）：本機登出後重新換 session', r.ok && r.reason === 'established' && log.signOut.length === 1 && log.fetch.length === 1 && log.setSession.length === 1);
   }
   {
     const { w, log } = page({ session: { user: userOf(OTHER, 'auth-2') }, reply: okSession });
