@@ -96,7 +96,8 @@ export async function handleLineWebhook(req: Request, deps: Deps): Promise<Respo
 
     for (const event of events) {
       if (event.type !== 'message' || event.message?.type !== 'text') continue
-      const text = String(event.message.text || '').trim()
+      // 中文輸入法常打出全形「＃」或夾全形空白：NFKC 轉半形再比對
+      const text = String(event.message.text || '').normalize('NFKC').trim()
       const replyToken = event.replyToken
       if (!replyToken) continue
 

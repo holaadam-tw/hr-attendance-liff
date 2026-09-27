@@ -112,6 +112,12 @@ const post = (url, body, headers = {}) => new Request(url, { method: 'POST', bod
   const ev = (text, source) => JSON.stringify({ events: [{ type: 'message', replyToken: 'rt', message: { type: 'text', text }, source }] });
 
   {
+    const raw = ev('＃待辦　', { type: 'user', userId: 'U1' });
+    const f = fakeFetch([['/rpc/line_pull_todo', { body: JSON.stringify('📋 我的待辦') }], ['/message/reply', { status: 200 }]]);
+    await hook.handleLineWebhook(post('https://fn/line-webhook', raw, { 'x-line-signature': sign(raw) }), { fetch: f.fn, env: envS });
+    check('全形「＃待辦」＋全形空白也認得（中文輸入法）', f.calls.some(c => c.url.includes('line_pull_todo')) && f.calls.some(c => c.url.includes('/message/reply')));
+  }
+  {
     const raw = ev('#待辦', { type: 'user', userId: 'U1' });
     const f = fakeFetch([['/rpc/line_pull_todo', { body: JSON.stringify('📋 我的待辦 10/02\n• 10/01 缺 45 分鐘') }], ['/message/reply', { status: 200 }]]);
     const res = await hook.handleLineWebhook(post('https://fn/line-webhook', raw, { 'x-line-signature': sign(raw) }), { fetch: f.fn, env: envS });
