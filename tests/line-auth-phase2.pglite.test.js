@@ -2,7 +2,8 @@
 // migration 141：P1 Phase 2 —— RPC 呼叫者身分 soft mode（wrapper＋assert_caller）— PGlite 實跑
 //
 // 不連線、不寫正式庫。流程：
-//   1. 正式庫快照（phase0＋attendance_schedules fixtures；quick_check_in 等 4 支是正式庫原文）＋ auth schema 替身
+//   1. 正式庫快照（phase0＋attendance_schedules fixtures；quick_check_in 等 4 支是正式庫原文，本體 md5 與正式庫逐支相同）＋ auth schema 替身
+//      替身 50 支的本體與正式庫不同 → 只在測試用的 141 副本裡，把這 50 支的 md5 指紋換成替身的 md5（正式庫原文 4 支不換）
 //      ＋ 其餘 50 支 wrapper 對象以「正式庫的參數／預設值／回傳型別／volatility／proacl」建立可重現的替身函式
 //      （回傳值由所有參數決定，能驗出參數順序、預設值、型別有沒有傳錯）
 //   2. 依上線順序套 130～135、138、139、140（141 的前提），記錄套用前狀態與每支函式的呼叫結果
@@ -10,7 +11,8 @@
 //      正式庫原文的打卡／補卡流程結果相同；soft mode 記錄內容、永不擋（含唯讀交易、設定缺漏）
 //   4. enforce：沒有 session 或不符 → 拒絕；相符、service role → 放行；逐支覆寫；預先設為 soft 的註冊類不受影響
 //   5. 權限：wrapper 與原函式 proacl 逐項相同；*_impl、assert_caller、設定／紀錄表 anon／authenticated 碰不到
-//   6. 清單防呆（多一支、少一支、138 未套、重複套用）→ 中止；回滾後所有函式定義與權限與套用前逐項相同；可重套
+//   6. 清單／指紋防呆（多一支、少一支、本體 md5／權限／設定與正式庫快照不同、138 未套、重複套用）→ 中止；
+//      回滾前 wrapper 被改掉 → 中止；回滾後所有函式定義與權限與套用前逐項相同；可重套
 //   7. 產生器：重新產生的 migration 與 repo 內的檔案逐字相同
 // 反向對照：MIGRATION141_FILE 指向空檔 → 大量失敗
 // ============================================================
@@ -20,14 +22,15 @@ const { spawnSync } = require('child_process');
 const { PGlite } = require('@electric-sql/pglite');
 
 const root = path.join(__dirname, '..');
-const read = f => fs.readFileSync(f, 'utf8');
+// 換行一律正規化成 LF（Windows checkout 會變 CRLF，函式本體 md5 會跟正式庫不同）
+const read = f => fs.readFileSync(f, 'utf8').replace(/\r\n/g, '\n');
 const snapshot = read(path.join(__dirname, 'fixtures', 'phase0_prod_snapshot.sql'))
   + '\n' + read(path.join(__dirname, 'fixtures', 'attendance_schedules_prod_snapshot.sql'));
 const mig = n => read(path.join(root, 'migrations', n));
 const base = ['130_companies_binding_attempts_lock.sql', '131_verified_admin_rpcs.sql', '132_verified_admin_rpcs_revoke.sql',
   '133_shift_swap_verified_review.sql', '134_attendance_write_lock.sql', '135_schedules_write_lock.sql',
   '138_line_auth_phase1.sql', '139_shift_swap_verified_requests.sql', '140_shift_swap_write_lock.sql'].map(mig);
-const m141 = read(process.env.MIGRATION141_FILE || path.join(root, 'migrations', '141_line_auth_rpc_wrappers.sql'));
+let m141 = read(process.env.MIGRATION141_FILE || path.join(root, 'migrations', '141_line_auth_rpc_wrappers.sql'));
 const m141rb = mig('141_line_auth_rpc_wrappers_rollback.sql');
 const inventory = JSON.parse(read(path.join(root, 'scripts', 'line-auth', 'rpc_inventory.json'))).functions;
 const wrappedList = JSON.parse(read(path.join(root, 'scripts', 'line-auth', 'wrapped_rpcs.json')));
@@ -214,6 +217,25 @@ const STUB_FREE = ['quick_check_in', 'quick_check_out_after_clock_in_makeup', 's
          FROM aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a LEFT JOIN pg_roles r ON r.oid = a.grantee
         WHERE a.grantee <> p.proowner) AS acl
     FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace ORDER BY 1`)).map(r => JSON.stringify(r)).join('\n');
+  const liveMd5 = async (f) => (await one(`SELECT md5(p.prosrc) AS m FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace
+      AND p.proname = $1 AND pg_get_function_identity_arguments(p.oid) = $2`, [f.name, f.identity_args])).m;
+  // 正式庫有些函式本體是以 CRLF 換行寫入的（例如 submit_makeup_punch）；fixture 以 LF 保存 → 換回 CRLF 再比對
+  for (const f of WRAPPED.filter(f => STUB_FREE.includes(f.name))) {
+    if ((await liveMd5(f)) === f.prosrc_md5) continue;
+    const def = (await one(`SELECT pg_get_functiondef(p.oid) AS d FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace
+      AND p.proname = $1 AND pg_get_function_identity_arguments(p.oid) = $2`, [f.name, f.identity_args])).d;
+    const a = def.indexOf('$function$') + 10, b = def.lastIndexOf('$function$');
+    await db.exec(`SET ROLE prod_postgres; ${def.slice(0, a)}${def.slice(a, b).replace(/\n/g, '\r\n')}${def.slice(b)}; RESET ROLE;`);
+  }
+  const realMd5Bad = [];
+  for (const f of WRAPPED.filter(f => STUB_FREE.includes(f.name))) if ((await liveMd5(f)) !== f.prosrc_md5) realMd5Bad.push(f.name);
+  check('正式庫原文 4 支：快照裡的本體 md5 與正式庫清單逐支相同（141 的本體指紋檢查不用替換就會通過）', realMd5Bad.length === 0, realMd5Bad.join(', '));
+  let subst = 0;
+  for (const f of stubs) {
+    const lit = `'${f.prosrc_md5}'`;
+    if (m141.split(lit).length === 2) { m141 = m141.replace(lit, `'${await liveMd5(f)}'`); subst++; }
+  }
+  check('測試用 141 副本：只替換 50 支替身的本體指紋', subst === 50, `${subst}`);
   const before = await fnState();
   const aclOf = async (name, ident) => (await one(`SELECT (SELECT string_agg(coalesce(r.rolname, 'PUBLIC') || ':' || a.privilege_type, ',' ORDER BY coalesce(r.rolname, 'PUBLIC') || ':' || a.privilege_type)
       FROM aclexplode(p.proacl) a LEFT JOIN pg_roles r ON r.oid = a.grantee WHERE a.grantee <> p.proowner) AS acl
@@ -292,6 +314,23 @@ const STUB_FREE = ['quick_check_in', 'quick_check_out_after_clock_in_makeup', 's
   err = await apply(m141);
   check('清單中的一支已不是 anon 可執行 → 中止', /get_my_payslip/.test(err), err);
   await db.exec(`SET ROLE prod_postgres; GRANT EXECUTE ON FUNCTION public.get_my_payslip(text, integer, integer) TO PUBLIC, anon, authenticated; RESET ROLE;`);
+  const payslipDef = (await one(`SELECT pg_get_functiondef('public.get_my_payslip(text, integer, integer)'::regprocedure) AS d`)).d;
+  await db.exec(`SET ROLE prod_postgres; ${payslipDef.replace('RETURN jsonb_build_object(', 'RETURN jsonb_build_object(\'x\', 1, ')}; RESET ROLE;`);
+  err = await apply(m141);
+  check('指紋：某支的本體被改過（md5 不同）→ 中止', /get_my_payslip.*md5/.test(err), err);
+  await db.exec(`SET ROLE prod_postgres; ${payslipDef}; RESET ROLE;`);
+  await db.exec(`SET ROLE prod_postgres; REVOKE EXECUTE ON FUNCTION public.get_weekly_schedules(uuid, date, text) FROM service_role; RESET ROLE;`);
+  err = await apply(m141);
+  check('指紋：某支的執行權限與快照不同 → 中止', /get_weekly_schedules.*執行權限/.test(err), err);
+  await db.exec(`SET ROLE prod_postgres; GRANT EXECUTE ON FUNCTION public.get_weekly_schedules(uuid, date, text) TO service_role; RESET ROLE;`);
+  await db.exec(`SET ROLE prod_postgres; ALTER FUNCTION public.get_my_payslip(text, integer, integer) SET search_path = public; RESET ROLE;`);
+  err = await apply(m141);
+  check('指紋：某支的設定（search_path）與快照不同 → 中止', /get_my_payslip.*設定/.test(err), err);
+  await db.exec(`SET ROLE prod_postgres; ALTER FUNCTION public.get_my_payslip(text, integer, integer) RESET search_path; RESET ROLE;`);
+  await db.exec(`ALTER FUNCTION public.get_my_payslip(text, integer, integer) STRICT`);
+  err = await apply(m141);
+  check('指紋：某支變成 STRICT → 中止', /get_my_payslip.*STRICT/.test(err), err);
+  await db.exec(`ALTER FUNCTION public.get_my_payslip(text, integer, integer) CALLED ON NULL INPUT`);
   await db.exec(`ALTER FUNCTION public.caller_line_user_id() RENAME TO caller_line_user_id_x`);
   err = await apply(m141);
   check('138 未套（caller_line_user_id 不存在）→ 中止', /138/.test(err), err);
@@ -454,6 +493,13 @@ const STUB_FREE = ['quick_check_in', 'quick_check_out_after_clock_in_makeup', 's
   // ---------- 4. 回滾、重套 ----------
   console.log('\n=== 重複套用、回滾、重套 ===');
   const afterApply = await fnState();
+  const wrapDef = (await one(`SELECT pg_get_functiondef('public.get_my_payslip(text, integer, integer)'::regprocedure) AS d`)).d;
+  await db.exec(`SET ROLE prod_postgres; CREATE OR REPLACE FUNCTION public.get_my_payslip(p_line_user_id text, p_year integer, p_month integer) RETURNS jsonb
+    LANGUAGE sql VOLATILE SECURITY DEFINER AS $x$ SELECT '{}'::jsonb $x$; RESET ROLE;`);
+  err = await apply(m141rb);
+  check('回滾前 wrapper 已被 CREATE OR REPLACE 蓋掉 → 回滾中止（不會刪錯函式）', /get_my_payslip.*已不是 141 的 wrapper/.test(err), err);
+  await db.exec(`SET ROLE prod_postgres; ${wrapDef}; RESET ROLE;`);
+  check('（還原 wrapper 後狀態與套用後相同）', (await fnState()) === afterApply);
   err = await apply(mig('138_line_auth_phase1_rollback.sql'));
   check('141 還在時回滾 138：中止（否則 wrapper 找不到 caller_line_user_id）', /141/.test(err) && (await fnState()) === afterApply, err);
   err = await apply(m141);

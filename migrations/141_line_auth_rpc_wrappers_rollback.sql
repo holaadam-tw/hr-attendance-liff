@@ -2,6 +2,7 @@
 -- 141 回滾：還原 54 支 RPC 的原名稱與權限（正式庫 2026-09-28 proacl），刪掉 wrapper、assert_caller、設定與紀錄表
 -- ⚠️ 本檔由 scripts/line-auth/generate-rpc-wrappers.js 產生，請勿手改
 -- ⚠️ line_auth_caller_log 的紀錄會一起刪除；需要的話先匯出
+-- 回滾前會確認每支 wrapper 仍是 141 產生的（有呼叫 assert_caller 與 <name>_impl），否則中止
 -- ============================================================
 
 BEGIN;
@@ -10,6 +11,78 @@ DO $$ BEGIN
   IF to_regclass('public.line_auth_caller_settings') IS NULL THEN
     RAISE EXCEPTION '141 未套用（line_auth_caller_settings 不存在），不需要回滾';
   END IF;
+END $$;
+
+DO $$
+DECLARE
+  r record;
+  v_src text;
+BEGIN
+  FOR r IN SELECT * FROM (VALUES
+    ('admin_makeup_punch', 'p_company_id uuid, p_line_user_id text, p_employee_id uuid, p_punch_date date, p_punch_type text, p_punch_time time without time zone, p_note text'),
+    ('approve_leave_request', 'p_company_id uuid, p_line_user_id text, p_request_id uuid, p_status text, p_rejection_reason text'),
+    ('confirm_daily_overtime', 'p_company_id uuid, p_line_user_id text, p_employee_id uuid, p_ot_date date, p_decision text, p_minutes integer, p_note text'),
+    ('count_fw_trackpoints', 'p_line_user_id text, p_trip_id uuid'),
+    ('create_shift_type', 'p_company_id uuid, p_line_user_id text, p_name text, p_code text, p_start_time time without time zone, p_end_time time without time zone, p_is_overnight boolean'),
+    ('delete_company_holiday', 'p_company_id uuid, p_line_user_id text, p_holiday_date date'),
+    ('delete_shift_type', 'p_id uuid, p_company_id uuid, p_line_user_id text'),
+    ('get_attendance_anomalies', 'p_company_id uuid, p_line_user_id text'),
+    ('get_checkin_failures', 'p_company_id uuid, p_line_user_id text, p_days integer'),
+    ('get_company_current_salaries', 'p_company_id uuid, p_line_user_id text'),
+    ('get_company_daily_attendance', 'p_company_id uuid, p_date date, p_line_user_id text'),
+    ('get_company_holidays', 'p_company_id uuid, p_line_user_id text, p_from date, p_to date'),
+    ('get_company_leave_requests_for_audit', 'p_company_id uuid, p_line_user_id text, p_from date, p_to date, p_include_pending boolean'),
+    ('get_company_monthly_attendance', 'p_company_id uuid, p_year integer, p_month integer, p_line_user_id text'),
+    ('get_company_monthly_missing_minutes', 'p_company_id uuid, p_year integer, p_month integer, p_line_user_id text'),
+    ('get_company_overtime_requests', 'p_company_id uuid, p_line_user_id text, p_from date, p_to date, p_status text, p_limit integer'),
+    ('get_company_payroll', 'p_company_id uuid, p_line_user_id text, p_year integer, p_month integer'),
+    ('get_company_shift_types', 'p_company_id uuid, p_line_user_id text'),
+    ('get_employee_current_salary', 'p_company_id uuid, p_line_user_id text, p_employee_id uuid'),
+    ('get_employee_schedule', 'p_line_user_id text, p_year integer, p_month integer'),
+    ('get_fw_trackpoints', 'p_line_user_id text, p_trip_id uuid'),
+    ('get_leave_approval_requests_v2', 'p_company_id uuid, p_status text, p_line_user_id text'),
+    ('get_leave_approval_requests', 'p_company_id uuid, p_status text, p_line_user_id text'),
+    ('get_leave_history', 'p_line_user_id text, p_company_id uuid, p_limit integer'),
+    ('get_leave_history', 'p_line_user_id text, p_limit integer'),
+    ('get_line_push_status', 'p_company_id uuid, p_line_user_id text'),
+    ('get_makeup_review_requests', 'p_company_id uuid, p_status text, p_review_filter text, p_line_user_id text'),
+    ('get_missing_work_hours_notification_control', 'p_company_id uuid, p_line_user_id text'),
+    ('get_monthly_attendance', 'p_line_user_id text, p_year integer, p_month integer'),
+    ('get_my_current_salary', 'p_line_user_id text'),
+    ('get_my_makeup_requests', 'p_line_user_id text, p_limit integer, p_company_id uuid'),
+    ('get_my_overtime_requests', 'p_line_user_id text, p_limit integer'),
+    ('get_my_payslip', 'p_line_user_id text, p_year integer, p_month integer'),
+    ('get_my_year_end_stats', 'p_line_user_id text, p_year integer'),
+    ('get_pending_makeup_requests', 'p_company_id uuid, p_line_user_id text'),
+    ('get_pending_overtime_requests', 'p_company_id uuid, p_status text, p_line_user_id text'),
+    ('get_weekly_schedules', 'p_company_id uuid, p_start_date date, p_line_user_id text'),
+    ('insert_fw_trackpoints', 'p_line_user_id text, p_trip_id uuid, p_points jsonb'),
+    ('log_checkin_failure', 'p_line_user_id text, p_punch_type text, p_stage text, p_failure_code text, p_outcome text, p_detail jsonb, p_company_id uuid'),
+    ('preview_company_missing_work_hours', 'p_company_id uuid, p_line_user_id text, p_days_back integer'),
+    ('quick_check_in', 'p_line_user_id text, p_latitude double precision, p_longitude double precision, p_photo_url text, p_device_id text, p_action text'),
+    ('quick_check_out_after_clock_in_makeup', 'p_line_user_id text, p_latitude double precision, p_longitude double precision, p_photo_url text, p_device_id text, p_action text'),
+    ('register_employee', 'p_company_id uuid, p_line_user_id text, p_data jsonb'),
+    ('resolve_attendance_anomaly', 'p_anomaly_id uuid, p_company_id uuid, p_line_user_id text'),
+    ('save_payroll_records', 'p_company_id uuid, p_line_user_id text, p_year integer, p_month integer, p_records jsonb, p_is_published boolean'),
+    ('set_missing_work_hours_notification_enabled', 'p_company_id uuid, p_line_user_id text, p_enabled boolean'),
+    ('set_my_preferred_language', 'p_company_id uuid, p_line_user_id text, p_language text'),
+    ('submit_leave_request', 'p_line_user_id text, p_company_id uuid, p_leave_type character varying, p_start_date date, p_end_date date, p_reason text, p_leave_period text, p_leave_start_time time without time zone, p_leave_end_time time without time zone'),
+    ('submit_leave_request', 'p_line_user_id text, p_leave_type character varying, p_start_date date, p_end_date date, p_reason text, p_leave_period text, p_leave_hours numeric'),
+    ('submit_makeup_punch', 'p_line_user_id text, p_punch_date date, p_punch_type text, p_punch_time time without time zone, p_reason text, p_note text, p_company_id uuid'),
+    ('submit_overtime_request', 'p_line_user_id text, p_ot_date date, p_hours numeric, p_reason text, p_compensation_type text'),
+    ('update_shift_type', 'p_id uuid, p_company_id uuid, p_line_user_id text, p_name text, p_code text, p_start_time time without time zone, p_end_time time without time zone, p_is_overnight boolean'),
+    ('upsert_company_holiday', 'p_company_id uuid, p_line_user_id text, p_holiday_date date, p_holiday_name text, p_holiday_type text'),
+    ('upsert_salary_setting', 'p_company_id uuid, p_line_user_id text, p_employee_id uuid, p_salary_type text, p_base_salary numeric, p_meal_allowance numeric, p_position_allowance numeric, p_full_attendance_bonus numeric, p_pension_self_rate numeric, p_sync_employee_rate boolean')
+  ) v(n, ident) LOOP
+    SELECT pp.prosrc INTO v_src FROM pg_proc pp
+     WHERE pp.pronamespace = 'public'::regnamespace AND pp.proname = r.n AND pg_get_function_identity_arguments(pp.oid) = r.ident;
+    IF v_src IS NULL OR position('public.assert_caller(' IN v_src) = 0 OR position('public.' || r.n || '_impl(' IN v_src) = 0 THEN
+      RAISE EXCEPTION '%(%) 已不是 141 的 wrapper（可能被 CREATE OR REPLACE 蓋掉）；請先人工確認再回滾', r.n, r.ident;
+    END IF;
+    IF to_regprocedure('public.' || r.n || '_impl(' || regexp_replace(r.ident, '(^|, )p_[a-z0-9_]+ ', '\1', 'g') || ')') IS NULL THEN
+      RAISE EXCEPTION '找不到 %_impl(%)', r.n, r.ident;
+    END IF;
+  END LOOP;
 END $$;
 
 -- admin_makeup_punch(p_company_id uuid, p_line_user_id text, p_employee_id uuid, p_punch_date date, p_punch_type text, p_punch_time time without time zone, p_note text)
