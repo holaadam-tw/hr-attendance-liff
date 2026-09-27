@@ -5,10 +5,10 @@
 
 ---
 
-## 🟡 2026-09-28 P1 身分根治 Phase 1：LINE 驗證 → Supabase Auth session（migration 135＋line-auth，**待業主套用／部署**）
+## 🟡 2026-09-28 P1 身分根治 Phase 1：LINE 驗證 → Supabase Auth session（migration 138＋line-auth，**待業主套用／部署**）
 
 - line-auth Edge Function：LIFF access token 驗證（同 line-push）→ `line_auth_resolve`（只給在職員工／平台管理員）→ admin 建帳號（app_metadata.line_user_id）→ admin generate_link＋/verify 換 session（不需 JWT secret；/verify 被限流時回 token_hash 讓前端自己換）
-- 135：`caller_line_user_id()`（只採信 authenticated JWT 的 app_metadata）、`line_auth_resolve`（service role）、`line_auth_whoami`
+- 138：`caller_line_user_id()`（只採信 authenticated JWT 的 app_metadata）、`line_auth_resolve`（service role）、`line_auth_whoami`
 - 前端：登入後背景建立 session，放在獨立 client（storageKey hr-line-auth-v1）；現有 `sb` 仍是 anon → **零行為變更**；`CONFIG.LINE_AUTH_MODE='off'` 可關
 - 測試：PGlite 27、Edge 26、jsdom 23、真 supabase-js 7；詳見 `docs/LINE_AUTH_PHASE1.md`（含 Dashboard 檢查清單、上線、回滾）
 - **狀態：PR 待審，未套正式庫、未部署、未改 Dashboard。**

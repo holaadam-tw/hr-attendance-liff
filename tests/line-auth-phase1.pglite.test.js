@@ -1,15 +1,15 @@
 // ============================================================
-// migration 135：P1 身分根治 Phase 1（caller_line_user_id／line_auth_resolve／line_auth_whoami）— PGlite 實跑
+// migration 138：P1 身分根治 Phase 1（caller_line_user_id／line_auth_resolve／line_auth_whoami）— PGlite 實跑
 //
 // 不連線、不寫正式庫。流程：
 //   1. 正式庫快照（tests/fixtures/phase0_prod_snapshot.sql）＋ auth schema 最小替身（auth.users、auth.jwt()／auth.uid()
 //      與正式庫定義逐字相同：讀 request.jwt.claim(s)）
 //   2. 套用前：函式不存在（反向對照）
-//   3. 套 135：JWT 取 LINE userId 的各種情境（authenticated／anon／user_metadata 偽造／格式不符）、
+//   3. 套 138：JWT 取 LINE userId 的各種情境（authenticated／anon／user_metadata 偽造／格式不符）、
 //      resolve 的權限與結果、whoami
 //   4. 零行為變更：套用前後，既有 public 函式本體與權限、所有 RLS 政策、表權限逐項相同
 //   5. 回滾 → 回到原狀 → 可重複套用
-// 反向對照：MIGRATION135_FILE 指向空檔 → 大量失敗
+// 反向對照：MIGRATION138_FILE 指向空檔 → 大量失敗
 // ============================================================
 const fs = require('fs');
 const path = require('path');
@@ -18,8 +18,8 @@ const { PGlite } = require('@electric-sql/pglite');
 const root = path.join(__dirname, '..');
 const read = f => fs.readFileSync(f, 'utf8');
 const snapshot = read(path.join(__dirname, 'fixtures', 'phase0_prod_snapshot.sql'));
-const m135 = read(process.env.MIGRATION135_FILE || path.join(root, 'migrations', '135_line_auth_phase1.sql'));
-const m135rb = read(path.join(root, 'migrations', '135_line_auth_phase1_rollback.sql'));
+const m138 = read(process.env.MIGRATION138_FILE || path.join(root, 'migrations', '138_line_auth_phase1.sql'));
+const m138rb = read(path.join(root, 'migrations', '138_line_auth_phase1_rollback.sql'));
 
 let pass = 0, fail = 0;
 function check(name, condition, detail = '') {
@@ -50,7 +50,7 @@ GRANT EXECUTE ON FUNCTION auth.jwt(), auth.uid() TO anon, authenticated, service
 
 (async () => {
   console.log('\n═══════════════════════════════════════');
-  console.log('  P1 Phase 1：caller_line_user_id／line_auth_resolve（135，PGlite 實跑）');
+  console.log('  P1 Phase 1：caller_line_user_id／line_auth_resolve（138，PGlite 實跑）');
   console.log('═══════════════════════════════════════');
 
   const db = new PGlite();
@@ -109,10 +109,10 @@ GRANT EXECUTE ON FUNCTION auth.jwt(), auth.uid() TO anon, authenticated, service
   check('套用前：caller_line_user_id 不存在（反向對照基準）', typeof r?.error === 'string');
   const before = await state();
 
-  console.log('\n=== 套 135 ===');
+  console.log('\n=== 套 138 ===');
   let ok = true;
-  try { await db.exec(m135); } catch (e) { ok = false; check('135 可在 PostgreSQL 套用', false, e.message); }
-  if (ok) check('135 可在 PostgreSQL 套用', true);
+  try { await db.exec(m138); } catch (e) { ok = false; check('138 可在 PostgreSQL 套用', false, e.message); }
+  if (ok) check('138 可在 PostgreSQL 套用', true);
   check('零行為變更：既有 public 函式本體／權限、所有政策、表權限與 RLS 完全不變', (await state()) === before);
 
   console.log('\n=== caller_line_user_id() ===');
@@ -168,12 +168,12 @@ GRANT EXECUTE ON FUNCTION auth.jwt(), auth.uid() TO anon, authenticated, service
   check('anon 不能呼叫 whoami', denied(r), r.error);
 
   console.log('\n=== 回滾／重套 ===');
-  await db.exec(m135rb);
+  await db.exec(m138rb);
   check('回滾後三個函式都不存在', !(await one(`SELECT count(*)::int AS n FROM pg_proc WHERE proname IN ('caller_line_user_id', 'line_auth_resolve', 'line_auth_whoami')`)).n);
   check('回滾後與套用前逐項相同', (await state()) === before);
   ok = true;
-  try { await db.exec(m135); await db.exec(m135); } catch (e) { ok = false; check('135 可重複套用', false, e.message); }
-  if (ok) check('135 可重複套用', true);
+  try { await db.exec(m138); await db.exec(m138); } catch (e) { ok = false; check('138 可重複套用', false, e.message); }
+  if (ok) check('138 可重複套用', true);
 
   console.log(`\n結果：${pass} 通過、${fail} 失敗`);
   process.exit(fail ? 1 : 0);

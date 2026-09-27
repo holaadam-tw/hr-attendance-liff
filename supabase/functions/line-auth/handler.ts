@@ -76,7 +76,7 @@ export async function handleLineAuth(req: Request, deps: Deps): Promise<Response
 
     // 2. 是誰
     const resolved = await call(deps, '/rest/v1/rpc/line_auth_resolve', { method: 'POST', key: 'service', body: { p_line_user_id: lineUserId } })
-    if (resolved.status === 404) return fail(503, 'db_not_migrated', '資料庫尚未更新（135）')
+    if (resolved.status === 404) return fail(503, 'db_not_migrated', '資料庫尚未更新（138）')
     if (!resolved.ok || !resolved.data || typeof resolved.data !== 'object') return fail(503, 'service_unavailable', '登入服務暫時無法使用')
     const r = resolved.data
     if (r.success !== true) {

@@ -1,6 +1,6 @@
 # P1 身分根治 Phase 1：LINE 驗證 → Supabase Auth session
 
-> 狀態：PR 待審。**未套 135、未部署 line-auth、未改任何 Dashboard 設定。**
+> 狀態：PR 待審。**未套 138、未部署 line-auth、未改任何 Dashboard 設定。**
 > Phase 1 只「建立 session＋記錄」，現有 RPC／政策／查詢行為一律不變。
 
 ## 為什麼
@@ -50,7 +50,7 @@ holidays／binding_audit_log 有只給 authenticated 的政策，另有 7 條政
 
 ## 上線步驟
 1. 業主確認上表（特別是 **Allow new users to sign up = OFF**）。
-2. 套 `migrations/135_line_auth_phase1.sql`（純新增 3 個函式；測試證明既有函式／政策／權限逐項不變）。
+2. 套 `migrations/138_line_auth_phase1.sql`（純新增 3 個函式；測試證明既有函式／政策／權限逐項不變）。
 3. 部署：`supabase functions deploy line-auth`（verify_jwt 維持預設；前端以 anon key 當 Bearer 呼叫）。
 4. 合併前端（本 PR；需在 #3、#4 之後）。`CONFIG.LINE_AUTH_MODE = 'shadow'` 起就會在背景建立 session。
 5. 實機：在 LINE 開任一頁 → 開發者主控台 `lineAuthStatus` 應為 `verified_in_db`；再開一次應為 `reused`。
@@ -65,7 +65,7 @@ holidays／binding_audit_log 有只給 authenticated 的政策，另有 7 條政
 - **最快**：前端 `CONFIG.LINE_AUTH_MODE = 'off'`（一行 commit）；單機可 `localStorage.setItem('line_auth_mode','off')`。
   關閉後頁面行為與現在完全相同（Phase 1 本來就不影響任何查詢）。
 - Edge Function：`supabase functions delete line-auth`（前端遇 404 會退避 10 分鐘，不影響頁面）。
-- DB：`migrations/135_line_auth_phase1_rollback.sql`（Phase 2 wrapper 上線後不可單獨回滾）。
+- DB：`migrations/138_line_auth_phase1_rollback.sql`（Phase 2 wrapper 上線後不可單獨回滾）。
 - 已建立的 Auth 帳號：Dashboard → Authentication → Users 逐一刪除，或以 admin API 依 `app_metadata.line_user_id` 刪除；
   刪除會讓對應的 refresh token 失效，前端下次會自動重跑 line-auth（若仍啟用）。
 

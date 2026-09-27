@@ -1,5 +1,5 @@
 -- ============================================================
--- 135: P1 身分根治 Phase 1 —— LINE 驗證後發 Supabase Auth session（只建立、只記錄，不強制任何東西）
+-- 138: P1 身分根治 Phase 1 —— LINE 驗證後發 Supabase Auth session（只建立、只記錄，不強制任何東西）
 --
 -- 背景：099/118/124/131… 等 RPC 用前端傳的 p_line_user_id 當身分；employees.line_user_id 又讀得到
 --       → 冒充身分的根因。根治＝讓 DB 從「LINE 驗證過、由 Supabase Auth 簽發的 JWT」取得 LINE userId。
@@ -21,7 +21,7 @@
 --      只替 known 的人建立 Auth 帳號（陌生 LINE 帳號打開 LIFF 不會在 auth.users 生出一堆帳號）。
 --   C. line_auth_whoami()：給 authenticated（前端確認 session 的 JWT 在 DB 端讀得到 line_user_id，只做記錄）
 --
--- 回滾：migrations/135_line_auth_phase1_rollback.sql（只刪本檔新增的 3 個函式；auth.users 已建立的帳號不動，
+-- 回滾：migrations/138_line_auth_phase1_rollback.sql（只刪本檔新增的 3 個函式；auth.users 已建立的帳號不動，
 --       要清掉見 PR 的回滾步驟）
 -- 只建立 migration 檔，不得由開發流程直接套用正式資料庫。
 -- ============================================================

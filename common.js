@@ -225,7 +225,7 @@ async function establishLineAuthSession() {
             return { ok: false, reason: 'mismatch' };
         }
         lineAuthLog('established', { user: user.id, created: !!out.created, mode: out.mode || 'session' });
-        // 記錄用：確認 DB 端從 JWT 讀得到 line_user_id（135 的 line_auth_whoami；失敗不影響）
+        // 記錄用：確認 DB 端從 JWT 讀得到 line_user_id（138 的 line_auth_whoami；失敗不影響）
         Promise.resolve(client.rpc('line_auth_whoami')).then((w) => {
             const ok = !!(w && w.data && w.data.line_user_id === lineUserId);
             lineAuthLog(ok ? 'verified_in_db' : 'db_check_failed', { user: user.id });

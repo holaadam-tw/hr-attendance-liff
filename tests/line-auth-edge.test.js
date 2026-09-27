@@ -136,7 +136,7 @@ function routes(o = {}) {
   t = await run({ liff_access_token: 'liff-at-SECRET' }, { resolve: { body: { success: false, error_code: 'duplicate_auth_user' } } });
   check('同一個 LINE userId 對到兩個帳號：409、不換 session', t.res.status === 409 && !find(t.f, 'POST', 'generate_link'));
   t = await run({ liff_access_token: 'liff-at-SECRET' }, { resolve: { status: 404, body: { code: 'PGRST202' } } });
-  check('135 未套：503「資料庫尚未更新（135）」', t.res.status === 503 && t.out.code === 'db_not_migrated');
+  check('138 未套：503「資料庫尚未更新（138）」', t.res.status === 503 && t.out.code === 'db_not_migrated');
   t = await run({ liff_access_token: 'liff-at-SECRET' }, { link: { body: { id: '99999999-aaaa-4bbb-8ccc-000000000009', hashed_token: 'hashed-SECRET' } } });
   check('generate_link 回來的是別的 user：409、不 verify', t.res.status === 409 && !find(t.f, 'POST', '/auth/v1/verify'));
   t = await run({ liff_access_token: 'liff-at-SECRET' }, { verifyOtp: { body: session({ user: { id: AUTH_ID, app_metadata: { line_user_id: 'U' + 'f'.repeat(32) } } }) } });
