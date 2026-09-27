@@ -9,7 +9,7 @@
 --
 -- 正式庫 2026-09-28 唯讀查詢：auth.users／auth.identities 皆 0 列；auth.jwt() 為 Supabase 標準定義；
 --   anon 與 authenticated 權限「不」相同（bookings／requests／announcements 有只給 anon 的政策，
---   holidays／binding_audit_log 有只給 authenticated 的政策，另有 7 條政策用 auth.uid()/auth.jwt()）
+--   holidays／binding_audit_log 有只給 authenticated 的政策，另有 6 條 public 政策用 auth.uid()/auth.jwt()）
 --   → Phase 1 前端用「另一個」supabase client 持有 session，現有資料查詢仍用 anon（見 PR）。
 --
 -- 本檔（純新增）：

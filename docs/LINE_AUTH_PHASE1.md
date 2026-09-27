@@ -31,14 +31,14 @@
 
 ### 為什麼前端用「另一個」client
 正式庫（2026-09-28 唯讀查）anon 與 authenticated 權限不同：bookings／requests／announcements 有只給 anon 的政策，
-holidays／binding_audit_log 有只給 authenticated 的政策，另有 7 條政策用 `auth.uid()`／`auth.jwt()`。
+holidays／binding_audit_log 有只給 authenticated 的政策，另有 6 條 public 政策用 `auth.uid()`／`auth.jwt()`（makeup_punch_requests 3、employees、attendance、holidays 各 1）。
 若把 session 設到現有 `sb`，所有查詢會從 anon 變 authenticated → 行為改變。所以 Phase 1 的 session 放在
 `storageKey: 'hr-line-auth-v1'` 的獨立 client，`sb` 完全不動（有真 supabase-js 測試證明）。
 
 ## 業主要在 Dashboard 確認的事（本 PR 不改任何設定）
 | 位置 | 要確認 | 原因 |
 |---|---|---|
-| Authentication → Sign In / Providers → **Allow new users to sign up** | **關閉** | 開著的話任何人拿 anon key 就能 `/signup` 建帳號；line-auth 用 admin API 建帳號，不受這個開關影響 |
+| Authentication → Sign In / Providers → **Allow new users to sign up** | **關閉**（⛔ **硬性前置：正式庫 2026-09-28 目前是「開」**，`disable_signup=false`） | 開著的話任何人拿 anon key 就能 `/signup` 建帳號（例如先註冊 `<別人>@line-auth.invalid` 卡位）；line-auth 用 admin API 建帳號，不受這個開關影響 |
 | Authentication → Sign In / Providers → **Allow anonymous sign-ins** | 關閉 | 同上 |
 | Authentication → Sign In / Providers → **Email** | 保持啟用（預設）；「Confirm email」開關不影響（帳號建立時已 confirm） | 依原始碼 verify 不檢查這個開關，但**未在正式環境實測**；關掉前請先在測試專案試 |
 | Authentication → Email → SMTP／Send Email Hook | 不需設定 | generate_link 不寄信 |
@@ -49,7 +49,7 @@ holidays／binding_audit_log 有只給 authenticated 的政策，另有 7 條政
 | Edge Functions → Secrets | 不需新增（用內建 SUPABASE_URL／SUPABASE_SERVICE_ROLE_KEY／SUPABASE_ANON_KEY）；可選 `LINE_AUTH_EMAIL_DOMAIN`、沿用 `LINE_LOGIN_CHANNEL_ID` | — |
 
 ## 上線步驟
-1. 業主確認上表（特別是 **Allow new users to sign up = OFF**）。
+1. ⛔ **硬性閘門**：業主在 Dashboard 把 **Allow new users to sign up 關掉**（正式庫目前是開的），並確認上表其他項。沒關就不要做第 2 步以後。
 2. 套 `migrations/138_line_auth_phase1.sql`（純新增 3 個函式；測試證明既有函式／政策／權限逐項不變）。
 3. 部署：`supabase functions deploy line-auth`（verify_jwt 維持預設；前端以 anon key 當 Bearer 呼叫）。
 4. 合併前端（本 PR；需在 #3、#4 之後）。`CONFIG.LINE_AUTH_MODE = 'shadow'` 起就會在背景建立 session。
@@ -62,12 +62,23 @@ holidays／binding_audit_log 有只給 authenticated 的政策，另有 7 條政
 7. 穩定後才開始 Phase 2。
 
 ## 回滾
-- **最快**：前端 `CONFIG.LINE_AUTH_MODE = 'off'`（一行 commit）；單機可 `localStorage.setItem('line_auth_mode','off')`。
+- **伺服器端最快**：Edge Function secret `LINE_AUTH_DISABLED=true` → line-auth 一律回 503 `disabled`，完全不碰 Auth（前端退避 1 小時、頁面照常）。
+- **前端最快**：前端 `CONFIG.LINE_AUTH_MODE = 'off'`（一行 commit）；單機可 `localStorage.setItem('line_auth_mode','off')`。
   關閉後頁面行為與現在完全相同（Phase 1 本來就不影響任何查詢）。
 - Edge Function：`supabase functions delete line-auth`（前端遇 404 會退避 10 分鐘，不影響頁面）。
 - DB：`migrations/138_line_auth_phase1_rollback.sql`（Phase 2 wrapper 上線後不可單獨回滾）。
 - 已建立的 Auth 帳號：Dashboard → Authentication → Users 逐一刪除，或以 admin API 依 `app_metadata.line_user_id` 刪除；
   刪除會讓對應的 refresh token 失效，前端下次會自動重跑 line-auth（若仍啟用）。
+
+## ⚠️ Phase 2／3 之前必須先處理（二審發現）
+**使用者可以自己設密碼、繞過 LINE**：拿到 session 的人（就是該 LINE 使用者本人）可在 24 小時內呼叫 `PUT /auth/v1/user { password }`
+設定密碼（「Secure password change」只要求 session 未滿 24 小時），之後就能用 `<LINE userId 小寫>@line-auth.invalid`＋密碼直接登入，
+不再經過 LINE 驗證。Phase 1 沒有任何東西依賴這個 session，所以目前無害；但 Phase 2／3 開始用 `caller_line_user_id()` 之前，必須：
+1. **每次呼叫都在 DB 現查在職狀態**（`caller_line_user_id()` 只代表「曾經通過 LINE 驗證的那個人」，不代表他現在還是員工）
+2. **離職／停用時 ban 或刪除該 Auth 使用者**（line-auth 遇到 not_linked 但已有帳號 → admin API ban；或在員工停用流程裡處理）
+3. **評估關閉密碼登入**：Dashboard 的「Secure password change」只能擋 24 小時後的改密碼，擋不住剛登入的人；
+   可行做法是 Auth Hook「Password Verification Attempt」一律拒絕，或 Custom Access Token Hook 拒發 `amr=password` 的 token（需確認方案支援）
+4. **建立帳號時設一組隨機密碼沒有幫助**：`PUT /user` 改密碼不需要舊密碼，使用者照樣能覆寫；只會多一個要保管的秘密 → 不採用
 
 ## 已知限制／未驗證
 - 未在正式環境實跑（無 LIFF token 可測、且不得部署）；generate_link／verify 的行為依原始碼與 supabase-js 型別，

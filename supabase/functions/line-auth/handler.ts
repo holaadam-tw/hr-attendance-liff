@@ -13,6 +13,10 @@
 //      讓前端自己呼叫 verifyOtp（限制改算在使用者自己的 IP）
 //   5. 驗證回來的 user 真的是這個 LINE userId 的帳號，才回傳
 //
+// 伺服器端關閉開關：Edge Function secret LINE_AUTH_DISABLED=true → 一律回 503 disabled，完全不碰 LINE／DB／Auth。
+// 每個 LINE 帳號頻率限制：已有帳號、且上次登入在 LINE_AUTH_MIN_INTERVAL_SECONDS（預設 10）秒內 → 429 too_frequent
+//   （用 Auth 的 last_sign_in_at，不需要新表；新帳號第一次不受限）
+//
 // 絕不記錄 token（LIFF access token、hashed_token、access/refresh token）。
 
 import { verifyLiffAccessToken, type Deps } from '../line-push/handler.ts'
@@ -65,6 +69,9 @@ export async function handleLineAuth(req: Request, deps: Deps): Promise<Response
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   if (req.method !== 'POST') return fail(405, 'method_not_allowed', 'method not allowed')
   const log = deps.log || (() => {})
+  if ((deps.env('LINE_AUTH_DISABLED') || '').trim().toLowerCase() === 'true') {
+    return fail(503, 'disabled', 'LINE 登入服務暫停中')
+  }
   try {
     const body = await req.json().catch(() => null)
     const liffToken = body && typeof body.liff_access_token === 'string' ? body.liff_access_token : ''
@@ -123,6 +130,12 @@ export async function handleLineAuth(req: Request, deps: Deps): Promise<Response
     if (!created) {
       const u = await call(deps, `/auth/v1/admin/users/${userId}`, { method: 'GET', key: 'service' })
       if (!u.ok || !u.data) return fail(503, 'service_unavailable', '登入服務暫時無法使用')
+      const minInterval = Number(deps.env('LINE_AUTH_MIN_INTERVAL_SECONDS') || 10)
+      const lastSignIn = Date.parse(u.data.last_sign_in_at || '')
+      if (minInterval > 0 && Number.isFinite(lastSignIn) && Date.now() - lastSignIn < minInterval * 1000) {
+        log('line-auth: too frequent for this LINE user')
+        return fail(429, 'too_frequent', '登入太頻繁，請稍後再試')
+      }
       if (!sameIds(u.data.app_metadata?.company_ids, companyIds)) {
         const up = await call(deps, `/auth/v1/admin/users/${userId}`, { method: 'PUT', key: 'service', body: { app_metadata: appMetadata } })
         if (!up.ok) return fail(503, 'service_unavailable', '登入服務暫時無法使用')

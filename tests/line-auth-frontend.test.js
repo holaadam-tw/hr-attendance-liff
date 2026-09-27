@@ -139,6 +139,12 @@ const okSession = { ok: true, mode: 'session', created: true, session: { access_
       && Number(w.sessionStorage.getItem('line_auth_backoff_until')) <= Date.now() + 10 * 60 * 1000 + 1000);
   }
   {
+    const { w } = page({ reply: { ok: false, status: 429, code: 'too_frequent' } });
+    const r = await w.__establish();
+    const until = Number(w.sessionStorage.getItem('line_auth_backoff_until'));
+    check('伺服器回 too_frequent：只退避約 30 秒', !r.ok && r.reason === 'too_frequent' && until <= Date.now() + 31 * 1000 && until > Date.now() + 20 * 1000);
+  }
+  {
     const { w } = page({ fetchThrows: true });
     let threw = false, r;
     try { r = await w.__establish(); } catch (e) { threw = true; }

@@ -128,7 +128,7 @@ async function initializeLiff(options) {
 // - 關閉：CONFIG.LINE_AUTH_MODE = 'off'（或單機 localStorage line_auth_mode=off）
 const LINE_AUTH_STORAGE_KEY = 'hr-line-auth-v1';
 const LINE_AUTH_BACKOFF_KEY = 'line_auth_backoff_until';
-const LINE_AUTH_BACKOFF_MS = { not_linked: 60 * 60 * 1000, default: 10 * 60 * 1000 };
+const LINE_AUTH_BACKOFF_MS = { not_linked: 60 * 60 * 1000, too_frequent: 30 * 1000, disabled: 60 * 60 * 1000, default: 10 * 60 * 1000 };
 let _lineAuthClient = null;
 let _lineAuthPromise = null;
 window.lineAuthStatus = { state: 'idle' };

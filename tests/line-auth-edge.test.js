@@ -151,6 +151,19 @@ function routes(o = {}) {
   check('429：改回傳 token_hash 讓前端自己 verifyOtp（mode=token_hash）', t.res.status === 200 && t.out.mode === 'token_hash' && t.out.token_hash === 'hashed-SECRET'
     && t.out.verify_type === 'magiclink' && t.out.user.id === AUTH_ID && !t.out.session);
 
+  console.log('\n=== 伺服器端關閉開關／每人頻率限制 ===');
+  {
+    const f = fakeFetch(routes());
+    const envOff = key => (key === 'LINE_AUTH_DISABLED' ? 'true' : env(key));
+    const res = await mod.handleLineAuth(post({ liff_access_token: 'liff-at-SECRET' }), { fetch: f.fn, env: envOff, log: m => logs.push(m) });
+    const out = await res.json();
+    check('LINE_AUTH_DISABLED=true：503 disabled、完全不發任何請求（不碰 LINE／DB／Auth）', res.status === 503 && out.code === 'disabled' && f.calls.length === 0);
+  }
+  t = await run({ liff_access_token: 'liff-at-SECRET' }, { getUser: { body: { id: AUTH_ID, last_sign_in_at: new Date(Date.now() - 3000).toISOString(), app_metadata: { line_user_id: LINE_USER, company_ids: [COMPANY] } } } });
+  check('同一個 LINE 帳號 10 秒內再換 session：429 too_frequent、不 generate_link', t.res.status === 429 && t.out.code === 'too_frequent' && !find(t.f, 'POST', 'generate_link'));
+  t = await run({ liff_access_token: 'liff-at-SECRET' }, { getUser: { body: { id: AUTH_ID, last_sign_in_at: new Date(Date.now() - 60000).toISOString(), app_metadata: { line_user_id: LINE_USER, company_ids: [COMPANY] } } } });
+  check('上次登入超過 10 秒：照常發 session', t.res.status === 200 && t.out.mode === 'session');
+
   console.log('\n=== 其他 ===');
   const opt = await mod.handleLineAuth(new Request('https://fn/line-auth', { method: 'OPTIONS' }), { fetch: async () => { throw new Error('x'); }, env });
   check('OPTIONS：CORS', opt.status === 200 && opt.headers.get('Access-Control-Allow-Origin') === '*');
