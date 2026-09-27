@@ -13,6 +13,7 @@
 //     employee_create／employee_update／employee_delete_pending、makeup_review、overtime_review、schedule_save
 //     （131／132：員工管理、補卡／加班審核、排班；核准人／排班人＝LINE 驗證的 userId，不採信前端傳的員工 ID）、
 //     shift_swap_review（133：換班核准／拒絕；135 起前端不能直接寫 schedules）
+//     payroll_unlock（133：薪酬密碼在 DB 以 bcrypt 比對，前端讀不到密碼）
 //   員工發的訊息，DB 回傳寄件人前綴（［姓名 送出］），這裡一定加在最前面。
 //
 // 舊模式（相容還沒更新的頁面，前端帶 token）：必須帶 company_id，且 token 必須等於該公司設定
@@ -61,6 +62,7 @@ const RPC_MIGRATION: Record<string, string> = {
   platform_company_save: '130', platform_company_set_status: '130', platform_company_delete_pending: '130',
   review_makeup_request: '131', review_overtime_request: '131', save_schedules_verified: '131',
   review_shift_swap_request: '133',
+  payroll_password_unlock: '133',
 }
 
 async function callRpc(deps: Deps, fn: string, args: Record<string, unknown>): Promise<{ ok: boolean; data: any; missing?: string }> {
@@ -227,6 +229,8 @@ const VERIFIED_ACTIONS = [
   'company_save', 'company_set_status', 'company_delete_pending',
   // 133：換班審核（審核人＝LINE 驗證的 userId；核准時同一交易互換班別）
   'shift_swap_review',
+  // 133：薪酬密碼改在伺服器端比對（DB 只存 bcrypt 雜湊），成功回短效 unlock_token
+  'payroll_unlock',
 ] as const
 export const MAX_BATCH_SETTINGS = 30
 export const MAX_BATCH_REVIEWS = 50
@@ -245,6 +249,26 @@ async function handleVerifiedAction(body: any, deps: Deps): Promise<Response> {
   if (action === 'company_save' && body.company_id != null && !companyId) return badRequest()
   const lineUserId = await verifyLiffAccessToken(deps, String(body.liff_access_token))
   if (!lineUserId) return unauthenticated()
+
+  // ---- 薪酬密碼（133）：比對在 DB（bcrypt），錯誤次數限制也在 DB；密碼不記 log、不回傳 ----
+  if (action === 'payroll_unlock') {
+    const password = typeof body.password === 'string' ? body.password : ''
+    if (!password || password.length > 100) return badRequest('請輸入密碼')
+    const r = await callRpc(deps, 'payroll_password_unlock', {
+      p_company_id: companyId, p_line_user_id: lineUserId, p_password: password,
+    })
+    if (r.ok && r.data && typeof r.data === 'object' && r.data.success !== true) {
+      if (r.data.error_code === 'wrong_password') return json({ ok: false, status: 403, code: 'wrong_password', error: '密碼錯誤' }, 403)
+      if (r.data.error_code === 'rate_limited') {
+        return json({ ok: false, status: 429, code: 'rate_limited', error: typeof r.data.error === 'string' ? r.data.error : '嘗試次數太多，請稍後再試' }, 429)
+      }
+    }
+    return rpcResult(r, (d) => ({
+      unlock_token: typeof d.unlock_token === 'string' ? d.unlock_token : null,
+      expires_at: d.expires_at ?? null,
+      configured: d.configured === true,
+    }))
+  }
 
   // ---- 員工管理（131：admin_* 由 DB 判斷公司、角色、公務機、受保護帳號）----
   if (action === 'employee_create') {

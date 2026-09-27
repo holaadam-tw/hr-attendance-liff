@@ -452,6 +452,36 @@ const post = (url, body, headers = {}) => new Request(url, { method: 'POST', bod
     n = 0;
     t = await run({ action: 'makeup_review', company_id: COMPANY, request_ids: [REQ, REQ3], decision: 'approve' }, missingRoute('review_makeup_request'));
     check('批次第 1 筆就發現 RPC 不存在：db_not_migrated、0 筆核准、其餘列為未處理', t.res.status === 503 && t.out.code === 'db_not_migrated' && t.out.approved_count === 0 && t.out.failed_id === REQ && t.out.not_processed_ids[0] === REQ3);
+    // ---- 133：薪酬密碼伺服器端比對 ----
+    const unlockRoutes = (resp) => rpcRoutes([['/rpc/payroll_password_unlock', resp]]);
+    t = await run({ action: 'payroll_unlock', company_id: COMPANY, password: 'pw-1234', line_user_id: 'Uadmin' },
+      unlockRoutes({ body: { success: true, unlock_token: 'tok', expires_at: '2026-09-28T16:00:00+00:00', configured: true } }));
+    c = call(t.f, 'payroll_password_unlock');
+    check('payroll_unlock：以 LINE 驗出的 userId 呼叫 payroll_password_unlock（忽略前端夾帶的 line_user_id）、回短效解鎖',
+      t.res.status === 200 && c && c.body.p_line_user_id === LIFF_USER && c.body.p_company_id === COMPANY && c.body.p_password === 'pw-1234'
+      && t.out.unlock_token === 'tok' && t.out.expires_at === '2026-09-28T16:00:00+00:00' && t.out.configured === true, JSON.stringify(t.out));
+    check('payroll_unlock：回應不含密碼', !JSON.stringify(t.out).includes('pw-1234'));
+    t = await run({ action: 'payroll_unlock', company_id: COMPANY, password: 'nope' },
+      unlockRoutes({ body: { success: false, error: '密碼錯誤', error_code: 'wrong_password' } }));
+    check('payroll_unlock：密碼錯 → 403 wrong_password、沒有 unlock_token', t.res.status === 403 && t.out.code === 'wrong_password' && !t.out.unlock_token);
+    t = await run({ action: 'payroll_unlock', company_id: COMPANY, password: 'nope' },
+      unlockRoutes({ body: { success: false, error: '密碼錯誤次數太多，請 15 分鐘後再試', error_code: 'rate_limited' } }));
+    check('payroll_unlock：錯太多次 → 429 rate_limited', t.res.status === 429 && t.out.code === 'rate_limited' && /15 分鐘/.test(t.out.error));
+    t = await run({ action: 'payroll_unlock', company_id: COMPANY, password: 'x' },
+      unlockRoutes({ body: { success: false, error: '您不是這家公司的成員', error_code: 'access_denied' } }));
+    check('payroll_unlock：非公司成員 → 403 access_denied', t.res.status === 403 && t.out.code === 'access_denied');
+    t = await run({ action: 'payroll_unlock', company_id: COMPANY, password: '' });
+    check('payroll_unlock：沒帶密碼 → 400、不呼叫 RPC', t.res.status === 400 && !t.f.calls.some(x => x.url.includes('/rpc/')));
+    t = await run({ action: 'payroll_unlock', company_id: COMPANY, password: 'x'.repeat(101) });
+    check('payroll_unlock：密碼過長 → 400、不呼叫 RPC', t.res.status === 400 && !t.f.calls.some(x => x.url.includes('/rpc/')));
+    t = await run({ action: 'payroll_unlock', password: 'pw' });
+    check('payroll_unlock：沒帶公司 → 400', t.res.status === 400 && t.f.calls.length === 0);
+    t = await run({ action: 'payroll_unlock', company_id: COMPANY, password: 'pw' }, rpcRoutes([['/v2/profile', { status: 401, body: {} }]]));
+    check('payroll_unlock：LIFF token 驗不過 → 401、不比對密碼', t.res.status === 401 && !call(t.f, 'payroll_password_unlock'));
+    t = await run({ action: 'payroll_unlock', company_id: COMPANY, password: 'pw' }, unlockRoutes({ status: 500, body: { message: 'boom' } }));
+    check('payroll_unlock：RPC 連不上 → 503（fail-closed，不放行）', t.res.status === 503 && !t.out.unlock_token);
+    t = await run({ action: 'payroll_unlock', company_id: COMPANY, password: 'pw' }, missingRoute('payroll_password_unlock'));
+    check('payroll_unlock：133 未套 → 503「資料庫尚未更新（133）」、不放行', t.res.status === 503 && t.out.code === 'db_not_migrated' && /（133）/.test(t.out.error) && !t.out.unlock_token);
   }
 
   console.log('\n=== line-webhook ===');
