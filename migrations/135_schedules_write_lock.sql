@@ -16,6 +16,7 @@
 --
 -- 本檔：drop 兩條寫入政策；anon／authenticated 只留 SELECT（讀取收斂屬 P1，另案）
 -- 回滾：migrations/135_schedules_write_lock_rollback.sql
+-- 套用身分：必須以表擁有者 postgres 套用（SQL Editor／supabase db push）；檔尾的自我檢查會在撤權未生效時整筆回復。
 -- 只建立 migration 檔，不得由開發流程直接套用正式資料庫。
 -- ============================================================
 
@@ -33,5 +34,23 @@ DROP POLICY IF EXISTS "schedules_update" ON public.schedules;
 
 REVOKE ALL ON public.schedules FROM anon, authenticated;
 GRANT SELECT ON public.schedules TO anon, authenticated;
+
+-- 自我檢查（同一交易）：撤權沒生效就整筆回復
+DO $$ DECLARE r text; p text; BEGIN
+  FOREACH r IN ARRAY ARRAY['anon', 'authenticated'] LOOP
+    FOREACH p IN ARRAY ARRAY['INSERT', 'UPDATE', 'DELETE', 'TRUNCATE'] LOOP
+      IF has_table_privilege(r, 'public.schedules', p) THEN
+        RAISE EXCEPTION '撤權未生效：% 仍有 schedules 的 %（請以表擁有者 postgres 身分套用）', r, p;
+      END IF;
+    END LOOP;
+    IF NOT has_table_privilege(r, 'public.schedules', 'SELECT') THEN
+      RAISE EXCEPTION '% 失去 schedules 的 SELECT（讀取不應受影響）', r;
+    END IF;
+  END LOOP;
+  IF EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'schedules'
+             AND cmd IN ('INSERT', 'UPDATE', 'DELETE', 'ALL') AND qual IS DISTINCT FROM 'false') THEN
+    RAISE EXCEPTION 'schedules 仍有會放行的寫入政策';
+  END IF;
+END $$;
 
 COMMIT;

@@ -56,8 +56,9 @@ const ST = { day: '00000000-0000-0000-0000-00000000cd01', night: '00000000-0000-
 const SW = {
   ok: '00000000-0000-0000-0000-00000000ee01', notAgreed: '00000000-0000-0000-0000-00000000ee02', noSched: '00000000-0000-0000-0000-00000000ee03',
   cross: '00000000-0000-0000-0000-00000000ee04', rej: '00000000-0000-0000-0000-00000000ee05', b: '00000000-0000-0000-0000-00000000ee06',
-  pa: '00000000-0000-0000-0000-00000000ee07',
+  pa: '00000000-0000-0000-0000-00000000ee07', off: '00000000-0000-0000-0000-00000000ee08',
 };
+const OFF_DATE = '2026-10-07';
 const MK = '00000000-0000-0000-0000-00000000aa01';
 const SWAP_DATE = '2026-10-05';
 
@@ -147,7 +148,8 @@ const SWAP_DATE = '2026-10-05';
         ('${ST.b}', 'D', 'B 早班', '08:00', '17:00', '${B}');
       INSERT INTO public.schedules (employee_id, date, shift_type_id) VALUES
         ('${E.e4}', '${SWAP_DATE}', '${ST.day}'), ('${E.e5}', '${SWAP_DATE}', '${ST.night}'),
-        ('${E.e4}', '${today}', '${ST.day}'), ('${E.bUser}', '${SWAP_DATE}', '${ST.b}');
+        ('${E.e4}', '${today}', '${ST.day}'), ('${E.bUser}', '${SWAP_DATE}', '${ST.b}'), ('${E.e1}', '${OFF_DATE}', '${ST.day}');
+      INSERT INTO public.schedules (employee_id, date, shift_type_id, is_off_day, notes) VALUES ('${E.e2}', '${OFF_DATE}', NULL, true, '家中有事');
       INSERT INTO public.attendance (employee_id, date, check_in_time, check_out_time, is_late) VALUES
         ('${E.bUser}', '${yesterday}', now() - interval '1 day 9 hours', now() - interval '1 day', false);
       INSERT INTO public.shift_swap_requests (id, requester_id, target_id, swap_date, status, target_agreed, requester_original_shift, target_original_shift) VALUES
@@ -157,7 +159,8 @@ const SWAP_DATE = '2026-10-05';
         ('${SW.cross}', '${E.e4}', '${E.bUser}', '${SWAP_DATE}', 'pending_admin', true, '早班', 'B 早班'),
         ('${SW.rej}', '${E.e4}', '${E.e5}', '${SWAP_DATE}', 'pending_admin', true, '早班', '晚班'),
         ('${SW.b}', '${E.bUser}', '${E.bAdmin}', '${SWAP_DATE}', 'pending_admin', true, NULL, NULL),
-        ('${SW.pa}', '${E.e4}', '${E.e5}', '${SWAP_DATE}', 'pending_admin', true, '早班', '晚班');
+        ('${SW.pa}', '${E.e4}', '${E.e5}', '${SWAP_DATE}', 'pending_admin', true, '早班', '晚班'),
+        ('${SW.off}', '${E.e1}', '${E.e2}', '${OFF_DATE}', 'pending_admin', true, '早班', '休');
     `);
   }
 
@@ -291,6 +294,11 @@ const SWAP_DATE = '2026-10-05';
     && (await schedOf(E.e4, SWAP_DATE)).shift_type_id === ST.day);
   r = await sw('Umgr', SW.b, 'approve');
   check('A 主管審 B 公司內部的換班：找不到', r?.error_code === 'not_found');
+  r = await sw('Umgr', SW.off, 'approve');
+  const o1 = await schedOf(E.e1, OFF_DATE), o2 = await schedOf(E.e2, OFF_DATE);
+  check('上班日與休假日互換：整格互換（班別＋休假標記），不會出現「有班別又標休假」', r?.success === true
+    && o1.shift_type_id === null && o1.is_off_day === true && o2.shift_type_id === ST.day && o2.is_off_day === false, JSON.stringify([o1, o2]));
+  check('換班不動備註', o2.notes === '家中有事' && o1.notes === null);
 
   // ---------- 3. 套 135 ----------
   console.log('\n=== 套用 135（schedules 寫入鎖）===');
@@ -300,6 +308,15 @@ const SWAP_DATE = '2026-10-05';
     let e2 = '';
     try { await db2.exec(m135); } catch (e) { e2 = e.message; }
     check('沒套 131／133 就套 135：中止（避免排班、換班失去寫入路徑）', /131／133/.test(e2), e2);
+    await db2.exec('ROLLBACK');
+    // 以非擁有者身分套 134：REVOKE 只會警告不會報錯 → 必須由檔內自我檢查（或 DROP POLICY）整筆回復
+    let e3 = '';
+    try { await db2.exec('SET ROLE service_role'); await db2.exec(m134); } catch (e) { e3 = e.message; }
+    try { await db2.exec('ROLLBACK'); } catch (_) { /* 無交易 */ }
+    await db2.exec('RESET ROLE');
+    const still = (await db2.query(`SELECT has_table_privilege('anon', 'public.attendance', 'INSERT') AS i,
+      (SELECT count(*)::int FROM pg_policies WHERE tablename = 'attendance' AND policyname = '允許插入考勤記錄') AS p`)).rows[0];
+    check('不是以表擁有者身分套 134：中止、整筆回復（不會出現「以為撤了其實沒撤」）', e3 !== '' && still.i === true && still.p === 1, e3);
     await db2.close();
   }
   await seed();
@@ -319,7 +336,7 @@ const SWAP_DATE = '2026-10-05';
     r = await as(role, `TRUNCATE public.schedules`);
     check(`${role} TRUNCATE 排班：permission denied`, denied(r), r.error);
     r = await as(role, `SELECT s.date FROM public.schedules s JOIN public.employees e ON e.id = s.employee_id WHERE e.company_id = $1`, [A]);
-    check(`${role} 仍讀得到排班（班表頁、薪資頁）`, !r.error && r.rows.length === 3, r.error);
+    check(`${role} 仍讀得到排班（班表頁、薪資頁）`, !r.error && r.rows.length === 5, r.error);
   }
   check('排班資料沒被動到', (await schedCount()) === sBefore && (await schedOf(E.e4, SWAP_DATE)).shift_type_id === ST.day);
   r = await rpc('service_role', 'save_schedules_verified', { p_company_id: A, p_line_user_id: 'Uadmin', p_items: JSON.stringify([
@@ -329,12 +346,21 @@ const SWAP_DATE = '2026-10-05';
     && (await schedOf(E.e4, SWAP_DATE)).shift_type_id === ST.night && (await schedOf(E.e2, '2026-10-06')).is_off_day === true, JSON.stringify(r));
   r = await rpc('service_role', 'save_schedules_verified', { p_company_id: A, p_line_user_id: 'U9', p_items: JSON.stringify([{ employee_id: E.e1, date: '2026-10-06', delete: true }]) });
   check('135 之後：排班員刪除排班照常', r?.success === true && !(await schedOf(E.e1, '2026-10-06')));
+  r = await rpc('service_role', 'save_schedules_verified', { p_company_id: A, p_line_user_id: 'Uadmin', p_items: JSON.stringify([
+    { employee_id: E.e2, date: OFF_DATE, shift_type_id: ST.night, is_off_day: false, notes: '家中有事' }]) });
+  check('排班儲存帶原本的備註（前端沿用）：備註保留', r?.success === true && (await schedOf(E.e2, OFF_DATE)).notes === '家中有事');
   r = await sw('Umgr', SW.rej, 'approve');
   check('135 之後：換班核准照常（兩人班別互換）', r?.success === true && (await schedOf(E.e4, SWAP_DATE)).shift_type_id === ST.night && (await schedOf(E.e5, SWAP_DATE)).shift_type_id === ST.night, JSON.stringify(r));
   r = await rpc('anon', 'quick_check_in', { p_line_user_id: 'U4', p_latitude: 25.03, p_longitude: 121.56, p_photo_url: null, p_device_id: null, p_action: 'check_in' });
   check('135 之後：排班制員工打卡照常（讀 schedules）', r?.success === true && (await attOf(E.e4)).shift_type_id === ST.day, JSON.stringify(r));
   r = await rpc('anon', 'kiosk_check_in', { p_kiosk_line_user_id: 'Ukiosk', p_employee_id: E.e1, p_action: 'check_in', p_photo_url: null, p_latitude: null, p_longitude: null });
   check('135 之後：公務機打卡照常', r?.success === true, JSON.stringify(r));
+  // 已被打卡紀錄引用的排班（attendance.schedule_id，正式庫有外鍵）：刪除會讓整批失敗 → 前端事先略過並告知
+  const refd = await one(`SELECT a.schedule_id FROM public.attendance a WHERE a.employee_id = $1 AND a.date = $2`, [E.e4, today]);
+  r = await rpc('service_role', 'save_schedules_verified', { p_company_id: A, p_line_user_id: 'Uadmin', p_items: JSON.stringify([
+    { employee_id: E.e1, date: '2026-10-09', shift_type_id: ST.day }, { employee_id: E.e4, date: today, delete: true }]) });
+  check('（說明前端為何先檢查）刪除已有打卡紀錄的排班：DB 外鍵擋下、整批不存', !!refd?.schedule_id && r?.success === false && r.error_code === 'item_failed'
+    && /foreign key/.test(r.error) && !!(await schedOf(E.e4, today)) && !(await schedOf(E.e1, '2026-10-09')), JSON.stringify(r));
 
   check('打卡／補卡／排班寫入函式（10 支）本體與正式庫原文逐字相同（本 PR 不改打卡路徑）', (await writerDefs()) === writersBefore);
 

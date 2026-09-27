@@ -105,6 +105,9 @@ GRANT ALL ON public.shift_types TO anon, authenticated;
 CREATE POLICY "Users can read own attendance" ON public.attendance FOR SELECT TO anon, authenticated
   USING (employee_id IN (SELECT employees.id FROM employees WHERE ((employees.line_user_id)::text = (auth.jwt() ->> 'sub'::text))));
 GRANT ALL ON public.attendance, public.schedules TO anon, authenticated;
+ALTER TABLE public.attendance
+  ADD CONSTRAINT attendance_schedule_id_fkey FOREIGN KEY (schedule_id) REFERENCES public.schedules(id),
+  ADD CONSTRAINT attendance_shift_type_id_fkey FOREIGN KEY (shift_type_id) REFERENCES public.shift_types(id);
 
 -- ↓↓↓ 正式庫原文（pg_get_functiondef，2026-09-28）↓↓↓
 CREATE OR REPLACE FUNCTION public.lunch_overlap_hours(p_company_id uuid, p_date date, p_start timestamp without time zone, p_end timestamp without time zone)

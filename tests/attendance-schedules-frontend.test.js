@@ -64,22 +64,28 @@ const readsAtt = files.filter(f => /from\(\s*['"]attendance['"]\s*\)/.test(f.src
 check('讀取照舊（134／135 只撤寫入）：仍有頁面讀 attendance', readsAtt > 0, `${readsAtt} 個檔案`);
 
 const sched = read('modules/schedules.js');
-const saveSrc = grab(sched, 'saveSchedule'), approveSrc = grab(sched, 'approveSwap'), rejectSrc = grab(sched, 'rejectSwap');
-check('saveSchedule／approveSwap／rejectSwap 都找得到', !!(saveSrc && approveSrc && rejectSrc));
+const saveSrc = grab(sched, 'saveSchedule'), approveSrc = grab(sched, 'approveSwap'), rejectSrc = grab(sched, 'rejectSwap'), copySrc = grab(sched, 'copyLastWeek');
+check('saveSchedule／approveSwap／rejectSwap／copyLastWeek 都找得到', !!(saveSrc && approveSrc && rejectSrc && copySrc));
+check('載入／複製上週：不再把沒有班別的列當成不存在的 morning 班', !/\|\|\s*'morning'/.test(sched) && /is_off_day \? 'off'/.test(grab(sched, 'loadShiftMgr')));
 check('換班審核不再送審核人（approver_id／currentAdminEmployee.id）', !/approver_id/.test(approveSrc + rejectSrc) && !/currentAdminEmployee\?\.id/.test(approveSrc + rejectSrc));
 check('換班審核不再直接寫 shift_swap_requests', !/from\('shift_swap_requests'\)[^;]*\.update\(/.test(approveSrc + rejectSrc));
 
 // 實跑：組出假的執行環境
-function makeEnv({ reply = () => ({ ok: true, data: { ok: true, saved_count: 1, result: { success: true, swap_date: '2026-10-05' } } }), existing = 0, confirmAnswer = true } = {}) {
-  const calls = [], sbCalls = [], toasts = [], audits = [], notifies = [];
+// tables：假的 schedules／attendance 資料，in()／gte()／lte() 會照欄位過濾
+function makeEnv({ reply = () => ({ ok: true, data: { ok: true, saved_count: 1, result: { success: true, swap_date: '2026-10-05' } } }), tables = {}, confirmAnswer = true } = {}) {
+  const calls = [], sbCalls = [], toasts = [], audits = [], notifies = [], renders = [];
   const status = { style: {}, textContent: '' };
   const chain = (table) => {
+    let rows = (tables[table] || []).slice();
     const q = {
       _t: table,
-      select() { return q; }, in() { return q; }, eq() { return q; },
+      select() { return q; }, eq() { return q; },
+      in(col, vals) { rows = rows.filter(r => vals.includes(r[col])); return q; },
+      gte(col, v) { rows = rows.filter(r => r[col] >= v); return q; },
+      lte(col, v) { rows = rows.filter(r => r[col] <= v); return q; },
       single: async () => ({ data: { swap_date: '2026-10-05', requester_id: 'e4', target_id: 'e5', requester: { name: '甲', id: 'e4', company_id: 'co-a' }, target: { name: '乙', id: 'e5' } } }),
       maybeSingle: async () => ({ data: null }),
-      then(res) { return Promise.resolve({ count: existing, data: [] }).then(res); },
+      then(res) { return Promise.resolve({ count: rows.length, data: rows, error: null }).then(res); },
     };
     for (const w of ['insert', 'update', 'upsert', 'delete']) q[w] = () => { sbCalls.push(`${table}.${w}`); return Promise.resolve({ error: null }); };
     return q;
@@ -92,23 +98,31 @@ function makeEnv({ reply = () => ({ ok: true, data: { ok: true, saved_count: 1, 
     confirm: () => confirmAnswer, prompt: () => '人手不足',
     showToast: (m) => toasts.push(m), friendlyError: (e) => e.message,
     writeAuditLog: (...a) => audits.push(a), sendUserNotify: (...a) => notifies.push(a), loadSwapApprovals: () => {},
-    setTimeout: () => {},
+    setTimeout: () => {}, renderShiftTable: () => renders.push(1),
+    smEmployees: [{ id: '00000000-0000-0000-0000-0000000000e2', name: '員工二' }],
+    fmtDate: (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`,
+    getWeekDates: () => Array.from({ length: 7 }, (_, i) => new Date(2026, 9, 5 + i)),
   };
-  return { env, calls, sbCalls, toasts, audits, notifies, status };
+  return { env, calls, sbCalls, toasts, audits, notifies, status, renders };
 }
 function build(t, original, data) {
   const names = Object.keys(t.env);
   const f = new Function(...names, 'smScheduleOriginal', 'smScheduleData',
-    `${saveSrc}\n${approveSrc}\n${rejectSrc}\nreturn { saveSchedule, approveSwap, rejectSwap, state: () => ({ smScheduleOriginal, smScheduleData }) };`);
+    `${saveSrc}\n${approveSrc}\n${rejectSrc}\n${copySrc}\nreturn { saveSchedule, approveSwap, rejectSwap, copyLastWeek, state: () => ({ smScheduleOriginal, smScheduleData }) };`);
   return f(...names.map(n => t.env[n]), original, data);
 }
 
 (async () => {
-  if (!(saveSrc && approveSrc && rejectSrc)) { finish(); return; }
+  if (!(saveSrc && approveSrc && rejectSrc && copySrc)) { finish(); return; }
   console.log('\n=== 後台排班儲存（saveSchedule，實跑）===');
   const K = (e, d) => `${e}_2026-10-0${d}`;
   const e1 = '00000000-0000-0000-0000-0000000000e1', e2 = '00000000-0000-0000-0000-0000000000e2', e3 = '00000000-0000-0000-0000-0000000000e3', e4 = '00000000-0000-0000-0000-0000000000e4';
-  let t = makeEnv({ existing: 2 });
+  const baseRows = () => [
+    { id: 's1', employee_id: e1, date: '2026-10-05', notes: '支援外場' },
+    { id: 's2', employee_id: e2, date: '2026-10-05', notes: null },
+    { id: 's3', employee_id: e3, date: '2026-10-05', notes: null },
+  ];
+  let t = makeEnv({ tables: { schedules: baseRows(), attendance: [] } });
   let h = build(t, { [K(e1, 5)]: 'D', [K(e2, 5)]: 'N', [K(e3, 5)]: 'D' }, { [K(e1, 5)]: 'N', [K(e2, 5)]: null, [K(e3, 5)]: 'D', [K(e4, 6)]: 'off' });
   await h.saveSchedule();
   const items = t.calls[0]?.payload?.items || [];
@@ -117,16 +131,52 @@ function build(t, original, data) {
   check('只送有變更的 3 格（沒動的不重寫）', items.length === 3 && !byEmp[e3], JSON.stringify(items));
   check('改班別 → shift_type_id；清成未排 → delete；休 → is_off_day',
     byEmp[e1]?.shift_type_id === 'st-n' && byEmp[e1]?.date === '2026-10-05' && byEmp[e2]?.delete === true && byEmp[e4]?.is_off_day === true && byEmp[e4]?.shift_type_id === null);
+  check('改動的格子沿用原本的備註（畫面不能編輯備註，不會被清掉）', byEmp[e1]?.notes === '支援外場' && byEmp[e4]?.notes === null, JSON.stringify(byEmp[e1]));
   check('帶公司、不帶任何排班人／LINE ID', t.calls[0]?.payload?.company_id === 'co-a' && !/Uadmin|emp-admin|scheduler/.test(JSON.stringify(t.calls[0]?.payload)));
-  check('成功後以目前班表為新基準（再按一次不會重送）', JSON.stringify(h.state().smScheduleOriginal) === JSON.stringify(h.state().smScheduleData) && /已儲存 3 筆/.test(t.status.textContent));
+  check('成功後以目前班表為新基準（再按一次不會重送）', JSON.stringify(h.state().smScheduleOriginal) === JSON.stringify(Object.fromEntries(Object.entries(h.state().smScheduleData).filter(([, v]) => v))) && /已儲存 3 筆/.test(t.status.textContent));
   t.calls.length = 0;
   await h.saveSchedule();
   check('沒有變更：不呼叫伺服器', t.calls.length === 0 && /沒有排班變更/.test(t.status.textContent));
 
-  t = makeEnv({ existing: 1, confirmAnswer: false });
+  t = makeEnv({ tables: { schedules: baseRows(), attendance: [] }, confirmAnswer: false });
   h = build(t, { [K(e1, 5)]: 'D' }, { [K(e1, 5)]: 'N' });
   await h.saveSchedule();
   check('覆蓋既有排班時按取消：不送出', t.calls.length === 0);
+
+  // 已被打卡紀錄引用的排班（attendance.schedule_id）不能刪：保留該格、其餘照存、告知是哪幾格
+  t = makeEnv({ tables: { schedules: baseRows(), attendance: [{ schedule_id: 's2' }] } });
+  h = build(t, { [K(e1, 5)]: 'D', [K(e2, 5)]: 'N' }, { [K(e1, 5)]: 'N', [K(e2, 5)]: null });
+  await h.saveSchedule();
+  let sent = t.calls[0]?.payload?.items || [];
+  check('清除已有打卡紀錄的排班：不送刪除、其餘照存（不會整批失敗）', sent.length === 1 && sent[0].employee_id === e1 && !sent.some(i => i.delete), JSON.stringify(sent));
+  check('該格還原成原本的班別並告知（含員工與日期）', h.state().smScheduleData[K(e2, 5)] === 'N' && /1 格已有打卡紀錄，保留原排班未刪除（員工二 2026-10-05）/.test(t.status.textContent) && t.renders.length === 1, t.status.textContent);
+  t = makeEnv({ tables: { schedules: baseRows(), attendance: [{ schedule_id: 's2' }] } });
+  h = build(t, { [K(e2, 5)]: 'N' }, { [K(e2, 5)]: null });
+  await h.saveSchedule();
+  check('只有被引用的刪除：不呼叫伺服器、說明原因', t.calls.length === 0 && /沒有可儲存的變更.*已有打卡紀錄/.test(t.status.textContent), t.status.textContent);
+  t = makeEnv({ tables: { schedules: baseRows(), attendance: [] }, reply: () => ({ ok: false, code: 'item_failed', message: 'update or delete on table "schedules" violates foreign key constraint' }) });
+  h = build(t, { [K(e2, 5)]: 'N' }, { [K(e2, 5)]: null });
+  await h.saveSchedule();
+  check('送出後才遇到外鍵錯誤（同時有人打卡）：顯示看得懂的訊息，不是原始 SQL 錯誤', /已被打卡紀錄使用/.test(t.status.textContent) && !/foreign key/.test(t.status.textContent), t.status.textContent);
+
+  // 班別已不存在的格子：不存、告知，而且下次仍算未存（不會假裝存好了）
+  t = makeEnv({ tables: { schedules: [], attendance: [] } });
+  h = build(t, {}, { [K(e1, 5)]: 'N', [K(e2, 6)]: 'morning' });
+  await h.saveSchedule();
+  check('班別已不存在的格子：不送、告知，基準不更新', (t.calls[0]?.payload?.items || []).length === 1 && /1 格的班別已不存在，未儲存/.test(t.status.textContent)
+    && h.state().smScheduleOriginal[K(e2, 6)] === undefined && h.state().smScheduleOriginal[K(e1, 5)] === 'N', t.status.textContent);
+
+  console.log('\n=== 複製上週（copyLastWeek，實跑）===');
+  t = makeEnv({ tables: { schedules: [
+    { employee_id: e1, date: '2026-09-28', is_off_day: false, shift_types: { code: 'D', name: '早班' } },
+    { employee_id: e2, date: '2026-09-28', is_off_day: true, shift_types: null },
+    { employee_id: e3, date: '2026-09-28', is_off_day: false, shift_types: null },
+  ] } });
+  h = build(t, {}, {});
+  await h.copyLastWeek();
+  const cd = h.state().smScheduleData;
+  check('上週休假照抄成「休」、上班照抄班別、沒有班別的列不抄（不再變成不存在的 morning）',
+    cd[K(e1, 5)] === 'D' && cd[K(e2, 5)] === 'off' && cd[K(e3, 5)] === undefined && /已複製上週 2 筆/.test(t.toasts.at(-1)), JSON.stringify(cd));
 
   t = makeEnv({ reply: () => ({ ok: false, code: 'access_denied', message: '沒有排班權限' }) });
   h = build(t, {}, { [K(e1, 5)]: 'D' });

@@ -8,7 +8,7 @@
 -- 新增：review_shift_swap_request（只給 service_role，由 line-push 驗 LIFF 後代呼叫）
 --   - 審核人＝LINE 驗證的本人：在職 admin／manager（非公務機），或綁定該公司的平台管理員（沿用 131 的 is_company_manager_caller）
 --   - 申請人與對象都必須屬於該公司；只處理 pending_admin（且對方已同意）的申請
---   - 核准：鎖住兩人當天的排班，同一交易互換班別並把申請標為 approved；任一步失敗整筆不存
+--   - 核准：鎖住兩人當天的排班，同一交易整格互換（班別與休假標記）並把申請標為 approved；任一步失敗整筆不存
 --   - 拒絕：標為 rejected、記錄原因
 --
 -- 前提：131 已套用（is_company_manager_caller）。
@@ -86,19 +86,20 @@ BEGIN
         RETURN jsonb_build_object('success', false, 'error', '對方尚未同意換班', 'error_code', 'not_agreed');
     END IF;
 
-    SELECT s.id, s.shift_type_id INTO v_s1 FROM public.schedules s
+    SELECT s.id, s.shift_type_id, COALESCE(s.is_off_day, false) AS is_off_day INTO v_s1 FROM public.schedules s
     WHERE s.employee_id = v_req.requester_id AND s.date = v_req.swap_date FOR UPDATE;
     v_found1 := FOUND;
-    SELECT s.id, s.shift_type_id INTO v_s2 FROM public.schedules s
+    SELECT s.id, s.shift_type_id, COALESCE(s.is_off_day, false) AS is_off_day INTO v_s2 FROM public.schedules s
     WHERE s.employee_id = v_req.target_id AND s.date = v_req.swap_date FOR UPDATE;
     v_found2 := FOUND;
     IF NOT v_found1 OR NOT v_found2 THEN
         RETURN jsonb_build_object('success', false, 'error', '雙方當天都必須已有排班，才能核准換班', 'error_code', 'schedule_missing');
     END IF;
 
-    -- 與原本前端相同：只互換 shift_type_id（同一交易，任一步失敗整筆回復）
-    UPDATE public.schedules SET shift_type_id = v_s2.shift_type_id WHERE id = v_s1.id;
-    UPDATE public.schedules SET shift_type_id = v_s1.shift_type_id WHERE id = v_s2.id;
+    -- 整格互換：班別與休假標記一起換（上班日與休假日互換時，休假標記跟著換過去，
+    -- 不會留下「有班別又標休假」的矛盾）。備註、排班人不動。同一交易，任一步失敗整筆回復。
+    UPDATE public.schedules SET shift_type_id = v_s2.shift_type_id, is_off_day = v_s2.is_off_day WHERE id = v_s1.id;
+    UPDATE public.schedules SET shift_type_id = v_s1.shift_type_id, is_off_day = v_s1.is_off_day WHERE id = v_s2.id;
     UPDATE public.shift_swap_requests
     SET status = 'approved', approver_id = v_approver, approved_at = now()
     WHERE id = v_req.id;
