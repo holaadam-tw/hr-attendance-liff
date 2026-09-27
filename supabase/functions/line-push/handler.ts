@@ -267,8 +267,9 @@ async function handleVerifiedAction(body: any, deps: Deps): Promise<Response> {
   // ---- 補卡審核：可一次多筆（一鍵全批），每筆各自由 DB 驗權限與公司 ----
   if (action === 'makeup_review') {
     const decision = body.decision === 'approve' || body.decision === 'reject' ? body.decision : null
-    const ids = Array.isArray(body.request_ids) ? body.request_ids : []
-    if (!decision || ids.length === 0 || ids.length > MAX_BATCH_REVIEWS || ids.some((i: unknown) => !uuidOrNull(i))) return badRequest()
+    const rawIds: unknown[] = Array.isArray(body.request_ids) ? body.request_ids : []
+    if (!decision || rawIds.length === 0 || rawIds.length > MAX_BATCH_REVIEWS || rawIds.some((i) => !uuidOrNull(i))) return badRequest()
+    const ids = [...new Set(rawIds as string[])]   // 重複的 id 只處理一次（indexOf 才能正確算出未處理的筆數）
     const reason = typeof body.reason === 'string' ? body.reason.slice(0, 500) : null
     const review = (id: string) => callRpc(deps, 'review_makeup_request', {
       p_company_id: companyId, p_line_user_id: lineUserId, p_request_id: id, p_decision: decision, p_reason: reason,

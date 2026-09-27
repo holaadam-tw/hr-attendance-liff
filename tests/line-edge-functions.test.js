@@ -413,6 +413,10 @@ const post = (url, body, headers = {}) => new Request(url, { method: 'POST', bod
       t.res.status === 503 && t.out.ok === false && t.out.code === 'service_unavailable' && t.out.approved_count === 1
       && t.out.approved_ids.length === 1 && t.out.approved_ids[0] === REQ && t.out.results.length === 2 && t.out.results[1].error === '此申請已處理過'
       && t.out.failed_id === REQ3 && Array.isArray(t.out.not_processed_ids) && t.out.not_processed_ids.length === 0, JSON.stringify(t.out));
+    // LOW：重複的 request_id 只處理一次
+    n = 0;
+    t = await run({ action: 'makeup_review', company_id: COMPANY, request_ids: [REQ, REQ, REQ3], decision: 'approve' });
+    check('makeup_review：重複的 id 去重後只呼叫一次 RPC', t.res.status === 200 && t.f.calls.filter(x => x.url.includes('/rpc/review_makeup_request')).length === 2 && t.out.results.length === 2);
     // L5：RPC 不存在（migration 還沒套）→ 明確告知
     const missingRoute = (name) => rpcRoutes([['/rpc/' + name, { status: 404, body: { code: 'PGRST202', message: 'Could not find the function public.' + name } }]]);
     t = await run({ action: 'makeup_review', company_id: COMPANY, request_ids: [REQ], decision: 'approve' }, missingRoute('review_makeup_request'));

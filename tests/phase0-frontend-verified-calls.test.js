@@ -109,6 +109,7 @@ function rest() {
   check('審核一律走 makeup_review／overtime_review', (body.match(/callVerifiedAction\('makeup_review'/g) || []).length === 3 && (body.match(/callVerifiedAction\('overtime_review'/g) || []).length === 2);
   check('前端不再送核准人（approver_id／currentAdminEmployee.id）', !/approver(_id|Id)\s*[:,)]/.test(body) && !/p_approver_id/.test(body) && !/currentAdminEmployee/.test(body));
   check('一鍵全批：每批最多 50 筆、一次送出', /todays\.slice\(i, i \+ 50\)/.test(body) && /request_ids: chunk\.map\(r => r\.id\)/.test(body));
+  check('一鍵全批：單筆批次的業務性失敗（已處理等）計為失敗但繼續，中斷類才停止', /const interrupted = results !== null/.test(body) && /continue;/.test(body));
   check('一鍵全批中途失敗：仍依伺服器回報的每筆結果計數、已核准的寫稽核（含 approved_ids）',
     /const results = Array\.isArray\(res\.data\?\.results\)/.test(body) && /approvedIds\.push\(x\.id\)/.test(body)
     && /writeAuditLog\('batch_approve_gps'[^\n]*approved_ids: approvedIds/.test(body) && /已通過 \$\{ok\} 筆/.test(body));
@@ -127,8 +128,8 @@ function rest() {
   const getTok = grab(ap, 'getCachedAttendanceLiffToken');
   check('打卡總覽讀 token：sessionStorage、key 含目前 LINE 使用者、過期就刪', /sessionStorage\.getItem\(attendanceLiffTokenKey\(\)\)/.test(getTok)
     && /currentLineUserId/.test(grab(ap, 'attendanceLiffTokenKey')) && /expires_at\) > Date\.now\(\)/.test(getTok) && /clearAttendanceLiffToken\(\)/.test(getTok));
-  check('存檔成功後刪 token（工時模式、排班都是）', /callAttendanceVerifiedAction\('employee_update'[^;]*;[^;]*;\s*clearAttendanceLiffToken\(\);/.test(grab(ap, 'saveHumanMode'))
-    && /clearAttendanceLiffToken\(\); showToast/.test(grab(ap, 'saveHumanSchedule')));
+  check('存檔成功「不」刪 token（工時模式一列一列存，第二列不能被迫重新登入）；只靠 50 分鐘期限與失效時刪',
+    !/clearAttendanceLiffToken/.test(grab(ap, 'saveHumanMode')) && !/clearAttendanceLiffToken/.test(grab(ap, 'saveHumanSchedule')));
   check('token 失效時刪 token', /clearAttendanceLiffToken\(\)/.test(grab(ap, 'reloginAttendancePublic')));
   const head = ap.slice(0, ap.indexOf('</head>'));
   const scripts = [...head.matchAll(/<script[^>]*src="([^"]+)"[^>]*>/g)].map(m => m[0]);
@@ -162,6 +163,20 @@ function rest() {
     ss.setItem('attendance_public_liff_token_C1_Uaaa', 'not-json');
     check('（實跑）內容壞掉：當作沒有', f.get() === null);
   } catch (e) { check('（實跑）token 讀取函式可執行', false, e.message); }
+
+  console.log('\n=== 全部頁面的外部腳本：固定版本＋SRI（M-B）===');
+  {
+    const tags = files.filter(f => f.rel.endsWith('.html')).flatMap(f => [...f.src.matchAll(/<script[^>]*src="(https:[^"]+)"[^>]*>/g)].map(m => ({ rel: f.rel, tag: m[0], url: m[1] })));
+    const sb = tags.filter(t => /@supabase\/supabase-js/.test(t.url));
+    const liffTags = tags.filter(t => /static\.line-scdn\.net\/liff/.test(t.url));
+    check('supabase-js：沒有任何頁面載入浮動的 @2', !sb.some(t => /supabase-js@2(["\/]|$)/.test(t.url + '"') && !/@2\.\d+\.\d+/.test(t.url)), sb.filter(t => !/@2\.\d+\.\d+/.test(t.url)).map(t => t.rel).join(', '));
+    check('supabase-js：全部固定 2.117.2＋SRI＋crossorigin', sb.length >= 20 && sb.every(t => t.url.endsWith('@2.117.2/dist/umd/supabase.js')
+      && /integrity="sha384-Rj26LVGvoeRVR6\+mwQmFfcR3QOBEwT\+ZmuCWpuiqeTzJpCs0ER4ITAWGb4Hiy3Ok"/.test(t.tag) && /crossorigin="anonymous"/.test(t.tag)), sb.length + ' 處');
+    check('LIFF SDK：沒有任何頁面載入浮動的 edge/2', !liffTags.some(t => /liff\/edge\/2\//.test(t.url)), liffTags.filter(t => /edge\/2\//.test(t.url)).map(t => t.rel).join(', '));
+    check('LIFF SDK：全部固定 versions/2.31.0＋SRI＋crossorigin', liffTags.length >= 18 && liffTags.every(t => t.url.endsWith('/liff/edge/versions/2.31.0/sdk.js')
+      && /integrity="sha384-T6WhT96rkehAFkTtmiRZ60sehxj4zgbifvzi7oGH792T3NN\+\+f2rCvyb\/WrHAz2D"/.test(t.tag) && /crossorigin="anonymous"/.test(t.tag)), liffTags.length + ' 處');
+    check('index.html（LIFF endpoint）也已固定', tags.some(t => t.rel === 'index.html' && /@2\.117\.2/.test(t.url)) && tags.some(t => t.rel === 'index.html' && /versions\/2\.31\.0/.test(t.url)));
+  }
 
   console.log('\n=== 快取版本 ===');
   const htmls = files.filter(f => f.rel.endsWith('.html') && /common\.js\?v=/.test(f.src));

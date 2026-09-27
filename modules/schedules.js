@@ -529,8 +529,11 @@ export async function batchApproveTodayGpsMakeups() {
             }
             if (!res.ok) {
                 fail += chunk.length - (results ? results.length : 0);
-                stopMessage = res.message || '審核中斷';
-                break;
+                // 單筆批次的業務性失敗（例如已被別人處理）不是中斷：計為失敗、繼續下一批
+                const interrupted = results !== null || !res.data || ['service_unavailable', 'db_not_migrated', 'network_error', 'invalid_response',
+                    'unauthenticated', 'relogin_redirect', 'access_denied'].includes(res.code);
+                if (interrupted) { stopMessage = res.message || '審核中斷'; break; }
+                continue;
             }
             if (!results && !res.data?.result?.success) fail += chunk.length;
         } catch (_) { fail += chunk.length; stopMessage = '審核中斷'; break; }
