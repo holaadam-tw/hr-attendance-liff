@@ -5,11 +5,58 @@ const CONFIG = {
     SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5zc3Vpc3l2bHJxbnFmeHVwa2xiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkyOTAwMzUsImV4cCI6MjA4NDg2NjAzNX0.q_B6v3gf1TOCuAq7z0xIw10wDueCSJn0p37VzdMfmbc',
     BUCKET: 'selfies',
     // P1 Phase 1：'shadow'＝登入後在背景建立 LINE 驗證的 Supabase session（不改任何現有查詢）；'off'＝關閉
-    LINE_AUTH_MODE: 'shadow'
+    LINE_AUTH_MODE: 'shadow',
+    // P1 Phase 2：'session'＝帶 p_line_user_id 的 RPC 在有 LINE session 時改用 session client 呼叫（141 soft mode 據此記錄覆蓋率）；'anon'＝全部照舊用 anon
+    LINE_AUTH_RPC: 'session'
 };
 
 const sb = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
 window.sb = sb;
+
+// ===== P1 身分根治 Phase 2：帶 p_line_user_id 的 RPC 在有 LINE session 時改用 session client 呼叫 =====
+// - 141 把這些 RPC 包成 wrapper：JWT 的 LINE userId 與 p_line_user_id 相符就不記錄；不符或沒有 session（anon）
+//   在 soft mode 只記錄、照常執行。這裡讓有 session 的頁面帶著 session 呼叫，紀錄才看得出真正的覆蓋率。
+// - 名單＝scripts/line-auth/wrapped_rpcs.json 的 rpc_names（產生器產生；測試逐一比對）
+// - 只在 LINE session 已建立且屬於目前 LIFF 帳號、access token 還沒到期時切換（_lineAuthRpcReady／_lineAuthExpiresAt，
+//   由下方 Phase 1 區塊設定；refresh 失敗時 token 會過期 → 自動回到 anon，不會讓呼叫因 JWT 過期而失敗）；
+//   其他情況、其他 RPC、所有 from() 查詢一律照舊用 anon 的 sb
+// - wrapper 與原函式的權限相同（anon 與 authenticated 都可執行）、原函式都是 SECURITY DEFINER（不受 RLS 角色差異影響）
+// - 關閉：CONFIG.LINE_AUTH_RPC = 'anon'（或單機 localStorage line_auth_rpc=anon）；CONFIG.LINE_AUTH_MODE = 'off' 也會一併關閉
+const LINE_AUTH_SESSION_RPCS = new Set([
+    'admin_makeup_punch', 'approve_leave_request', 'confirm_daily_overtime', 'count_fw_trackpoints',
+    'create_shift_type', 'delete_company_holiday', 'delete_shift_type', 'get_attendance_anomalies',
+    'get_checkin_failures', 'get_company_current_salaries', 'get_company_daily_attendance', 'get_company_holidays',
+    'get_company_leave_requests_for_audit', 'get_company_monthly_attendance', 'get_company_monthly_missing_minutes',
+    'get_company_overtime_requests', 'get_company_payroll', 'get_company_shift_types', 'get_employee_current_salary',
+    'get_employee_schedule', 'get_fw_trackpoints', 'get_leave_approval_requests', 'get_leave_approval_requests_v2',
+    'get_leave_history', 'get_line_push_status', 'get_makeup_review_requests',
+    'get_missing_work_hours_notification_control', 'get_monthly_attendance', 'get_my_current_salary',
+    'get_my_makeup_requests', 'get_my_overtime_requests', 'get_my_payslip', 'get_my_year_end_stats',
+    'get_pending_makeup_requests', 'get_pending_overtime_requests', 'get_weekly_schedules', 'insert_fw_trackpoints',
+    'log_checkin_failure', 'preview_company_missing_work_hours', 'quick_check_in',
+    'quick_check_out_after_clock_in_makeup', 'register_employee', 'resolve_attendance_anomaly',
+    'save_payroll_records', 'set_missing_work_hours_notification_enabled', 'set_my_preferred_language',
+    'submit_leave_request', 'submit_makeup_punch', 'submit_overtime_request', 'update_shift_type',
+    'upsert_company_holiday', 'upsert_salary_setting'
+]);
+let _lineAuthRpcReady = false;
+let _lineAuthExpiresAt = 0;   // 秒（Supabase session.expires_at）
+window.lineAuthRpcCounts = { session: 0, anon: 0 };
+const _anonRpc = sb.rpc.bind(sb);
+function lineAuthRpcEnabled() {
+    try { if (localStorage.getItem('line_auth_rpc') === 'anon') return false; } catch (e) {}
+    return CONFIG.LINE_AUTH_RPC !== 'anon' && lineAuthMode() !== 'off';
+}
+sb.rpc = function (fn, args, options) {
+    if (LINE_AUTH_SESSION_RPCS.has(fn)) {
+        if (_lineAuthRpcReady && Date.now() / 1000 < _lineAuthExpiresAt - 30 && lineAuthRpcEnabled()) {
+            window.lineAuthRpcCounts.session++;
+            return getLineAuthClient().rpc(fn, args, options);
+        }
+        window.lineAuthRpcCounts.anon++;
+    }
+    return _anonRpc(fn, args, options);
+};
 
 // 全域變數
 let liffProfile = null;
@@ -149,9 +196,9 @@ function getLineAuthClient() {
             auth: { storageKey: LINE_AUTH_STORAGE_KEY, persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
         });
         try {
-            _lineAuthClient.auth.onAuthStateChange((evt) => {
-                if (evt === 'TOKEN_REFRESHED') lineAuthLog('refreshed');
-                if (evt === 'SIGNED_OUT') lineAuthLog('signed_out');
+            _lineAuthClient.auth.onAuthStateChange((evt, session) => {
+                if (evt === 'TOKEN_REFRESHED') { _lineAuthExpiresAt = Number(session && session.expires_at) || 0; lineAuthLog('refreshed'); }
+                if (evt === 'SIGNED_OUT') { _lineAuthRpcReady = false; lineAuthLog('signed_out'); }
             });
         } catch (e) {}
     }
@@ -170,6 +217,7 @@ async function establishLineAuthSession() {
     if (lineAuthMode() === 'off') { lineAuthLog('disabled'); return { ok: false, reason: 'disabled' }; }
     const lineUserId = liffProfile && liffProfile.userId;
     if (!lineUserId || !window.supabase || typeof window.supabase.createClient !== 'function') return { ok: false, reason: 'not_ready' };
+    _lineAuthRpcReady = false;   // Phase 2：確認 session 屬於目前 LINE 帳號之前，RPC 一律走 anon
     try {
         const client = getLineAuthClient();
         const { data } = await client.auth.getSession();
@@ -179,6 +227,8 @@ async function establishLineAuthSession() {
             // 本機存的 session 不代表伺服器還認：問一次 Auth（帳號被刪／refresh 失效 → 清掉重換）
             const check = await client.auth.getUser().catch((e) => ({ error: e }));
             if (check && !check.error && check.data && check.data.user && check.data.user.id === current.user.id) {
+                _lineAuthExpiresAt = Number(current.expires_at) || 0;
+                _lineAuthRpcReady = true;
                 lineAuthLog('reused', { user: current.user.id });
                 return { ok: true, reason: 'reused' };
             }
@@ -224,6 +274,8 @@ async function establishLineAuthSession() {
             lineAuthLog('failed', { code: setResult && setResult.error ? 'set_session_error' : 'mismatch' });
             return { ok: false, reason: 'mismatch' };
         }
+        _lineAuthExpiresAt = Number(setResult.data.session && setResult.data.session.expires_at) || 0;
+        _lineAuthRpcReady = true;
         lineAuthLog('established', { user: user.id, created: !!out.created, mode: out.mode || 'session' });
         // 記錄用：確認 DB 端從 JWT 讀得到 line_user_id（138 的 line_auth_whoami；失敗不影響）
         Promise.resolve(client.rpc('line_auth_whoami')).then((w) => {

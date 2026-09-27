@@ -49,6 +49,8 @@ const SUITES = [
   { name: 'P1 Phase 1：真 supabase-js 驗證 session 與資料 client 隔離', file: 'line-auth-supabase-js.test.js' },
   { name: 'shift_swap_requests 只能經伺服器端函式寫入（139／140，PGlite 實跑）', file: 'shift-swap-write-lock.pglite.test.js' },
   { name: '前端員工端換班改走 LIFF 驗證（139／140）', file: 'shift-swap-frontend.test.js' },
+  { name: 'P1 Phase 2：RPC wrapper soft mode／enforce／回滾（141，PGlite 實跑）', file: 'line-auth-phase2.pglite.test.js' },
+  { name: 'P1 Phase 2：前端有 session 時 RPC 改用 session client（jsdom＋真 supabase-js）', file: 'line-auth-phase2-frontend.test.js' },
   { name: '打卡總覽', file: 'attendance-overview.test.js' },
   { name: '薪資頁加班來源', file: 'payroll-overtime.test.js' },
   { name: 'RLS 已鎖定資料表', file: 'rls-locked-tables.test.js' },

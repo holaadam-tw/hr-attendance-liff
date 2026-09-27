@@ -5,6 +5,17 @@
 
 ---
 
+## 🟡 2026-09-28 P1 身分根治 Phase 2：RPC 呼叫者身分 soft mode（migration 141，**待業主套用／合併**）
+
+- 產生器 `scripts/line-auth/generate-rpc-wrappers.js`：正式庫唯讀清單（帶 p_line_user_id 的函式 83 支）扣掉 service role only 9 支、131／132 已撤 20 支 → 54 支包 wrapper（原函式改名 `<name>_impl`，wrapper 簽名／預設值／回傳型別／proacl 相同）
+- `assert_caller`：JWT 的 LINE userId（138 `caller_line_user_id()`）與 p_line_user_id 相符就放行；不符或沒有 session → soft 記一筆（只存雜湊）後放行、enforce 拒絕；模式在 `line_auth_caller_settings`（預設 soft，只有 service role 能改，可逐支覆寫）
+- 前端：名單內 RPC 在 LINE session 已建立、屬於目前帳號且未過期時改用 session client；`CONFIG.LINE_AUTH_RPC='anon'` 可關
+- 138 回滾加防呆：141 還在時中止
+- 測試：PGlite 70 項（141 換空檔 → 失敗）、前端 jsdom＋真 supabase-js 28 項（舊 common.js → 失敗）；詳見 `docs/LINE_AUTH_PHASE2.md`
+- **狀態：PR 待審，未套正式庫、未部署；enforce 未開。**
+
+---
+
 ## 🟡 2026-09-28 shift_swap_requests 只能經伺服器端函式寫入（migration 139／140，**待業主套用／合併／部署**）
 
 - 問題：正式庫唯一政策「Allow all for authenticated」實際套用對象是 PUBLIC（含 anon），anon／authenticated 有全部 grant → 前端可直接新增、修改（例如直接改成已同意／已核准）、刪除任何人的換班申請（目前 0 列）
