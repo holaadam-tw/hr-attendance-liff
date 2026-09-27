@@ -108,7 +108,7 @@ import {
     closeCompanyModal, editCompany, saveCompany,
     initSalesTargetPage, stChangeWeek, saveDefaultTarget,
     switchSysTab
-} from './settings.js?v=20260927-linebudget';
+} from './settings.js?v=20260927-linesecure';
 
 // ===== 綁定 window（供 HTML onclick 使用）=====
 

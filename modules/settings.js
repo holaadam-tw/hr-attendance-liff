@@ -2,7 +2,7 @@
 // modules/settings.js — 功能管理、公告、客戶、外勤審核、公司、業務目標
 // 依賴 common.js 全域: sb, showToast, escapeHTML, friendlyError,
 //   writeAuditLog, sendAdminNotify, getGPS, getTaiwanDate,
-//   invalidateSettingsCache, fmtDate
+//   invalidateSettingsCache, fmtDate, saveLineMessagingConfig
 // ============================================================
 
 // 產業別模板（common.js getFeatureVisibility 使用）
@@ -39,28 +39,45 @@ export function switchSysTab(tab, btn) {
 }
 
 // ===== LINE Messaging API 推播設定 =====
-export function loadNotifyToken() {
-    const setting = getCachedSetting('line_messaging_api');
-    if (setting) {
-        const tokenEl = document.getElementById('lineChannelToken');
-        const groupEl = document.getElementById('lineGroupId');
-        if (tokenEl && setting.token) tokenEl.value = setting.token;
-        if (groupEl && setting.groupId) groupEl.value = setting.groupId;
-    }
+// 126／127：token 不再回到瀏覽器。設定頁只顯示「已設定（末 4 碼）」與群組 ID；
+// 儲存時 token 欄位留空 = 沿用目前的 token（只改群組 ID）。
+export async function loadNotifyToken() {
+    const tokenEl = document.getElementById('lineChannelToken');
+    const groupEl = document.getElementById('lineGroupId');
+    if (tokenEl) { tokenEl.value = ''; tokenEl.placeholder = '貼上 Channel Access Token'; }
+    const companyId = window.currentCompanyId;
+    const lineUserId = window.currentAdminEmployee?.line_user_id || liffProfile?.userId || null;
+    if (!companyId || !lineUserId) return;
+    try {
+        const { data, error } = await sb.rpc('get_line_messaging_config', { p_company_id: companyId, p_line_user_id: lineUserId });
+        if (error || !data?.success) return;
+        if (tokenEl) {
+            tokenEl.dataset.configured = data.has_token ? '1' : '';
+            tokenEl.placeholder = data.has_token
+                ? `已設定（${data.token_hint || '已設定'}）— 留空＝沿用，貼上新值＝更換`
+                : '貼上 Channel Access Token';
+        }
+        if (groupEl && data.group_id) groupEl.value = data.group_id;
+    } catch (e) { /* 讀不到就顯示空白表單 */ }
 }
 
 export async function saveNotifyToken() {
-    const token = document.getElementById('lineChannelToken')?.value?.trim();
+    const tokenEl = document.getElementById('lineChannelToken');
+    const token = tokenEl?.value?.trim() || '';
     const groupId = document.getElementById('lineGroupId')?.value?.trim();
-    if (!token) return showToast('❌ 請輸入 Channel Access Token');
+    if (!token && tokenEl?.dataset?.configured !== '1') return showToast('❌ 請輸入 Channel Access Token');
     if (!groupId) return showToast('❌ 請輸入 Group ID');
     const status = document.getElementById('notifyStatus');
-    try {
-        const value = { token, groupId };
-        await saveSetting('line_messaging_api', value, 'LINE Messaging API 推播設定');
-        showToast('✅ 設定已儲存');
-        if (status) { status.style.display = 'block'; status.style.color = '#059669'; status.textContent = '✅ 已儲存'; }
-    } catch(e) { showToast('❌ 儲存失敗'); }
+    const result = await saveLineMessagingConfig(token, groupId);
+    if (!result.ok) {
+        showToast('❌ 儲存失敗：' + (result.message || ''));
+        if (status) { status.style.display = 'block'; status.style.color = '#DC2626'; status.textContent = '❌ ' + (result.message || '儲存失敗'); }
+        return;
+    }
+    if (tokenEl) tokenEl.value = '';
+    showToast('✅ 設定已儲存');
+    if (status) { status.style.display = 'block'; status.style.color = '#059669'; status.textContent = '✅ 已儲存'; }
+    await loadNotifyToken();
 }
 
 export async function testNotify() {

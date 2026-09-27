@@ -169,12 +169,12 @@ async function main() {
     log(WARN, '功能', 'companies 資料', 'RLS 限制或無資料');
   }
 
-  // LINE Messaging API
+  // LINE Messaging API：127 起 token 那一列 anon 讀不到（讀得到才是問題）
   const notifyQ = await tableQuery('system_settings', 'key=eq.line_messaging_api&select=value');
   if (notifyQ.data && notifyQ.data.length > 0 && notifyQ.data[0].value?.token) {
-    log(PASS, '功能', 'LINE Messaging API', '已設定');
+    log(WARN, '安全', 'LINE Channel token', 'anon 讀得到 token（migration 127 尚未套用？）');
   } else {
-    log(INFO, '功能', 'LINE Messaging API', '未設定');
+    log(PASS, '安全', 'LINE Channel token', 'anon 讀不到（設定狀態請在管理後台 LINE 設定頁查看）');
   }
 
   // ===== 6. 預約系統資料 =====

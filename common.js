@@ -471,6 +471,14 @@ function updateUserInfo(data) {
 // ===== 系統設定（含快取） =====
 let _settingsCache = null; // { key: value, ... }
 
+// 前端不保存秘密設定（126／127）：LINE Channel token 只在伺服器端使用。
+// 127 套用前 DB 仍讀得到這列 → 讀到就丟掉，不放進記憶體或 sessionStorage。
+const SECRET_SETTING_KEYS = ['line_messaging_api'];
+function stripSecretSettings(cache) {
+    if (cache && typeof cache === 'object') SECRET_SETTING_KEYS.forEach(k => { delete cache[k]; });
+    return cache;
+}
+
 async function loadSettings(forceRefresh) {
     try {
         const _loadCompanyId = window.currentCompanyId || window.currentEmployee?.company_id || currentEmployee?.company_id;
@@ -481,7 +489,7 @@ async function loadSettings(forceRefresh) {
             const cached = sessionStorage.getItem('system_settings_cache');
             if (cached) {
                 try {
-                    _settingsCache = JSON.parse(cached);
+                    _settingsCache = stripSecretSettings(JSON.parse(cached));
                     officeLocations = _settingsCache['office_locations'] || [];
                 } catch(e) { sessionStorage.removeItem('system_settings_cache'); }
                 // 即使有快取，也要從 DB 讀取最新的 feature_visibility
@@ -508,6 +516,7 @@ async function loadSettings(forceRefresh) {
         if (!error && data) {
             _settingsCache = {};
             data.forEach(row => { _settingsCache[row.key] = row.value; });
+            stripSecretSettings(_settingsCache);
             officeLocations = _settingsCache['office_locations'] || [];
             // 寫入 sessionStorage，排除 feature_visibility（確保每次從 DB 讀最新值）
             try {
@@ -532,24 +541,26 @@ function getCachedSetting(key) {
     return _settingsCache ? _settingsCache[key] : null;
 }
 
-// 統一儲存 system_settings（先查再更新，避免重複 insert）
+// 統一儲存 system_settings（126 起走 admin_save_setting RPC：驗公司、驗管理身分；127 起前端不能直接寫表）
+// 失敗會 throw（以前寫入被擋也會顯示「已儲存」）
 async function saveSetting(key, value, description) {
     const companyId = window.currentCompanyId || window.currentEmployee?.company_id || currentEmployee?.company_id;
-    if (!companyId) { console.warn('saveSetting: no companyId'); return; }
+    if (!companyId) { console.warn('saveSetting: no companyId'); throw new Error('目前公司資料尚未就緒'); }
+    if (SECRET_SETTING_KEYS.includes(key)) throw new Error('LINE 設定請用 saveLineMessagingConfig 儲存');
+    const lineUserId = adminCallerLineUserId();
+    if (!lineUserId) throw new Error('無法確認登入身分，請重新開啟頁面');
 
-    const { data: existing } = await sb.from('system_settings')
-        .select('id')
-        .eq('key', key)
-        .eq('company_id', companyId)
-        .maybeSingle();
-
-    if (existing) {
-        await sb.from('system_settings')
-            .update({ value: value, updated_at: new Date().toISOString() })
-            .eq('id', existing.id);
-    } else {
-        await sb.from('system_settings')
-            .insert({ key: key, value: value, company_id: companyId, description: description || key });
+    const { data, error } = await sb.rpc('admin_save_setting', {
+        p_company_id: companyId,
+        p_line_user_id: lineUserId,
+        p_key: key,
+        p_value: value === undefined ? null : value,
+        p_description: description || key
+    });
+    if (error || !data || data.success !== true) {
+        const msg = (data && data.error) || (error && error.message) || '設定儲存失敗';
+        console.error('saveSetting 失敗:', key, msg);
+        throw new Error(msg);
     }
 
     invalidateSettingsCache();
@@ -564,8 +575,19 @@ async function initCompanySettings(companyId) {
         { key: 'check_in_radius', value: {meters:1000}, description: '打卡距離' },
         { key: 'departments', value: ['管理部','生產部','業務部','倉管部'], description: '部門列表' }
     ];
+    const lineUserId = adminCallerLineUserId();
+    // 舊行為是「只新增、不覆蓋」（insert 撞 unique 就略過）；RPC 是 upsert，所以先查已有哪些 key
+    const { data: existingRows } = await sb.from('system_settings')
+        .select('key').eq('company_id', companyId).in('key', defaults.map(d => d.key));
+    const existingKeys = (existingRows || []).map(r => r.key);
     for (const d of defaults) {
-        await sb.from('system_settings').insert({ ...d, company_id: companyId }).catch(function() {});
+        if (existingKeys.includes(d.key)) continue;
+        try {
+            await sb.rpc('admin_save_setting', {
+                p_company_id: companyId, p_line_user_id: lineUserId,
+                p_key: d.key, p_value: d.value, p_description: d.description
+            });
+        } catch (e) { console.warn('初始化設定失敗', d.key); }
     }
 }
 
@@ -1575,11 +1597,36 @@ function resolveAdminNotifyRoute(category) {
     return ['digest', 'approver', 'group', 'off'].includes(route) ? route : 'group';
 }
 
-async function sendLineMessage(to, text, meta) {
+// LIFF access token：line-push Edge Function 會拿去向 LINE 驗證真實身分（126 起不再由前端送 Channel token）
+function getLiffAccessTokenSafe() {
+    try {
+        if (typeof liff !== 'undefined' && liff && typeof liff.getAccessToken === 'function') {
+            return liff.getAccessToken() || null;
+        }
+    } catch (e) { /* LIFF 尚未初始化 */ }
+    return null;
+}
+
+const LINE_PUSH_DENY_MESSAGES = {
+    unauthenticated: 'LINE 登入已過期，請重新開啟頁面後再試',
+    not_company_member: '您不是這家公司的在職員工，無法發送通知',
+    manager_required: '只有主管可以發送此通知',
+    category_not_allowed: '不支援的通知類型',
+    target_not_allowed: '不支援的通知對象',
+    missing_token: '尚未設定 LINE Channel Access Token',
+    missing_group: '尚未設定主管 LINE 群組 ID',
+    missing_user_line: '該員工尚未綁定 LINE',
+    employee_not_found: '找不到該員工',
+    authorize_unavailable: 'LINE 推播服務暫時無法使用，請稍後再試'
+};
+
+// target: 'admin_group' | 'admin_approver' | 'employee'（收件人由伺服器依公司設定決定，前端不能指定任意 LINE ID）
+async function requestLinePush(target, text, meta) {
     meta = meta || {};
-    const setting = getCachedSetting('line_messaging_api');
-    if (!setting?.token) return lineNotifyFailure('missing_token', '尚未設定 LINE Channel Access Token');
-    if (!to) return lineNotifyFailure('missing_target', '尚未設定 LINE 收件群組或員工尚未綁定 LINE');
+    const companyId = window.currentCompanyId;
+    if (!companyId) return lineNotifyFailure('missing_company', '目前公司資料尚未就緒');
+    const accessToken = getLiffAccessTokenSafe();
+    if (!accessToken) return lineNotifyFailure('unauthenticated', LINE_PUSH_DENY_MESSAGES.unauthenticated);
     try {
         const res = await fetch('https://nssuisyvlrqnqfxupklb.supabase.co/functions/v1/line-push', {
             method: 'POST',
@@ -1587,13 +1634,14 @@ async function sendLineMessage(to, text, meta) {
                 'Content-Type': 'application/json',
                 'Authorization': 'Bearer ' + CONFIG.SUPABASE_ANON_KEY
             },
-            // company_id/category/priority 給 Edge Function 記推播紀錄與月預算閘門（125）；舊版 Edge Function 會忽略
             body: JSON.stringify({
-                token: setting.token, to, text,
-                company_id: window.currentCompanyId || null,
-                category: meta.category || 'frontend_other',
-                priority: meta.priority === 'high' ? 'high' : 'normal',
-                recipient_ref: meta.recipientRef || null
+                liff_access_token: accessToken,
+                company_id: companyId,
+                target,
+                employee_id: meta.employeeId || null,
+                text,
+                category: meta.category || (target === 'employee' ? 'user_other' : 'admin_other'),
+                priority: meta.priority === 'high' ? 'high' : 'normal'
             })
         });
         const result = await res.json().catch(() => null);
@@ -1605,14 +1653,17 @@ async function sendLineMessage(to, text, meta) {
             console.warn('[LINE Push] 本月推播預算已用完，未送出');
             return lineNotifyFailure('budget_blocked', '本月 LINE 推播額度快用完，這則沒有送出；請直接到系統查看', 429);
         }
+        if (result.code && LINE_PUSH_DENY_MESSAGES[result.code]) {
+            return lineNotifyFailure(result.code, LINE_PUSH_DENY_MESSAGES[result.code], result.status || res.status);
+        }
         const wrappedStatus = Number(result.status);
         const effectiveStatus = Number.isFinite(wrappedStatus) && wrappedStatus > 0 ? wrappedStatus : res.status;
         const wrappedOk = effectiveStatus >= 200 && effectiveStatus < 300 && result.ok !== false && !result.error;
         if (!res.ok || !wrappedOk) {
-            console.error('[LINE Push] 推播失敗:', { status: effectiveStatus, code: 'line_rejected' });
+            console.error('[LINE Push] 推播失敗:', { status: effectiveStatus, code: result.code || 'line_rejected' });
             return lineNotifyFailure('line_rejected', lineNotifyMessageForStatus(effectiveStatus), effectiveStatus);
         }
-        return { ok: true, status: effectiveStatus, code: 'sent', message: 'LINE 已接受推播' };
+        return { ok: true, status: effectiveStatus, code: 'sent', message: 'LINE 已接受推播', recipientKind: result.recipient_kind || null };
     } catch(e) {
         console.error('[LINE Push] 無法連線推播服務');
         return lineNotifyFailure('network_error', '目前無法連線 LINE 推播服務，請檢查網路後重試');
@@ -1632,18 +1683,9 @@ async function sendAdminNotify(message, options) {
         if (route === 'off') {
             return { ok: true, status: 0, code: 'disabled', deferred: true, message: '此類通知已關閉' };
         }
-        const setting = getCachedSetting('line_messaging_api');
-        if (!setting?.token) return lineNotifyFailure('missing_token', '尚未設定 LINE Channel Access Token');
-        if (route === 'approver') {
-            const approverId = getCachedSetting('line_admin_approver_employee_id');
-            if (approverId) {
-                const direct = await sendUserNotify(approverId, message, { category, priority });
-                // 審核人沒綁 LINE / 查不到 → 退回群組，不要默默不發
-                if (direct.ok || !['missing_user_line', 'employee_lookup_failed'].includes(direct.code)) return direct;
-            }
-        }
-        if (!setting?.groupId) return lineNotifyFailure('missing_group', '尚未設定主管 LINE 群組 ID');
-        return await sendLineMessage(setting.groupId, message, { category: category || 'admin_other', priority });
+        // approver：伺服器私訊指定審核人；審核人沒設定／沒綁 LINE 時伺服器自動退回主管群組
+        return await requestLinePush(route === 'approver' ? 'admin_approver' : 'admin_group', message,
+            { category: category || 'admin_other', priority });
     } catch(e) {
         console.warn('LINE 推播失敗（非必要）');
         return lineNotifyFailure('unexpected_error', 'LINE 通知發生未預期錯誤，請稍後重試');
@@ -1654,25 +1696,45 @@ async function sendAdminNotify(message, options) {
 async function sendUserNotify(employeeId, message, options) {
     options = options || {};
     try {
-        const setting = getCachedSetting('line_messaging_api');
-        if (!setting?.token) return lineNotifyFailure('missing_token', '尚未設定 LINE Channel Access Token');
-        const companyId = window.currentCompanyId;
-        if (!companyId) return lineNotifyFailure('missing_company', '目前公司資料尚未就緒');
-        const { data: emp, error } = await sb.from('employees')
-            .select('line_user_id')
-            .eq('id', employeeId)
-            .eq('company_id', companyId)
-            .maybeSingle();
-        if (error) return lineNotifyFailure('employee_lookup_failed', '無法確認員工 LINE 綁定資料');
-        if (!emp?.line_user_id) return lineNotifyFailure('missing_user_line', '該員工尚未綁定 LINE');
-        return await sendLineMessage(emp.line_user_id, message, {
+        if (!employeeId) return lineNotifyFailure('missing_target', '尚未指定收件員工');
+        return await requestLinePush('employee', message, {
             category: options.category || 'user_other',
             priority: options.priority,
-            recipientRef: employeeId
+            employeeId
         });
     } catch(e) {
         console.warn('員工 LINE 推播失敗');
         return lineNotifyFailure('unexpected_error', 'LINE 通知發生未預期錯誤，請稍後重試');
+    }
+}
+
+// 管理員儲存 LINE 設定：token 只送到 Edge Function（驗 LIFF 身分後寫 DB），前端之後也讀不回來
+// channelToken 留空 = 沿用目前的 token（只改群組 ID）
+async function saveLineMessagingConfig(channelToken, groupId) {
+    const companyId = window.currentCompanyId;
+    if (!companyId) return { ok: false, code: 'missing_company', message: '目前公司資料尚未就緒' };
+    const accessToken = getLiffAccessTokenSafe();
+    if (!accessToken) return { ok: false, code: 'unauthenticated', message: LINE_PUSH_DENY_MESSAGES.unauthenticated };
+    try {
+        const res = await fetch('https://nssuisyvlrqnqfxupklb.supabase.co/functions/v1/line-push', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + CONFIG.SUPABASE_ANON_KEY },
+            body: JSON.stringify({
+                action: 'save_config',
+                liff_access_token: accessToken,
+                company_id: companyId,
+                channel_token: channelToken || '',
+                group_id: groupId || ''
+            })
+        });
+        const result = await res.json().catch(() => null);
+        if (!result) return { ok: false, code: 'invalid_response', message: '設定服務回傳無法辨識的結果' };
+        if (!result.ok) return { ok: false, code: result.code || 'save_failed', message: result.error || '儲存失敗' };
+        invalidateSettingsCache();
+        await loadSettings(true);
+        return { ok: true };
+    } catch (e) {
+        return { ok: false, code: 'network_error', message: '目前無法連線設定服務，請檢查網路後重試' };
     }
 }
 
