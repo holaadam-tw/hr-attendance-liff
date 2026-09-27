@@ -134,7 +134,7 @@ const existingLeave = (id, name) => ({
   const commonRefs = htmlFiles
     .map(name => ({ name, src: fs.readFileSync(path.join(root, name), 'utf8') }))
     .filter(file => file.src.includes('common.js'));
-  const staleRefs = commonRefs.filter(file => !file.src.includes('common.js?v=20260928-payroll133'));
+  const staleRefs = commonRefs.filter(file => !file.src.includes('common.js?v=20260928-payroll136'));
   check('所有 common.js 引用已同步升版', staleRefs.length === 0, staleRefs.map(file => file.name).join(', '));
 
   console.log(`\n  結果：${pass} 通過，${fail} 失敗`);

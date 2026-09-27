@@ -1,5 +1,5 @@
 -- ============================================================
--- 133: 薪酬密碼改成伺服器端比對（第一步：純新增，現有頁面行為不變）
+-- 136: 薪酬密碼改成伺服器端比對（第一步：純新增，現有頁面行為不變）
 --
 -- 背景（2026-09-28）：
 --   system_settings.payroll_password = {"password": "<明碼>"}，前端整列讀出來在瀏覽器裡比對
@@ -7,7 +7,7 @@
 --   正式庫 2026-09-28 唯讀查詢：2 家公司有設定（值都是 {password: 字串}），pgcrypto 在 extensions schema，
 --   system_settings 只有 update_system_settings_updated_at 一個 trigger。
 --
--- 本檔（套用後現有頁面完全照舊；明碼仍留在原處，第二步 134 才移除）：
+-- 本檔（套用後現有頁面完全照舊；明碼仍留在原處，第二步 137 才移除）：
 --   A. payroll_password_secrets：每家公司一列 bcrypt 雜湊（extensions.crypt + gen_salt('bf', 10)，自帶 salt）。
 --      RLS 開、anon/authenticated 沒有任何 grant、沒有政策 → 前端讀不到雜湊（連離線暴力破解都不給機會）。
 --   B. 回填：把現有明碼轉成雜湊存進 A（SQL 內完成，不輸出、不記錄明碼）。
@@ -15,7 +15,7 @@
 --        - anon/authenticated 直接寫／刪這一列 → 拒絕（126 起前端已改走 line-push save_setting；
 --          127 套用前 anon 仍能直接寫表，這裡先把「任何人改薪酬密碼」這條擋掉）
 --        - 經 admin_save_setting（owner 身分）寫入 {password: 新密碼} → 同步更新 A 的雜湊
---        - 本檔「保留」明碼（舊快取頁面還在用）；134 會把函式換成「存雜湊、欄位只留 {configured:true}」
+--        - 本檔「保留」明碼（舊快取頁面還在用）；137 會把函式換成「存雜湊、欄位只留 {configured:true}」
 --        - 刪除該列 → 同步刪 A
 --   D. payroll_password_unlock(company_id, line_user_id, password)：**只給 service role**
 --        line-push Edge Function（action=payroll_unlock）向 LINE 驗證 LIFF access token 取得真實 userId 後呼叫。
@@ -34,8 +34,8 @@
 --    本檔只保證「密碼不再外洩、比對在伺服器端、有嘗試次數限制」；要真的擋資料，得讓那些 RPC 檢查 unlock
 --    （需要 P1 身分根治 Phase 2 之後再做）。
 --
--- 上線順序（詳見 PR）：133 → line-push 部署 payroll_unlock → 前端上線 → 等舊快取過期（≥1 工作天）→ 134
--- 回滾：migrations/133_payroll_password_server_check_rollback.sql（先回滾 134 再回滾 133）
+-- 上線順序（詳見 PR）：136 → line-push 部署 payroll_unlock → 前端上線 → 等舊快取過期（≥1 工作天）→ 137
+-- 回滾：migrations/136_payroll_password_server_check_rollback.sql（先回滾 137 再回滾 136）
 -- 只建立 migration 檔，不得由開發流程直接套用正式資料庫。
 -- ============================================================
 
@@ -132,7 +132,7 @@ BEGIN
             INSERT INTO public.payroll_password_secrets (company_id, password_hash, updated_at)
             VALUES (NEW.company_id, extensions.crypt(v_pw, extensions.gen_salt('bf', 10)), now())
             ON CONFLICT (company_id) DO UPDATE SET password_hash = EXCLUDED.password_hash, updated_at = now();
-            -- 133：明碼先留著（舊快取頁面還在前端比對）；134 會改成 NEW.value := {"configured": true}
+            -- 136：明碼先留著（舊快取頁面還在前端比對）；137 會改成 NEW.value := {"configured": true}
         END IF;
     END IF;
     RETURN NEW;

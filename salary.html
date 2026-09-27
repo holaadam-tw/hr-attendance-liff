@@ -346,7 +346,7 @@
         </div>
     </div>
 
-<script src="common.js?v=20260928-payroll133"></script>
+<script src="common.js?v=20260928-payroll136"></script>
     <script type="module">
         import { loadHybridBonusData, renderSelectedBonusCard, saveAllBonuses, exportBonusCSV, toggleMatrixRef, updatePerformance, updateAdjustment } from './modules/payroll.js';
         window.loadHybridBonusData = loadHybridBonusData;
@@ -760,7 +760,7 @@
         // ===== 薪資密碼驗證 =====
         let _pwResolve = null;
 
-        // 133／134 起：密碼在伺服器端比對（line-push action=payroll_unlock），前端讀不到密碼。
+        // 136／137 起：密碼在伺服器端比對（line-push action=payroll_unlock），前端讀不到密碼。
         // 解鎖只在本機記「哪家公司、到什麼時候」（伺服器給的 expires_at，最多到台北當天午夜）。
         const PAYROLL_UNLOCK_KEY = 'payroll_unlock_v2';
         try { localStorage.removeItem('payroll_unlocked'); } catch (e) {}   // 舊版「當日有效」旗標不再採信

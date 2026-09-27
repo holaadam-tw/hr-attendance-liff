@@ -452,7 +452,7 @@ const post = (url, body, headers = {}) => new Request(url, { method: 'POST', bod
     n = 0;
     t = await run({ action: 'makeup_review', company_id: COMPANY, request_ids: [REQ, REQ3], decision: 'approve' }, missingRoute('review_makeup_request'));
     check('批次第 1 筆就發現 RPC 不存在：db_not_migrated、0 筆核准、其餘列為未處理', t.res.status === 503 && t.out.code === 'db_not_migrated' && t.out.approved_count === 0 && t.out.failed_id === REQ && t.out.not_processed_ids[0] === REQ3);
-    // ---- 133：薪酬密碼伺服器端比對 ----
+    // ---- 136：薪酬密碼伺服器端比對 ----
     const unlockRoutes = (resp) => rpcRoutes([['/rpc/payroll_password_unlock', resp]]);
     t = await run({ action: 'payroll_unlock', company_id: COMPANY, password: 'pw-1234', line_user_id: 'Uadmin' },
       unlockRoutes({ body: { success: true, unlock_token: 'tok', expires_at: '2026-09-28T16:00:00+00:00', configured: true } }));
@@ -481,7 +481,7 @@ const post = (url, body, headers = {}) => new Request(url, { method: 'POST', bod
     t = await run({ action: 'payroll_unlock', company_id: COMPANY, password: 'pw' }, unlockRoutes({ status: 500, body: { message: 'boom' } }));
     check('payroll_unlock：RPC 連不上 → 503（fail-closed，不放行）', t.res.status === 503 && !t.out.unlock_token);
     t = await run({ action: 'payroll_unlock', company_id: COMPANY, password: 'pw' }, missingRoute('payroll_password_unlock'));
-    check('payroll_unlock：133 未套 → 503「資料庫尚未更新（133）」、不放行', t.res.status === 503 && t.out.code === 'db_not_migrated' && /（133）/.test(t.out.error) && !t.out.unlock_token);
+    check('payroll_unlock：136 未套 → 503「資料庫尚未更新（136）」、不放行', t.res.status === 503 && t.out.code === 'db_not_migrated' && /（136）/.test(t.out.error) && !t.out.unlock_token);
   }
 
   console.log('\n=== line-webhook ===');

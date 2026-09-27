@@ -1,7 +1,7 @@
 // ============================================================
-// 133／134 前端：薪酬密碼改由伺服器端比對（jsdom 實跑 common.js／salary.html 原文）
+// 136／137 前端：薪酬密碼改由伺服器端比對（jsdom 實跑 common.js／salary.html 原文）
 //
-//   - 讀設定時丟掉明碼，只留 {configured}（134 套用前 DB 仍有明碼也不進記憶體／sessionStorage）
+//   - 讀設定時丟掉明碼，只留 {configured}（137 套用前 DB 仍有明碼也不進記憶體／sessionStorage）
 //   - 管理後台密碼框（common.js verifyPayrollPw）與薪資頁（salary.html submitPayrollPassword）
 //     都送 line-push action=payroll_unlock，前端不再自己比對
 //   - 解鎖依伺服器給的 expires_at 與公司判斷
@@ -78,11 +78,11 @@ const wrongReply = async () => ({ ok: false, code: 'wrong_password', message: '�
   {
     const { w } = page({ reply: wrongReply, cache: { payroll_password: { password: 'plain-123' }, office_locations: [1] } });
     const cache = w.__getCache();
-    check('134 前 DB 仍回明碼：快取裡只剩 configured=true', JSON.stringify(cache.payroll_password) === '{"configured":true}', JSON.stringify(cache.payroll_password));
+    check('137 前 DB 仍回明碼：快取裡只剩 configured=true', JSON.stringify(cache.payroll_password) === '{"configured":true}', JSON.stringify(cache.payroll_password));
     check('其他設定原樣保留', Array.isArray(cache.office_locations) && cache.office_locations[0] === 1);
     check('isPayrollPasswordConfigured()＝true', typeof w.isPayrollPasswordConfigured === 'function' && w.isPayrollPasswordConfigured() === true);
     const { w: w2 } = page({ reply: wrongReply, cache: { payroll_password: { configured: true } } });
-    check('134 後的 {configured:true} 照樣判定有設', w2.isPayrollPasswordConfigured?.() === true);
+    check('137 後的 {configured:true} 照樣判定有設', w2.isPayrollPasswordConfigured?.() === true);
     const { w: w3 } = page({ reply: wrongReply, cache: { office_locations: [] } });
     check('沒有這列：判定沒設', w3.isPayrollPasswordConfigured?.() === false);
     const { w: w4 } = page({ reply: wrongReply, cache: { payroll_password: { configured: false } } });

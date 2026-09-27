@@ -1,13 +1,13 @@
 // ============================================================
-// migration 133／134：薪酬密碼改伺服器端比對（bcrypt 雜湊＋錯誤次數限制＋短效解鎖）— PGlite 實跑
+// migration 136／137：薪酬密碼改伺服器端比對（bcrypt 雜湊＋錯誤次數限制＋短效解鎖）— PGlite 實跑
 //
 // 不連線、不寫正式庫。流程：
 //   1. base schema ＋ 125 ＋ 正式庫 system_settings 政策快照 ＋ 126 ＋ 129（正式庫已套）＋ pgcrypto（extensions schema，同正式庫）
 //   2. 套用前：重現「anon 讀得到薪酬密碼明碼」「anon 可直接改掉別家公司的薪酬密碼」
-//   3. 套 133：現有頁面照舊（明碼仍在、一般設定照寫）；雜湊回填；比對／錯誤次數限制／短效解鎖／權限
-//   4. 套 134：明碼消失、只剩 {configured}；新密碼經 admin_save_setting 存成雜湊；舊密碼失效
-//   5. 回滾 134 → 133 後回到原狀、可重複套用
-// 反向對照（證明測試在舊程式會失敗）：MIGRATION133_FILE／MIGRATION134_FILE 指向空檔 → 套用後的情境應大量失敗
+//   3. 套 136：現有頁面照舊（明碼仍在、一般設定照寫）；雜湊回填；比對／錯誤次數限制／短效解鎖／權限
+//   4. 套 137：明碼消失、只剩 {configured}；新密碼經 admin_save_setting 存成雜湊；舊密碼失效
+//   5. 回滾 137 → 136 後回到原狀、可重複套用
+// 反向對照（證明測試在舊程式會失敗）：MIGRATION136_FILE／MIGRATION137_FILE 指向空檔 → 套用後的情境應大量失敗
 // ============================================================
 const fs = require('fs');
 const path = require('path');
@@ -21,10 +21,10 @@ const prodRls = read(path.join(__dirname, 'fixtures', 'system_settings_prod_rls.
 const m125 = read(path.join(root, 'migrations', '125_line_push_budget_and_digest.sql'));
 const m126 = read(path.join(root, 'migrations', '126_line_push_server_token.sql'));
 const m129 = read(path.join(root, 'migrations', '129_platform_admin_write_lock.sql'));
-const m133 = read(process.env.MIGRATION133_FILE || path.join(root, 'migrations', '133_payroll_password_server_check.sql'));
-const m134 = read(process.env.MIGRATION134_FILE || path.join(root, 'migrations', '134_payroll_password_strip_plaintext.sql'));
-const m133rb = read(path.join(root, 'migrations', '133_payroll_password_server_check_rollback.sql'));
-const m134rb = read(path.join(root, 'migrations', '134_payroll_password_strip_plaintext_rollback.sql'));
+const m136 = read(process.env.MIGRATION136_FILE || path.join(root, 'migrations', '136_payroll_password_server_check.sql'));
+const m137 = read(process.env.MIGRATION137_FILE || path.join(root, 'migrations', '137_payroll_password_strip_plaintext.sql'));
+const m136rb = read(path.join(root, 'migrations', '136_payroll_password_server_check_rollback.sql'));
+const m137rb = read(path.join(root, 'migrations', '137_payroll_password_strip_plaintext_rollback.sql'));
 
 let pass = 0, fail = 0;
 function check(name, condition, detail = '') {
@@ -41,7 +41,7 @@ const PW_B = '4321';
 
 (async () => {
   console.log('\n═══════════════════════════════════════');
-  console.log('  薪酬密碼伺服器端比對（133／134，PGlite 實跑）');
+  console.log('  薪酬密碼伺服器端比對（136／137，PGlite 實跑）');
   console.log('═══════════════════════════════════════');
 
   const db = new PGlite({ extensions: { pgcrypto } });
@@ -76,7 +76,7 @@ const PW_B = '4321';
   const setting = async (company, key) => (await one(`SELECT value FROM public.system_settings WHERE company_id = $1 AND key = $2`, [company, key]))?.value;
   const unlock = (uid, company, pw) => rpc('service_role', 'payroll_password_unlock', { p_company_id: company, p_line_user_id: uid, p_password: pw });
   const save = (uid, company, key, value) => rpc('service_role', 'admin_save_setting', { p_company_id: company, p_line_user_id: uid, p_key: key, p_value: JSON.stringify(value), p_description: key });
-  const sx = async sql => { try { await db.exec(sql); } catch (e) { /* 反向對照（沒套 133）時表不存在 */ } };
+  const sx = async sql => { try { await db.exec(sql); } catch (e) { /* 反向對照（沒套 136）時表不存在 */ } };
   const tableExists = async t => !!(await one(`SELECT to_regclass($1) AS r`, ['public.' + t])).r;
 
   async function seed() {
@@ -103,7 +103,7 @@ const PW_B = '4321';
       ALTER TABLE public.system_settings ENABLE TRIGGER USER;
     `);
   }
-  // seed 繞過 trigger 直接放明碼（模擬正式庫現況，也不受前一段已套的 134 影響）；133 之後要把雜湊補上
+  // seed 繞過 trigger 直接放明碼（模擬正式庫現況，也不受前一段已套的 137 影響）；136 之後要把雜湊補上
   const backfill = async () => sx(`
     INSERT INTO public.payroll_password_secrets (company_id, password_hash)
     SELECT company_id, extensions.crypt(value->>'password', extensions.gen_salt('bf', 4)) FROM public.system_settings
@@ -118,18 +118,18 @@ const PW_B = '4321';
   r = await as('anon', `UPDATE public.system_settings SET value = '{"password":"hacked"}' WHERE key = 'payroll_password' AND company_id = $1`, [B]);
   check('現況重現：anon 可直接改掉 B 公司的薪酬密碼', !r.error && (await setting(B, 'payroll_password')).password === 'hacked');
 
-  // ---------- 2. 套 133 ----------
-  console.log('\n=== 套 133（純新增，現有頁面行為不變）===');
+  // ---------- 2. 套 136 ----------
+  console.log('\n=== 套 136（純新增，現有頁面行為不變）===');
   await seed();
   let ok = true;
-  try { await db.exec(m133); } catch (e) { ok = false; check('133 可在 PostgreSQL 套用', false, e.message); }
-  if (ok) check('133 可在 PostgreSQL 套用', true);
+  try { await db.exec(m136); } catch (e) { ok = false; check('136 可在 PostgreSQL 套用', false, e.message); }
+  if (ok) check('136 可在 PostgreSQL 套用', true);
 
   const secretRows = await tableExists('payroll_password_secrets')
     ? await q(`SELECT company_id, password_hash FROM public.payroll_password_secrets ORDER BY company_id`) : [];
   check('回填：兩家有設密碼的公司都有雜湊、C 公司沒有', secretRows.length === 2 && !secretRows.some(x => x.company_id === C));
   check('雜湊是 bcrypt（$2a$10$、自帶 salt）且不含明碼', secretRows.length === 2 && secretRows.every(x => /^\$2a\$10\$/.test(x.password_hash) && !x.password_hash.includes(PW_A) && !x.password_hash.includes(PW_B)));
-  check('133 不動明碼（舊快取頁面還能比對）', (await setting(A, 'payroll_password'))?.password === PW_A);
+  check('136 不動明碼（舊快取頁面還能比對）', (await setting(A, 'payroll_password'))?.password === PW_A);
 
   for (const role of ['anon', 'authenticated']) {
     r = await as(role, `SELECT * FROM public.payroll_password_secrets`);
@@ -148,9 +148,9 @@ const PW_B = '4321';
     check(`${role} 不能直接呼叫 payroll_unlock_check`, denied(r), r?.error);
   }
   r = await as('anon', `UPDATE public.system_settings SET value = '[{"name":"改"}]' WHERE key = 'office_locations' AND company_id = $1`, [A]);
-  check('133 只管 payroll_password：其他設定的現況（127 前 anon 可寫）不受影響', !r.error);
+  check('136 只管 payroll_password：其他設定的現況（127 前 anon 可寫）不受影響', !r.error);
 
-  console.log('\n=== 133：伺服器端比對 ===');
+  console.log('\n=== 136：伺服器端比對 ===');
   r = await unlock('U1', A, PW_A);
   check('員工輸入正確密碼：成功、回 64 碼 unlock_token', r?.success === true && /^[0-9a-f]{64}$/.test(r.unlock_token || '') && r.configured === true, JSON.stringify(r));
   const token = r?.unlock_token;
@@ -185,7 +185,7 @@ const PW_B = '4321';
   r = await unlock('U1', A, '');
   check('空密碼：bad_request（不算錯誤次數）', r?.error_code === 'bad_request');
 
-  console.log('\n=== 133：錯誤次數限制 ===');
+  console.log('\n=== 136：錯誤次數限制 ===');
   await sx(`DELETE FROM public.payroll_unlock_attempts`);
   for (let i = 0; i < 5; i++) await unlock('U2', A, 'guess' + i);
   r = await unlock('U2', A, PW_A);
@@ -210,76 +210,76 @@ const PW_B = '4321';
   r = await save('Uadmin', A, 'payroll_password', { password: '密'.repeat(25) });
   check('管理員設定超過 72 bytes 的密碼：拒絕、原密碼不變', r?.success !== true && (await unlock('U1', A, PW_A))?.success === true);
   check('解鎖以 advisory lock 排隊（並行請求不能繞過次數上限；PGlite 單連線無法實測並行）',
-    /pg_advisory_xact_lock\(hashtextextended\('payroll_unlock:'/.test(m133));
+    /pg_advisory_xact_lock\(hashtextextended\('payroll_unlock:'/.test(m136));
   check('嘗試紀錄不含密碼欄位', !(await q(`SELECT column_name FROM information_schema.columns WHERE table_name = 'payroll_unlock_attempts'`)).some(c => /pass/.test(c.column_name)));
   await sx(`DELETE FROM public.payroll_unlock_attempts`);
 
-  console.log('\n=== 133：管理員改密碼（admin_save_setting）同步雜湊 ===');
+  console.log('\n=== 136：管理員改密碼（admin_save_setting）同步雜湊 ===');
   r = await save('Uadmin', A, 'payroll_password', { password: 'new-A-pw' });
   check('admin 經 admin_save_setting 改密碼：成功', r?.success === true, JSON.stringify(r));
   check('新密碼立即可用、舊密碼失效', (await unlock('U1', A, 'new-A-pw'))?.success === true && (await unlock('U1', A, PW_A))?.error_code === 'wrong_password');
-  check('133 仍保留明碼（給舊快取頁面）', (await setting(A, 'payroll_password'))?.password === 'new-A-pw');
+  check('136 仍保留明碼（給舊快取頁面）', (await setting(A, 'payroll_password'))?.password === 'new-A-pw');
   r = await save('U1', A, 'payroll_password', { password: 'evil' });
   check('一般員工不能改密碼（126 的 admin_only 照舊）', r?.error_code === 'access_denied' || r?.error_code === 'admin_only');
   r = await save('Uadmin', C, 'payroll_password', { password: 'c-pw' });
   check('別家公司 admin 不能替 C 設密碼', r?.success !== true);
 
-  // ---------- 3. 套 134 ----------
-  console.log('\n=== 套 134（移除明碼）===');
+  // ---------- 3. 套 137 ----------
+  console.log('\n=== 套 137（移除明碼）===');
   await seed();
   await backfill();
   ok = true;
-  try { await db.exec(m134); } catch (e) { ok = false; check('134 可在 133 之後套用', false, e.message); }
-  if (ok) check('134 可在 133 之後套用', true);
+  try { await db.exec(m137); } catch (e) { ok = false; check('137 可在 136 之後套用', false, e.message); }
+  if (ok) check('137 可在 136 之後套用', true);
   const plain = await q(`SELECT company_id FROM public.system_settings WHERE key = 'payroll_password' AND value ? 'password'`);
   check('system_settings 再也沒有任何明碼', plain.length === 0, plain.length + ' 列');
   check('A、B 只剩 {"configured": true}', (await flag(A)) === true && (await flag(B)) === true, JSON.stringify(await setting(A, 'payroll_password')));
   r = await as('anon', `SELECT value FROM public.system_settings WHERE key = 'payroll_password'`);
   check('anon 讀到的只有 configured 旗標（密碼與雜湊都讀不到）', !r.error && r.rows.length === 2 && !JSON.stringify(r.rows).includes(PW_A) && !JSON.stringify(r.rows).includes('$2a$'));
-  check('既有密碼在 134 後照樣能解鎖', (await unlock('U1', A, PW_A))?.success === true && (await unlock('UB1', B, PW_B))?.success === true);
-  r = await save('Uadmin', A, 'payroll_password', { password: 'after-134' });
-  check('134 後 admin 改密碼：DB 仍只存 configured', r?.success === true && (await flag(A)) === true);
-  check('134 後新密碼可用、舊的失效', (await unlock('U1', A, 'after-134'))?.success === true && (await unlock('U1', A, PW_A))?.error_code === 'wrong_password');
+  check('既有密碼在 137 後照樣能解鎖', (await unlock('U1', A, PW_A))?.success === true && (await unlock('UB1', B, PW_B))?.success === true);
+  r = await save('Uadmin', A, 'payroll_password', { password: 'after-137' });
+  check('137 後 admin 改密碼：DB 仍只存 configured', r?.success === true && (await flag(A)) === true);
+  check('137 後新密碼可用、舊的失效', (await unlock('U1', A, 'after-137'))?.success === true && (await unlock('U1', A, PW_A))?.error_code === 'wrong_password');
   r = await save('Uadmin', A, 'payroll_password', { password: '' });
   check('清空密碼：雜湊刪除、旗標 configured=false、回到預設 0000', r?.success === true && (await flag(A)) === false
     && (await unlock('U1', A, '0000'))?.success === true);
 
-  console.log('\n=== 134 順序防呆 ===');
+  console.log('\n=== 137 順序防呆 ===');
   await seed();
-  await db.exec(m134rb); await db.exec(m133rb);
+  await db.exec(m137rb); await db.exec(m136rb);
   r = null;
-  try { await db.exec(m134); } catch (e) { r = e.message; await db.exec('ROLLBACK').catch(() => {}); }
-  check('沒套 133 就套 134：中止', !!r && /133/.test(r), r);
-  await db.exec(m133);
+  try { await db.exec(m137); } catch (e) { r = e.message; await db.exec('ROLLBACK').catch(() => {}); }
+  check('沒套 136 就套 137：中止', !!r && /136/.test(r), r);
+  await db.exec(m136);
   await db.exec(`DELETE FROM public.payroll_password_secrets WHERE company_id = '${B}'`);
   r = null;
-  try { await db.exec(m134); } catch (e) { r = e.message; await db.exec('ROLLBACK').catch(() => {}); }
-  check('有公司缺雜湊：134 中止、明碼不被抹掉（不會把密碼弄丟）', !!r && (await setting(B, 'payroll_password'))?.password === PW_B, r + ' / ' + JSON.stringify(await setting(B, 'payroll_password')));
+  try { await db.exec(m137); } catch (e) { r = e.message; await db.exec('ROLLBACK').catch(() => {}); }
+  check('有公司缺雜湊：137 中止、明碼不被抹掉（不會把密碼弄丟）', !!r && (await setting(B, 'payroll_password'))?.password === PW_B, r + ' / ' + JSON.stringify(await setting(B, 'payroll_password')));
 
   console.log('\n=== 回滾 ===');
   await seed();
-  await db.exec(m133); await db.exec(m134);
-  await db.exec(m134rb);
+  await db.exec(m136); await db.exec(m137);
+  await db.exec(m137rb);
   r = await save('Uadmin', A, 'payroll_password', { password: 'rb-pw' });
-  check('回滾 134 後：admin 重設密碼會存回明碼（舊版前端可用）＋同步雜湊', r?.success === true && (await setting(A, 'payroll_password'))?.password === 'rb-pw'
+  check('回滾 137 後：admin 重設密碼會存回明碼（舊版前端可用）＋同步雜湊', r?.success === true && (await setting(A, 'payroll_password'))?.password === 'rb-pw'
     && (await unlock('U1', A, 'rb-pw'))?.success === true);
   r = null;
-  try { await db.exec(m133rb); } catch (e) { r = e.message; await db.exec('ROLLBACK').catch(() => {}); }
-  check('B 公司密碼只剩雜湊時回滾 133：中止（不會默默把密碼弄丟）', !!r && /134/.test(r) && (await tableExists('payroll_password_secrets')), r);
+  try { await db.exec(m136rb); } catch (e) { r = e.message; await db.exec('ROLLBACK').catch(() => {}); }
+  check('B 公司密碼只剩雜湊時回滾 136：中止（不會默默把密碼弄丟）', !!r && /137/.test(r) && (await tableExists('payroll_password_secrets')), r);
   await save('Uadmin', B, 'payroll_password', { password: 'rb-pw-b' });
   await db.exec(`INSERT INTO public.employees (company_id, employee_number, name, line_user_id, role, is_kiosk, is_active) VALUES ('${B}', 'B09', 'B 管理員', 'UBadmin', 'admin', false, true)`);
   r = await save('UBadmin', B, 'payroll_password', { password: 'rb-pw-b' });
   check('B 管理員重設密碼後（存回明碼）', r?.success === true && (await setting(B, 'payroll_password'))?.password === 'rb-pw-b');
-  await db.exec(m133rb);
+  await db.exec(m136rb);
   const leftovers = await q(`SELECT tgname FROM pg_trigger WHERE tgrelid = 'public.system_settings'::regclass AND tgname LIKE 'trg_payroll%'`);
-  check('回滾 133：trigger、表、函式全部移除', leftovers.length === 0 && !(await tableExists('payroll_password_secrets'))
+  check('回滾 136：trigger、表、函式全部移除', leftovers.length === 0 && !(await tableExists('payroll_password_secrets'))
     && !(await one(`SELECT to_regprocedure('public.payroll_password_unlock(uuid, text, text)') AS r`)).r);
   r = await as('anon', `UPDATE public.system_settings SET value = '{"password":"x"}' WHERE key = 'payroll_password' AND company_id = $1`, [B]);
-  check('回滾 133 後回到正式庫現況（anon 可寫，由 127 另行處理）', !r.error);
+  check('回滾 136 後回到正式庫現況（anon 可寫，由 127 另行處理）', !r.error);
   await seed();
   ok = true;
-  try { await db.exec(m133); await db.exec(m133); await db.exec(m134); await db.exec(m134); } catch (e) { ok = false; check('133／134 可重複套用', false, e.message); }
-  if (ok) check('133／134 可重複套用', true);
+  try { await db.exec(m136); await db.exec(m136); await db.exec(m137); await db.exec(m137); } catch (e) { ok = false; check('136／137 可重複套用', false, e.message); }
+  if (ok) check('136／137 可重複套用', true);
 
   console.log(`\n結果：${pass} 通過、${fail} 失敗`);
   process.exit(fail ? 1 : 0);

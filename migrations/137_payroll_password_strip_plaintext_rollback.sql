@@ -1,5 +1,5 @@
 -- ============================================================
--- 134 回滾：trigger 函式換回 133 版（寫入時同步雜湊、保留欄位原值）
+-- 137 回滾：trigger 函式換回 136 版（寫入時同步雜湊、保留欄位原值）
 --
 -- ⚠️ 明碼無法還原：system_settings.payroll_password 會維持 {"configured": true}。
 --    新版前端（伺服器端比對）不受影響；若連前端也要退回舊版，請管理員在設定頁重設一次密碼
@@ -39,7 +39,7 @@ BEGIN
             INSERT INTO public.payroll_password_secrets (company_id, password_hash, updated_at)
             VALUES (NEW.company_id, extensions.crypt(v_pw, extensions.gen_salt('bf', 10)), now())
             ON CONFLICT (company_id) DO UPDATE SET password_hash = EXCLUDED.password_hash, updated_at = now();
-            -- 133：明碼先留著（舊快取頁面還在前端比對）；134 會改成 NEW.value := {"configured": true}
+            -- 136：明碼先留著（舊快取頁面還在前端比對）；137 會改成 NEW.value := {"configured": true}
         END IF;
     END IF;
     RETURN NEW;

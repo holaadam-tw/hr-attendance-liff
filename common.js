@@ -479,8 +479,8 @@ const SECRET_SETTING_KEYS = ['line_messaging_api'];
 function stripSecretSettings(cache) {
     if (cache && typeof cache === 'object') {
         SECRET_SETTING_KEYS.forEach(k => { delete cache[k]; });
-        // 薪酬密碼（133／134）：比對改在伺服器端，前端只需要知道「有沒有設」。
-        // 134 套用前 DB 仍存明碼 → 讀到就只留 configured，不放進記憶體或 sessionStorage。
+        // 薪酬密碼（136／137）：比對改在伺服器端，前端只需要知道「有沒有設」。
+        // 137 套用前 DB 仍存明碼 → 讀到就只留 configured，不放進記憶體或 sessionStorage。
         if (Object.prototype.hasOwnProperty.call(cache, 'payroll_password')) {
             const v = cache.payroll_password;
             cache.payroll_password = { configured: !!(v && typeof v === 'object' && (v.configured === true || (typeof v.password === 'string' && v.password !== ''))) };
@@ -1846,7 +1846,7 @@ function handleLiffSessionExpired() {
 // action：save_setting／save_config／get_line_config／platform_admin_save／platform_link_company、
 //   company_save／company_set_status／company_delete_pending（130）、
 //   employee_create／employee_update／employee_delete_pending／makeup_review／overtime_review／schedule_save（131／132）、
-//   payroll_unlock（133：薪酬密碼伺服器端比對）
+//   payroll_unlock（136：薪酬密碼伺服器端比對）
 // 回傳 { ok, code, message, data }
 async function callVerifiedAction(action, payload) {
     const expired = () => handleLiffSessionExpired()
@@ -2574,7 +2574,7 @@ window.togglePayrollPwVisibility = function() {
     window.togglePasswordField('payrollPwInput', document.getElementById('payrollPwToggle'));
 };
 
-// 薪酬密碼是否已設定（133／134：DB 只給 configured 旗標，密碼本身只有伺服器端的雜湊）
+// 薪酬密碼是否已設定（136／137：DB 只給 configured 旗標，密碼本身只有伺服器端的雜湊）
 function isPayrollPasswordConfigured() {
     const v = getCachedSetting('payroll_password');
     return !!(v && typeof v === 'object' && (v.configured === true || (typeof v.password === 'string' && v.password !== '')));

@@ -5,18 +5,18 @@
 
 ---
 
-## 🟡 2026-09-28 薪酬密碼改伺服器端比對（migration 133／134，**待業主套用／合併／部署**）
+## 🟡 2026-09-28 薪酬密碼改伺服器端比對（migration 136／137，**待業主套用／合併／部署**）
 
 ### 問題
 - `system_settings.payroll_password = {password: 明碼}`，前端整列讀出來在瀏覽器比對（common.js `verifyPayrollPw`、salary.html `submitPayrollPassword`）→ 拿到 anon key 就讀得到；127 套用前 anon 還能直接改掉別家公司的薪酬密碼。
 
 ### 修法
-- 133（純新增）：`payroll_password_secrets`（bcrypt，anon/authenticated 無權限）＋回填既有明碼的雜湊；trigger 讓 `admin_save_setting` 寫入時同步雜湊、擋 anon/authenticated 直接寫／刪這一列；`payroll_password_unlock`（service role only：公司成員檢查、每人 15 分鐘 5 次／每公司 30 次錯誤上限、短效 unlock_token＝最多 12 小時且不跨台北午夜，DB 只存 SHA-256）；`payroll_unlock_check`（第二階段用）
-- 134（前端上線、舊快取過期後）：system_settings 只留 `{configured}`，之後任何路徑都寫不進明碼
+- 136（純新增）：`payroll_password_secrets`（bcrypt，anon/authenticated 無權限）＋回填既有明碼的雜湊；trigger 讓 `admin_save_setting` 寫入時同步雜湊、擋 anon/authenticated 直接寫／刪這一列；`payroll_password_unlock`（service role only：公司成員檢查、每人 15 分鐘 5 次／每公司 30 次錯誤上限、短效 unlock_token＝最多 12 小時且不跨台北午夜，DB 只存 SHA-256）；`payroll_unlock_check`（第二階段用）
+- 137（前端上線、舊快取過期後）：system_settings 只留 `{configured}`，之後任何路徑都寫不進明碼
 - line-push `action=payroll_unlock`；前端兩處改呼叫它，讀設定時丟掉明碼
 
 ### 驗證
-- `tests/payroll-password-server.pglite.test.js` 62 項（反向對照：133／134 換空檔 → 45 項失敗）
+- `tests/payroll-password-server.pglite.test.js` 68 項（反向對照：136／137 換空檔 → 48 項失敗）
 - `tests/payroll-password-frontend.test.js` 25 項（反向對照：舊 common.js／salary.html → 10 項失敗）
 - `tests/line-edge-functions.test.js` +10 項（舊 handler → payroll_unlock 失敗）
 
