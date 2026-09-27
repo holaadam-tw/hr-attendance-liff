@@ -874,10 +874,16 @@
                         // localStorage：讓打卡總覽在同一裝置記住登入，關閉分頁後重開不必再跑一次 LINE 驗證
                         localStorage.setItem('attendance_public_line_user_id_' + _pubCompany, liffProfile.userId);
                         localStorage.setItem('attendance_public_line_name_' + _pubCompany, liffProfile.displayName || '');
-                        // 131／132：打卡總覽的排班／工時模式儲存要經 line-push 驗 LIFF 身分，帶著本次登入的 access token 過去
+                        // 131／132：打卡總覽的排班／工時模式儲存要經 line-push 驗 LIFF 身分，帶著本次登入的 access token 過去。
+                        // 只放 sessionStorage（同一個分頁；下面用 location.href 同分頁導過去），以「公司＋LINE 使用者」為 key，
+                        // 並加本地有效期限；打卡總覽存檔成功或 token 失效就會刪掉。不放 localStorage（共用裝置會變成上一個人）。
                         const _pubToken = typeof getLiffAccessTokenSafe === 'function' ? getLiffAccessTokenSafe() : null;
-                        if (_pubToken) localStorage.setItem('attendance_public_liff_token_' + _pubCompany, _pubToken);
-                        else localStorage.removeItem('attendance_public_liff_token_' + _pubCompany);
+                        const _pubTokenKey = 'attendance_public_liff_token_' + _pubCompany + '_' + liffProfile.userId;
+                        try {
+                            localStorage.removeItem('attendance_public_liff_token_' + _pubCompany);
+                            if (_pubToken) sessionStorage.setItem(_pubTokenKey, JSON.stringify({ token: _pubToken, expires_at: Date.now() + 50 * 60 * 1000 }));
+                            else sessionStorage.removeItem(_pubTokenKey);
+                        } catch (e) {}
                     }
                     window.location.href = 'attendance_public.html?company=' + encodeURIComponent(_pubCompany);
                     return;

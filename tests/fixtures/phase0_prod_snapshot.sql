@@ -111,6 +111,16 @@ ALTER TABLE public.overtime_requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.shift_types ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.schedules ENABLE ROW LEVEL SECURITY;
 GRANT ALL ON public.attendance, public.makeup_punch_requests, public.overtime_requests, public.shift_types, public.schedules TO service_role;
+-- attendance／schedules 的 anon 直接寫入（正式庫 2026-09-27 pg_policies／role_table_grants 快照；本 PR 不處理，列為下一個 P0）
+GRANT SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.attendance, public.schedules TO anon, authenticated;
+CREATE POLICY "Allow RPC access attendance" ON public.attendance FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Block direct access" ON public.attendance FOR ALL TO anon, authenticated USING (false);
+CREATE POLICY "允許插入考勤記錄" ON public.attendance FOR INSERT TO anon, authenticated WITH CHECK (true);
+CREATE POLICY "允許更新考勤記錄" ON public.attendance FOR UPDATE TO anon, authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "允許查看考勤記錄" ON public.attendance FOR SELECT TO anon, authenticated USING (true);
+CREATE POLICY "schedules_insert" ON public.schedules FOR INSERT TO public WITH CHECK (true);
+CREATE POLICY "schedules_read" ON public.schedules FOR SELECT TO public USING (true);
+CREATE POLICY "schedules_update" ON public.schedules FOR UPDATE TO public USING (true);
 
 -- ↓↓↓ 正式庫原文（pg_get_functiondef，2026-09-27）↓↓↓
 CREATE OR REPLACE FUNCTION public.has_company_access(p_line_user_id text, p_company_id uuid, p_require_manager boolean DEFAULT false)

@@ -5,6 +5,8 @@
 --   1. approve_makeup_request／reject_makeup_request／approve_overtime_request／reject_overtime_request
 --      完全不驗核准人：anon 帶任何 p_approver_id 就能核准別家公司的補卡（直接寫進 attendance）、改加班時數
 --   2. upsert_schedule／delete_schedule 只信任 p_scheduler_id（員工 uuid，employees 表 anon 可讀）→ 冒充排班者改別人的班表
+--      ⚠️ 注意：attendance、schedules 兩張表本身在正式庫仍開放 anon 直接寫入（USING/WITH CHECK true 政策＋grant），
+--         本檔與 132 只收掉「經 RPC」的路；直接寫表要等下一包（見 132 檔頭）
 --   3. admin_create_employee／admin_update_employee／admin_delete_pending_employee（124）信任前端傳的 p_line_user_id，
 --      而 employees 的 line_user_id anon 讀得到 → 冒充 admin 把自己升成 admin、或把 admin 的 LINE ID 換成自己的，
 --      之後就能「正當」通過 126／129 的 LIFF 驗證（推播、設定、平台頁）

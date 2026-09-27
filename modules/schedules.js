@@ -512,31 +512,37 @@ export async function batchApproveTodayGpsMakeups() {
     const btn = document.getElementById('batchGpsApproveBtn');
     if (btn) { btn.disabled = true; }
     // 131／132：一次送出（每批最多 50 筆），由 line-push 驗 LIFF 身分後逐筆核准（核准人＝LINE 驗證的本人）
-    let ok = 0, fail = 0;
+    // 中途失敗時伺服器會回報「已處理的每一筆」：已核准的照實計數並寫稽核，其餘算失敗，並停止後續批次
+    let ok = 0, fail = 0, stopMessage = '';
+    const approvedIds = [];
     for (let i = 0; i < todays.length; i += 50) {
         const chunk = todays.slice(i, i + 50);
         try {
             const res = await callVerifiedAction('makeup_review', {
                 company_id: window.currentCompanyId, request_ids: chunk.map(r => r.id), decision: 'approve'
             });
-            if (!res.ok) {
-                fail += chunk.length;
-                if (res.code === 'relogin_redirect' || res.code === 'unauthenticated' || res.code === 'access_denied') { showToast('❌ ' + res.message); break; }
-            } else if (Array.isArray(res.data?.results)) {
-                res.data.results.forEach(x => { if (x.success) ok++; else fail++; });
-            } else if (res.data?.result?.success) {
-                ok++;
-            } else {
-                fail += chunk.length;
+            const results = Array.isArray(res.data?.results) ? res.data.results : null;
+            if (results) {
+                results.forEach(x => { if (x.success) { ok++; approvedIds.push(x.id); } else fail++; });
+            } else if (res.ok && res.data?.result?.success) {
+                ok++; approvedIds.push(chunk[0].id);
             }
-        } catch (_) { fail += chunk.length; }
+            if (!res.ok) {
+                fail += chunk.length - (results ? results.length : 0);
+                stopMessage = res.message || '審核中斷';
+                break;
+            }
+            if (!results && !res.data?.result?.success) fail += chunk.length;
+        } catch (_) { fail += chunk.length; stopMessage = '審核中斷'; break; }
         if (btn) btn.textContent = `⏳ ${ok + fail}/${todays.length}`;
     }
+    if (stopMessage) fail = todays.length - ok;
     if (ok > 0 && typeof writeAuditLog === 'function') {
-        writeAuditLog('batch_approve_gps', 'makeup_punch_requests', null, `一鍵通過今日 GPS 待審 ${ok} 筆`);
+        writeAuditLog('batch_approve_gps', 'makeup_punch_requests', null, `一鍵通過今日 GPS 待審 ${ok} 筆`, { approved_ids: approvedIds });
     }
+    if (stopMessage) showToast('❌ ' + stopMessage + (ok > 0 ? `（已通過 ${ok} 筆）` : ''));
     if (btn) { btn.disabled = false; btn.textContent = '⚡ 一鍵全批今日 GPS 待審'; }
-    showToast(`✅ 通過 ${ok} 筆${fail ? `，失敗 ${fail} 筆` : ''}`);
+    if (!stopMessage) showToast(`✅ 通過 ${ok} 筆${fail ? `，失敗 ${fail} 筆` : ''}`);
     loadMakeupApprovals(currentMakeupStatus || 'pending', currentMakeupFilter || 'gps_review');
 }
 

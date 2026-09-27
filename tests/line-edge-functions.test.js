@@ -402,6 +402,26 @@ const post = (url, body, headers = {}) => new Request(url, { method: 'POST', bod
     check('company_delete_pending：呼叫者＝LINE userId', t.res.status === 200 && call(t.f, 'platform_company_delete_pending').body.p_caller_line_user_id === LIFF_USER);
     t = await run({ action: 'company_delete_pending', company_id: COMPANY }, rpcRoutes([['/rpc/platform_company_delete_pending', { status: 500, body: { message: 'boom' } }]]));
     check('RPC 連不上 → 503', t.res.status === 503 && t.out.code === 'service_unavailable');
+
+    // L1：批次中途連不上 DB → 回報已處理的每一筆（已核准的 id、停在哪一筆、哪些沒處理）
+    const REQ3 = '00000000-0000-0000-0000-00000000aa03';
+    let n = 0;
+    t = await run({ action: 'makeup_review', company_id: COMPANY, request_ids: [REQ, REQ2, REQ3], decision: 'approve' },
+      rpcRoutes([['/rpc/review_makeup_request', (b) => (++n === 3 ? { status: 500, body: { message: 'boom' } }
+        : { body: b.p_request_id === REQ2 ? { success: false, error: '此申請已處理過', error_code: 'not_pending' } : { success: true } })]]));
+    check('makeup_review（批次）：第 3 筆 DB 失敗 → 503，並回報第 1 筆已核准、第 2 筆失敗原因、停在第 3 筆',
+      t.res.status === 503 && t.out.ok === false && t.out.code === 'service_unavailable' && t.out.approved_count === 1
+      && t.out.approved_ids.length === 1 && t.out.approved_ids[0] === REQ && t.out.results.length === 2 && t.out.results[1].error === '此申請已處理過'
+      && t.out.failed_id === REQ3 && Array.isArray(t.out.not_processed_ids) && t.out.not_processed_ids.length === 0, JSON.stringify(t.out));
+    // L5：RPC 不存在（migration 還沒套）→ 明確告知
+    const missingRoute = (name) => rpcRoutes([['/rpc/' + name, { status: 404, body: { code: 'PGRST202', message: 'Could not find the function public.' + name } }]]);
+    t = await run({ action: 'makeup_review', company_id: COMPANY, request_ids: [REQ], decision: 'approve' }, missingRoute('review_makeup_request'));
+    check('RPC 不存在（131 未套）：503 db_not_migrated「資料庫尚未更新（131）」', t.res.status === 503 && t.out.code === 'db_not_migrated' && /資料庫尚未更新（131）/.test(t.out.error), JSON.stringify(t.out));
+    t = await run({ action: 'company_save', fields: { code: 'X', name: 'x' } }, missingRoute('platform_company_save'));
+    check('RPC 不存在（130 未套）：「資料庫尚未更新（130）」', t.res.status === 503 && /資料庫尚未更新（130）/.test(t.out.error));
+    n = 0;
+    t = await run({ action: 'makeup_review', company_id: COMPANY, request_ids: [REQ, REQ3], decision: 'approve' }, missingRoute('review_makeup_request'));
+    check('批次第 1 筆就發現 RPC 不存在：db_not_migrated、0 筆核准、其餘列為未處理', t.res.status === 503 && t.out.code === 'db_not_migrated' && t.out.approved_count === 0 && t.out.failed_id === REQ && t.out.not_processed_ids[0] === REQ3);
   }
 
   console.log('\n=== line-webhook ===');

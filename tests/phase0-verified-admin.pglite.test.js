@@ -407,6 +407,16 @@ const DEAD23 = [
   r = await upd('U1', E.e1, { role: 'admin' });
   check('攻擊者就算用自己真的 LINE 帳號（LIFF 驗證通過）也不能自升權限', r?.error_code === 'access_denied' && (await empRow(E.e1)).role === 'user');
 
+  // ---------- 4b. 誠實紀錄：132 沒有堵住的（下一個 P0：鎖 attendance／schedules 直接寫入）----------
+  console.log('\n=== 已知未解決（下一個 P0）：attendance／schedules 仍可被 anon 直接寫入 ===');
+  r = await as('anon', `INSERT INTO public.attendance (employee_id, date, check_in_time, is_manual) VALUES ($1, '2026-11-01', now(), true)`, [E.bUser]);
+  check('（已知）132 之後 anon 仍可直接新增 B 公司員工的出勤：本 PR 不處理', !r.error, r.error);
+  r = await as('anon', `INSERT INTO public.schedules (employee_id, date, is_off_day) VALUES ($1, '2026-11-01', true)`, [E.bUser]);
+  check('（已知）132 之後 anon 仍可直接新增 B 公司的排班：本 PR 不處理', !r.error, r.error);
+  r = await as('anon', `DELETE FROM public.schedules WHERE employee_id = $1 RETURNING id`, [E.bUser]);
+  check('（已知）schedules 沒有 DELETE 政策：anon 刪不到任何列', !r.error && r.rows.length === 0, r.error);
+  await db.exec(`DELETE FROM public.attendance WHERE date = '2026-11-01'; DELETE FROM public.schedules WHERE date = '2026-11-01'`);
+
   // ---------- 5. 順序防呆、回滾、重套 ----------
   console.log('\n=== 順序防呆、回滾、重套 ===');
   {

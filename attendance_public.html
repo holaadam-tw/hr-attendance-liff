@@ -5,10 +5,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>📊 打卡總覽 - 會計查看</title>
-    <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <!-- 本頁不呼叫 LIFF SDK（身分由 index.html 帶過來），所以不載入 sdk.js；其餘外部腳本固定版本＋SRI（本頁會暫存 LIFF access token） -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js" integrity="sha384-Rj26LVGvoeRVR6+mwQmFfcR3QOBEwT+ZmuCWpuiqeTzJpCs0ER4ITAWGb4Hiy3Ok" crossorigin="anonymous"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" integrity="sha384-EnyY0/GSHQGSxSgMwaIPzSESbqoOLSexfnSMN2AP+39Ckmn92stwABZynq1JyzdT" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" integrity="sha384-3zSEDfvllQohrq0PHL1fOXJuC/jSOO34H46t6UQfobFOmxE5BpjjaIJY5F2/bMnU" crossorigin="anonymous"></script>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;900&display=swap" rel="stylesheet">
     <style>
 :root { --primary:#4F46E5; --primary-soft:#EEF2FF; --bg:#F6F8FB; --card:#fff; --text:#1E293B; --text-muted:#64748B; --border:#E2E8F0; --success:#059669; --danger:#DC2626; --warning:#D97706; }
@@ -941,13 +941,29 @@ function getCachedAttendanceProfile() {
 }
 function openCheckinEntry(action) { window.location.href = buildCheckinUrl(action); }
 // 131／132：管理動作（排班、工時模式）經 line-push Edge Function 驗 LIFF 身分，身分＝LINE 驗證的 userId。
-// 本頁不是 LIFF endpoint，LIFF access token 由 index.html（goto=attendance_public）登入後存在同一裝置；過期就回 LINE 重新登入。
+// 本頁不是 LIFF endpoint：LIFF access token 由 index.html（goto=attendance_public）登入後放在 sessionStorage（同一分頁），
+// key＝公司＋LINE 使用者、帶本地有效期限；存檔成功或 token 失效就刪掉，下次存檔回 LINE 重新驗證。
+function attendanceLiffTokenKey() {
+    return 'attendance_public_liff_token_' + companyId + '_' + (currentLineUserId || '');
+}
+function clearAttendanceLiffToken() {
+    try {
+        sessionStorage.removeItem(attendanceLiffTokenKey());
+        localStorage.removeItem('attendance_public_liff_token_' + companyId);   // 舊版（未上線）存法，一併清掉
+    } catch (e) {}
+}
 function getCachedAttendanceLiffToken() {
-    if (!companyId) return null;
-    try { return localStorage.getItem('attendance_public_liff_token_' + companyId) || null; } catch (e) { return null; }
+    if (!companyId || !currentLineUserId) return null;
+    try {
+        const raw = sessionStorage.getItem(attendanceLiffTokenKey());
+        const saved = raw ? JSON.parse(raw) : null;
+        if (!saved || typeof saved.token !== 'string' || !saved.token) return null;
+        if (!(Number(saved.expires_at) > Date.now())) { clearAttendanceLiffToken(); return null; }
+        return saved.token;
+    } catch (e) { return null; }
 }
 function reloginAttendancePublic(message) {
-    try { localStorage.removeItem('attendance_public_liff_token_' + companyId); } catch (e) {}
+    clearAttendanceLiffToken();
     if (confirm((message || 'LINE 登入已過期') + '\n需要重新以 LINE 登入後才能儲存（這次尚未儲存的變更會遺失）。現在重新登入？')) {
         window.location.replace(buildAttendancePublicLiffUrl());
     }
@@ -2933,8 +2949,8 @@ async function seedBenmiShiftTypes() {
         showToast('建立預設班別失敗：' + (e.message || ''));
     }
 }
-async function saveHumanMode(empId) { if (!canSaveHumanSchedule()) return showToast('\u6c92\u6709\u6392\u73ed\u6b0a\u9650'); const row = document.querySelector('[data-human-emp="' + empId + '"]'); if (!row) return; const mode = row.querySelector('select').value; const start = row.querySelector('.hr-start').value || null; const end = row.querySelector('.hr-end').value || null; try { const updates = { shift_mode: mode, fixed_shift_start: mode === 'fixed' ? (start || '10:30') : null, fixed_shift_end: mode === 'fixed' ? (end || '21:30') : null }; const upRes = await callAttendanceVerifiedAction('employee_update', { employee_id: empId, updates: updates }); if (!upRes.ok) throw new Error(upRes.message || '\u5132\u5b58\u5931\u6557'); showToast('\u5de5\u6642\u6a21\u5f0f\u5df2\u5132\u5b58'); await loadHumanManagement(); } catch (e) { console.error('Save human mode error:', e); showToast('\u5132\u5b58\u5931\u6557\uff1a' + (e.message || '')); } }
-async function saveHumanSchedule() { if (!canSaveHumanSchedule()) return showToast('\u6c92\u6709\u6392\u73ed\u6b0a\u9650'); if (!currentEmployeeId) return showToast('\u7f3a\u5c11\u7ba1\u7406\u8005\u8eab\u4efd'); const changes = Object.keys(humanDraft).filter(key => (humanDraft[key] || null) !== (humanOriginal[key] || null)); if (changes.length === 0) return showToast('\u6c92\u6709\u6392\u73ed\u8b8a\u66f4'); const btn = document.getElementById('humanSaveBtn'); btn.disabled = true; btn.textContent = '\u8f09\u5165\u4e2d...'; try { const items = changes.map(key => { const [empId, dateStr] = key.split('_'); const val = humanDraft[key] || null; return val ? { employee_id: empId, date: dateStr, shift_type_id: val === 'off' ? null : val, is_off_day: val === 'off' } : { employee_id: empId, date: dateStr, delete: true }; }); for (let i = 0; i < items.length; i += 400) { const res = await callAttendanceVerifiedAction('schedule_save', { items: items.slice(i, i + 400) }); if (!res.ok) throw new Error(res.message || 'save failed'); } showToast('\u6392\u73ed\u5df2\u5132\u5b58'); await loadHumanManagement(); } catch (e) { console.error('Save human schedule error:', e); showToast('\u6392\u73ed\u5132\u5b58\u5931\u6557\uff1a' + (e.message || '')); } finally { btn.disabled = false; btn.textContent = '\ud83d\udcbe \u5132\u5b58\u6392\u73ed'; } }
+async function saveHumanMode(empId) { if (!canSaveHumanSchedule()) return showToast('\u6c92\u6709\u6392\u73ed\u6b0a\u9650'); const row = document.querySelector('[data-human-emp="' + empId + '"]'); if (!row) return; const mode = row.querySelector('select').value; const start = row.querySelector('.hr-start').value || null; const end = row.querySelector('.hr-end').value || null; try { const updates = { shift_mode: mode, fixed_shift_start: mode === 'fixed' ? (start || '10:30') : null, fixed_shift_end: mode === 'fixed' ? (end || '21:30') : null }; const upRes = await callAttendanceVerifiedAction('employee_update', { employee_id: empId, updates: updates }); if (!upRes.ok) throw new Error(upRes.message || '\u5132\u5b58\u5931\u6557'); clearAttendanceLiffToken(); showToast('\u5de5\u6642\u6a21\u5f0f\u5df2\u5132\u5b58'); await loadHumanManagement(); } catch (e) { console.error('Save human mode error:', e); showToast('\u5132\u5b58\u5931\u6557\uff1a' + (e.message || '')); } }
+async function saveHumanSchedule() { if (!canSaveHumanSchedule()) return showToast('\u6c92\u6709\u6392\u73ed\u6b0a\u9650'); if (!currentEmployeeId) return showToast('\u7f3a\u5c11\u7ba1\u7406\u8005\u8eab\u4efd'); const changes = Object.keys(humanDraft).filter(key => (humanDraft[key] || null) !== (humanOriginal[key] || null)); if (changes.length === 0) return showToast('\u6c92\u6709\u6392\u73ed\u8b8a\u66f4'); const btn = document.getElementById('humanSaveBtn'); btn.disabled = true; btn.textContent = '\u8f09\u5165\u4e2d...'; try { const items = changes.map(key => { const [empId, dateStr] = key.split('_'); const val = humanDraft[key] || null; return val ? { employee_id: empId, date: dateStr, shift_type_id: val === 'off' ? null : val, is_off_day: val === 'off' } : { employee_id: empId, date: dateStr, delete: true }; }); for (let i = 0; i < items.length; i += 400) { const res = await callAttendanceVerifiedAction('schedule_save', { items: items.slice(i, i + 400) }); if (!res.ok) throw new Error(res.message || 'save failed'); } clearAttendanceLiffToken(); showToast('\u6392\u73ed\u5df2\u5132\u5b58'); await loadHumanManagement(); } catch (e) { console.error('Save human schedule error:', e); showToast('\u6392\u73ed\u5132\u5b58\u5931\u6557\uff1a' + (e.message || '')); } finally { btn.disabled = false; btn.textContent = '\ud83d\udcbe \u5132\u5b58\u6392\u73ed'; } }
 
 // === end ===
 window.addEventListener('beforeunload', stopAutoRefresh);

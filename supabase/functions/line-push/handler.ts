@@ -55,7 +55,13 @@ function json(payload: unknown, status: number): Response {
   })
 }
 
-async function callRpc(deps: Deps, fn: string, args: Record<string, unknown>): Promise<{ ok: boolean; data: any }> {
+// 新動作依賴的 migration：RPC 不存在（PostgREST PGRST202）時，回報「資料庫尚未更新（1xx）」而不是籠統的服務錯誤
+const RPC_MIGRATION: Record<string, string> = {
+  platform_company_save: '130', platform_company_set_status: '130', platform_company_delete_pending: '130',
+  review_makeup_request: '131', review_overtime_request: '131', save_schedules_verified: '131',
+}
+
+async function callRpc(deps: Deps, fn: string, args: Record<string, unknown>): Promise<{ ok: boolean; data: any; missing?: string }> {
   const url = deps.env('SUPABASE_URL')
   const key = deps.env('SUPABASE_SERVICE_ROLE_KEY')
   if (!url || !key) return { ok: false, data: null }
@@ -66,6 +72,7 @@ async function callRpc(deps: Deps, fn: string, args: Record<string, unknown>): P
       body: JSON.stringify(args),
     })
     const data = await res.json().catch(() => null)
+    if (res.status === 404 && data && data.code === 'PGRST202') return { ok: false, data, missing: RPC_MIGRATION[fn] || '?' }
     return { ok: res.ok, data }
   } catch (_) {
     return { ok: false, data: null }
@@ -195,9 +202,12 @@ async function handleVerifiedPush(body: any, deps: Deps): Promise<Response> {
 
 // ---- 驗過 LIFF 身分後代呼叫 service-role RPC（設定寫入、LINE 設定、平台管理員）----
 // RPC 回 { success:false, error_code } 時轉成 4xx；RPC 連不上 → 503
-function rpcResult(saved: { ok: boolean; data: any }, extra: (d: any) => Record<string, unknown> = () => ({})): Response {
+function rpcResult(saved: { ok: boolean; data: any; missing?: string }, extra: (d: any) => Record<string, unknown> = () => ({})): Response {
+  if (saved.missing) {
+    return json({ ok: false, status: 503, code: 'db_not_migrated', error: `資料庫尚未更新（${saved.missing}），請通知系統管理員` }, 503)
+  }
   if (!saved.ok || !saved.data || typeof saved.data !== 'object') {
-    return json({ ok: false, status: 503, code: 'service_unavailable', error: '設定服務暫時無法使用' }, 503)
+    return json({ ok: false, status: 503, code: 'service_unavailable', error: '服務暫時無法使用，請稍後再試' }, 503)
   }
   if (saved.data.success !== true) {
     const code = typeof saved.data.error_code === 'string' ? saved.data.error_code : 'failed'
@@ -265,15 +275,23 @@ async function handleVerifiedAction(body: any, deps: Deps): Promise<Response> {
     })
     if (ids.length === 1) return rpcResult(await review(ids[0]), withResult)
     const results: Array<Record<string, unknown>> = []
+    const summary = () => ({
+      results, approved_count: results.filter((x) => x.success).length,
+      approved_ids: results.filter((x) => x.success).map((x) => x.id),
+    })
     for (const id of ids) {
       const r = await review(id)
-      if (!r.ok || !r.data || typeof r.data !== 'object' || r.data.error_code === 'access_denied') return rpcResult(r)
+      if (r.missing || !r.ok || !r.data || typeof r.data !== 'object' || r.data.error_code === 'access_denied') {
+        // 中途停下：回報已處理的每一筆（前端要據此計數、寫稽核），以及停在哪一筆、為什麼
+        const stop = await rpcResult(r).json()
+        return json({ ...stop, ...summary(), failed_id: id, not_processed_ids: ids.slice(ids.indexOf(id) + 1) }, stop.status)
+      }
       results.push({
         id, success: r.data.success === true, error: r.data.success === true ? null : (r.data.error ?? null),
         closed_duplicates: r.data.closed_duplicates ?? 0,
       })
     }
-    return json({ ok: true, status: 200, results, approved_count: results.filter((x) => x.success).length }, 200)
+    return json({ ok: true, status: 200, ...summary() }, 200)
   }
 
   // ---- 加班認列 ----

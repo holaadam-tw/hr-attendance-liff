@@ -109,6 +109,9 @@ function rest() {
   check('審核一律走 makeup_review／overtime_review', (body.match(/callVerifiedAction\('makeup_review'/g) || []).length === 3 && (body.match(/callVerifiedAction\('overtime_review'/g) || []).length === 2);
   check('前端不再送核准人（approver_id／currentAdminEmployee.id）', !/approver(_id|Id)\s*[:,)]/.test(body) && !/p_approver_id/.test(body) && !/currentAdminEmployee/.test(body));
   check('一鍵全批：每批最多 50 筆、一次送出', /todays\.slice\(i, i \+ 50\)/.test(body) && /request_ids: chunk\.map\(r => r\.id\)/.test(body));
+  check('一鍵全批中途失敗：仍依伺服器回報的每筆結果計數、已核准的寫稽核（含 approved_ids）',
+    /const results = Array\.isArray\(res\.data\?\.results\)/.test(body) && /approvedIds\.push\(x\.id\)/.test(body)
+    && /writeAuditLog\('batch_approve_gps'[^\n]*approved_ids: approvedIds/.test(body) && /已通過 \$\{ok\} 筆/.test(body));
 
   console.log('\n=== 打卡總覽（attendance_public.html）＋ index.html ===');
   const ap = read('attendance_public.html'), idx = read('index.html');
@@ -116,7 +119,49 @@ function rest() {
   check('排班改走 schedule_save 批次（不再送 scheduler_id）', /callAttendanceVerifiedAction\('schedule_save'/.test(ap) && !/p_scheduler_id/.test(ap));
   check('送出的身分是 LIFF access token，不是 line_user_id', /liff_access_token: token/.test(grab(ap, 'callAttendanceVerifiedAction')) && !/line_user_id/.test(grab(ap, 'callAttendanceVerifiedAction')));
   check('token 過期／缺少：清掉並回 LINE 重新登入', /reloginAttendancePublic/.test(grab(ap, 'callAttendanceVerifiedAction')) && /buildAttendancePublicLiffUrl\(\)/.test(grab(ap, 'reloginAttendancePublic')));
-  check('index.html 導去打卡總覽時存下本次 LIFF access token', /localStorage\.setItem\('attendance_public_liff_token_' \+ _pubCompany, _pubToken\)/.test(idx) && /getLiffAccessTokenSafe\(\)/.test(idx));
+  check('index.html：LIFF access token 只放 sessionStorage、key＝公司＋LINE 使用者、帶 expires_at',
+    /sessionStorage\.setItem\(_pubTokenKey, JSON\.stringify\(\{ token: _pubToken, expires_at: Date\.now\(\) \+ /.test(idx)
+    && /_pubTokenKey = 'attendance_public_liff_token_' \+ _pubCompany \+ '_' \+ liffProfile\.userId/.test(idx) && /getLiffAccessTokenSafe\(\)/.test(idx));
+  check('token 不寫進 localStorage（任何頁面）', !files.some(f => /localStorage\.setItem\([^)]*liff_token/.test(f.src)));
+  check('index.html 之後用 location.href 同分頁導過去（sessionStorage 才帶得過去）', /window\.location\.href = 'attendance_public\.html\?company=/.test(idx));
+  const getTok = grab(ap, 'getCachedAttendanceLiffToken');
+  check('打卡總覽讀 token：sessionStorage、key 含目前 LINE 使用者、過期就刪', /sessionStorage\.getItem\(attendanceLiffTokenKey\(\)\)/.test(getTok)
+    && /currentLineUserId/.test(grab(ap, 'attendanceLiffTokenKey')) && /expires_at\) > Date\.now\(\)/.test(getTok) && /clearAttendanceLiffToken\(\)/.test(getTok));
+  check('存檔成功後刪 token（工時模式、排班都是）', /callAttendanceVerifiedAction\('employee_update'[^;]*;[^;]*;\s*clearAttendanceLiffToken\(\);/.test(grab(ap, 'saveHumanMode'))
+    && /clearAttendanceLiffToken\(\); showToast/.test(grab(ap, 'saveHumanSchedule')));
+  check('token 失效時刪 token', /clearAttendanceLiffToken\(\)/.test(grab(ap, 'reloginAttendancePublic')));
+  const head = ap.slice(0, ap.indexOf('</head>'));
+  const scripts = [...head.matchAll(/<script[^>]*src="([^"]+)"[^>]*>/g)].map(m => m[0]);
+  check('打卡總覽不再載入 LIFF SDK（本頁沒用到）', !scripts.some(t => /liff\/edge/.test(t)));
+  check('打卡總覽外部腳本全部固定版本＋SRI＋crossorigin', scripts.length === 3 && scripts.every(t => /integrity="sha384-[A-Za-z0-9+/=]{64}"/.test(t) && /crossorigin="anonymous"/.test(t))
+    && scripts.some(t => /supabase-js@\d+\.\d+\.\d+\//.test(t)) && !scripts.some(t => /supabase-js@2"/.test(t)), scripts.length + ' 支');
+
+  // 實跑：用頁面原文組出 token 讀取函式，注入假的 storage
+  try {
+    const src = ['attendanceLiffTokenKey', 'clearAttendanceLiffToken', 'getCachedAttendanceLiffToken'].map(n => grab(ap, n)).join('\n');
+    const mkStore = () => { const m = new Map(); return { getItem: k => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: k => m.delete(k), _m: m }; };
+    const build = (company, user, ss, ls) => new Function('companyId', 'currentLineUserId', 'sessionStorage', 'localStorage',
+      `${src}; return { get: getCachedAttendanceLiffToken, clear: clearAttendanceLiffToken, key: attendanceLiffTokenKey };`)(company, user, ss, ls);
+    const ss = mkStore(), ls = mkStore();
+    ss.setItem('attendance_public_liff_token_C1_Uaaa', JSON.stringify({ token: 'tok-a', expires_at: Date.now() + 60000 }));
+    let f = build('C1', 'Uaaa', ss, ls);
+    check('（實跑）同一位使用者、未過期：拿得到 token', f.get() === 'tok-a');
+    f = build('C1', 'Ubbb', ss, ls);
+    check('（實跑）同裝置換成另一位 LINE 使用者：拿不到上一位的 token', f.get() === null);
+    f = build('C2', 'Uaaa', ss, ls);
+    check('（實跑）換公司：拿不到', f.get() === null);
+    ss.setItem('attendance_public_liff_token_C1_Uaaa', JSON.stringify({ token: 'tok-a', expires_at: Date.now() - 1 }));
+    f = build('C1', 'Uaaa', ss, ls);
+    check('（實跑）過期：拿不到且刪掉', f.get() === null && ss.getItem('attendance_public_liff_token_C1_Uaaa') === null);
+    ss.setItem('attendance_public_liff_token_C1_Uaaa', JSON.stringify({ token: 'tok-a', expires_at: Date.now() + 60000 }));
+    ls.setItem('attendance_public_liff_token_C1', 'legacy');
+    f.clear();
+    check('（實跑）clear：刪 sessionStorage 的 token 與舊版 localStorage key', ss.getItem('attendance_public_liff_token_C1_Uaaa') === null && ls.getItem('attendance_public_liff_token_C1') === null);
+    ls.setItem('attendance_public_liff_token_C1', 'legacy-token');
+    check('（實跑）不讀 localStorage（舊版存法不再採用）', f.get() === null);
+    ss.setItem('attendance_public_liff_token_C1_Uaaa', 'not-json');
+    check('（實跑）內容壞掉：當作沒有', f.get() === null);
+  } catch (e) { check('（實跑）token 讀取函式可執行', false, e.message); }
 
   console.log('\n=== 快取版本 ===');
   const htmls = files.filter(f => f.rel.endsWith('.html') && /common\.js\?v=/.test(f.src));
