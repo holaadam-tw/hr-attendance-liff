@@ -16,7 +16,8 @@ export interface Deps {
   log?: (msg: string) => void
 }
 
-export const TODO_COMMANDS = ['#待辦', '待辦', '#todo', '#待辦事項']
+// 「代辦」是常見同音誤打（owner 第一次就這樣打）
+export const TODO_COMMANDS = ['#待辦', '待辦', '#todo', '#待辦事項', '待辦事項', '#代辦', '代辦', '#代辦事項', '代辦事項']
 
 function toBase64(bytes: ArrayBuffer): string {
   let bin = ''
