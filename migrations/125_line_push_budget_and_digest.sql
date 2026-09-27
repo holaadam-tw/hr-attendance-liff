@@ -803,13 +803,21 @@ AS $$
 DECLARE
     v_scanned INTEGER;
     v_mwh JSONB;
+    v_notify JSONB;
 BEGIN
     v_scanned := public.scan_missing_checkouts();
     v_mwh := public.scan_missing_work_hours(3);
+    -- 通知出錯不能連掃描一起回滾（掃描結果是打卡總覽與 #待辦 的來源）；錯誤留在排程紀錄
+    BEGIN
+        v_notify := public.line_daily_notify(now());
+    EXCEPTION WHEN OTHERS THEN
+        RAISE WARNING 'line_daily_notify failed: % (%)', SQLERRM, SQLSTATE;
+        v_notify := jsonb_build_object('error', SQLERRM, 'sqlstate', SQLSTATE);
+    END;
     RETURN jsonb_build_object(
         'scanned_new', v_scanned,
         'missing_work_hours_scan', v_mwh,
-        'notify', public.line_daily_notify(now())
+        'notify', v_notify
     );
 END;
 $$;

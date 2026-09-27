@@ -330,6 +330,18 @@ const at = (date, time = '09:10') => `${date} ${time}:00+08`;
   const ctl = (await one(`SELECT public.get_missing_work_hours_notification_control('${C}', 'Uadmin') AS c`)).c;
   check('缺時開關 RPC 顯示 09:10', ctl.schedule_time === '09:10');
 
+  // 通知出錯時，掃描結果不能跟著回滾
+  await seed();
+  await q(`DELETE FROM public.attendance_anomalies`);
+  await q(`INSERT INTO public.attendance (employee_id, date, check_in_time)
+           VALUES ('${E.e1}', (now() AT TIME ZONE 'Asia/Taipei')::date - 1, now() - interval '1 day')`);
+  await q(`CREATE OR REPLACE FUNCTION public.line_daily_notify(p_now TIMESTAMPTZ DEFAULT now()) RETURNS JSONB
+           LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'boom'; END; $$`);
+  const broken = (await one(`SELECT public.run_daily_attendance_audit() AS r`)).r;
+  const kept = (await one(`SELECT COUNT(*)::int AS n FROM public.attendance_anomalies`)).n;
+  check('通知失敗：排程不中斷、錯誤寫進回傳、掃描結果保留', broken.notify && broken.notify.error === 'boom' && kept > 0 && broken.scanned_new === kept,
+    `notify=${JSON.stringify(broken.notify)} anomalies=${kept} scanned=${broken.scanned_new}`);
+
   // ---------- 11. 回滾與重套 ----------
   console.log('\n=== 回滾 → 再套一次 ===');
   let rbOk = true;
