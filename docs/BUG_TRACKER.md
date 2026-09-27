@@ -9,9 +9,10 @@
 
 - 問題：正式庫唯一政策「Allow all for authenticated」實際套用對象是 PUBLIC（含 anon），anon／authenticated 有全部 grant → 前端可直接新增、修改（例如直接改成已同意／已核准）、刪除任何人的換班申請（目前 0 列）
 - 139（純新增，service role only）：`shift_swap_request_create`（申請人＝LINE 驗證的本人；對象同公司、在職、非公務機、非自己；雙方當天都要有排班；班別名稱 DB 現查；同對象同日不重複）、`shift_swap_request_respond`（只有對象本人能同意／拒絕，且只處理 pending_target）
+- 審查補強：同兩人同一天只能有一筆進行中的申請（不分方向，唯一部分索引＋事前檢查）、不能申請過去的日期、同一 LINE 帳號對到多位在職員工時拒絕、回覆以申請列的對象比對；handler 對不存在的日期回 400
 - line-push：`shift_swap_create`／`shift_swap_respond`；schedule.html 三處直接寫表改呼叫它們（伺服器拒絕時照實顯示，不再誤報成功）
 - 140（前端上線、舊快取過期後）：FOR ALL 政策換成 SELECT 政策（讀取不變）、anon／authenticated 只留 SELECT；檔尾自我檢查
-- 測試：PGlite 70 項（139／140 換空檔 → 55 項失敗）、前端 16 項（舊頁面 → 11 項失敗）、Edge +14 項
+- 測試：PGlite 75 項（139／140 換空檔 → 60 項失敗）、前端 16 項（舊頁面 → 11 項失敗）、Edge +16 項
 - **狀態：PR 待審，未套正式庫、未部署。**
 
 ---

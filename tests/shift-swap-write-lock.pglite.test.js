@@ -42,7 +42,9 @@ const E = {
   kiosk: '00000000-0000-0000-0000-0000000000c1', bAdmin: '00000000-0000-0000-0000-0000000000b1', bUser: '00000000-0000-0000-0000-0000000000b2',
 };
 const ST = { day: '00000000-0000-0000-0000-00000000cd01', night: '00000000-0000-0000-0000-00000000cd02', b: '00000000-0000-0000-0000-00000000cd03' };
-const D1 = '2026-10-05', D2 = '2026-10-06', OFF = '2026-10-07';
+// 日期以「今天（台北）」往後推，測試不會因日期過去而失效（139 拒絕過去的日期）
+const taipeiPlus = n => { const d = new Date(Date.now() + 8 * 3600 * 1000); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+const D1 = taipeiPlus(7), D2 = taipeiPlus(8), OFF = taipeiPlus(9), D3 = taipeiPlus(10), PAST = taipeiPlus(-1);
 const FAKE = '00000000-0000-0000-0000-00000000ff01';
 
 (async () => {
@@ -120,7 +122,8 @@ const FAKE = '00000000-0000-0000-0000-00000000ff01';
         ('${E.e4}', '${D2}', '${ST.day}'), ('${E.e5}', '${D2}', '${ST.night}'),
         ('${E.e1}', '${D1}', '${ST.day}'), ('${E.e1}', '${OFF}', '${ST.day}'),
         ('${E.quit}', '${D1}', '${ST.day}'), ('${E.pend}', '${D1}', '${ST.day}'), ('${E.kiosk}', '${D1}', '${ST.day}'),
-        ('${E.bUser}', '${D1}', '${ST.b}');
+        ('${E.bUser}', '${D1}', '${ST.b}'), ('${E.e4}', '${PAST}', '${ST.day}'), ('${E.e5}', '${PAST}', '${ST.night}'),
+        ('${E.e1}', '${D3}', '${ST.day}'), ('${E.e2}', '${D3}', '${ST.night}');
       INSERT INTO public.schedules (employee_id, date, shift_type_id, is_off_day) VALUES ('${E.e2}', '${OFF}', NULL, true);
     `);
   }
@@ -197,6 +200,13 @@ const FAKE = '00000000-0000-0000-0000-00000000ff01';
   check('申請人當天沒有排班：拒絕', r?.error_code === 'schedule_missing');
   r = await create('U4', null, D1);
   check('沒選對象：拒絕', r?.error_code === 'invalid_value');
+  r = await create('U4', E.e5, PAST);
+  check('過去的日期：拒絕（雙方當天都有排班也一樣）', r?.error_code === 'past_date');
+  await db.exec(`INSERT INTO public.employees (id, company_id, employee_number, name, line_user_id, role, is_kiosk, status, is_active) VALUES
+    ('00000000-0000-0000-0000-0000000000d1', '${A}', 'D01', '重複一', 'Udup', 'user', false, 'approved', true),
+    ('00000000-0000-0000-0000-0000000000d2', '${A}', 'D02', '重複二', 'Udup', 'user', false, 'approved', true)`);
+  r = await create('Udup', E.e5, D1);
+  check('同一公司同一個 LINE 帳號對到兩位在職員工：拒絕（不猜是哪一位）', r?.error_code === 'ambiguous_employee');
   check('以上被拒的申請都沒有寫入', (await swCount()) === n0);
 
   r = await create('U4', E.e5, D1, A, '  家裡有事  ');
@@ -209,6 +219,10 @@ const FAKE = '00000000-0000-0000-0000-00000000ff01';
     && row.status === 'pending_target' && row.target_agreed === null && row.approver_id === null && r.target_shift === '晚班', JSON.stringify(row));
   r = await create('U4', E.e5, D1);
   check('同一對象同一天已有進行中的申請：不重複建立', r?.error_code === 'duplicate' && (await swCount()) === n0 + 1);
+  r = await create('U5', E.e4, D1);
+  check('反方向重複（對方已向我提出同一天的申請）：不重複建立', r?.error_code === 'duplicate' && (await swCount()) === n0 + 1);
+  r = await q(`SELECT 1`).then(() => as('service_role', `INSERT INTO public.shift_swap_requests (requester_id, target_id, swap_date, status) VALUES ($1, $2, $3, 'pending_target')`, [E.e5, E.e4, D1]));
+  check('唯一索引：同兩人同一天第二筆進行中的申請（例如同時送出）寫不進去', /unique|duplicate key/.test(r.error || ''), r.error);
   r = await create('U1', E.e2, OFF);
   row = r?.id && await swRow(r.id);
   check('對方當天是休假：可以申請、班別顯示「休假」', r?.success === true && row?.target_original_shift === '休假' && row.requester_original_shift === '早班', JSON.stringify(row));
@@ -229,6 +243,12 @@ const FAKE = '00000000-0000-0000-0000-00000000ff01';
   check('別家公司員工帶本公司 ID：找不到員工資料', r?.error_code === 'access_denied');
   r = await respond('U5', req1, 'approve');
   check('動作只能 agree／decline', r?.error_code === 'invalid_value' && (await swRow(req1)).status === 'pending_target');
+  r = await create('U1', E.e2, D3);
+  const reqDup = r?.id || FAKE;
+  await db.exec(`UPDATE public.employees SET line_user_id = 'U2' WHERE id = '00000000-0000-0000-0000-0000000000d1'`);
+  r = await respond('U2', reqDup, 'agree');
+  check('對象的 LINE 帳號同時對到另一位員工：仍以申請列的對象比對、同意成功（不會因先對到別人而被拒）', r?.success === true && (await swRow(reqDup)).status === 'pending_admin', JSON.stringify(r));
+  await db.exec(`UPDATE public.employees SET line_user_id = 'Udup' WHERE id = '00000000-0000-0000-0000-0000000000d1'`);
   r = await respond('U5', FAKE, 'agree');
   check('不存在的申請：not_found', r?.error_code === 'not_found');
   await db.exec(`UPDATE public.employees SET is_active = false WHERE id = '${E.e5}'`);
@@ -300,7 +320,7 @@ const FAKE = '00000000-0000-0000-0000-00000000ff01';
   err = '';
   for (let i = 0; i < 2 && !err; i++) err = await apply(m139) || await apply(m140);
   check('139、140 可重複套用', err === '', err);
-  r = await as('anon', `INSERT INTO public.shift_swap_requests (requester_id, target_id, swap_date) VALUES ($1, $2, '2026-10-30')`, [E.e4, E.e5]);
+  r = await as('anon', `INSERT INTO public.shift_swap_requests (requester_id, target_id, swap_date) VALUES ($1, $2, $3)`, [E.e4, E.e5, taipeiPlus(30)]);
   check('重套後仍擋直接寫入', denied(r), r.error);
   check('重套後政策恰好 1 條（SELECT）', (await q(`SELECT cmd FROM pg_policies WHERE tablename = 'shift_swap_requests'`)).map(x => x.cmd).join(',') === 'SELECT');
 

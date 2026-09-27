@@ -424,6 +424,9 @@ const post = (url, body, headers = {}) => new Request(url, { method: 'POST', bod
     check('shift_swap_create：target_id 不是 UUID → 400、不呼叫 RPC', t.res.status === 400 && !t.f.calls.some(x => x.url.includes('/rpc/')));
     t = await run({ action: 'shift_swap_create', company_id: COMPANY, target_id: TGT, swap_date: '10/05' });
     check('shift_swap_create：日期格式不對 → 400、不呼叫 RPC', t.res.status === 400 && !t.f.calls.some(x => x.url.includes('/rpc/')));
+    t = await run({ action: 'shift_swap_create', company_id: COMPANY, target_id: TGT, swap_date: '2026-02-30' });
+    check('shift_swap_create：不存在的日期（2026-02-30）→ 400、不呼叫 RPC（不會變成 503）', t.res.status === 400 && !t.f.calls.some(x => x.url.includes('/rpc/')));
+    check('isRealDate：閏年 2028-02-29 合法、2026-13-01 不合法', push.isRealDate('2028-02-29') && !push.isRealDate('2026-13-01') && !push.isRealDate(20261005));
     t = await run({ action: 'shift_swap_create', target_id: TGT, swap_date: '2026-10-05' });
     check('shift_swap_create：沒帶 company_id → 400、不驗 LIFF', t.res.status === 400 && t.f.calls.length === 0);
     t = await run({ action: 'shift_swap_create', company_id: COMPANY, target_id: TGT, swap_date: '2026-10-05' }, rpcRoutes([['/v2/profile', { status: 401, body: {} }]]));

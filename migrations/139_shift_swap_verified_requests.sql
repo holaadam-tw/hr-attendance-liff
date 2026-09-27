@@ -12,8 +12,11 @@
 -- 新增（只給 service_role，由 line-push 驗 LIFF 後以 LINE 回傳的 userId 呼叫）：
 --   A. shift_swap_request_create：申請人＝LINE 驗證的本人（該公司在職、非公務機）；
 --      對象必須同公司、在職、非公務機、不是自己；雙方當天都必須已有排班（與 133 核准條件一致）；
---      班別名稱由 DB 依排班現查（不採信前端）；同一對象同一天已有進行中的申請 → 不重複建立
---   B. shift_swap_request_respond：只有「被邀請換班的對象本人」能同意／拒絕，且申請必須是 pending_target
+--      班別名稱由 DB 依排班現查（不採信前端）；日期不能早於今天（台北）；
+--      同兩人同一天已有進行中的申請（不論誰向誰提出）→ 不重複建立（另有唯一索引擋同時送出）
+--      同一公司同一個 LINE 帳號對到多位在職員工 → 拒絕（不猜是哪一位）
+--   B. shift_swap_request_respond：只有「被邀請換班的對象本人」能同意／拒絕（以申請列的 target_id＋公司＋LINE 帳號＋在職比對），
+--      且申請必須是 pending_target
 --      同意 → target_agreed = true、status = pending_admin；拒絕 → status = rejected（原因「對方不同意」）
 --
 -- 上線順序：套 139 → 部署 line-push → merge 前端 → 等至少 1 個工作天（LINE 內建瀏覽器快取）→ 套 140（撤直接寫入）
@@ -22,6 +25,11 @@
 -- ============================================================
 
 BEGIN;
+
+-- 同兩人同一天只能有一筆進行中的申請（不分方向）；正式庫 0 列，建立不會失敗
+CREATE UNIQUE INDEX IF NOT EXISTS shift_swap_requests_one_pending_idx
+    ON public.shift_swap_requests (LEAST(requester_id, target_id), GREATEST(requester_id, target_id), swap_date)
+    WHERE status IN ('pending_target', 'pending_admin');
 
 -- ===== A. 申請換班 =====
 CREATE OR REPLACE FUNCTION public.shift_swap_request_create(
@@ -43,6 +51,7 @@ DECLARE
     v_found1 BOOLEAN := false;
     v_found2 BOOLEAN := false;
     v_id UUID;
+    v_matches INT;
 BEGIN
     IF COALESCE(p_line_user_id, '') = '' OR p_company_id IS NULL THEN
         RETURN jsonb_build_object('success', false, 'error', '找不到您的員工資料', 'error_code', 'access_denied');
@@ -50,14 +59,18 @@ BEGIN
     IF p_target_id IS NULL OR p_swap_date IS NULL THEN
         RETURN jsonb_build_object('success', false, 'error', '請選擇日期和同事', 'error_code', 'invalid_value');
     END IF;
+    IF p_swap_date < (now() AT TIME ZONE 'Asia/Taipei')::date THEN
+        RETURN jsonb_build_object('success', false, 'error', '不能申請已經過去的日期', 'error_code', 'past_date');
+    END IF;
 
-    SELECT e.id INTO v_requester FROM public.employees e
+    SELECT count(*), min(e.id::text)::uuid INTO v_matches, v_requester FROM public.employees e
     WHERE e.company_id = p_company_id AND e.line_user_id = p_line_user_id AND e.is_active = true
-      AND COALESCE(e.status, 'approved') = 'approved' AND COALESCE(e.is_kiosk, false) = false
-    ORDER BY e.created_at
-    LIMIT 1;
-    IF v_requester IS NULL THEN
+      AND COALESCE(e.status, 'approved') = 'approved' AND COALESCE(e.is_kiosk, false) = false;
+    IF v_matches = 0 THEN
         RETURN jsonb_build_object('success', false, 'error', '找不到您的員工資料', 'error_code', 'access_denied');
+    END IF;
+    IF v_matches > 1 THEN
+        RETURN jsonb_build_object('success', false, 'error', '您的 LINE 帳號對應到多位員工，請聯絡管理員', 'error_code', 'ambiguous_employee');
     END IF;
 
     SELECT e.id INTO v_target FROM public.employees e
@@ -80,20 +93,26 @@ BEGIN
         RETURN jsonb_build_object('success', false, 'error', '雙方當天都必須已有排班才能申請換班', 'error_code', 'schedule_missing');
     END IF;
 
+    -- 不分方向：對方已向我提出同一天的申請也算重複（唯一索引另外擋同時送出）
     IF EXISTS (
         SELECT 1 FROM public.shift_swap_requests r
-        WHERE r.requester_id = v_requester AND r.target_id = v_target AND r.swap_date = p_swap_date
-          AND r.status IN ('pending_target', 'pending_admin')
+        WHERE LEAST(r.requester_id, r.target_id) = LEAST(v_requester, v_target)
+          AND GREATEST(r.requester_id, r.target_id) = GREATEST(v_requester, v_target)
+          AND r.swap_date = p_swap_date AND r.status IN ('pending_target', 'pending_admin')
     ) THEN
-        RETURN jsonb_build_object('success', false, 'error', '這一天已經向同一位同事提出換班，請等待對方或主管處理', 'error_code', 'duplicate');
+        RETURN jsonb_build_object('success', false, 'error', '你們這一天已經有進行中的換班申請，請等待對方或主管處理', 'error_code', 'duplicate');
     END IF;
 
-    INSERT INTO public.shift_swap_requests (
-        requester_id, target_id, swap_date, requester_original_shift, target_original_shift, reason, status
-    ) VALUES (
-        v_requester, v_target, p_swap_date, v_req_shift, v_tgt_shift,
-        left(btrim(COALESCE(p_reason, '')), 500), 'pending_target'
-    ) RETURNING id INTO v_id;
+    BEGIN
+        INSERT INTO public.shift_swap_requests (
+            requester_id, target_id, swap_date, requester_original_shift, target_original_shift, reason, status
+        ) VALUES (
+            v_requester, v_target, p_swap_date, v_req_shift, v_tgt_shift,
+            left(btrim(COALESCE(p_reason, '')), 500), 'pending_target'
+        ) RETURNING id INTO v_id;
+    EXCEPTION WHEN unique_violation THEN
+        RETURN jsonb_build_object('success', false, 'error', '你們這一天已經有進行中的換班申請，請等待對方或主管處理', 'error_code', 'duplicate');
+    END;
 
     RETURN jsonb_build_object('success', true, 'id', v_id, 'requester_id', v_requester, 'target_id', v_target,
         'swap_date', p_swap_date, 'requester_shift', v_req_shift, 'target_shift', v_tgt_shift);
@@ -115,7 +134,6 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-    v_caller UUID;
     v_req RECORD;
 BEGIN
     IF p_decision IS NULL OR p_decision NOT IN ('agree', 'decline') THEN
@@ -125,12 +143,11 @@ BEGIN
         RETURN jsonb_build_object('success', false, 'error', '找不到您的員工資料', 'error_code', 'access_denied');
     END IF;
 
-    SELECT e.id INTO v_caller FROM public.employees e
-    WHERE e.company_id = p_company_id AND e.line_user_id = p_line_user_id AND e.is_active = true
-      AND COALESCE(e.status, 'approved') = 'approved' AND COALESCE(e.is_kiosk, false) = false
-    ORDER BY e.created_at
-    LIMIT 1;
-    IF v_caller IS NULL THEN
+    IF NOT EXISTS (
+        SELECT 1 FROM public.employees e
+        WHERE e.company_id = p_company_id AND e.line_user_id = p_line_user_id AND e.is_active = true
+          AND COALESCE(e.status, 'approved') = 'approved' AND COALESCE(e.is_kiosk, false) = false
+    ) THEN
         RETURN jsonb_build_object('success', false, 'error', '找不到您的員工資料', 'error_code', 'access_denied');
     END IF;
 
@@ -144,7 +161,12 @@ BEGIN
     IF v_req.id IS NULL THEN
         RETURN jsonb_build_object('success', false, 'error', '找不到換班申請', 'error_code', 'not_found');
     END IF;
-    IF v_req.target_id IS DISTINCT FROM v_caller THEN
+    -- 呼叫者必須就是申請列上的對象（以 target_id＋公司＋LINE 帳號＋在職比對；同一 LINE 帳號對到多位員工也不會猜錯人）
+    IF NOT EXISTS (
+        SELECT 1 FROM public.employees e
+        WHERE e.id = v_req.target_id AND e.company_id = p_company_id AND e.line_user_id = p_line_user_id AND e.is_active = true
+          AND COALESCE(e.status, 'approved') = 'approved' AND COALESCE(e.is_kiosk, false) = false
+    ) THEN
         RETURN jsonb_build_object('success', false, 'error', '只有被邀請換班的同事本人可以回覆', 'error_code', 'access_denied');
     END IF;
     IF v_req.status IS DISTINCT FROM 'pending_target' THEN

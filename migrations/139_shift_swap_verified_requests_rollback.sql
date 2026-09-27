@@ -13,5 +13,6 @@ END $$;
 
 DROP FUNCTION IF EXISTS public.shift_swap_request_create(UUID, TEXT, UUID, DATE, TEXT);
 DROP FUNCTION IF EXISTS public.shift_swap_request_respond(UUID, TEXT, UUID, TEXT);
+DROP INDEX IF EXISTS public.shift_swap_requests_one_pending_idx;
 
 COMMIT;

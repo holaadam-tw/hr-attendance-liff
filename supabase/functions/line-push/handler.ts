@@ -244,6 +244,13 @@ const isObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v =
 const uuidOrNull = (v: unknown): string | null => (typeof v === 'string' && UUID_RE.test(v) ? v : null)
 const withResult = (d: any) => ({ result: d })
 
+// YYYY-MM-DD 且是真的日期（2026-02-30 這種交給 DB 會變成 503，這裡先回 400）
+export function isRealDate(v: unknown): v is string {
+  if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return false
+  const d = new Date(v + 'T00:00:00Z')
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === v
+}
+
 async function handleVerifiedAction(body: any, deps: Deps): Promise<Response> {
   const action = String(body.action)
   const companyId = uuidOrNull(body.company_id)
@@ -376,7 +383,7 @@ async function handleVerifiedAction(body: any, deps: Deps): Promise<Response> {
   // ---- 員工端換班（139）：申請人＝LINE 驗證的本人；只有對象本人能同意／拒絕 ----
   if (action === 'shift_swap_create') {
     const targetId = uuidOrNull(body.target_id)
-    const swapDate = typeof body.swap_date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.swap_date) ? body.swap_date : null
+    const swapDate = isRealDate(body.swap_date) ? body.swap_date : null
     if (!targetId || !swapDate) return badRequest()
     return rpcResult(await callRpc(deps, 'shift_swap_request_create', {
       p_company_id: companyId, p_line_user_id: lineUserId, p_target_id: targetId, p_swap_date: swapDate,
