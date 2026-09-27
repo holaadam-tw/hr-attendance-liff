@@ -541,26 +541,22 @@ function getCachedSetting(key) {
     return _settingsCache ? _settingsCache[key] : null;
 }
 
-// 統一儲存 system_settings（126 起走 admin_save_setting RPC：驗公司、驗管理身分；127 起前端不能直接寫表）
-// 失敗會 throw（以前寫入被擋也會顯示「已儲存」）
+// 統一儲存 system_settings（126 起經 line-push Edge Function 驗 LIFF 身分 → admin_save_setting；
+// 127 起前端不能直接寫表）。失敗會 throw（以前寫入被擋也會顯示「已儲存」），呼叫端要 try/catch 顯示錯誤。
 async function saveSetting(key, value, description) {
     const companyId = window.currentCompanyId || window.currentEmployee?.company_id || currentEmployee?.company_id;
     if (!companyId) { console.warn('saveSetting: no companyId'); throw new Error('目前公司資料尚未就緒'); }
     if (SECRET_SETTING_KEYS.includes(key)) throw new Error('LINE 設定請用 saveLineMessagingConfig 儲存');
-    const lineUserId = adminCallerLineUserId();
-    if (!lineUserId) throw new Error('無法確認登入身分，請重新開啟頁面');
 
-    const { data, error } = await sb.rpc('admin_save_setting', {
-        p_company_id: companyId,
-        p_line_user_id: lineUserId,
-        p_key: key,
-        p_value: value === undefined ? null : value,
-        p_description: description || key
+    const result = await callVerifiedAction('save_setting', {
+        company_id: companyId,
+        key,
+        value: value === undefined ? null : value,
+        description: description || key
     });
-    if (error || !data || data.success !== true) {
-        const msg = (data && data.error) || (error && error.message) || '設定儲存失敗';
-        console.error('saveSetting 失敗:', key, msg);
-        throw new Error(msg);
+    if (!result.ok) {
+        console.error('saveSetting 失敗:', key, result.code);
+        throw new Error(result.message || '設定儲存失敗');
     }
 
     invalidateSettingsCache();
@@ -575,19 +571,14 @@ async function initCompanySettings(companyId) {
         { key: 'check_in_radius', value: {meters:1000}, description: '打卡距離' },
         { key: 'departments', value: ['管理部','生產部','業務部','倉管部'], description: '部門列表' }
     ];
-    const lineUserId = adminCallerLineUserId();
     // 舊行為是「只新增、不覆蓋」（insert 撞 unique 就略過）；RPC 是 upsert，所以先查已有哪些 key
     const { data: existingRows } = await sb.from('system_settings')
         .select('key').eq('company_id', companyId).in('key', defaults.map(d => d.key));
     const existingKeys = (existingRows || []).map(r => r.key);
     for (const d of defaults) {
         if (existingKeys.includes(d.key)) continue;
-        try {
-            await sb.rpc('admin_save_setting', {
-                p_company_id: companyId, p_line_user_id: lineUserId,
-                p_key: d.key, p_value: d.value, p_description: d.description
-            });
-        } catch (e) { console.warn('初始化設定失敗', d.key); }
+        const r = await callVerifiedAction('save_setting', { company_id: companyId, key: d.key, value: d.value, description: d.description });
+        if (!r.ok) console.warn('初始化設定失敗', d.key, r.code);
     }
 }
 
@@ -1617,6 +1608,7 @@ const LINE_PUSH_DENY_MESSAGES = {
     missing_group: '尚未設定主管 LINE 群組 ID',
     missing_user_line: '該員工尚未綁定 LINE',
     employee_not_found: '找不到該員工',
+    rate_limited: '短時間內發送太多通知，請稍後再試（主管仍會在每日彙總看到）',
     authorize_unavailable: 'LINE 推播服務暫時無法使用，請稍後再試'
 };
 
@@ -1708,34 +1700,41 @@ async function sendUserNotify(employeeId, message, options) {
     }
 }
 
-// 管理員儲存 LINE 設定：token 只送到 Edge Function（驗 LIFF 身分後寫 DB），前端之後也讀不回來
-// channelToken 留空 = 沿用目前的 token（只改群組 ID）
-async function saveLineMessagingConfig(channelToken, groupId) {
-    const companyId = window.currentCompanyId;
-    if (!companyId) return { ok: false, code: 'missing_company', message: '目前公司資料尚未就緒' };
+// 需要「真實身分」的動作一律經 line-push Edge Function：它先向 LINE 驗證 LIFF access token 取得 userId，
+// 再以 service role 呼叫對應的 RPC（126／129）。前端自己報的 line_user_id 不會被採信。
+// action：save_setting／save_config／get_line_config／platform_admin_save／platform_link_company
+// 回傳 { ok, code, message, data }
+async function callVerifiedAction(action, payload) {
     const accessToken = getLiffAccessTokenSafe();
     if (!accessToken) return { ok: false, code: 'unauthenticated', message: LINE_PUSH_DENY_MESSAGES.unauthenticated };
     try {
         const res = await fetch('https://nssuisyvlrqnqfxupklb.supabase.co/functions/v1/line-push', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + CONFIG.SUPABASE_ANON_KEY },
-            body: JSON.stringify({
-                action: 'save_config',
-                liff_access_token: accessToken,
-                company_id: companyId,
-                channel_token: channelToken || '',
-                group_id: groupId || ''
-            })
+            body: JSON.stringify(Object.assign({}, payload || {}, { action, liff_access_token: accessToken }))
         });
         const result = await res.json().catch(() => null);
-        if (!result) return { ok: false, code: 'invalid_response', message: '設定服務回傳無法辨識的結果' };
-        if (!result.ok) return { ok: false, code: result.code || 'save_failed', message: result.error || '儲存失敗' };
-        invalidateSettingsCache();
-        await loadSettings(true);
-        return { ok: true };
+        if (!result) return { ok: false, code: 'invalid_response', message: '伺服器回傳無法辨識的結果' };
+        if (!result.ok) {
+            const code = result.code || 'failed';
+            return { ok: false, code, message: result.error || LINE_PUSH_DENY_MESSAGES[code] || '操作失敗', data: result };
+        }
+        return { ok: true, code: 'ok', data: result };
     } catch (e) {
-        return { ok: false, code: 'network_error', message: '目前無法連線設定服務，請檢查網路後重試' };
+        return { ok: false, code: 'network_error', message: '目前無法連線伺服器，請檢查網路後重試' };
     }
+}
+
+// 管理員儲存 LINE 設定：token 只送到 Edge Function（驗 LIFF 身分後寫 DB），前端之後也讀不回來
+// channelToken 留空 = 沿用目前的 token（只改群組 ID）
+async function saveLineMessagingConfig(channelToken, groupId) {
+    const companyId = window.currentCompanyId;
+    if (!companyId) return { ok: false, code: 'missing_company', message: '目前公司資料尚未就緒' };
+    const result = await callVerifiedAction('save_config', { company_id: companyId, channel_token: channelToken || '', group_id: groupId || '' });
+    if (!result.ok) return result;
+    invalidateSettingsCache();
+    await loadSettings(true);
+    return { ok: true };
 }
 
 // ===== 公告系統（使用 announcements 資料表） =====
@@ -2446,7 +2445,12 @@ window.verifyPayrollPw = function() {
 window.savePayrollPassword = async function() {
     const pw = document.getElementById('payrollNewPw')?.value.trim();
     if (!pw) { showToast('⚠️ 請輸入密碼'); return; }
-    await saveSetting('payroll_password', { password: pw }, '薪酬管理密碼');
+    try {
+        await saveSetting('payroll_password', { password: pw }, '薪酬管理密碼');
+    } catch (e) {
+        showToast('❌ 儲存失敗：' + (e?.message || ''));
+        return;
+    }
     showToast('✅ 密碼已更新');
     document.getElementById('payrollNewPw').value = '';
     window._payrollUnlocked = false;

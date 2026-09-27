@@ -759,7 +759,12 @@
             advance_days: advDays,
             auto_confirm: !manualConfirm
         });
-        await saveSetting('booking_service_settings', settingsValue, '服務業預約基本設定');
+        try {
+            await saveSetting('booking_service_settings', settingsValue, '服務業預約基本設定');
+        } catch (e) {
+            showToast('❌ 設定儲存失敗：' + (e && e.message ? e.message : ''));
+            return;
+        }
         bsSettings.advance_days = advDays;
         bsSettings.auto_confirm = !manualConfirm;
         showToast('設定已儲存');

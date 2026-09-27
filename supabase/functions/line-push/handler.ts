@@ -6,7 +6,10 @@
 //   2. 用 service role 呼叫 line_push_authorize：驗公司成員／主管、類別權限、由 DB 決定收件人、預約月預算，
 //      回傳 token（只在伺服器端使用，絕不回給前端）
 //   3. 送 LINE push → line_push_complete 回寫結果
-//   另有 action=save_config：同樣驗 LIFF 後，代管理員把新的 token／groupId 存進 DB（前端讀不到 token，也不需要）
+//   另有幾個 action（都先驗 LIFF，身分來自 LINE，再以 service role 呼叫對應 RPC，由 DB 做權限判斷）：
+//     save_config（LINE token／groupId）、save_setting（其他公司設定）、get_line_config（設定頁顯示末 4 碼）、
+//     platform_admin_save／platform_link_company（平台頁維護平台管理員，129 起前端不能直接寫那兩張表）
+//   員工發的訊息，DB 回傳寄件人前綴（［姓名 送出］），這裡一定加在最前面。
 //
 // 舊模式（相容還沒更新的頁面，前端帶 token）：必須帶 company_id，且 token 必須等於該公司設定
 //   （line_push_reserve_frontend 比對 SHA-256），不符 → 403 不送（不再當任意 token 的轉發器）。
@@ -125,11 +128,15 @@ const DENY_STATUS: Record<string, number> = {
   manager_required: 403,
   category_not_allowed: 403,
   target_not_allowed: 403,
+  rate_limited: 429,
   missing_token: 409,
   missing_group: 409,
   missing_user_line: 409,
   employee_not_found: 404,
 }
+
+const unauthenticated = () => json({ ok: false, status: 401, code: 'unauthenticated', error: 'LINE 登入已過期，請重新開啟頁面' }, 401)
+const badRequest = (msg = '缺少必要參數') => json({ ok: false, status: 400, code: 'bad_request', error: msg }, 400)
 
 // ---- 建議模式：伺服器端取 token ----
 async function handleVerifiedPush(body: any, deps: Deps): Promise<Response> {
@@ -138,17 +145,11 @@ async function handleVerifiedPush(body: any, deps: Deps): Promise<Response> {
   const target = typeof body.target === 'string' ? body.target : ''
   const category = typeof body.category === 'string' ? body.category.slice(0, 60) : ''
   const employeeId = typeof body.employee_id === 'string' && UUID_RE.test(body.employee_id) ? body.employee_id : null
-  if (!companyId || !text || !target || !category || !body.liff_access_token) {
-    return json({ ok: false, status: 400, code: 'bad_request', error: '缺少必要參數' }, 400)
-  }
-  if (target === 'employee' && !employeeId) {
-    return json({ ok: false, status: 400, code: 'bad_request', error: '缺少收件員工' }, 400)
-  }
+  if (!companyId || !text || !target || !category || !body.liff_access_token) return badRequest()
+  if (target === 'employee' && !employeeId) return badRequest('缺少收件員工')
 
   const lineUserId = await verifyLiffAccessToken(deps, String(body.liff_access_token))
-  if (!lineUserId) {
-    return json({ ok: false, status: 401, code: 'unauthenticated', error: 'LINE 登入已過期，請重新開啟頁面' }, 401)
-  }
+  if (!lineUserId) return unauthenticated()
 
   const auth = await callRpc(deps, 'line_push_authorize', {
     p_company_id: companyId,
@@ -173,7 +174,9 @@ async function handleVerifiedPush(body: any, deps: Deps): Promise<Response> {
     return json({ ok: false, status: 503, code: 'authorize_unavailable', error: 'LINE 推播服務暫時無法使用' }, 503)
   }
 
-  const { res, raw, lineMessage } = await sendLine(deps, String(a.token), String(a.to), text)
+  // 員工發的訊息：DB 決定的寄件人前綴一定放最前面（不能偽裝成系統／主管通知）
+  const prefix = typeof a.text_prefix === 'string' ? a.text_prefix : ''
+  const { res, raw, lineMessage } = await sendLine(deps, String(a.token), String(a.to), prefix + text)
   if (a.log_id != null) {
     await callRpc(deps, 'line_push_complete', {
       p_log_id: Number(a.log_id),
@@ -187,36 +190,66 @@ async function handleVerifiedPush(body: any, deps: Deps): Promise<Response> {
   return json(payload, res.status)
 }
 
-// ---- 管理員存新 token／groupId（前端讀不到舊 token）----
-async function handleSaveConfig(body: any, deps: Deps): Promise<Response> {
-  const companyId = typeof body.company_id === 'string' && UUID_RE.test(body.company_id) ? body.company_id : null
-  if (!companyId || !body.liff_access_token) {
-    return json({ ok: false, status: 400, code: 'bad_request', error: '缺少必要參數' }, 400)
-  }
-  const lineUserId = await verifyLiffAccessToken(deps, String(body.liff_access_token))
-  if (!lineUserId) {
-    return json({ ok: false, status: 401, code: 'unauthenticated', error: 'LINE 登入已過期，請重新開啟頁面' }, 401)
-  }
-  const value: Record<string, string> = {
-    groupId: typeof body.group_id === 'string' ? body.group_id.trim().slice(0, 100) : '',
-  }
-  if (typeof body.channel_token === 'string' && body.channel_token.trim()) value.token = body.channel_token.trim().slice(0, 1000)
-  const saved = await callRpc(deps, 'admin_save_setting', {
-    p_company_id: companyId,
-    p_line_user_id: lineUserId,
-    p_key: 'line_messaging_api',
-    p_value: value,
-    p_description: 'LINE Messaging API 推播設定',
-  })
+// ---- 驗過 LIFF 身分後代呼叫 service-role RPC（設定寫入、LINE 設定、平台管理員）----
+// RPC 回 { success:false, error_code } 時轉成 4xx；RPC 連不上 → 503
+function rpcResult(saved: { ok: boolean; data: any }, extra: (d: any) => Record<string, unknown> = () => ({})): Response {
   if (!saved.ok || !saved.data || typeof saved.data !== 'object') {
-    return json({ ok: false, status: 503, code: 'save_unavailable', error: '設定服務暫時無法使用' }, 503)
+    return json({ ok: false, status: 503, code: 'service_unavailable', error: '設定服務暫時無法使用' }, 503)
   }
   if (saved.data.success !== true) {
-    const code = typeof saved.data.error_code === 'string' ? saved.data.error_code : 'save_failed'
-    const status = code === 'access_denied' || code === 'admin_only' ? 403 : 400
-    return json({ ok: false, status, code, error: typeof saved.data.error === 'string' ? saved.data.error : '儲存失敗' }, status)
+    const code = typeof saved.data.error_code === 'string' ? saved.data.error_code : 'failed'
+    const status = ['access_denied', 'admin_only'].includes(code) ? 403 : 400
+    return json({ ok: false, status, code, error: typeof saved.data.error === 'string' ? saved.data.error : '操作失敗' }, status)
   }
-  return json({ ok: true, status: 200 }, 200)
+  return json({ ok: true, status: 200, ...extra(saved.data) }, 200)
+}
+
+const VERIFIED_ACTIONS = ['save_config', 'save_setting', 'get_line_config', 'platform_admin_save', 'platform_link_company'] as const
+
+async function handleVerifiedAction(body: any, deps: Deps): Promise<Response> {
+  const action = String(body.action)
+  const companyId = typeof body.company_id === 'string' && UUID_RE.test(body.company_id) ? body.company_id : null
+  const needsCompany = action !== 'platform_admin_save'
+  if (!body.liff_access_token || (needsCompany && !companyId)) return badRequest()
+  const lineUserId = await verifyLiffAccessToken(deps, String(body.liff_access_token))
+  if (!lineUserId) return unauthenticated()
+
+  if (action === 'save_config') {
+    // 管理員存新 token／groupId（前端讀不到舊 token；token 留空＝沿用）
+    const value: Record<string, string> = {
+      groupId: typeof body.group_id === 'string' ? body.group_id.trim().slice(0, 100) : '',
+    }
+    if (typeof body.channel_token === 'string' && body.channel_token.trim()) value.token = body.channel_token.trim().slice(0, 1000)
+    return rpcResult(await callRpc(deps, 'admin_save_setting', {
+      p_company_id: companyId, p_line_user_id: lineUserId, p_key: 'line_messaging_api',
+      p_value: value, p_description: 'LINE Messaging API 推播設定',
+    }))
+  }
+  if (action === 'save_setting') {
+    const key = typeof body.key === 'string' ? body.key : ''
+    if (!key || key === 'line_messaging_api') return badRequest('設定名稱不正確')
+    return rpcResult(await callRpc(deps, 'admin_save_setting', {
+      p_company_id: companyId, p_line_user_id: lineUserId, p_key: key,
+      p_value: body.value === undefined ? null : body.value,
+      p_description: typeof body.description === 'string' ? body.description.slice(0, 200) : key,
+    }))
+  }
+  if (action === 'get_line_config') {
+    return rpcResult(await callRpc(deps, 'get_line_messaging_config', { p_company_id: companyId, p_line_user_id: lineUserId }),
+      (d) => ({ has_token: d.has_token === true, token_hint: d.token_hint ?? null, group_id: d.group_id ?? '' }))
+  }
+  if (action === 'platform_admin_save') {
+    const adminId = typeof body.admin_id === 'string' && UUID_RE.test(body.admin_id) ? body.admin_id : null
+    const companyIds = Array.isArray(body.company_ids) ? body.company_ids.filter((c: unknown) => typeof c === 'string' && UUID_RE.test(c)) : []
+    return rpcResult(await callRpc(deps, 'platform_admin_save', {
+      p_caller_line_user_id: lineUserId, p_admin_id: adminId,
+      p_line_user_id: typeof body.line_user_id === 'string' ? body.line_user_id.trim() : null,
+      p_name: typeof body.name === 'string' ? body.name.slice(0, 100) : '',
+      p_is_active: body.is_active !== false, p_company_ids: companyIds,
+    }), (d) => ({ id: d.id }))
+  }
+  // platform_link_company
+  return rpcResult(await callRpc(deps, 'platform_link_company_owner', { p_caller_line_user_id: lineUserId, p_company_id: companyId }))
 }
 
 // ---- 舊模式（前端帶 token）----
@@ -278,7 +311,7 @@ export async function handleLinePush(req: Request, deps: Deps): Promise<Response
   try {
     const body = await req.json()
     if (body && body.token) return await handleLegacyTokenPush(body, deps)
-    if (body && body.action === 'save_config') return await handleSaveConfig(body, deps)
+    if (body && (VERIFIED_ACTIONS as readonly string[]).includes(body.action)) return await handleVerifiedAction(body, deps)
     if (body && body.liff_access_token) return await handleVerifiedPush(body, deps)
     return json({ ok: false, status: 400, error: '缺少必要參數' }, 400)
   } catch (_) {

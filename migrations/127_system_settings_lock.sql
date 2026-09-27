@@ -2,7 +2,7 @@
 -- 127: system_settings 收斂 ——（1）LINE token 那一列 anon/authenticated 讀不到
 --                              （2）anon/authenticated 不能直接寫，只能走 admin_save_setting（126）
 --
--- ⚠️ 前置：126 已套用、line-push Edge Function 已部署新版、前端（本 PR）已上線並等舊快取過期。
+-- ⚠️ 前置：126＋129 已套用、line-push Edge Function 已部署新版、前端（本 PR）已上線並等舊快取過期（≥1 工作天）。
 --         順序錯了會讓「還沒更新的頁面」推播失敗／設定存不進去（見 PR 的上線步驟）。
 --
 -- 正式庫 2026-09-27 快照（SELECT pg_policies，唯讀查詢）：
@@ -23,7 +23,8 @@
 --   C. service_role 政策保留；SECURITY DEFINER 函式（line_daily_notify、admin_save_setting、
 --      line_push_authorize、115 的開關 RPC …）以 owner 身分執行，不受影響。
 --
--- 還沒處理（刻意不在本檔）：payroll_password 仍可被 anon 讀（薪資頁在前端比對密碼，要另開一包改 RPC）。
+-- 還沒處理（刻意不在本檔）：payroll_password 仍可被 anon 讀。它只是前端的畫面鎖（薪資資料本身另有讀取路徑），
+--   藏起來需要把「比對密碼」改成 RPC，另開一包；寫入已限管理員且需 LIFF 驗證（126）。
 --
 -- 回滾：migrations/127_system_settings_lock_rollback.sql（完整還原上面快照）
 -- 只建立 migration 檔，不得由開發流程直接套用正式資料庫。

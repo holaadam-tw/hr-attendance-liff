@@ -65,7 +65,7 @@ const PA = '00000000-0000-0000-0000-00000000fa01';
         ('${E.kiosk}', '${A}', 'K01', '公務機', 'Ukiosk', 'user', true, true, 'approved'),
         ('${E.pending}', '${A}', 'P01', '待審', NULL, 'user', false, false, 'pending');
       INSERT INTO public.platform_admins (id, line_user_id, name) VALUES ('${PA}', 'Uplatform', '平台');
-      INSERT INTO public.platform_admin_companies (platform_admin_id, company_id, role) VALUES ('${PA}', '${A}', 'admin');
+      INSERT INTO public.platform_admin_companies (platform_admin_id, company_id, role) VALUES ('${PA}', '${A}', 'owner');
     `);
   }
   const upd = async (caller, emp, updates) => (await q(`SELECT public.admin_update_employee($1, $2, $3, $4::jsonb) AS r`, [A, caller, emp, JSON.stringify(updates)]))[0].r;

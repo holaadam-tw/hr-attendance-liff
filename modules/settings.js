@@ -2,7 +2,7 @@
 // modules/settings.js — 功能管理、公告、客戶、外勤審核、公司、業務目標
 // 依賴 common.js 全域: sb, showToast, escapeHTML, friendlyError,
 //   writeAuditLog, sendAdminNotify, getGPS, getTaiwanDate,
-//   invalidateSettingsCache, fmtDate, saveLineMessagingConfig
+//   invalidateSettingsCache, fmtDate, saveLineMessagingConfig, callVerifiedAction
 // ============================================================
 
 // 產業別模板（common.js getFeatureVisibility 使用）
@@ -46,11 +46,12 @@ export async function loadNotifyToken() {
     const groupEl = document.getElementById('lineGroupId');
     if (tokenEl) { tokenEl.value = ''; tokenEl.placeholder = '貼上 Channel Access Token'; }
     const companyId = window.currentCompanyId;
-    const lineUserId = window.currentAdminEmployee?.line_user_id || liffProfile?.userId || null;
-    if (!companyId || !lineUserId) return;
+    if (!companyId) return;
     try {
-        const { data, error } = await sb.rpc('get_line_messaging_config', { p_company_id: companyId, p_line_user_id: lineUserId });
-        if (error || !data?.success) return;
+        // 經 Edge Function 驗 LIFF 身分後讀（get_line_messaging_config 只給 service role）
+        const result = await callVerifiedAction('get_line_config', { company_id: companyId });
+        if (!result.ok) return;
+        const data = result.data;
         if (tokenEl) {
             tokenEl.dataset.configured = data.has_token ? '1' : '';
             tokenEl.placeholder = data.has_token
@@ -945,11 +946,9 @@ export async function saveCompany() {
 
             // 平台管理員建立公司 → 自動連結為 owner
             if (window.isPlatformAdmin && window.currentPlatformAdmin?.id && newComp.id) {
-                await sb.from('platform_admin_companies').insert({
-                    platform_admin_id: window.currentPlatformAdmin.id,
-                    company_id: newComp.id,
-                    role: 'owner'
-                });
+                // 129：平台管理員表前端不能直接寫，經 Edge Function 驗 LIFF 後綁定
+                const link = await callVerifiedAction('platform_link_company', { company_id: newComp.id });
+                if (!link.ok) showToast('⚠️ 公司已建立，但未能自動綁定為管理公司：' + (link.message || ''));
                 // 更新記憶中的公司列表
                 if (window.managedCompanies) {
                     window.managedCompanies.push({

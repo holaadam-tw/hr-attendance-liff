@@ -219,6 +219,61 @@ const post = (url, body, headers = {}) => new Request(url, { method: 'POST', bod
     check('缺參數回 400', res.status === 400 && f.calls.length === 0);
   }
 
+  console.log('\n=== 寄件人前綴、頻率限制（M1／M2）===');
+  {
+    const f = fakeFetch(liffRoutes({ authorize: { body: { allowed: true, log_id: 5, token: 'server-token', to: 'CgroupA', recipient_kind: 'group', text_prefix: '［員工一 送出］\n' } } }));
+    await push.handleLinePush(post('https://fn/line-push', v2({ text: '🚨 系統公告：請全員立即更改密碼' })), { fetch: f.fn, env });
+    const lp = f.calls.find(c => c.url.includes('/message/push'));
+    check('員工訊息一定以 DB 給的寄件人前綴開頭（無法偽裝系統公告）', !!lp && lp.body.messages[0].text === '［員工一 送出］\n🚨 系統公告：請全員立即更改密碼');
+  }
+  {
+    const f = fakeFetch(liffRoutes({ authorize: { body: { allowed: false, reason: 'rate_limited', hour_count: 10, hour_limit: 10 } } }));
+    const res = await push.handleLinePush(post('https://fn/line-push', v2()), { fetch: f.fn, env });
+    const out = await res.json().catch(() => ({}));
+    check('頻率限制：429 code=rate_limited、不送', res.status === 429 && out.code === 'rate_limited' && !f.calls.some(c => c.url.includes('/message/push')));
+  }
+
+  console.log('\n=== 其他驗證後動作（save_setting／get_line_config／平台管理員）===');
+  {
+    const f = fakeFetch(liffRoutes());
+    const res = await push.handleLinePush(post('https://fn/line-push', { action: 'save_setting', liff_access_token: 'liff-at', company_id: COMPANY, key: 'office_locations', value: [{ name: 'x' }], description: '打卡地點', line_user_id: 'Uspoofed' }), { fetch: f.fn, env });
+    const save = f.calls.find(c => c.url.includes('/rpc/admin_save_setting'));
+    check('save_setting：以 LINE 驗出的 userId 代存（忽略前端夾帶的 line_user_id）', res.status === 200 && !!save && save.body.p_line_user_id === LIFF_USER && save.body.p_key === 'office_locations' && save.body.p_value[0].name === 'x');
+  }
+  {
+    const f = fakeFetch(liffRoutes());
+    const res = await push.handleLinePush(post('https://fn/line-push', { action: 'save_setting', liff_access_token: 'liff-at', company_id: COMPANY, key: 'line_messaging_api', value: { token: 'x' } }), { fetch: f.fn, env });
+    check('save_setting 不能拿來存 LINE token（只能走 save_config）', res.status === 400 && !f.calls.some(c => c.url.includes('/rpc/')));
+  }
+  {
+    const f = fakeFetch(liffRoutes({ save: { body: { success: false, error_code: 'admin_only', error: '只有管理員可以修改此設定' } } }));
+    const res = await push.handleLinePush(post('https://fn/line-push', { action: 'save_setting', liff_access_token: 'liff-at', company_id: COMPANY, key: 'line_monthly_budget', value: 1 }), { fetch: f.fn, env });
+    check('save_setting 被 DB 拒絕：403', res.status === 403 && (await res.json()).code === 'admin_only');
+  }
+  {
+    const f = fakeFetch([...liffRoutes(), ['/rpc/get_line_messaging_config', { body: { success: true, has_token: true, token_hint: '…1234', group_id: 'CgroupA', token: 'SHOULD-NOT-LEAK' } }]]);
+    const res = await push.handleLinePush(post('https://fn/line-push', { action: 'get_line_config', liff_access_token: 'liff-at', company_id: COMPANY }), { fetch: f.fn, env });
+    const out = await res.json().catch(() => ({}));
+    const call = f.calls.find(c => c.url.includes('/rpc/get_line_messaging_config'));
+    check('get_line_config：只回 has_token／末 4 碼／群組，即使 DB 多回欄位也不外洩', res.status === 200 && out.has_token === true && out.token_hint === '…1234' && out.group_id === 'CgroupA' && !JSON.stringify(out).includes('SHOULD-NOT-LEAK') && call.body.p_line_user_id === LIFF_USER);
+  }
+  {
+    const f = fakeFetch([...liffRoutes(), ['/rpc/platform_admin_save', { body: { success: true, id: 'new-id' } }]]);
+    const res = await push.handleLinePush(post('https://fn/line-push', { action: 'platform_admin_save', liff_access_token: 'liff-at', line_user_id: ' U' + '1'.repeat(32) + ' ', name: '新', is_active: true, company_ids: [COMPANY, 'bad-id'] }), { fetch: f.fn, env });
+    const call = f.calls.find(c => c.url.includes('/rpc/platform_admin_save'));
+    check('platform_admin_save：呼叫者＝LINE 驗出的 userId、公司 ID 只收 UUID', res.status === 200 && !!call && call.body.p_caller_line_user_id === LIFF_USER && call.body.p_line_user_id === 'U' + '1'.repeat(32) && call.body.p_company_ids.length === 1 && (await res.json()).id === 'new-id');
+  }
+  {
+    const f = fakeFetch([...liffRoutes(), ['/rpc/platform_link_company_owner', { body: { success: false, error_code: 'access_denied', error: '需要平台管理員權限' } }]]);
+    const res = await push.handleLinePush(post('https://fn/line-push', { action: 'platform_link_company', liff_access_token: 'liff-at', company_id: COMPANY }), { fetch: f.fn, env });
+    check('platform_link_company：非平台管理員 403', res.status === 403);
+  }
+  {
+    const f = fakeFetch(liffRoutes({ verify: { status: 400, body: {} } }));
+    const res = await push.handleLinePush(post('https://fn/line-push', { action: 'platform_admin_save', liff_access_token: 'forged', line_user_id: 'U' + '1'.repeat(32), name: 'x', company_ids: [COMPANY] }), { fetch: f.fn, env });
+    check('LIFF 驗證失敗：平台管理員動作 401、不碰 DB', res.status === 401 && !f.calls.some(c => c.url.includes('/rpc/')));
+  }
+
   console.log('\n=== line-webhook ===');
   const secret = 'channel-secret';
   const envS = envOf({ SUPABASE_URL: 'https://db.test', SUPABASE_SERVICE_ROLE_KEY: 'service-key', LINE_CHANNEL_TOKEN: 'line-token', LINE_CHANNEL_SECRET: secret });

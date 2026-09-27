@@ -1,17 +1,32 @@
 -- ============================================================
--- 測試用：system_settings 在正式庫的 RLS／grant 現況（2026-09-27 唯讀查詢 pg_policies、
+-- 測試用：system_settings、platform_admins、platform_admin_companies 在正式庫的 RLS／grant 現況（2026-09-27 唯讀查詢 pg_policies、
 -- information_schema.role_table_grants 的快照），加上 126 依賴的既有 helper（正式庫 pg_get_functiondef 原文）。
 -- 疊在 line_push_base_schema.sql＋migration 125 之後載入。
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS public.platform_admins (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(), line_user_id TEXT, name TEXT, role TEXT DEFAULT 'platform_admin',
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(), line_user_id TEXT UNIQUE, name TEXT, role TEXT DEFAULT 'platform_admin',
   is_active BOOLEAN DEFAULT true, created_at TIMESTAMPTZ DEFAULT now()
 );
 CREATE TABLE IF NOT EXISTS public.platform_admin_companies (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(), platform_admin_id UUID REFERENCES public.platform_admins(id),
-  company_id UUID REFERENCES public.companies(id), role TEXT, created_at TIMESTAMPTZ DEFAULT now()
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  platform_admin_id UUID REFERENCES public.platform_admins(id) ON DELETE CASCADE,
+  company_id UUID REFERENCES public.companies(id) ON DELETE CASCADE,
+  role TEXT CHECK (role = ANY (ARRAY['owner'::text, 'manager'::text])), created_at TIMESTAMPTZ DEFAULT now(),
+  UNIQUE (platform_admin_id, company_id)
 );
+-- 正式庫 2026-09-27 快照：兩表 RLS 開啟、政策全部 {public} true、anon/authenticated 全部 grant
+ALTER TABLE public.platform_admins ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.platform_admin_companies ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "allow_select_platform_admins" ON public.platform_admins FOR SELECT TO public USING (true);
+CREATE POLICY "allow_insert_platform_admins" ON public.platform_admins FOR INSERT TO public WITH CHECK (true);
+CREATE POLICY "allow_update_platform_admins" ON public.platform_admins FOR UPDATE TO public USING (true) WITH CHECK (true);
+CREATE POLICY "allow_delete_platform_admins" ON public.platform_admins FOR DELETE TO public USING (true);
+CREATE POLICY "pac_select" ON public.platform_admin_companies FOR SELECT TO public USING (true);
+CREATE POLICY "pac_insert" ON public.platform_admin_companies FOR INSERT TO public WITH CHECK (true);
+CREATE POLICY "pac_update" ON public.platform_admin_companies FOR UPDATE TO public USING (true) WITH CHECK (true);
+CREATE POLICY "pac_delete" ON public.platform_admin_companies FOR DELETE TO public USING (true);
+GRANT SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER ON public.platform_admins, public.platform_admin_companies TO anon, authenticated, service_role;
 
 -- ↓↓↓ 正式庫原文 ↓↓↓
 CREATE OR REPLACE FUNCTION public.has_company_access(p_line_user_id text, p_company_id uuid, p_require_manager boolean DEFAULT false)

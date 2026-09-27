@@ -128,7 +128,7 @@ const existingLeave = (id, name) => ({
   check('管理端不再宣稱自動駁回或表單鎖定', !/自動駁回|表單直接鎖定/.test(adminSrc + leaveModuleSrc));
   check('既有設定鍵保留以相容公司資料', /saveSetting\('max_concurrent_leave'/.test(leaveModuleSrc));
   check('管理月曆只在實際人數大於門檻時警告', /const over = dayCount\[ds\] > maxC/.test(leaveModuleSrc) && /const over = cnt > maxC/.test(leaveModuleSrc));
-  check('管理模組快取版本已更新', /leave\.js\?v=20260927-linebudget/.test(moduleIndexSrc));
+  check('管理模組快取版本已更新', /leave\.js\?v=20260927-linesecure/.test(moduleIndexSrc));
 
   const htmlFiles = fs.readdirSync(root).filter(name => name.endsWith('.html'));
   const commonRefs = htmlFiles

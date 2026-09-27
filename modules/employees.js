@@ -28,9 +28,12 @@ export async function addNewDepartment(selectId) {
     var depts = getCachedSetting('departments') || [];
     if (depts.includes(name)) { alert('此部門已存在'); return; }
 
-    depts.push(name);
-
-    await saveSetting('departments', depts, '部門列表');
+    try {
+        await saveSetting('departments', depts.concat([name]), '部門列表');
+    } catch (e) {
+        showToast('❌ 新增部門失敗：' + (e?.message || ''));
+        return;
+    }
 
     loadDepartmentOptions(selectId, name);
     showToast('✅ 已新增部門：' + name);
