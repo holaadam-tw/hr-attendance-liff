@@ -312,6 +312,8 @@ const post = (url, body, headers = {}) => new Request(url, { method: 'POST', bod
       ['/rpc/review_overtime_request', { body: { success: true } }],
       ['/rpc/save_schedules_verified', { body: { success: true, saved_count: 2 } }],
       ['/rpc/review_shift_swap_request', { body: { success: true, status: 'approved', requester_id: EMP, target_id: EMP, swap_date: '2026-10-05' } }],
+      ['/rpc/shift_swap_request_create', { body: { success: true, id: REQ, requester_shift: '早班', target_shift: '晚班' } }],
+      ['/rpc/shift_swap_request_respond', (b) => ({ body: { success: true, status: b.p_decision === 'agree' ? 'pending_admin' : 'rejected' } })],
       ['/rpc/platform_company_save', { body: { success: true, id: COMPANY, company: { id: COMPANY, code: 'NEW', name: '新公司' } } }],
       ['/rpc/platform_company_set_status', { body: { success: true, id: COMPANY, status: 'active' } }],
       ['/rpc/platform_company_delete_pending', { body: { success: true, name: '待審公司' } }],
@@ -407,6 +409,44 @@ const post = (url, body, headers = {}) => new Request(url, { method: 'POST', bod
     t = await run({ action: 'shift_swap_review', company_id: COMPANY, request_id: REQ, decision: 'approve' },
       rpcRoutes([['/rpc/review_shift_swap_request', { body: { success: false, error: '雙方當天都必須已有排班，才能核准換班', error_code: 'schedule_missing' } }]]));
     check('shift_swap_review：缺排班 → 400、訊息照傳', t.res.status === 400 && t.out.code === 'schedule_missing' && /雙方當天/.test(t.out.error));
+
+    // 139：員工端換班（申請人／回覆人＝LINE userId）
+    const TGT = '00000000-0000-0000-0000-0000000000e2';
+    t = await run({ action: 'shift_swap_create', company_id: COMPANY, target_id: TGT, swap_date: '2026-10-05', reason: '家裡有事',
+      requester_id: EMP, p_line_user_id: 'Uother', status: 'approved', target_agreed: true });
+    c = call(t.f, 'shift_swap_request_create');
+    check('shift_swap_create：申請人＝LINE userId；前端夾帶的 requester_id／p_line_user_id／status／target_agreed 不會送進 DB',
+      t.res.status === 200 && c && c.body.p_line_user_id === LIFF_USER && c.body.p_company_id === COMPANY && c.body.p_target_id === TGT
+      && c.body.p_swap_date === '2026-10-05' && c.body.p_reason === '家裡有事'
+      && Object.keys(c.body).sort().join(',') === 'p_company_id,p_line_user_id,p_reason,p_swap_date,p_target_id'
+      && !JSON.stringify(c.body).includes('Uother') && t.out.result?.target_shift === '晚班', JSON.stringify(c?.body));
+    t = await run({ action: 'shift_swap_create', company_id: COMPANY, target_id: 'bad', swap_date: '2026-10-05' });
+    check('shift_swap_create：target_id 不是 UUID → 400、不呼叫 RPC', t.res.status === 400 && !t.f.calls.some(x => x.url.includes('/rpc/')));
+    t = await run({ action: 'shift_swap_create', company_id: COMPANY, target_id: TGT, swap_date: '10/05' });
+    check('shift_swap_create：日期格式不對 → 400、不呼叫 RPC', t.res.status === 400 && !t.f.calls.some(x => x.url.includes('/rpc/')));
+    t = await run({ action: 'shift_swap_create', target_id: TGT, swap_date: '2026-10-05' });
+    check('shift_swap_create：沒帶 company_id → 400、不驗 LIFF', t.res.status === 400 && t.f.calls.length === 0);
+    t = await run({ action: 'shift_swap_create', company_id: COMPANY, target_id: TGT, swap_date: '2026-10-05' }, rpcRoutes([['/v2/profile', { status: 401, body: {} }]]));
+    check('shift_swap_create：LIFF token 驗不過 → 401、不呼叫 RPC', t.res.status === 401 && !call(t.f, 'shift_swap_request_create'));
+    t = await run({ action: 'shift_swap_create', company_id: COMPANY, target_id: TGT, swap_date: '2026-10-05' },
+      rpcRoutes([['/rpc/shift_swap_request_create', { body: { success: false, error: '雙方當天都必須已有排班才能申請換班', error_code: 'schedule_missing' } }]]));
+    check('shift_swap_create：缺排班 → 400、訊息照傳', t.res.status === 400 && t.out.code === 'schedule_missing' && /雙方當天/.test(t.out.error));
+    t = await run({ action: 'shift_swap_create', company_id: COMPANY, target_id: TGT, swap_date: '2026-10-05' },
+      rpcRoutes([['/rpc/shift_swap_request_create', { status: 404, body: { code: 'PGRST202' } }]]));
+    check('shift_swap_create：139 未套 → 503 db_not_migrated（139）', t.res.status === 503 && t.out.code === 'db_not_migrated' && /139/.test(t.out.error));
+
+    t = await run({ action: 'shift_swap_respond', company_id: COMPANY, request_id: REQ, decision: 'agree', target_id: EMP, p_line_user_id: 'Uother' });
+    c = call(t.f, 'shift_swap_request_respond');
+    check('shift_swap_respond（同意）：回覆人＝LINE userId，前端夾帶的 target_id／p_line_user_id 不會送進 DB',
+      t.res.status === 200 && c && c.body.p_line_user_id === LIFF_USER && c.body.p_request_id === REQ && c.body.p_decision === 'agree'
+      && Object.keys(c.body).sort().join(',') === 'p_company_id,p_decision,p_line_user_id,p_request_id' && t.out.result?.status === 'pending_admin', JSON.stringify(c?.body));
+    t = await run({ action: 'shift_swap_respond', company_id: COMPANY, request_id: REQ, decision: 'decline' });
+    check('shift_swap_respond（拒絕）', t.res.status === 200 && call(t.f, 'shift_swap_request_respond').body.p_decision === 'decline');
+    t = await run({ action: 'shift_swap_respond', company_id: COMPANY, request_id: REQ, decision: 'approve' });
+    check('shift_swap_respond：decision 只能 agree／decline（不能直接核准）→ 400、不呼叫 RPC', t.res.status === 400 && !t.f.calls.some(x => x.url.includes('/rpc/')));
+    t = await run({ action: 'shift_swap_respond', company_id: COMPANY, request_id: REQ, decision: 'agree' },
+      rpcRoutes([['/rpc/shift_swap_request_respond', { body: { success: false, error: '只有被邀請換班的同事本人可以回覆', error_code: 'access_denied' } }]]));
+    check('shift_swap_respond：不是對象本人 → 403', t.res.status === 403 && t.out.code === 'access_denied');
 
     t = await run({ action: 'company_save', fields: { code: 'NEW', name: '新公司' } });
     c = call(t.f, 'platform_company_save');
