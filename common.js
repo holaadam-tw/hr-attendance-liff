@@ -1835,7 +1835,9 @@ function handleLiffSessionExpired() {
 
 // 需要「真實身分」的動作一律經 line-push Edge Function：它先向 LINE 驗證 LIFF access token 取得 userId，
 // 再以 service role 呼叫對應的 RPC（126／129）。前端自己報的 line_user_id 不會被採信。
-// action：save_setting／save_config／get_line_config／platform_admin_save／platform_link_company
+// action：save_setting／save_config／get_line_config／platform_admin_save／platform_link_company、
+//   company_save／company_set_status／company_delete_pending（130）、
+//   employee_create／employee_update／employee_delete_pending／makeup_review／overtime_review／schedule_save（131／132）
 // 回傳 { ok, code, message, data }
 async function callVerifiedAction(action, payload) {
     const expired = () => handleLiffSessionExpired()
@@ -2638,43 +2640,39 @@ function getAdminInfo() {
 }
 
 // ===== 124：employees 寫入一律走 RPC（RLS 已收掉 anon 的 INSERT/UPDATE/DELETE） =====
-function adminCallerLineUserId() {
-    return window.currentAdminEmployee?.line_user_id || liffProfile?.userId || window.currentLineUserId || null;
+// 131／132：改經 line-push Edge Function 驗 LIFF 身分後代呼叫（前端不再自己報管理員的 line_user_id）
+// 回傳 { data, error }，error 為 Error 或 null，方便既有 try/throw 寫法直接沿用；data＝RPC 原本的回傳內容
+async function verifiedEmployeeCall(action, payload, fallbackMessage) {
+    const result = await callVerifiedAction(action, payload);
+    if (!result.ok) {
+        const err = new Error(result.message || fallbackMessage);
+        err.code = result.code;
+        // 保留 RPC 原本的失敗格式（例如核准待審員工時靠 data.error_code === 'duplicate_number' 重試下一個工號）
+        return { data: { success: false, error: err.message, error_code: result.code }, error: err };
+    }
+    return { data: result.data?.result || { success: true }, error: null };
 }
 
-// 回傳 { data, error }，error 為 Error 或 null，方便既有 try/throw 寫法直接沿用
 async function rpcUpdateEmployee(employeeId, updates, companyId) {
-    const { data, error } = await sb.rpc('admin_update_employee', {
-        p_company_id: companyId || window.currentCompanyId,
-        p_line_user_id: adminCallerLineUserId(),
-        p_employee_id: employeeId,
-        p_updates: updates
-    });
-    if (error) return { data: null, error };
-    if (!data?.success) return { data, error: new Error(data?.error || '更新失敗') };
-    return { data, error: null };
+    return verifiedEmployeeCall('employee_update', {
+        company_id: companyId || window.currentCompanyId,
+        employee_id: employeeId,
+        updates: updates
+    }, '更新失敗');
 }
 
 async function rpcCreateEmployee(fields, companyId) {
-    const { data, error } = await sb.rpc('admin_create_employee', {
-        p_company_id: companyId || window.currentCompanyId,
-        p_line_user_id: adminCallerLineUserId(),
-        p_data: fields
-    });
-    if (error) return { data: null, error };
-    if (!data?.success) return { data, error: new Error(data?.error || '新增失敗') };
-    return { data, error: null };
+    return verifiedEmployeeCall('employee_create', {
+        company_id: companyId || window.currentCompanyId,
+        data: fields
+    }, '新增失敗');
 }
 
 async function rpcDeletePendingEmployee(employeeId, companyId) {
-    const { data, error } = await sb.rpc('admin_delete_pending_employee', {
-        p_company_id: companyId || window.currentCompanyId,
-        p_line_user_id: adminCallerLineUserId(),
-        p_employee_id: employeeId
-    });
-    if (error) return { data: null, error };
-    if (!data?.success) return { data, error: new Error(data?.error || '刪除失敗') };
-    return { data, error: null };
+    return verifiedEmployeeCall('employee_delete_pending', {
+        company_id: companyId || window.currentCompanyId,
+        employee_id: employeeId
+    }, '刪除失敗');
 }
 
 async function updateEmployeeRole(employeeId, newRole) {

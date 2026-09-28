@@ -299,6 +299,135 @@ const post = (url, body, headers = {}) => new Request(url, { method: 'POST', bod
     check('批次超過 30 筆：400', res.status === 400 && !f.calls.some(c => c.url.includes('/rpc/')));
   }
 
+  console.log('\n=== 130／131／132：員工管理、審核、排班、公司維護（身分＝LINE 驗證的 userId）===');
+  {
+    const EMP = '00000000-0000-0000-0000-0000000000e1';
+    const REQ = '00000000-0000-0000-0000-00000000aa01';
+    const REQ2 = '00000000-0000-0000-0000-00000000aa02';
+    const rpcRoutes = (extra = []) => [...extra, ...liffRoutes(),
+      ['/rpc/admin_update_employee', { body: { success: true, id: EMP, name: '員工一', updated_keys: ['role'] } }],
+      ['/rpc/admin_create_employee', { body: { success: true, id: EMP, employee_number: 'E09' } }],
+      ['/rpc/admin_delete_pending_employee', { body: { success: true, name: '待審' } }],
+      ['/rpc/review_makeup_request', (b) => ({ body: b.p_request_id === REQ2 ? { success: false, error: '此申請已處理過', error_code: 'not_pending' } : { success: true, closed_duplicates: 1 } })],
+      ['/rpc/review_overtime_request', { body: { success: true } }],
+      ['/rpc/save_schedules_verified', { body: { success: true, saved_count: 2 } }],
+      ['/rpc/platform_company_save', { body: { success: true, id: COMPANY, company: { id: COMPANY, code: 'NEW', name: '新公司' } } }],
+      ['/rpc/platform_company_set_status', { body: { success: true, id: COMPANY, status: 'active' } }],
+      ['/rpc/platform_company_delete_pending', { body: { success: true, name: '待審公司' } }],
+    ];
+    const call = (f, name) => f.calls.find(c => c.url.includes('/rpc/' + name));
+    const run = async (body, routes = rpcRoutes()) => {
+      const f = fakeFetch(routes);
+      const res = await push.handleLinePush(post('https://fn/line-push', { liff_access_token: 'liff-at', ...body }), { fetch: f.fn, env });
+      return { f, res, out: await res.json() };
+    };
+
+    let t = await run({ action: 'employee_update', company_id: COMPANY, employee_id: EMP, updates: { role: 'admin' }, line_user_id: 'Uadmin', p_line_user_id: 'Uadmin' });
+    let c = call(t.f, 'admin_update_employee');
+    check('employee_update：以 LINE 驗出的 userId 呼叫 admin_update_employee（忽略前端夾帶的 line_user_id）',
+      t.res.status === 200 && c && c.body.p_line_user_id === LIFF_USER && c.body.p_company_id === COMPANY && c.body.p_employee_id === EMP && c.body.p_updates.role === 'admin' && t.out.result?.id === EMP, JSON.stringify(c?.body));
+    t = await run({ action: 'employee_update', company_id: COMPANY, employee_id: EMP, updates: { role: 'admin' } },
+      rpcRoutes([['/rpc/admin_update_employee', { body: { success: false, error: '只有管理員可以變更角色', error_code: 'role_denied' } }]]));
+    check('employee_update：DB 回 role_denied → 403、訊息照傳', t.res.status === 403 && t.out.code === 'role_denied' && /管理員/.test(t.out.error));
+    t = await run({ action: 'employee_update', company_id: COMPANY, employee_id: EMP, updates: { line_user_id: 'Ux' } },
+      rpcRoutes([['/rpc/admin_update_employee', { body: { success: false, error: '只有管理員可以修改管理員帳號', error_code: 'target_protected' } }]]));
+    check('employee_update：受保護帳號 → 403', t.res.status === 403 && t.out.code === 'target_protected');
+    t = await run({ action: 'employee_update', company_id: COMPANY, employee_id: 'bad', updates: {} });
+    check('employee_update：員工 ID 不是 UUID → 400、不呼叫 RPC', t.res.status === 400 && !t.f.calls.some(x => x.url.includes('/rpc/')));
+    t = await run({ action: 'employee_update', company_id: COMPANY, employee_id: EMP, updates: { role: 'admin' } }, rpcRoutes([['/v2/profile', { status: 401, body: {} }]]));
+    check('employee_update：LIFF token 驗不過 → 401、不呼叫 RPC', t.res.status === 401 && t.out.code === 'unauthenticated' && !call(t.f, 'admin_update_employee'));
+    t = await run({ action: 'employee_create', company_id: COMPANY, data: { name: '新人', employee_number: 'E09', id_card_last_4: '1234' } });
+    c = call(t.f, 'admin_create_employee');
+    check('employee_create：呼叫者＝LINE userId、回傳 RPC 結果', t.res.status === 200 && c.body.p_line_user_id === LIFF_USER && c.body.p_data.name === '新人' && t.out.result?.employee_number === 'E09');
+    t = await run({ action: 'employee_delete_pending', company_id: COMPANY, employee_id: EMP });
+    c = call(t.f, 'admin_delete_pending_employee');
+    check('employee_delete_pending：呼叫者＝LINE userId', t.res.status === 200 && c.body.p_line_user_id === LIFF_USER && c.body.p_employee_id === EMP);
+    t = await run({ action: 'employee_create', data: { name: 'x' } });
+    check('沒帶 company_id → 400', t.res.status === 400 && t.f.calls.length === 0);
+
+    t = await run({ action: 'makeup_review', company_id: COMPANY, request_ids: [REQ], decision: 'approve', approver_id: EMP, p_approver_id: EMP });
+    c = call(t.f, 'review_makeup_request');
+    check('makeup_review（單筆）：核准人＝LINE userId，前端夾帶的 approver_id 不會送進 DB',
+      t.res.status === 200 && c.body.p_line_user_id === LIFF_USER && c.body.p_request_id === REQ && c.body.p_decision === 'approve'
+      && !('p_approver_id' in c.body) && !JSON.stringify(c.body).includes(EMP) && t.out.result?.closed_duplicates === 1, JSON.stringify(c?.body));
+    t = await run({ action: 'makeup_review', company_id: COMPANY, request_ids: [REQ2], decision: 'reject', reason: '不符' });
+    check('makeup_review（單筆）：已處理 → 400 not_pending', t.res.status === 400 && t.out.code === 'not_pending');
+    t = await run({ action: 'makeup_review', company_id: COMPANY, request_ids: [REQ, REQ2], decision: 'approve' });
+    const verifyCalls = t.f.calls.filter(x => x.url.includes('/oauth2/v2.1/verify')).length;
+    check('makeup_review（批次 2 筆）：只驗一次 LIFF、逐筆呼叫、回報各筆結果',
+      t.res.status === 200 && verifyCalls === 1 && t.f.calls.filter(x => x.url.includes('/rpc/review_makeup_request')).length === 2
+      && t.out.approved_count === 1 && t.out.results.length === 2 && t.out.results[1].error === '此申請已處理過', JSON.stringify(t.out));
+    t = await run({ action: 'makeup_review', company_id: COMPANY, request_ids: [REQ, REQ2], decision: 'approve' },
+      rpcRoutes([['/rpc/review_makeup_request', { body: { success: false, error: '需要管理員權限', error_code: 'access_denied' } }]]));
+    check('makeup_review（批次）：第一筆就 access_denied → 403、不再繼續', t.res.status === 403 && t.f.calls.filter(x => x.url.includes('/rpc/review_makeup_request')).length === 1);
+    t = await run({ action: 'makeup_review', company_id: COMPANY, request_ids: Array.from({ length: 51 }, () => REQ), decision: 'approve' });
+    check('makeup_review：超過 50 筆 → 400、不呼叫 RPC', t.res.status === 400 && !t.f.calls.some(x => x.url.includes('/rpc/')));
+    t = await run({ action: 'makeup_review', company_id: COMPANY, request_ids: [REQ], decision: 'delete' });
+    check('makeup_review：decision 不合法 → 400、不呼叫 RPC', t.res.status === 400 && !t.f.calls.some(x => x.url.includes('/rpc/')));
+
+    t = await run({ action: 'overtime_review', company_id: COMPANY, request_id: REQ, decision: 'approve', approved_hours: '1.5', reason_category: 'closing', note: '收攤', approver_id: EMP });
+    c = call(t.f, 'review_overtime_request');
+    check('overtime_review：核准人＝LINE userId、時數轉數字', t.res.status === 200 && c.body.p_line_user_id === LIFF_USER && c.body.p_approved_hours === 1.5 && c.body.p_reason_category === 'closing' && !JSON.stringify(c.body).includes(EMP));
+    t = await run({ action: 'overtime_review', company_id: COMPANY, request_id: REQ, decision: 'approve', approved_hours: 'abc' });
+    check('overtime_review：時數不是數字 → 400', t.res.status === 400 && !call(t.f, 'review_overtime_request'));
+
+    const items = [{ employee_id: EMP, date: '2026-10-01', shift_type_id: REQ, is_off_day: false, scheduler_id: EMP }, { employee_id: EMP, date: '2026-10-02', delete: true }];
+    t = await run({ action: 'schedule_save', company_id: COMPANY, items, scheduler_id: EMP });
+    c = call(t.f, 'save_schedules_verified');
+    check('schedule_save：排班人＝LINE userId、只轉送白名單欄位（前端夾帶的 scheduler_id 丟掉）',
+      t.res.status === 200 && c.body.p_line_user_id === LIFF_USER && c.body.p_items.length === 2 && !('scheduler_id' in c.body.p_items[0]) && c.body.p_items[1].delete === true && t.out.saved_count === 2, JSON.stringify(c?.body));
+    t = await run({ action: 'schedule_save', company_id: COMPANY, items: [{ employee_id: EMP, date: '10/01' }] });
+    check('schedule_save：日期格式不對 → 400', t.res.status === 400 && !call(t.f, 'save_schedules_verified'));
+    t = await run({ action: 'schedule_save', company_id: COMPANY, items: Array.from({ length: 401 }, () => ({ employee_id: EMP, date: '2026-10-01' })) });
+    check('schedule_save：超過 400 筆 → 400、不呼叫 RPC', t.res.status === 400 && !t.f.calls.some(x => x.url.includes('/rpc/')));
+    t = await run({ action: 'schedule_save', company_id: COMPANY, items: [{ employee_id: EMP, date: '2026-10-01' }] },
+      rpcRoutes([['/rpc/save_schedules_verified', { body: { success: false, error: '沒有排班權限', error_code: 'access_denied' } }]]));
+    check('schedule_save：DB 拒絕 → 403', t.res.status === 403 && t.out.code === 'access_denied');
+
+    t = await run({ action: 'company_save', fields: { code: 'NEW', name: '新公司' } });
+    c = call(t.f, 'platform_company_save');
+    check('company_save（新增，不帶 company_id）：呼叫者＝LINE userId', t.res.status === 200 && c.body.p_caller_line_user_id === LIFF_USER && c.body.p_company_id === null && c.body.p_fields.code === 'NEW' && t.out.result?.company?.code === 'NEW');
+    t = await run({ action: 'company_save', company_id: COMPANY, fields: { name: '改名' } });
+    check('company_save（修改）：帶 company_id', t.res.status === 200 && call(t.f, 'platform_company_save').body.p_company_id === COMPANY);
+    t = await run({ action: 'company_save', company_id: 'bad', fields: { name: 'x' } });
+    check('company_save：company_id 不是 UUID → 400', t.res.status === 400 && t.f.calls.length === 0);
+    t = await run({ action: 'company_save', fields: { code: 'NEW', name: 'x' } },
+      rpcRoutes([['/rpc/platform_company_save', { body: { success: false, error: '需要平台管理員權限', error_code: 'access_denied' } }]]));
+    check('company_save：非平台管理員 → 403', t.res.status === 403 && t.out.code === 'access_denied');
+    t = await run({ action: 'company_set_status', company_id: COMPANY, status: 'active' });
+    check('company_set_status：呼叫者＝LINE userId', t.res.status === 200 && call(t.f, 'platform_company_set_status').body.p_caller_line_user_id === LIFF_USER);
+    t = await run({ action: 'company_set_status', company_id: COMPANY, status: 'deleted' });
+    check('company_set_status：狀態不合法 → 400、不呼叫 RPC', t.res.status === 400 && !t.f.calls.some(x => x.url.includes('/rpc/')));
+    t = await run({ action: 'company_delete_pending', company_id: COMPANY });
+    check('company_delete_pending：呼叫者＝LINE userId', t.res.status === 200 && call(t.f, 'platform_company_delete_pending').body.p_caller_line_user_id === LIFF_USER);
+    t = await run({ action: 'company_delete_pending', company_id: COMPANY }, rpcRoutes([['/rpc/platform_company_delete_pending', { status: 500, body: { message: 'boom' } }]]));
+    check('RPC 連不上 → 503', t.res.status === 503 && t.out.code === 'service_unavailable');
+
+    // L1：批次中途連不上 DB → 回報已處理的每一筆（已核准的 id、停在哪一筆、哪些沒處理）
+    const REQ3 = '00000000-0000-0000-0000-00000000aa03';
+    let n = 0;
+    t = await run({ action: 'makeup_review', company_id: COMPANY, request_ids: [REQ, REQ2, REQ3], decision: 'approve' },
+      rpcRoutes([['/rpc/review_makeup_request', (b) => (++n === 3 ? { status: 500, body: { message: 'boom' } }
+        : { body: b.p_request_id === REQ2 ? { success: false, error: '此申請已處理過', error_code: 'not_pending' } : { success: true } })]]));
+    check('makeup_review（批次）：第 3 筆 DB 失敗 → 503，並回報第 1 筆已核准、第 2 筆失敗原因、停在第 3 筆',
+      t.res.status === 503 && t.out.ok === false && t.out.code === 'service_unavailable' && t.out.approved_count === 1
+      && t.out.approved_ids.length === 1 && t.out.approved_ids[0] === REQ && t.out.results.length === 2 && t.out.results[1].error === '此申請已處理過'
+      && t.out.failed_id === REQ3 && Array.isArray(t.out.not_processed_ids) && t.out.not_processed_ids.length === 0, JSON.stringify(t.out));
+    // LOW：重複的 request_id 只處理一次
+    n = 0;
+    t = await run({ action: 'makeup_review', company_id: COMPANY, request_ids: [REQ, REQ, REQ3], decision: 'approve' });
+    check('makeup_review：重複的 id 去重後只呼叫一次 RPC', t.res.status === 200 && t.f.calls.filter(x => x.url.includes('/rpc/review_makeup_request')).length === 2 && t.out.results.length === 2);
+    // L5：RPC 不存在（migration 還沒套）→ 明確告知
+    const missingRoute = (name) => rpcRoutes([['/rpc/' + name, { status: 404, body: { code: 'PGRST202', message: 'Could not find the function public.' + name } }]]);
+    t = await run({ action: 'makeup_review', company_id: COMPANY, request_ids: [REQ], decision: 'approve' }, missingRoute('review_makeup_request'));
+    check('RPC 不存在（131 未套）：503 db_not_migrated「資料庫尚未更新（131）」', t.res.status === 503 && t.out.code === 'db_not_migrated' && /資料庫尚未更新（131）/.test(t.out.error), JSON.stringify(t.out));
+    t = await run({ action: 'company_save', fields: { code: 'X', name: 'x' } }, missingRoute('platform_company_save'));
+    check('RPC 不存在（130 未套）：「資料庫尚未更新（130）」', t.res.status === 503 && /資料庫尚未更新（130）/.test(t.out.error));
+    n = 0;
+    t = await run({ action: 'makeup_review', company_id: COMPANY, request_ids: [REQ, REQ3], decision: 'approve' }, missingRoute('review_makeup_request'));
+    check('批次第 1 筆就發現 RPC 不存在：db_not_migrated、0 筆核准、其餘列為未處理', t.res.status === 503 && t.out.code === 'db_not_migrated' && t.out.approved_count === 0 && t.out.failed_id === REQ && t.out.not_processed_ids[0] === REQ3);
+  }
+
   console.log('\n=== line-webhook ===');
   const secret = 'channel-secret';
   const envS = envOf({ SUPABASE_URL: 'https://db.test', SUPABASE_SERVICE_ROLE_KEY: 'service-key', LINE_CHANNEL_TOKEN: 'line-token', LINE_CHANNEL_SECRET: secret });

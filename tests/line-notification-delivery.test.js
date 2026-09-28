@@ -202,7 +202,8 @@ function buildLineHelpers({ response, fetchError, extraSettings = {}, liffToken 
   const paWrites = frontFiles.filter(n => /from\(\s*['"]platform_admin(s|_companies)['"]\s*\)\s*\.(insert|update|delete|upsert)\(/.test(fs.readFileSync(path.join(root, n), 'utf8').replace(/\s+/g, ' ')));
   check('前端已無直接寫 platform_admins／platform_admin_companies（129）', paWrites.length === 0, paWrites.join(', '));
   const platformSrc = fs.readFileSync(path.join(root, 'platform.html'), 'utf8');
-  check('平台頁新增／修改平台管理員、建公司綁定改走 callVerifiedAction', /callVerifiedAction\('platform_admin_save'/.test(platformSrc) && /callVerifiedAction\('platform_link_company'/.test(platformSrc) && /callVerifiedAction\('platform_link_company'/.test(settingsSrc));
+  // 130：建公司改走 company_save（DB 在同一個交易裡把建立者綁成 owner），不再另外呼叫 platform_link_company
+  check('平台頁新增／修改平台管理員、建公司（含自動綁 owner）改走 callVerifiedAction', /callVerifiedAction\('platform_admin_save'/.test(platformSrc) && /callVerifiedAction\('company_save'/.test(platformSrc) && /callVerifiedAction\('company_save'/.test(settingsSrc));
   check('line-test.html（手動貼 token 的除錯頁）已刪除', !fs.existsSync(path.join(root, 'line-test.html')));
 
   console.log('\n=== saveSetting 呼叫端都會顯示錯誤（L1）===');
@@ -231,12 +232,12 @@ function buildLineHelpers({ response, fetchError, extraSettings = {}, liffToken 
   check('本機 Edge Function 回傳不包含 Channel Token', !/json\(\{[^\n]*\btoken\b/.test(edgeSrc));
   check('本機 Edge Function 例外訊息不直接外洩', /LINE 推播服務暫時無法使用/.test(edgeSrc) && !/error:\s*e\.message/.test(edgeSrc));
 
-  check('管理模組快取版本已更新', /settings\.js\?v=20260927-linesecure/.test(moduleIndexSrc));
+  check('管理模組快取版本已更新', /settings\.js\?v=20260927-verified130/.test(moduleIndexSrc));
   const htmlFiles = fs.readdirSync(root).filter(name => name.endsWith('.html'));
   const commonRefs = htmlFiles
     .map(name => ({ name, src: fs.readFileSync(path.join(root, name), 'utf8') }))
     .filter(file => file.src.includes('common.js'));
-  const staleRefs = commonRefs.filter(file => !file.src.includes('common.js?v=20260927-linesecure'));
+  const staleRefs = commonRefs.filter(file => !file.src.includes('common.js?v=20260927-verified130'));
   check('所有 common.js 引用已同步升版', staleRefs.length === 0, staleRefs.map(file => file.name).join(', '));
 
   console.log(`\n  結果：${pass} 通過，${fail} 失敗`);

@@ -120,6 +120,8 @@ const WRITE_LOCKED = [
     note: '13 處寫入改 RPC；anon 的 INSERT/UPDATE/DELETE grant 與全開政策已撤',
   },
 ];
+const VERIFIED_VIA_EDGE = { admin_create_employee: 'employee_create', admin_update_employee: 'employee_update', admin_delete_pending_employee: 'employee_delete_pending' };
+const VERIFIED_ACTION_NAME = VERIFIED_VIA_EDGE;
 const writeRe = table => new RegExp("sb\\s*\\.\\s*from\\(\\s*['\"`]" + table + "['\"`]\\s*\\)[^;]{0,400}?\\.(insert|update|upsert|delete)\\(");
 WRITE_LOCKED.forEach(({ table, migration, rpcs, note }) => {
   console.log('--- ' + table + '（migration ' + migration + '，只鎖寫入）' + note + ' ---');
@@ -127,6 +129,14 @@ WRITE_LOCKED.forEach(({ table, migration, rpcs, note }) => {
   check(table + ' 前端 0 處直接寫入（insert/update/upsert/delete）', offenders.length === 0,
     offenders.length ? '違規：' + offenders.join(', ') : undefined);
   rpcs.forEach(rpc => {
+    // 131／132：admin_* 改經 line-push 驗 LIFF 身分代呼叫（身分來自 LINE，不由前端帶 p_line_user_id），前端不得直接 rpc
+    if (VERIFIED_VIA_EDGE[rpc]) {
+      const direct = sources.filter(s => new RegExp("rpc\\(\\s*['\"`]" + rpc + "['\"`]").test(s.text)).map(s => s.rel);
+      check(rpc + ' 前端 0 處直接呼叫（132 會撤 anon 權限）', direct.length === 0, direct.join(', '));
+      const via = sources.filter(s => new RegExp("verifiedEmployeeCall\\(\\s*'" + VERIFIED_VIA_EDGE[rpc] + "'").test(s.text) || new RegExp("VerifiedAction\\(\\s*'" + VERIFIED_ACTION_NAME[rpc] + "'").test(s.text));
+      check(rpc + ' 改經 line-push 驗證動作 ' + VERIFIED_VIA_EDGE[rpc] + '（帶 company_id）', via.length > 0, via.map(u => u.rel).join(', '));
+      return;
+    }
     const users = sources.filter(s => new RegExp("rpc\\(\\s*['\"`]" + rpc + "['\"`]").test(s.text));
     check(rpc + ' 有被前端呼叫', users.length > 0, users.map(u => u.rel).join(', '));
     const missingCompany = [], missingCaller = [];

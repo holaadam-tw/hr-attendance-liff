@@ -1,76 +1,30 @@
 -- ============================================================
--- 128: 124 員工寫入 RPC 補強（P2）——公務機不能管員工、主管不能改管理員帳號
---
--- ⛔ 2026-09-27 起由 131 取代，不要再套用本檔：131 已併入本檔全部補強（另外 admin 判斷也排除公務機）。
---    131 套用後再執行本檔會把三支函式蓋回較舊的版本，所以下方加了防呆（偵測到 131 就中止）。
---
--- 背景（2026-09-27 審查 124，正式庫 9/15 已套用；本檔的函式本體取自 124，
---       已比對正式庫 pg_get_functiondef 與 repo 124 三支函式完全相同）：
---   - admin_create_employee／admin_update_employee／admin_delete_pending_employee 用
---     has_company_access(…, true) 驗權限，這個 helper 也放行「公務機」（is_kiosk=true）帳號
---     → 放在門口的共用打卡平板，只要知道自己的 LINE ID 就能新增／修改／刪除員工
---   - admin_update_employee 沒保護目標：主管（manager）或公務機可以把 admin 的 line_user_id
---     改成自己的 → 之後以 admin 身分操作（提權）
---
--- 本檔（只改授權判斷，其他邏輯逐字沿用 124）：
---   A. is_company_manager_caller：在職 admin/manager（非公務機）或該公司平台管理員
---   B. 三支 RPC 改用 A 驗權限（公務機一律拒絕）
---   C. admin_update_employee：目標是 admin／platform_admin 時，呼叫者必須是公司 admin 或平台管理員
---
--- ⚠️ 仍未解決（P1，見 PR 說明）：這些 RPC 信任前端傳入的 p_line_user_id；員工的 line_user_id
---    目前 anon 讀得到（employees SELECT 政策 USING true）。本檔縮小「誰能冒充成功」的範圍，不是強身分驗證。
---
--- 回滾：migrations/128_employee_rpc_kiosk_admin_guard_rollback.sql（還原 124 版本）
--- 只建立 migration 檔，不得由開發流程直接套用正式資料庫。
+-- 131 回滾：還原正式庫快照（2026-09-27）
+--   - admin_create_employee／admin_update_employee／admin_delete_pending_employee 還原為正式庫原文（pg_get_functiondef 逐字，即 124 版本）
+--   - 移除 131 新增的 5 支函式（兩個 helper、review_makeup_request、review_overtime_request、save_schedules_verified）
+--   - 23 支舊 RPC 的執行權還原為 PUBLIC＋anon＋authenticated＋service_role
+-- 必須先回滾 132（否則前端的舊路徑與新路徑會同時失效）；本檔開頭有防呆。
 -- ============================================================
 
 BEGIN;
 
 DO $$ BEGIN
-  IF to_regprocedure('public.is_company_admin_strict_caller(text, uuid)') IS NOT NULL THEN
-    RAISE EXCEPTION '131 已套用（已包含 128 的補強）：不要再套 128';
+  IF NOT has_function_privilege('anon', 'public.admin_update_employee(uuid, text, uuid, jsonb)', 'EXECUTE') THEN
+    RAISE EXCEPTION '132 仍在套用中：請先執行 132_verified_admin_rpcs_revoke_rollback.sql，再回滾 131';
   END IF;
 END $$;
 
--- ===== A. 誰可以管員工（排除公務機） =====
-CREATE OR REPLACE FUNCTION public.is_company_manager_caller(p_line_user_id TEXT, p_company_id UUID)
-RETURNS BOOLEAN
-LANGUAGE sql
-STABLE
-SECURITY DEFINER
-SET search_path = public
-AS $$
-    SELECT COALESCE(p_line_user_id, '') <> '' AND p_company_id IS NOT NULL AND (
-        EXISTS (
-            SELECT 1 FROM public.employees e
-            WHERE e.line_user_id = p_line_user_id
-              AND e.company_id = p_company_id
-              AND e.is_active = true
-              AND e.role IN ('admin', 'manager', 'platform_admin')
-              AND COALESCE(e.is_kiosk, false) = false
-        ) OR EXISTS (
-            SELECT 1 FROM public.platform_admins pa
-            JOIN public.platform_admin_companies pac ON pac.platform_admin_id = pa.id
-            WHERE pa.line_user_id = p_line_user_id
-              AND pa.is_active = true
-              AND pac.company_id = p_company_id
-        )
-    );
-$$;
+DROP FUNCTION IF EXISTS public.review_makeup_request(UUID, TEXT, UUID, TEXT, TEXT);
+DROP FUNCTION IF EXISTS public.review_overtime_request(UUID, TEXT, UUID, TEXT, NUMERIC, TEXT, TEXT, TEXT);
+DROP FUNCTION IF EXISTS public.save_schedules_verified(UUID, TEXT, JSONB);
 
-REVOKE ALL ON FUNCTION public.is_company_manager_caller(TEXT, UUID) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.is_company_manager_caller(TEXT, UUID) TO service_role;
-
--- ===== A1. 新增員工（管理員） =====
-CREATE OR REPLACE FUNCTION public.admin_create_employee(
-    p_company_id UUID,
-    p_line_user_id TEXT,
-    p_data JSONB
-) RETURNS JSONB
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
+-- ↓↓↓ 正式庫原文（pg_get_functiondef，2026-09-27）↓↓↓
+CREATE OR REPLACE FUNCTION public.admin_create_employee(p_company_id uuid, p_line_user_id text, p_data jsonb)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
 DECLARE
     v_id UUID;
     v_role TEXT := COALESCE(NULLIF(p_data->>'role', ''), 'user');
@@ -78,7 +32,7 @@ DECLARE
     v_number TEXT := NULLIF(btrim(COALESCE(p_data->>'employee_number', '')), '');
     v_code TEXT := NULLIF(btrim(COALESCE(p_data->>'id_card_last_4', '')), '');
 BEGIN
-    IF NOT public.is_company_manager_caller(p_line_user_id, p_company_id) THEN
+    IF NOT public.has_company_access(p_line_user_id, p_company_id, true) THEN
         RETURN jsonb_build_object('success', false, 'error', '需要管理員權限', 'error_code', 'access_denied');
     END IF;
     IF v_name IS NULL OR v_number IS NULL OR v_code IS NULL THEN
@@ -110,22 +64,14 @@ BEGIN
 EXCEPTION WHEN OTHERS THEN
     RETURN jsonb_build_object('success', false, 'error', SQLERRM);
 END;
-$$;
+$function$;
 
-REVOKE ALL ON FUNCTION public.admin_create_employee(UUID, TEXT, JSONB) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.admin_create_employee(UUID, TEXT, JSONB) TO anon, authenticated;
-
--- ===== A2. 更新員工（管理員；欄位白名單，只更新 p_updates 裡出現的鍵） =====
-CREATE OR REPLACE FUNCTION public.admin_update_employee(
-    p_company_id UUID,
-    p_line_user_id TEXT,
-    p_employee_id UUID,
-    p_updates JSONB
-) RETURNS JSONB
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
+CREATE OR REPLACE FUNCTION public.admin_update_employee(p_company_id uuid, p_line_user_id text, p_employee_id uuid, p_updates jsonb)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
 DECLARE
     v_target RECORD;
     v_role TEXT;
@@ -140,7 +86,7 @@ DECLARE
     ];
     v_bad TEXT;
 BEGIN
-    IF NOT public.is_company_manager_caller(p_line_user_id, p_company_id) THEN
+    IF NOT public.has_company_access(p_line_user_id, p_company_id, true) THEN
         RETURN jsonb_build_object('success', false, 'error', '需要管理員權限', 'error_code', 'access_denied');
     END IF;
     IF p_updates IS NULL OR jsonb_typeof(p_updates) <> 'object' OR p_updates = '{}'::jsonb THEN
@@ -157,10 +103,6 @@ BEGIN
     WHERE e.id = p_employee_id AND e.company_id = p_company_id;
     IF v_target.id IS NULL THEN
         RETURN jsonb_build_object('success', false, 'error', '找不到員工（或不屬於本公司）');
-    END IF;
-    -- 128：管理員／平台管理員帳號只有公司 admin（或平台管理員）能改；主管不能改 admin 的 LINE ID、停用 admin
-    IF v_target.role IN ('admin', 'platform_admin') AND NOT public.is_company_admin_caller(p_line_user_id, p_company_id) THEN
-        RETURN jsonb_build_object('success', false, 'error', '只有管理員可以修改管理員帳號', 'error_code', 'target_protected');
     END IF;
 
     IF p_updates ? 'role' THEN
@@ -237,25 +179,18 @@ BEGIN
 EXCEPTION WHEN OTHERS THEN
     RETURN jsonb_build_object('success', false, 'error', SQLERRM);
 END;
-$$;
+$function$;
 
-REVOKE ALL ON FUNCTION public.admin_update_employee(UUID, TEXT, UUID, JSONB) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.admin_update_employee(UUID, TEXT, UUID, JSONB) TO anon, authenticated;
-
--- ===== A3. 刪除待審登記（只允許 pending；在職員工走離職流程） =====
-CREATE OR REPLACE FUNCTION public.admin_delete_pending_employee(
-    p_company_id UUID,
-    p_line_user_id TEXT,
-    p_employee_id UUID
-) RETURNS JSONB
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
+CREATE OR REPLACE FUNCTION public.admin_delete_pending_employee(p_company_id uuid, p_line_user_id text, p_employee_id uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
 DECLARE
     v_name TEXT;
 BEGIN
-    IF NOT public.is_company_manager_caller(p_line_user_id, p_company_id) THEN
+    IF NOT public.has_company_access(p_line_user_id, p_company_id, true) THEN
         RETURN jsonb_build_object('success', false, 'error', '需要管理員權限', 'error_code', 'access_denied');
     END IF;
     DELETE FROM public.employees e
@@ -269,9 +204,38 @@ BEGIN
 EXCEPTION WHEN OTHERS THEN
     RETURN jsonb_build_object('success', false, 'error', SQLERRM);
 END;
-$$;
+$function$;
 
-REVOKE ALL ON FUNCTION public.admin_delete_pending_employee(UUID, TEXT, UUID) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.admin_delete_pending_employee(UUID, TEXT, UUID) TO anon, authenticated;
+-- ↑↑↑ 正式庫原文 ↑↑↑
+
+-- 還原後三支函式不再引用 helper，才能移除
+DROP FUNCTION IF EXISTS public.is_company_manager_caller(TEXT, UUID);
+DROP FUNCTION IF EXISTS public.is_company_admin_strict_caller(TEXT, UUID);
+
+GRANT EXECUTE ON FUNCTION
+    public.bind_employee(text, character varying, character varying, character varying, character varying),
+    public.bind_employee(text, text, text, text, text),
+    public.bind_employee_secure(text, text, text, text, text),
+    public.bind_existing_employee(text, text, text),
+    public.bind_line_id(character varying, character varying, character varying),
+    public.calculate_all_payroll(integer, integer),
+    public.check_schedule_permission(text),
+    public.check_user_status(text),
+    public.generate_verification_code(character varying, integer),
+    public.get_all_year_end_stats(integer),
+    public.get_annual_stats(integer, text),
+    public.get_annual_summary(text, integer),
+    public.get_company_info(text),
+    public.get_daily_schedule(date),
+    public.get_employee_payroll(text, integer, integer),
+    public.get_lunch_summary(date),
+    public.get_monthly_attendance_v2(text, integer, integer),
+    public.order_lunch(character varying, date, boolean, text),
+    public.quick_check_in_debug(text),
+    public.quick_check_in_debug2(text),
+    public.quick_check_in_v2(text, double precision, double precision, text, text),
+    public.sync_late_close_overtime_request(text, date),
+    public.update_office_locations(jsonb, text)
+TO PUBLIC, anon, authenticated, service_role;
 
 COMMIT;

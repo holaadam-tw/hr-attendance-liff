@@ -463,13 +463,12 @@ export async function loadMakeupApprovals(status = 'pending', filter = 'all') {
 export async function approveMakeupPunch(id) {
     setMakeupCardBusy(id, '正在通過並寫入正式出勤...');
     try {
-        const approverId = window.currentAdminEmployee?.id || null;
-        const { data: result, error } = await sb.rpc('approve_makeup_request', {
-            p_request_id: id,
-            p_approver_id: approverId
+        // 131／132：經 line-push 驗 LIFF 身分，核准人＝LINE 驗證的本人（前端不再帶 approver_id）
+        const res = await callVerifiedAction('makeup_review', {
+            company_id: window.currentCompanyId, request_ids: [id], decision: 'approve'
         });
-        if (error) throw error;
-        if (result && !result.success) throw new Error(result.error);
+        if (!res.ok) throw new Error(res.message);
+        const result = res.data?.result || {};
 
         const closed = Number(result?.closed_duplicates || 0);
         showToast(closed > 0 ? `✅ 已通過，並關閉 ${closed} 筆重複申請` : '✅ 已通過並寫入出勤');
@@ -512,36 +511,51 @@ export async function batchApproveTodayGpsMakeups() {
 
     const btn = document.getElementById('batchGpsApproveBtn');
     if (btn) { btn.disabled = true; }
-    const approverId = window.currentAdminEmployee?.id || null;
-    let ok = 0, fail = 0;
-    for (const r of todays) {
+    // 131／132：一次送出（每批最多 50 筆），由 line-push 驗 LIFF 身分後逐筆核准（核准人＝LINE 驗證的本人）
+    // 中途失敗時伺服器會回報「已處理的每一筆」：已核准的照實計數並寫稽核，其餘算失敗，並停止後續批次
+    let ok = 0, fail = 0, stopMessage = '';
+    const approvedIds = [];
+    for (let i = 0; i < todays.length; i += 50) {
+        const chunk = todays.slice(i, i + 50);
         try {
-            const { data: result, error: e } = await sb.rpc('approve_makeup_request', {
-                p_request_id: r.id, p_approver_id: approverId
+            const res = await callVerifiedAction('makeup_review', {
+                company_id: window.currentCompanyId, request_ids: chunk.map(r => r.id), decision: 'approve'
             });
-            if (e || (result && !result.success)) fail++; else ok++;
-        } catch (_) { fail++; }
+            const results = Array.isArray(res.data?.results) ? res.data.results : null;
+            if (results) {
+                results.forEach(x => { if (x.success) { ok++; approvedIds.push(x.id); } else fail++; });
+            } else if (res.ok && res.data?.result?.success) {
+                ok++; approvedIds.push(chunk[0].id);
+            }
+            if (!res.ok) {
+                fail += chunk.length - (results ? results.length : 0);
+                // 單筆批次的業務性失敗（例如已被別人處理）不是中斷：計為失敗、繼續下一批
+                const interrupted = results !== null || !res.data || ['service_unavailable', 'db_not_migrated', 'network_error', 'invalid_response',
+                    'unauthenticated', 'relogin_redirect', 'access_denied'].includes(res.code);
+                if (interrupted) { stopMessage = res.message || '審核中斷'; break; }
+                continue;
+            }
+            if (!results && !res.data?.result?.success) fail += chunk.length;
+        } catch (_) { fail += chunk.length; stopMessage = '審核中斷'; break; }
         if (btn) btn.textContent = `⏳ ${ok + fail}/${todays.length}`;
     }
+    if (stopMessage) fail = todays.length - ok;
     if (ok > 0 && typeof writeAuditLog === 'function') {
-        writeAuditLog('batch_approve_gps', 'makeup_punch_requests', null, `一鍵通過今日 GPS 待審 ${ok} 筆`);
+        writeAuditLog('batch_approve_gps', 'makeup_punch_requests', null, `一鍵通過今日 GPS 待審 ${ok} 筆`, { approved_ids: approvedIds });
     }
+    if (stopMessage) showToast('❌ ' + stopMessage + (ok > 0 ? `（已通過 ${ok} 筆）` : ''));
     if (btn) { btn.disabled = false; btn.textContent = '⚡ 一鍵全批今日 GPS 待審'; }
-    showToast(`✅ 通過 ${ok} 筆${fail ? `，失敗 ${fail} 筆` : ''}`);
+    if (!stopMessage) showToast(`✅ 通過 ${ok} 筆${fail ? `，失敗 ${fail} 筆` : ''}`);
     loadMakeupApprovals(currentMakeupStatus || 'pending', currentMakeupFilter || 'gps_review');
 }
 
 export async function rejectMakeupPunch(id, reason) {
     setMakeupCardBusy(id, '正在拒絕申請...');
     try {
-        const approverId = window.currentAdminEmployee?.id || null;
-        const { data: result, error } = await sb.rpc('reject_makeup_request', {
-            p_request_id: id,
-            p_approver_id: approverId,
-            p_reason: reason || '不符合規定',
+        const res = await callVerifiedAction('makeup_review', {
+            company_id: window.currentCompanyId, request_ids: [id], decision: 'reject', reason: reason || '不符合規定'
         });
-        if (error) throw error;
-        if (result && !result.success) throw new Error(result.error);
+        if (!res.ok) throw new Error(res.message);
 
         showToast('❌ 已拒絕');
         loadMakeupApprovals(currentMakeupStatus, currentMakeupFilter);
@@ -634,16 +648,12 @@ export async function approveOt(id) {
     if (h < 0) return showToast('核認時數不可小於 0');
     if ((reasonCategory === 'personal_delay' || reasonCategory === 'other') && !note) return showToast('個人拖延 / 其他請補備註');
     try {
-        const approverId = window.currentAdminEmployee?.id || null;
-        const { data: result, error } = await sb.rpc('approve_overtime_request', {
-            p_request_id: id,
-            p_approver_id: approverId,
-            p_approved_hours: h,
-            p_reason_category: reasonCategory,
-            p_note: note
+        // 131／132：經 line-push 驗 LIFF 身分，核准人＝LINE 驗證的本人
+        const res = await callVerifiedAction('overtime_review', {
+            company_id: window.currentCompanyId, request_id: id, decision: 'approve',
+            approved_hours: h, reason_category: reasonCategory, note: note
         });
-        if (error) throw error;
-        if (result && !result.success) throw new Error(result.error);
+        if (!res.ok) throw new Error(res.message);
 
         writeAuditLog('approve', 'overtime_requests', id, '', { approved_hours: h, approval_reason_category: reasonCategory, approval_note: note });
         showToast('✅ 已完成核認'); loadOtApprovals('pending');
@@ -659,16 +669,11 @@ export function rejectOtPrompt(id) {
 }
 export async function rejectOt(id, reason, reasonCategory, note = '') {
     try {
-        const approverId = window.currentAdminEmployee?.id || null;
-        const { data: result, error } = await sb.rpc('reject_overtime_request', {
-            p_request_id: id,
-            p_approver_id: approverId,
-            p_reason: reason || '未核准',
-            p_reason_category: reasonCategory || null,
-            p_note: note || ''
+        const res = await callVerifiedAction('overtime_review', {
+            company_id: window.currentCompanyId, request_id: id, decision: 'reject',
+            reason: reason || '未核准', reason_category: reasonCategory || null, note: note || ''
         });
-        if (error) throw error;
-        if (result && !result.success) throw new Error(result.error);
+        if (!res.ok) throw new Error(res.message);
 
         showToast('✅ 已標記不認列'); loadOtApprovals('pending');
     } catch (e) { showToast('❌ 不認列失敗: ' + friendlyError(e)); }
