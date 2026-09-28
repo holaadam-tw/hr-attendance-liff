@@ -15,6 +15,7 @@ let smWeekStart;
 
 let smEmployees = [];
 let smScheduleData = {};
+let smScheduleOriginal = {}; // 載入當下的班表；儲存時只送有變更的格子
 let smLeaveData = {};
 let smShiftTypes = []; // 動態班別列表
 let SHIFT_TYPES = [null, 'off']; // 預設只有 null 和 off，loadShiftMgr 會填入
@@ -27,6 +28,7 @@ const SHIFT_ICONS = ['☀️', '🌤️', '🌙', '⏰', '🌅', '🌆', '🔔',
 export function clearSchedulesState() {
     smEmployees = [];
     smScheduleData = {};
+    smScheduleOriginal = {};
     smLeaveData = {};
     smShiftTypes = [];
     SHIFT_TYPES = [null, 'off'];
@@ -74,14 +76,15 @@ export async function loadShiftMgr() {
 
         const { data: emps } = await sb.from('employees').select('id, name, department, shift_mode').eq('company_id', window.currentCompanyId).eq('is_active', true).eq('shift_mode', 'scheduled').order('name');
         smEmployees = emps || [];
-        const { data: scheds } = await sb.from('schedules').select('employee_id, date, shift_type_id, shift_types(name, code), employees!schedules_employee_id_fkey!inner(company_id)')
+        const { data: scheds } = await sb.from('schedules').select('employee_id, date, shift_type_id, is_off_day, shift_types(name, code), employees!schedules_employee_id_fkey!inner(company_id)')
             .eq('employees.company_id', window.currentCompanyId)
             .gte('date', startStr).lte('date', endStr);
         smScheduleData = {};
         (scheds || []).forEach(s => {
-            const code = s.shift_types?.code || s.shift_types?.name || 'morning';
-            smScheduleData[`${s.employee_id}_${s.date}`] = code;
+            const code = s.is_off_day ? 'off' : (s.shift_types?.code || s.shift_types?.name || null);
+            if (code) smScheduleData[`${s.employee_id}_${s.date}`] = code;
         });
+        smScheduleOriginal = { ...smScheduleData };
         const { data: lvs } = await sb.from('leave_requests').select('employee_id, start_date, end_date, status, employees!leave_requests_employee_id_fkey!inner(company_id)')
             .eq('employees.company_id', window.currentCompanyId)
             .in('status', ['approved']).or(`and(start_date.lte.${endStr},end_date.gte.${startStr})`);
@@ -222,36 +225,84 @@ export function cycleShift(key) {
 export async function saveSchedule() {
     const statusEl = document.getElementById('smSaveStatus');
     statusEl.style.display = 'block'; statusEl.style.color = '#F59E0B'; statusEl.textContent = '⏳ 儲存中...';
+    const nameOf = (id) => (smEmployees.find(e => e.id === id) || {}).name || '';
     try {
         const { data: shiftTypes } = await sb.rpc('get_company_shift_types', { p_company_id: window.currentCompanyId, p_line_user_id: window.currentAdminEmployee?.line_user_id });
         const stMap = {};
         (shiftTypes || []).forEach(st => { stMap[st.code || st.name] = st.id; });
-        const upserts = [];
-        for (const [key, shift] of Object.entries(smScheduleData)) {
-            if (!shift) continue;
+        // 只送有變更的格子（沒動到的排班不重寫）
+        // 班別 → shift_type_id；休 → is_off_day；清成未排 → 刪除；班別已不存在 → 不存、告知
+        const changes = [];
+        const unknown = [];
+        const keys = new Set([...Object.keys(smScheduleData), ...Object.keys(smScheduleOriginal)]);
+        for (const key of keys) {
+            const shift = smScheduleData[key] || null;
+            if (shift === (smScheduleOriginal[key] || null)) continue;
             const parts = key.split('_');
-            const empId = parts[0];
-            const date = parts.slice(1).join('-');
-            const stId = stMap[shift];
-            if (!stId) continue;
-            upserts.push({ employee_id: empId, date, shift_type_id: stId });
+            const c = { key, employee_id: parts[0], date: parts.slice(1).join('-'), shift };
+            if (shift && shift !== 'off' && !stMap[shift]) { unknown.push(c); continue; }
+            changes.push(c);
         }
-        if (upserts.length > 0) {
-            const empIds = [...new Set(upserts.map(u => u.employee_id))];
-            const dates = [...new Set(upserts.map(u => u.date))];
-            const { count } = await sb.from('schedules')
-                .select('id', { count: 'exact', head: true })
-                .in('employee_id', empIds)
-                .in('date', dates);
-            if (count > 0 && !confirm(`將覆蓋 ${count} 筆既有排班，確定儲存？`)) {
-                statusEl.style.display = 'none';
-                return;
+        const unknownMsg = unknown.length ? `；${unknown.length} 格的班別已不存在，未儲存（${unknown.slice(0, 3).map(c => nameOf(c.employee_id) + ' ' + c.date).join('、')}）` : '';
+        if (changes.length === 0) {
+            statusEl.style.color = unknown.length ? '#DC2626' : '#64748B';
+            statusEl.textContent = unknown.length ? '❌ 沒有可儲存的變更' + unknownMsg : '沒有排班變更';
+            if (!unknown.length) setTimeout(() => { statusEl.style.display = 'none'; }, 2500);
+            return;
+        }
+        // 讀既有排班：沿用原本的備註；已被打卡紀錄引用的排班不能刪（出勤會連不到排班），保留並告知
+        const empIds = [...new Set(changes.map(c => c.employee_id))];
+        const dates = [...new Set(changes.map(c => c.date))];
+        const { data: existingRows, error: exErr } = await sb.from('schedules')
+            .select('id, employee_id, date, notes')
+            .in('employee_id', empIds)
+            .in('date', dates);
+        if (exErr) throw exErr;
+        const existing = {};
+        (existingRows || []).forEach(r => { existing[`${r.employee_id}_${r.date}`] = r; });
+        const delIds = changes.filter(c => !c.shift && existing[c.key]).map(c => existing[c.key].id);
+        const referenced = new Set();
+        if (delIds.length > 0) {
+            const { data: refs, error: refErr } = await sb.from('attendance').select('schedule_id, employees!inner(company_id)')
+                .eq('employees.company_id', window.currentCompanyId).in('schedule_id', delIds);
+            if (refErr) throw refErr;
+            (refs || []).forEach(r => referenced.add(r.schedule_id));
+        }
+        const kept = changes.filter(c => !c.shift && existing[c.key] && referenced.has(existing[c.key].id));
+        kept.forEach(c => { smScheduleData[c.key] = smScheduleOriginal[c.key]; });
+        const toSave = changes.filter(c => !kept.includes(c));
+        const keptMsg = kept.length ? `；${kept.length} 格已有打卡紀錄，保留原排班未刪除（${kept.slice(0, 3).map(c => nameOf(c.employee_id) + ' ' + c.date).join('、')}）` : '';
+        if (kept.length) renderShiftTable();
+        if (toSave.length === 0) {
+            statusEl.style.color = '#DC2626'; statusEl.textContent = '❌ 沒有可儲存的變更' + keptMsg + unknownMsg;
+            return;
+        }
+        const overwrite = toSave.filter(c => existing[c.key]).length;
+        if (overwrite > 0 && !confirm(`將覆蓋 ${overwrite} 筆既有排班，確定儲存？`)) {
+            statusEl.style.display = 'none';
+            return;
+        }
+        const items = toSave.map(c => {
+            if (!c.shift) return { employee_id: c.employee_id, date: c.date, delete: true };
+            const notes = existing[c.key]?.notes ?? null; // 畫面不能編輯備註：沿用原本的
+            if (c.shift === 'off') return { employee_id: c.employee_id, date: c.date, shift_type_id: null, is_off_day: true, notes };
+            return { employee_id: c.employee_id, date: c.date, shift_type_id: stMap[c.shift], is_off_day: false, notes };
+        });
+        // 經 line-push 驗 LIFF 身分（排班人＝LINE 驗證的本人），每批最多 400 筆、整批成功或整批不存
+        for (let i = 0; i < items.length; i += 400) {
+            const res = await callVerifiedAction('schedule_save', { company_id: window.currentCompanyId, items: items.slice(i, i + 400) });
+            if (!res.ok) {
+                if (/foreign key|violates/i.test(res.message || '')) throw new Error('有排班已被打卡紀錄使用，不能刪除；請重新整理後再試');
+                throw new Error(res.message || '儲存失敗');
             }
-            const { error } = await sb.from('schedules').upsert(upserts, { onConflict: 'employee_id,date' });
-            if (error) throw error;
+            toSave.slice(i, i + 400).forEach(c => {
+                if (c.shift) smScheduleOriginal[c.key] = c.shift; else delete smScheduleOriginal[c.key];
+            });
         }
-        statusEl.style.color = '#059669'; statusEl.textContent = `✅ 已儲存 ${upserts.length} 筆排班`;
-        setTimeout(() => { statusEl.style.display = 'none'; }, 2500);
+        const warn = keptMsg + unknownMsg;
+        statusEl.style.color = warn ? '#D97706' : '#059669';
+        statusEl.textContent = `✅ 已儲存 ${items.length} 筆排班` + warn;
+        if (!warn) setTimeout(() => { statusEl.style.display = 'none'; }, 2500);
     } catch (e) {
         console.error(e);
         statusEl.style.color = '#DC2626'; statusEl.textContent = '❌ 儲存失敗: ' + e.message;
@@ -264,7 +315,7 @@ export async function copyLastWeek() {
     try {
         const lwStart = new Date(dates[0]); lwStart.setDate(lwStart.getDate() - 7);
         const lwEnd = new Date(dates[6]); lwEnd.setDate(lwEnd.getDate() - 7);
-        const { data: lastScheds } = await sb.from('schedules').select('employee_id, date, shift_type_id, shift_types(code, name), employees!schedules_employee_id_fkey!inner(company_id)')
+        const { data: lastScheds } = await sb.from('schedules').select('employee_id, date, shift_type_id, is_off_day, shift_types(code, name), employees!schedules_employee_id_fkey!inner(company_id)')
             .eq('employees.company_id', window.currentCompanyId)
             .gte('date', fmtDate(lwStart)).lte('date', fmtDate(lwEnd));
         let copied = 0;
@@ -272,8 +323,10 @@ export async function copyLastWeek() {
             const oldD = new Date(s.date + 'T00:00:00');
             const newD = new Date(oldD); newD.setDate(newD.getDate() + 7);
             const key = `${s.employee_id}_${fmtDate(newD)}`;
-            if (!smScheduleData[key]) {
-                smScheduleData[key] = s.shift_types?.code || s.shift_types?.name || 'morning';
+            // 休假照抄成「休」；班別已不存在的列不抄（不再當成不存在的 'morning'）
+            const code = s.is_off_day ? 'off' : (s.shift_types?.code || s.shift_types?.name || null);
+            if (code && !smScheduleData[key]) {
+                smScheduleData[key] = code;
                 copied++;
             }
         });
@@ -719,30 +772,13 @@ export async function approveSwap(id) {
             .select('*, requester:employees!shift_swap_requests_requester_id_fkey(name, id, company_id), target:employees!shift_swap_requests_target_id_fkey(name, id)')
             .eq('id', id).single();
         if (!req || req.requester?.company_id !== window.currentCompanyId) { showToast('❌ 無權操作此換班'); return; }
-        if (req) {
-            const date = req.swap_date;
-            const { data: s1 } = await sb.from('schedules').select('id, shift_type_id').eq('employee_id', req.requester_id).eq('date', date).maybeSingle();
-            const { data: s2 } = await sb.from('schedules').select('id, shift_type_id').eq('employee_id', req.target_id).eq('date', date).maybeSingle();
-            if (!s1 || !s2) throw new Error('雙方當天都必須已有排班，才能核准換班');
-            const { error: updateReqError } = await sb.from('schedules').update({ shift_type_id: s2.shift_type_id }).eq('id', s1.id);
-            if (updateReqError) throw updateReqError;
-            const { error: updateTargetError } = await sb.from('schedules').update({ shift_type_id: s1.shift_type_id }).eq('id', s2.id);
-            if (updateTargetError) {
-                await sb.from('schedules').update({ shift_type_id: s1.shift_type_id }).eq('id', s1.id);
-                throw updateTargetError;
-            }
-            const { error: approveError } = await sb.from('shift_swap_requests').update({
-                status: 'approved', approver_id: window.currentAdminEmployee?.id, approved_at: new Date().toISOString()
-            }).eq('id', id);
-            if (approveError) {
-                await sb.from('schedules').update({ shift_type_id: s1.shift_type_id }).eq('id', s1.id);
-                await sb.from('schedules').update({ shift_type_id: s2.shift_type_id }).eq('id', s2.id);
-                throw approveError;
-            }
-            writeAuditLog('approve', 'shift_swap_requests', id, `${req.requester?.name} ↔ ${req.target?.name}`, { date });
-            if (req.requester?.id) sendUserNotify(req.requester.id, `✅ 換班已核准\n📅 ${date} 班表已自動更新`, { category: 'shift_swap_result' });
-            if (req.target?.id) sendUserNotify(req.target.id, `✅ 換班已核准\n📅 ${date} 班表已自動更新`, { category: 'shift_swap_result' });
-        }
+        // 經 line-push 驗 LIFF 身分：伺服器端驗主管與公司、同一交易互換兩人班別並結案（135 起前端不能直接寫 schedules）
+        const res = await callVerifiedAction('shift_swap_review', { company_id: window.currentCompanyId, request_id: id, decision: 'approve' });
+        if (!res.ok) throw new Error(res.message || '審核失敗');
+        const date = res.data?.result?.swap_date || req.swap_date;
+        writeAuditLog('approve', 'shift_swap_requests', id, `${req.requester?.name} ↔ ${req.target?.name}`, { date });
+        if (req.requester?.id) sendUserNotify(req.requester.id, `✅ 換班已核准\n📅 ${date} 班表已自動更新`, { category: 'shift_swap_result' });
+        if (req.target?.id) sendUserNotify(req.target.id, `✅ 換班已核准\n📅 ${date} 班表已自動更新`, { category: 'shift_swap_result' });
         showToast('✅ 已核准，班表已交換');
         loadSwapApprovals();
     } catch (e) { showToast('❌ 審核失敗：' + friendlyError(e)); }
@@ -756,12 +792,10 @@ export async function rejectSwap(id) {
             .select('requester:employees!shift_swap_requests_requester_id_fkey(company_id)')
             .eq('id', id).single();
         if (!chk || chk.requester?.company_id !== window.currentCompanyId) { showToast('❌ 無權操作'); return; }
-        await sb.from('shift_swap_requests').update({
-            status: 'rejected', rejection_reason: reason || '不符規定',
-            approver_id: window.currentAdminEmployee?.id, approved_at: new Date().toISOString()
-        }).eq('id', id);
+        const res = await callVerifiedAction('shift_swap_review', { company_id: window.currentCompanyId, request_id: id, decision: 'reject', reason: reason || '不符規定' });
+        if (!res.ok) throw new Error(res.message || '操作失敗');
         showToast('❌ 已拒絕'); loadSwapApprovals();
-    } catch (e) { showToast('❌ 操作失敗'); }
+    } catch (e) { showToast('❌ 操作失敗：' + friendlyError(e)); }
 }
 
 // ===== 班別管理 =====
