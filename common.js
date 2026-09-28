@@ -477,7 +477,15 @@ let _settingsCache = null; // { key: value, ... }
 // 127 套用前 DB 仍讀得到這列 → 讀到就丟掉，不放進記憶體或 sessionStorage。
 const SECRET_SETTING_KEYS = ['line_messaging_api'];
 function stripSecretSettings(cache) {
-    if (cache && typeof cache === 'object') SECRET_SETTING_KEYS.forEach(k => { delete cache[k]; });
+    if (cache && typeof cache === 'object') {
+        SECRET_SETTING_KEYS.forEach(k => { delete cache[k]; });
+        // 薪酬密碼（136／137）：比對改在伺服器端，前端只需要知道「有沒有設」。
+        // 137 套用前 DB 仍存明碼 → 讀到就只留 configured，不放進記憶體或 sessionStorage。
+        if (Object.prototype.hasOwnProperty.call(cache, 'payroll_password')) {
+            const v = cache.payroll_password;
+            cache.payroll_password = { configured: !!(v && typeof v === 'object' && (v.configured === true || (typeof v.password === 'string' && v.password !== ''))) };
+        }
+    }
     return cache;
 }
 
@@ -1837,7 +1845,8 @@ function handleLiffSessionExpired() {
 // 再以 service role 呼叫對應的 RPC（126／129）。前端自己報的 line_user_id 不會被採信。
 // action：save_setting／save_config／get_line_config／platform_admin_save／platform_link_company、
 //   company_save／company_set_status／company_delete_pending（130）、
-//   employee_create／employee_update／employee_delete_pending／makeup_review／overtime_review／schedule_save（131／132）
+//   employee_create／employee_update／employee_delete_pending／makeup_review／overtime_review／schedule_save（131／132）、
+//   payroll_unlock（136：薪酬密碼伺服器端比對）
 // 回傳 { ok, code, message, data }
 async function callVerifiedAction(action, payload) {
     const expired = () => handleLiffSessionExpired()
@@ -2517,7 +2526,7 @@ function checkPayrollAccess(callback) {
 }
 
 function showPayrollPasswordDialog(callback) {
-    if (window._payrollUnlocked) { callback(); return; }
+    if (isPayrollUnlockedInMemory()) { callback(); return; }
 
     const overlay = document.createElement('div');
     overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.6);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;';
@@ -2565,19 +2574,51 @@ window.togglePayrollPwVisibility = function() {
     window.togglePasswordField('payrollPwInput', document.getElementById('payrollPwToggle'));
 };
 
-window.verifyPayrollPw = function() {
-    const input = document.getElementById('payrollPwInput')?.value;
-    const setting = getCachedSetting('payroll_password');
-    const correctPw = (setting && setting.password) ? setting.password : '0000';
+// 薪酬密碼是否已設定（136／137：DB 只給 configured 旗標，密碼本身只有伺服器端的雜湊）
+function isPayrollPasswordConfigured() {
+    const v = getCachedSetting('payroll_password');
+    return !!(v && typeof v === 'object' && (v.configured === true || (typeof v.password === 'string' && v.password !== '')));
+}
 
-    if (input === correctPw) {
+// 送到 line-push（action=payroll_unlock）：LIFF 驗身分 → DB 以 bcrypt 比對＋錯誤次數限制 → 短效解鎖
+// 回傳 { ok, code, message, expiresAt }
+async function requestPayrollUnlock(password) {
+    const companyId = window.currentCompanyId || window.currentEmployee?.company_id || currentEmployee?.company_id;
+    if (!companyId) return { ok: false, code: 'missing_company', message: '目前公司資料尚未就緒' };
+    const r = await callVerifiedAction('payroll_unlock', { company_id: companyId, password: String(password || '') });
+    if (!r.ok) return r;
+    const expiresAt = Date.parse(r.data && r.data.expires_at) || (Date.now() + 60 * 60 * 1000);
+    return { ok: true, code: 'ok', expiresAt };
+}
+
+function isPayrollUnlockedInMemory() {
+    return window._payrollUnlocked === true && Number(window._payrollUnlockExpires || 0) > Date.now();
+}
+
+window.verifyPayrollPw = async function() {
+    const input = document.getElementById('payrollPwInput')?.value || '';
+    const err = document.getElementById('payrollPwError');
+    const inp = document.getElementById('payrollPwInput');
+    if (window._payrollPwBusy) return;
+    window._payrollPwBusy = true;
+    let r;
+    try {
+        r = await requestPayrollUnlock(input);
+    } finally {
+        window._payrollPwBusy = false;
+    }
+
+    if (r.ok) {
         window._payrollUnlocked = true;
+        window._payrollUnlockExpires = r.expiresAt;
         if (window._payrollOverlay) window._payrollOverlay.remove();
         if (window._payrollCallback) window._payrollCallback();
     } else {
-        const err = document.getElementById('payrollPwError');
-        if (err) err.style.display = '';
-        const inp = document.getElementById('payrollPwInput');
+        if (r.code === 'relogin_redirect') return;
+        if (err) {
+            err.textContent = r.code === 'wrong_password' ? '密碼錯誤' : (r.message || '密碼驗證失敗');
+            err.style.display = '';
+        }
         if (inp) { inp.value = ''; inp.focus(); }
     }
 };

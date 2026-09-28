@@ -25,6 +25,8 @@
 --
 -- 還沒處理（刻意不在本檔）：payroll_password 仍可被 anon 讀。它只是前端的畫面鎖（薪資資料本身另有讀取路徑），
 --   藏起來需要把「比對密碼」改成 RPC，另開一包；寫入已限管理員且需 LIFF 驗證（126）。
+--   → 136／137 處理：密碼改存 payroll_password_secrets（bcrypt，anon/authenticated 無權限），伺服器端比對；
+--     137 後這一列只剩 {"configured": true|false}，不含秘密 → 刻意「不」加進下面的秘密清單（薪資頁要讀 configured）。
 --
 -- 回滾：migrations/127_system_settings_lock_rollback.sql（完整還原上面快照）
 -- 只建立 migration 檔，不得由開發流程直接套用正式資料庫。
