@@ -3,7 +3,9 @@ const CONFIG = {
     LIFF_ID: '2008962829-bnsS1bbB',
     SUPABASE_URL: 'https://nssuisyvlrqnqfxupklb.supabase.co',
     SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5zc3Vpc3l2bHJxbnFmeHVwa2xiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkyOTAwMzUsImV4cCI6MjA4NDg2NjAzNX0.q_B6v3gf1TOCuAq7z0xIw10wDueCSJn0p37VzdMfmbc',
-    BUCKET: 'selfies'
+    BUCKET: 'selfies',
+    // P1 Phase 1：'shadow'＝登入後在背景建立 LINE 驗證的 Supabase session（不改任何現有查詢）；'off'＝關閉
+    LINE_AUTH_MODE: 'shadow'
 };
 
 const sb = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
@@ -99,6 +101,8 @@ async function initializeLiff(options) {
         liffProfile = await liff.getProfile();
         // 登入過期重登回來：把剛才沒存成功的表單值填回（M-2）
         try { restoreFormDraft(); } catch (e) { console.warn('還原表單失敗', e); }
+        // P1 Phase 1：背景建立 Supabase Auth session（只記錄，不影響頁面；見 startLineAuthSession）
+        try { startLineAuthSession(); } catch (e) { /* 不影響登入 */ }
         // 登入後跳轉到原始目標頁面（從 admin.html 等頁面觸發的登入）
         const pendingPage = sessionStorage.getItem('liff_redirect_page');
         if (pendingPage) {
@@ -114,6 +118,137 @@ async function initializeLiff(options) {
         return false;
     }
 }
+
+// ===== P1 身分根治 Phase 1：LINE 驗證後建立 Supabase Auth session（只建立＋記錄，不改任何現有行為）=====
+// - session 放在「另一個」supabase client（getLineAuthClient，storageKey 獨立）；現有資料查詢的 sb 仍是 anon，
+//   因為正式庫 anon／authenticated 的政策不相同，切過去會改變行為（Phase 2 才逐步切）。
+// - 呼叫 line-auth Edge Function：LINE 驗證 LIFF access token → 取得／建立 Auth 帳號 → 回傳 session
+// - 已有同一個 LINE 帳號的 session → 沿用（supabase-js 自動 refresh）；換了 LINE 帳號 → 先清掉本機舊 session 再換
+// - 任何失敗都只記錄，不影響頁面；失敗後暫停一段時間再試，避免每頁都打
+// - 關閉：CONFIG.LINE_AUTH_MODE = 'off'（或單機 localStorage line_auth_mode=off）
+const LINE_AUTH_STORAGE_KEY = 'hr-line-auth-v1';
+const LINE_AUTH_BACKOFF_KEY = 'line_auth_backoff_until';
+const LINE_AUTH_BACKOFF_MS = { not_linked: 60 * 60 * 1000, too_frequent: 30 * 1000, disabled: 60 * 60 * 1000, default: 10 * 60 * 1000 };
+let _lineAuthClient = null;
+let _lineAuthPromise = null;
+window.lineAuthStatus = { state: 'idle' };
+
+function lineAuthLog(event, detail) {
+    window.lineAuthStatus = Object.assign({ state: event, at: new Date().toISOString() }, detail || {});
+    try { console.info('[line-auth]', event, detail || ''); } catch (e) {}
+}
+
+function lineAuthMode() {
+    try { if (localStorage.getItem('line_auth_mode') === 'off') return 'off'; } catch (e) {}
+    return CONFIG.LINE_AUTH_MODE || 'shadow';
+}
+
+function getLineAuthClient() {
+    if (!_lineAuthClient) {
+        _lineAuthClient = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY, {
+            auth: { storageKey: LINE_AUTH_STORAGE_KEY, persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
+        });
+        try {
+            _lineAuthClient.auth.onAuthStateChange((evt) => {
+                if (evt === 'TOKEN_REFRESHED') lineAuthLog('refreshed');
+                if (evt === 'SIGNED_OUT') lineAuthLog('signed_out');
+            });
+        } catch (e) {}
+    }
+    return _lineAuthClient;
+}
+
+function lineAuthBackoffActive() {
+    try { return Number(sessionStorage.getItem(LINE_AUTH_BACKOFF_KEY) || 0) > Date.now(); } catch (e) { return false; }
+}
+function lineAuthSetBackoff(code) {
+    try { sessionStorage.setItem(LINE_AUTH_BACKOFF_KEY, String(Date.now() + (LINE_AUTH_BACKOFF_MS[code] || LINE_AUTH_BACKOFF_MS.default))); } catch (e) {}
+}
+
+// 回傳 { ok, reason }；永不 throw
+async function establishLineAuthSession() {
+    if (lineAuthMode() === 'off') { lineAuthLog('disabled'); return { ok: false, reason: 'disabled' }; }
+    const lineUserId = liffProfile && liffProfile.userId;
+    if (!lineUserId || !window.supabase || typeof window.supabase.createClient !== 'function') return { ok: false, reason: 'not_ready' };
+    try {
+        const client = getLineAuthClient();
+        const { data } = await client.auth.getSession();
+        const current = data && data.session;
+        const currentLine = current && current.user && current.user.app_metadata ? current.user.app_metadata.line_user_id : null;
+        if (current && currentLine === lineUserId) {
+            // 本機存的 session 不代表伺服器還認：問一次 Auth（帳號被刪／refresh 失效 → 清掉重換）
+            const check = await client.auth.getUser().catch((e) => ({ error: e }));
+            if (check && !check.error && check.data && check.data.user && check.data.user.id === current.user.id) {
+                lineAuthLog('reused', { user: current.user.id });
+                return { ok: true, reason: 'reused' };
+            }
+            await client.auth.signOut({ scope: 'local' }).catch(() => {});
+            lineAuthLog('stale_session_cleared');
+        } else if (current) {
+            // 同一台裝置換了 LINE 帳號（或舊 session 不屬於這個 LINE 帳號）→ 只清本機，不動伺服器上的 session
+            await client.auth.signOut({ scope: 'local' }).catch(() => {});
+            lineAuthLog('mismatch_signed_out');
+        }
+        if (lineAuthBackoffActive()) return { ok: false, reason: 'backoff' };
+
+        const accessToken = getLiffAccessTokenSafe();
+        if (!accessToken) return { ok: false, reason: 'no_liff_token' };
+        const res = await fetch(CONFIG.SUPABASE_URL + '/functions/v1/line-auth', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + CONFIG.SUPABASE_ANON_KEY },
+            body: JSON.stringify({ liff_access_token: accessToken })
+        });
+        const out = await res.json().catch(() => null);
+        if (!out || !out.ok) {
+            const code = (out && out.code) || ('http_' + res.status);
+            lineAuthSetBackoff(code);
+            lineAuthLog('failed', { code });
+            return { ok: false, reason: code };
+        }
+        let setResult;
+        if (out.mode === 'token_hash' && out.token_hash) {
+            setResult = await client.auth.verifyOtp({ token_hash: out.token_hash, type: out.verify_type || 'magiclink' });
+        } else if (out.session && out.session.access_token && out.session.refresh_token) {
+            setResult = await client.auth.setSession({ access_token: out.session.access_token, refresh_token: out.session.refresh_token });
+        } else {
+            lineAuthSetBackoff('invalid_response');
+            lineAuthLog('failed', { code: 'invalid_response' });
+            return { ok: false, reason: 'invalid_response' };
+        }
+        const user = setResult && setResult.data && (setResult.data.user || (setResult.data.session && setResult.data.session.user));
+        const gotLine = user && user.app_metadata ? user.app_metadata.line_user_id : null;
+        if ((setResult && setResult.error) || gotLine !== lineUserId) {
+            // 拿到的不是這個 LINE 帳號的 session → 不留
+            await client.auth.signOut({ scope: 'local' }).catch(() => {});
+            lineAuthSetBackoff('mismatch');
+            lineAuthLog('failed', { code: setResult && setResult.error ? 'set_session_error' : 'mismatch' });
+            return { ok: false, reason: 'mismatch' };
+        }
+        lineAuthLog('established', { user: user.id, created: !!out.created, mode: out.mode || 'session' });
+        // 記錄用：確認 DB 端從 JWT 讀得到 line_user_id（138 的 line_auth_whoami；失敗不影響）
+        Promise.resolve(client.rpc('line_auth_whoami')).then((w) => {
+            const ok = !!(w && w.data && w.data.line_user_id === lineUserId);
+            lineAuthLog(ok ? 'verified_in_db' : 'db_check_failed', { user: user.id });
+        }).catch(() => {});
+        return { ok: true, reason: 'established' };
+    } catch (e) {
+        lineAuthSetBackoff('error');
+        lineAuthLog('failed', { code: 'exception', message: e && e.message ? e.message : String(e) });
+        return { ok: false, reason: 'exception' };
+    }
+}
+
+// 同一頁只跑一次；呼叫端不 await（不拖慢頁面）
+function startLineAuthSession() {
+    if (!_lineAuthPromise) _lineAuthPromise = establishLineAuthSession();
+    return _lineAuthPromise;
+}
+window.startLineAuthSession = startLineAuthSession;
+// Phase 2 用：取得目前的 LINE session（沒有就 null）
+window.getLineAuthSession = async function() {
+    if (!_lineAuthClient) return null;
+    try { const { data } = await _lineAuthClient.auth.getSession(); return (data && data.session) || null; } catch (e) { return null; }
+};
 
 // ===== 核心工具函數 =====
 
