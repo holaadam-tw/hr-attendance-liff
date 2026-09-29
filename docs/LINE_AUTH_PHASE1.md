@@ -71,6 +71,8 @@ holidays／binding_audit_log 有只給 authenticated 的政策，另有 6 條 pu
   刪除會讓對應的 refresh token 失效，前端下次會自動重跑 line-auth（若仍啟用）。
 
 ## ⚠️ Phase 2／3 之前必須先處理（二審發現）
+> **處理狀態**：1～3 項已做成 145／146／147＋line-auth 更新（未套用、未部署），見 [docs/LINE_AUTH_PHASE2_PREREQ.md](LINE_AUTH_PHASE2_PREREQ.md)。
+
 **使用者可以自己設密碼、繞過 LINE**：拿到 session 的人（就是該 LINE 使用者本人）可在 24 小時內呼叫 `PUT /auth/v1/user { password }`
 設定密碼（「Secure password change」只要求 session 未滿 24 小時），之後就能用 `<LINE userId 小寫>@line-auth.invalid`＋密碼直接登入，
 不再經過 LINE 驗證。Phase 1 沒有任何東西依賴這個 session，所以目前無害；但 Phase 2／3 開始用 `caller_line_user_id()` 之前，必須：
