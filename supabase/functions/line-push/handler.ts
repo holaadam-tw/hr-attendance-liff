@@ -12,7 +12,8 @@
 //     company_save／company_set_status／company_delete_pending（平台頁維護公司，130 起前端不能直接寫 companies）、
 //     employee_create／employee_update／employee_delete_pending、makeup_review、overtime_review、schedule_save
 //     （131／132：員工管理、補卡／加班審核、排班；核准人／排班人＝LINE 驗證的 userId，不採信前端傳的員工 ID）、
-//     shift_swap_review（133：換班核准／拒絕；135 起前端不能直接寫 schedules）
+//     shift_swap_review（133：換班核准／拒絕；135 起前端不能直接寫 schedules）、
+//     shift_swap_create／shift_swap_respond（139：員工申請換班、對方同意／拒絕；140 起前端不能直接寫 shift_swap_requests）
 //     payroll_unlock（136：薪酬密碼在 DB 以 bcrypt 比對，前端讀不到密碼）
 //   員工發的訊息，DB 回傳寄件人前綴（［姓名 送出］），這裡一定加在最前面。
 //
@@ -62,6 +63,7 @@ const RPC_MIGRATION: Record<string, string> = {
   platform_company_save: '130', platform_company_set_status: '130', platform_company_delete_pending: '130',
   review_makeup_request: '131', review_overtime_request: '131', save_schedules_verified: '131',
   review_shift_swap_request: '133',
+  shift_swap_request_create: '139', shift_swap_request_respond: '139',
   payroll_password_unlock: '136',
 }
 
@@ -229,6 +231,8 @@ const VERIFIED_ACTIONS = [
   'company_save', 'company_set_status', 'company_delete_pending',
   // 133：換班審核（審核人＝LINE 驗證的 userId；核准時同一交易互換班別）
   'shift_swap_review',
+  // 139：員工端換班（申請人／回覆人＝LINE 驗證的 userId；前端報的員工 ID 一律不採信）
+  'shift_swap_create', 'shift_swap_respond',
   // 136：薪酬密碼改在伺服器端比對（DB 只存 bcrypt 雜湊），成功回短效 unlock_token
   'payroll_unlock',
 ] as const
@@ -239,6 +243,13 @@ export const MAX_BATCH_SCHEDULES = 400
 const isObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
 const uuidOrNull = (v: unknown): string | null => (typeof v === 'string' && UUID_RE.test(v) ? v : null)
 const withResult = (d: any) => ({ result: d })
+
+// YYYY-MM-DD 且是真的日期（2026-02-30 這種交給 DB 會變成 503，這裡先回 400）
+export function isRealDate(v: unknown): v is string {
+  if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return false
+  const d = new Date(v + 'T00:00:00Z')
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === v
+}
 
 async function handleVerifiedAction(body: any, deps: Deps): Promise<Response> {
   const action = String(body.action)
@@ -366,6 +377,25 @@ async function handleVerifiedAction(body: any, deps: Deps): Promise<Response> {
     return rpcResult(await callRpc(deps, 'review_shift_swap_request', {
       p_company_id: companyId, p_line_user_id: lineUserId, p_request_id: requestId, p_decision: decision,
       p_reason: typeof body.reason === 'string' ? body.reason.slice(0, 500) : null,
+    }), withResult)
+  }
+
+  // ---- 員工端換班（139）：申請人＝LINE 驗證的本人；只有對象本人能同意／拒絕 ----
+  if (action === 'shift_swap_create') {
+    const targetId = uuidOrNull(body.target_id)
+    const swapDate = isRealDate(body.swap_date) ? body.swap_date : null
+    if (!targetId || !swapDate) return badRequest()
+    return rpcResult(await callRpc(deps, 'shift_swap_request_create', {
+      p_company_id: companyId, p_line_user_id: lineUserId, p_target_id: targetId, p_swap_date: swapDate,
+      p_reason: typeof body.reason === 'string' ? body.reason.slice(0, 500) : null,
+    }), withResult)
+  }
+  if (action === 'shift_swap_respond') {
+    const decision = body.decision === 'agree' || body.decision === 'decline' ? body.decision : null
+    const requestId = uuidOrNull(body.request_id)
+    if (!decision || !requestId) return badRequest()
+    return rpcResult(await callRpc(deps, 'shift_swap_request_respond', {
+      p_company_id: companyId, p_line_user_id: lineUserId, p_request_id: requestId, p_decision: decision,
     }), withResult)
   }
 

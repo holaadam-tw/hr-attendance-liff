@@ -1982,6 +1982,7 @@ function handleLiffSessionExpired() {
 //   company_save／company_set_status／company_delete_pending（130）、
 //   employee_create／employee_update／employee_delete_pending／makeup_review／overtime_review／schedule_save（131／132）、
 //   payroll_unlock（136：薪酬密碼伺服器端比對）
+//   shift_swap_review（133）、shift_swap_create／shift_swap_respond（139：員工申請換班、對方回覆）
 // 回傳 { ok, code, message, data }
 async function callVerifiedAction(action, payload) {
     const expired = () => handleLiffSessionExpired()

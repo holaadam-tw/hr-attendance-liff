@@ -439,23 +439,25 @@
                     return showToast('❌ 雙方當天都必須已有排班才能申請換班');
                 }
 
-                const { error } = await sb.from('shift_swap_requests').insert({
-                    requester_id: currentEmployee.id,
+                // 139／140：申請一律經 line-push 驗 LIFF 身分（申請人＝LINE 驗證的本人），前端不再直接寫 shift_swap_requests
+                const res = await callVerifiedAction('shift_swap_create', {
+                    company_id: window.currentCompanyId,
                     target_id: targetId,
                     swap_date: date,
-                    requester_original_shift: requesterShiftName,
-                    target_original_shift: targetShiftName,
-                    reason: reason || '',
-                    status: 'pending_target'
+                    reason: reason || ''
                 });
-                if (error) throw error;
+                if (!res.ok) {
+                    if (res.code === 'relogin_redirect') return showToast('⏳ ' + res.message);
+                    return showToast('❌ 申請失敗：' + (res.message || '操作失敗'));
+                }
                 
                 showToast('✅ 換班申請已送出，等待對方確認');
                 closeSwapModal();
                 loadSwapRequests();
                 
                 // 通知對方
-                sendUserNotify(targetId, `🔄 ${currentEmployee.name} 想跟您換 ${date} 的班\n您的班：${targetShift} → ${myShift}\n請到班表頁面確認`, { category: 'shift_swap_request' });
+                const out = (res.data && res.data.result) || {};
+                sendUserNotify(targetId, `🔄 ${currentEmployee.name} 想跟您換 ${date} 的班\n您的班：${out.target_shift || targetShift} → ${out.requester_shift || myShift}\n請到班表頁面確認`, { category: 'shift_swap_request' });
             } catch(e) { showToast('❌ 申請失敗：' + friendlyError(e)); }
         }
 
@@ -499,7 +501,9 @@
         async function agreeSwap(id) {
             if (!confirm('確定同意換班？')) return;
             try {
-                await sb.from('shift_swap_requests').update({ target_agreed: true, status: 'pending_admin' }).eq('id', id);
+                // 139／140：只有被邀請的同事本人能回覆（身分＝LINE 驗證的 userId）
+                const res = await callVerifiedAction('shift_swap_respond', { company_id: window.currentCompanyId, request_id: id, decision: 'agree' });
+                if (!res.ok) { loadSwapRequests(); return showToast((res.code === 'relogin_redirect' ? '⏳ ' : '❌ 操作失敗：') + (res.message || '')); }
                 showToast('✅ 已同意，等待主管審核');
                 loadSwapRequests();
                 sendAdminNotify('🔄 換班申請：雙方已同意，請審核', { category: 'shift_swap' });
@@ -508,7 +512,8 @@
 
         async function declineSwap(id) {
             try {
-                await sb.from('shift_swap_requests').update({ target_agreed: false, status: 'rejected', rejection_reason: '對方不同意' }).eq('id', id);
+                const res = await callVerifiedAction('shift_swap_respond', { company_id: window.currentCompanyId, request_id: id, decision: 'decline' });
+                if (!res.ok) { loadSwapRequests(); return showToast((res.code === 'relogin_redirect' ? '⏳ ' : '❌ 操作失敗：') + (res.message || '')); }
                 showToast('❌ 已拒絕');
                 loadSwapRequests();
             } catch(e) { showToast('❌ 操作失敗'); }
