@@ -73,6 +73,8 @@ ctx.globalThis = ctx;
 vm.createContext(ctx);
 vm.runInContext(commonFns, ctx);
 vm.runInContext(page, ctx);
+// 第 7 段會把 loadDailyData 換成空函式；第 12 段要測真本，先留一份
+const realLoadDailyData = ctx.loadDailyData;
 
 let pass = 0, fail = 0;
 function check(name, cond, extra) {
@@ -457,6 +459,141 @@ const OTR = [
   await ctx.loadLegacyGaps();
   check('無 company context 時卡片隱藏', legCard.style.display === 'none');
   ctx.window.currentCompanyId = 'COMPANY-A';
+
+  // ============================================================
+  console.log('\n=== 12. 國定假日：今日總覽不把全員算成應出勤 ===');
+  // 與每日稽核 calculate_missing_work_hours 同一份來源（holidays 表，前端經 get_company_holidays）
+  {
+    // 可設定錯誤的 supabase 替身
+    function makeHolidaySb({ holidays = [], holidayErr = null, schedules = [], schErr = null, ot = [], otErr = null, daily = [] }) {
+      const calls = [];
+      const rpcCalls = [];
+      return {
+        calls, rpcCalls,
+        from(t) {
+          const rec = { table: t, chain: [] };
+          calls.push(rec);
+          const api = {};
+          ['select', 'gte', 'lte', 'gt', 'lt', 'eq', 'is', 'not', 'limit', 'order', 'in'].forEach(m => {
+            api[m] = (...a) => { rec.chain.push(m + '(' + a.join(',') + ')'); return api; };
+          });
+          api.then = (res) => res(t === 'schedules'
+            ? { data: schErr ? null : schedules, error: schErr }
+            : { data: [], error: null });
+          return api;
+        },
+        rpc: async (name, args) => {
+          rpcCalls.push({ name, args });
+          if (name === 'get_company_holidays') return { data: holidayErr ? null : holidays, error: holidayErr };
+          if (name === 'get_company_overtime_requests') return { data: otErr ? null : ot, error: otErr };
+          if (name === 'get_company_daily_attendance') return { data: daily, error: null };
+          return { data: [], error: null };
+        }
+      };
+    }
+    // 其他卡片的載入與本測試無關，暫時換成空函式（結束後還原）
+    const saved = {};
+    ['loadLunchStats', 'loadAnomalyData', 'loadCheckinFailures', 'loadOvertimeConfirm', 'loadLegacyGaps', 'loadCheckoutDistances']
+      .forEach(n => { saved[n] = ctx[n]; ctx[n] = async () => {}; });
+    const savedToday = ctx.getTaiwanDate;
+    ctx.getTaiwanDate = () => '2026-09-28';
+    el('dailyDatePicker').value = '';
+    el('filterDept').value = '';
+    el('filterStatus').value = '';
+
+    const TEACHERS_DAY = [{ holiday_date: '2026-09-28', holiday_name: '教師節', holiday_type: 'national' }];
+    const mk = (id, extra) => Object.assign({ employee_id: id, employee_name: '員工' + id, department: '生產', status: 'not_checked', is_late: false, is_early_leave: false }, extra || {});
+    const twenty = Array.from({ length: 20 }, (_, i) => mk('P' + (i + 1)));
+    const stat = id => String(el(id).textContent);
+    const banner = el('dailyHolidayBanner');
+
+    // 12a. 9/28 重現：20 人、沒人排班也沒人加班
+    ctx.sb = makeHolidaySb({ holidays: TEACHERS_DAY, daily: twenty });
+    await realLoadDailyData();
+    check('教師節：應出勤 0（原本 20）', stat('dExpected') === '0', stat('dExpected'));
+    check('教師節：未打卡 0（原本 20）', stat('dNotChecked') === '0', stat('dNotChecked'));
+    check('提示顯示「今天是國定假日（教師節）」', banner.style.display === 'block' && banner.innerHTML.includes('今天是國定假日（教師節）'), banner.innerHTML);
+    check('星期列附上假日名稱', String(el('dailyDayLabel').textContent).includes('教師節'), el('dailyDayLabel').textContent);
+    check('表格不列出放假的人', el('dailyTableBody').innerHTML.includes('無資料'));
+    const hRpc = ctx.sb.rpcCalls.find(c => c.name === 'get_company_holidays');
+    check('假日查詢帶公司與選定日期（p_from = p_to = 2026-09-28）',
+      !!hRpc && hRpc.args.p_company_id === 'COMPANY-A' && hRpc.args.p_from === '2026-09-28' && hRpc.args.p_to === '2026-09-28' && hRpc.args.p_line_user_id === 'U1');
+    const schQ = ctx.sb.calls.find(c => c.table === 'schedules');
+    check('假日當天排班查詢帶 employees.company_id（多租戶）',
+      !!schQ && schQ.chain.includes('eq(employees.company_id,COMPANY-A)') && schQ.chain.includes('eq(date,2026-09-28)'), schQ && schQ.chain.join(' '));
+    const otQ = ctx.sb.rpcCalls.find(c => c.name === 'get_company_overtime_requests');
+    check('加班查詢走 RPC 且限當天', !!otQ && otQ.args.p_from === '2026-09-28' && otQ.args.p_to === '2026-09-28' && otQ.args.p_company_id === 'COMPANY-A');
+
+    // 12b. 假日有排班／加班／自行來打卡的混合情境
+    const mixed = [
+      mk('S1'),                                        // 有排班（上班）→ 應出勤、未打卡
+      mk('S2', { status: 'off_day' }),                 // 排班＝休假 → RPC 本來就回 off_day
+      mk('O1', { status: 'completed', check_in_time: '2026-09-28T00:00:00Z', check_out_time: '2026-09-28T09:00:00Z' }), // 已核准加班且已打卡
+      mk('O2'),                                        // 加班待審、還沒打卡 → 應出勤、未打卡
+      mk('R1'),                                        // 加班被駁回 → 放假
+      mk('W1', { status: 'working', check_in_time: '2026-09-28T00:30:00Z' }), // 沒排班也自己來打卡
+      mk('L1', { status: 'on_leave', leave_type: 'annual' }), // 沒排班卻有跨假日的請假 → 放假
+      mk('N1'), mk('N2'),                              // 其他人 → 放假
+    ];
+    ctx.sb = makeHolidaySb({
+      holidays: TEACHERS_DAY,
+      daily: mixed,
+      schedules: [{ employee_id: 'S1', is_off_day: false }, { employee_id: 'S2', is_off_day: true }],
+      ot: [
+        { employee_id: 'O1', ot_date: '2026-09-28', status: 'approved' },
+        { employee_id: 'O2', ot_date: '2026-09-28', status: 'pending' },
+        { employee_id: 'R1', ot_date: '2026-09-28', status: 'rejected' },
+      ],
+    });
+    await realLoadDailyData();
+    check('混合：應出勤＝有排班或加班申請（S1、O1、O2）＝3', stat('dExpected') === '3', stat('dExpected'));
+    check('混合：已打卡含自行來打卡的人（O1、W1）＝2', stat('dChecked') === '2', stat('dChecked'));
+    check('混合：未打卡只算有排班／加班的（S1、O2）＝2', stat('dNotChecked') === '2', stat('dNotChecked'));
+    check('混合：無排班的跨假日請假不算請假人數', stat('dLeave') === '0', stat('dLeave'));
+    const tb = el('dailyTableBody').innerHTML;
+    check('表格列出 S1／O1／O2／W1', ['員工S1', '員工O1', '員工O2', '員工W1'].every(n => tb.includes(n)));
+    check('表格不列出 R1／L1／N1／N2／S2', ['員工R1', '員工L1', '員工N1', '員工N2', '員工S2'].every(n => !tb.includes(n)));
+
+    // 12c. 非假日：行為與原本相同，不多查排班／加班
+    ctx.getTaiwanDate = () => '2026-09-29';
+    ctx.sb = makeHolidaySb({ holidays: [], daily: twenty });
+    await realLoadDailyData();
+    check('非假日：應出勤照舊＝20', stat('dExpected') === '20', stat('dExpected'));
+    check('非假日：提示隱藏', banner.style.display === 'none');
+    check('非假日：不查 schedules', !ctx.sb.calls.some(c => c.table === 'schedules'));
+    check('非假日：不為假日多打加班 RPC', !ctx.sb.rpcCalls.some(c => c.name === 'get_company_overtime_requests'));
+
+    // 12d. 假日 RPC 失敗 → 退回原本行為，不擋頁面
+    ctx.getTaiwanDate = () => '2026-09-28';
+    ctx.sb = makeHolidaySb({ holidayErr: { message: 'boom' }, daily: twenty });
+    await realLoadDailyData();
+    check('假日讀取失敗：退回原本行為（應出勤 20）', stat('dExpected') === '20', stat('dExpected'));
+    check('假日讀取失敗：提示隱藏', banner.style.display === 'none');
+
+    // 12e. 排班讀取失敗 → 仍提示假日，但明講人數未扣除
+    ctx.sb = makeHolidaySb({ holidays: TEACHERS_DAY, schErr: { message: 'x' }, daily: twenty });
+    await realLoadDailyData();
+    check('排班讀取失敗：仍顯示假日提示', banner.style.display === 'block' && banner.innerHTML.includes('教師節'));
+    check('排班讀取失敗：提示寫明人數未扣除', banner.innerHTML.includes('讀取失敗'));
+    check('排班讀取失敗：人數不亂扣（應出勤 20）', stat('dExpected') === '20', stat('dExpected'));
+
+    // 12f. 不是今天、補假、公司假日、名稱逃逸
+    el('dailyDatePicker').value = '2026-10-09';
+    ctx.getTaiwanDate = () => '2026-10-12';
+    ctx.sb = makeHolidaySb({ holidays: [{ holiday_date: '2026-10-09', holiday_name: '國慶日補假', holiday_type: 'makeup' }], daily: twenty });
+    await realLoadDailyData();
+    check('過去日期寫「2026-10-09 是國定假日（國慶日補假）」', banner.innerHTML.includes('2026-10-09 是國定假日（國慶日補假）'), banner.innerHTML);
+    el('dailyDatePicker').value = '2026-10-12';
+    ctx.sb = makeHolidaySb({ holidays: [{ holiday_date: '2026-10-12', holiday_name: '<img src=x onerror=alert(1)>', holiday_type: 'company' }], daily: twenty });
+    await realLoadDailyData();
+    check('公司自訂假日顯示「公司假日」', banner.innerHTML.includes('今天是公司假日'), banner.innerHTML);
+    check('假日名稱經 escapeHTML', !banner.innerHTML.includes('<img') && banner.innerHTML.includes('&lt;img'));
+
+    // 還原
+    el('dailyDatePicker').value = '';
+    ctx.getTaiwanDate = savedToday;
+    Object.keys(saved).forEach(n => { ctx[n] = saved[n]; });
+  }
 
   console.log('\n═══════════════════════════════════════');
   console.log('  結果：✅ ' + pass + ' 通過  ❌ ' + fail + ' 失敗');

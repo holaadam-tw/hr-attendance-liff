@@ -120,6 +120,8 @@
                     </div>
                     <input type="date" id="dailyDatePicker" onchange="onDailyDateChange()" style="padding:8px 12px;border:2px solid #E2E8F0;border-radius:10px;font-size:13px;font-family:inherit;">
                 </div>
+                <!-- 假日提示：資料來源＝holidays 表（get_company_holidays），與每日稽核 calculate_missing_work_hours 同一份 -->
+                <div id="dailyHolidayBanner" style="display:none;margin-top:10px;padding:10px 12px;border-radius:10px;background:#FEF3C7;border:1px solid #FCD34D;color:#92400E;font-size:13px;font-weight:700;line-height:1.6;"></div>
             </div>
 
             <!-- 統計卡片 -->
@@ -519,19 +521,22 @@
 
             try {
                 // 下班定位距離與出勤資料並行載入（loadCheckoutDistances 內部自行吞錯，不會拖垮主流程）
-                const [attRes] = await Promise.all([
+                const [attRes, holidayCtx] = await Promise.all([
                     sb.rpc('get_company_daily_attendance', {
                         p_company_id: window.currentCompanyId,
                         p_date: dateStr,
                         p_line_user_id: liffProfile?.userId || null   // 099 呼叫者身分驗證
                     }),
+                    loadDailyHolidayContext(dateStr),
                     loadCheckoutDistances(dateStr)
                 ]);
                 const { data, error } = attRes;
 
                 if (error) throw error;
 
-                dailyData = data || [];
+                dailyHolidayCtx = holidayCtx;
+                dailyData = applyHolidayToDaily(data || [], holidayCtx);
+                renderDailyHolidayBanner(dateStr, holidayCtx);
                 updateDailyStats();
                 updateDeptFilter();
                 renderDailyTable();
@@ -549,7 +554,103 @@
                 checkoutDistanceMap = {};
                 const crCard = document.getElementById('checkoutRangeCard');
                 if (crCard) crCard.style.display = 'none';
+                const hb = document.getElementById('dailyHolidayBanner');
+                if (hb) hb.style.display = 'none';
             }
+        }
+
+        // ===== 假日（國定假日／補假／公司假日）=====
+        // 每日稽核 calculate_missing_work_hours 以 holidays 表判斷「公司假日」並整天跳過；
+        // 打卡總覽原本只看星期幾，國定假日仍把全員算成應出勤（2026-09-28 教師節：應出勤 20、未打卡 20）。
+        // 這裡讀同一張 holidays 表（get_company_holidays RPC，118），假日當天：
+        //   - 應出勤＝當天有排班（非休假）或有加班申請（待審／已核准）的人
+        //   - 其他沒來的人視為放假，不列入未打卡
+        //   - 假日仍有打卡的人照常顯示、計入已打卡
+        // 假日 RPC 失敗 → 退回原本行為（不擋頁面）；排班／加班讀取失敗 → 顯示假日提示＋警告，人數不扣除。
+        let dailyHolidayCtx = null;
+
+        function holidayKindLabel(type) {
+            if (type === 'national' || type === 'makeup') return '國定假日';
+            if (type === 'company') return '公司假日';
+            return '假日';
+        }
+
+        async function loadDailyHolidayContext(dateStr) {
+            if (!window.currentCompanyId) return null;
+            let holiday = null;
+            try {
+                const { data, error } = await sb.rpc('get_company_holidays', {
+                    p_company_id: window.currentCompanyId,
+                    p_line_user_id: liffProfile?.userId || null,
+                    p_from: dateStr,
+                    p_to: dateStr
+                });
+                if (error) throw error;
+                holiday = (data || []).find(h => h && h.holiday_date === dateStr) || null;
+            } catch (e) {
+                console.warn('Load holiday warning:', e);
+                return null;
+            }
+            if (!holiday) return null;
+
+            const ctx = { date: dateStr, name: holiday.holiday_name || '', type: holiday.holiday_type || '', workIds: null, loadError: false };
+            try {
+                const [schRes, otRes] = await Promise.all([
+                    sb.from('schedules')
+                        .select('employee_id, is_off_day, employees!schedules_employee_id_fkey!inner(company_id)')
+                        .eq('employees.company_id', window.currentCompanyId)
+                        .eq('date', dateStr)
+                        .limit(1000),
+                    sb.rpc('get_company_overtime_requests', {
+                        p_company_id: window.currentCompanyId,
+                        p_line_user_id: liffProfile?.userId || null,
+                        p_from: dateStr,
+                        p_to: dateStr,
+                        p_status: null,
+                        p_limit: 1000
+                    })
+                ]);
+                if (schRes.error) throw schRes.error;
+                if (otRes.error) throw otRes.error;
+                const ids = new Set();
+                (schRes.data || []).forEach(s => { if (s && s.employee_id && s.is_off_day !== true) ids.add(s.employee_id); });
+                (otRes.data || []).forEach(o => {
+                    if (o && o.employee_id && o.ot_date === dateStr && (o.status === 'pending' || o.status === 'approved')) ids.add(o.employee_id);
+                });
+                ctx.workIds = ids;
+            } catch (e) {
+                console.warn('Load holiday schedules/overtime warning:', e);
+                ctx.loadError = true;
+            }
+            return ctx;
+        }
+
+        // 假日當天：沒排班、沒加班、也沒打卡的人改成放假（status=off_day，沿用既有隱藏邏輯）
+        function applyHolidayToDaily(rows, hctx) {
+            if (!hctx || !hctx.workIds) return rows;
+            return rows.map(r => {
+                if (hctx.workIds.has(r.employee_id)) return r;
+                if (r.check_in_time || r.check_out_time) return r;
+                return Object.assign({}, r, { status: 'off_day', holiday_off: true });
+            });
+        }
+
+        function renderDailyHolidayBanner(dateStr, hctx) {
+            const el = document.getElementById('dailyHolidayBanner');
+            if (!el) return;
+            if (!hctx) { el.style.display = 'none'; el.innerHTML = ''; return; }
+            const who = dateStr === getTaiwanDate() ? '今天' : dateStr + ' ';
+            let html = '🎌 ' + escapeHTML(who) + '是' + escapeHTML(holidayKindLabel(hctx.type))
+                + '（' + escapeHTML(hctx.name || '未命名') + '）';
+            if (hctx.loadError) {
+                html += '<div style="font-size:12px;font-weight:600;color:#B45309;margin-top:2px;">⚠️ 排班／加班資料讀取失敗，下方人數未扣除放假人員</div>';
+            } else {
+                html += '<div style="font-size:12px;font-weight:600;color:#B45309;margin-top:2px;">應出勤只計當天有排班或加班申請的人</div>';
+            }
+            el.innerHTML = html;
+            el.style.display = 'block';
+            const dayLabel = document.getElementById('dailyDayLabel');
+            if (dayLabel && hctx.name) dayLabel.textContent = (dayLabel.textContent || '') + ' · ' + hctx.name;
         }
 
         // ===== 下班定位距離（前端現算，不擋人、只呈現）=====
@@ -1655,7 +1756,10 @@
 
         function updateDailyStats() {
             const d = dailyData.filter(r => r.status !== 'off_day');
-            const expected = d.length;
+            // 假日：應出勤只算有排班／加班申請的人（假日自行來打卡的人仍計入已打卡）
+            const expected = (dailyHolidayCtx && dailyHolidayCtx.workIds)
+                ? d.filter(r => dailyHolidayCtx.workIds.has(r.employee_id)).length
+                : d.length;
             const checked = d.filter(r => r.status === 'working' || r.status === 'completed').length;
             const notChecked = d.filter(r => r.status === 'not_checked' || r.status === 'absent').length;
             const late = d.filter(r => r.is_late).length;
