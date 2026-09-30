@@ -17,6 +17,14 @@
 // 每個 LINE 帳號頻率限制：已有帳號、且上次登入在 LINE_AUTH_MIN_INTERVAL_SECONDS（預設 10）秒內 → 429 too_frequent
 //   （用 Auth 的 last_sign_in_at，不需要新表；新帳號第一次不受限）
 //
+// 離職／停用（Phase 2／3 前置，145／146）：
+//   - 登入時 not_linked 但已有 Auth 帳號（例如離職後又打開 LIFF）→ 以 admin API 停權（ban，可逆）再回 403
+//   - {"action":"reconcile"}（146 的 pg_cron 在有對象時呼叫）：line_auth_reconcile_targets 列出「LINE Auth 帳號未停權、
+//     但已不在職」的帳號 → 逐一停權。只依 DB 現況、冪等、每次最多 50 筆 → 任何人觸發都不會停權到在職者。
+//     停權時在 app_metadata 標 line_auth_banned=true；已被人工停權（沒有這個標記）的帳號一律不碰。
+//   - 回任（再次在職）：登入時發現帳號是「本機制停權的」→ 自動解除停權；人工停權的 → 403 account_disabled
+//   關閉開關：secret LINE_AUTH_RECONCILE_DISABLED=true → reconcile 一律 503（登入時的停權／解除不受影響）
+//
 // 絕不記錄 token（LIFF access token、hashed_token、access/refresh token）。
 
 import { verifyLiffAccessToken, type Deps } from '../line-push/handler.ts'
@@ -62,6 +70,41 @@ async function call(deps: Deps, path: string, init: { method: string; body?: unk
   }
 }
 
+export const BAN_DURATION = '876000h'   // 約 100 年＝直到人工或回任解除
+export const RECONCILE_LIMIT = 50
+
+const isBanned = (u: any) => {
+  const t = Date.parse(u?.banned_until || '')
+  return Number.isFinite(t) && t > Date.now()
+}
+
+// 停權（ban）：只在 app_metadata 加標記，不改其他欄位（GoTrue 對 app_metadata 是逐鍵合併）
+async function banAuthUser(deps: Deps, userId: string): Promise<boolean> {
+  const r = await call(deps, `/auth/v1/admin/users/${userId}`, {
+    method: 'PUT', key: 'service',
+    body: { ban_duration: BAN_DURATION, app_metadata: { line_auth_banned: true, line_auth_banned_at: new Date().toISOString() } },
+  })
+  return r.ok
+}
+
+async function reconcile(deps: Deps, log: (m: string) => void): Promise<Response> {
+  if ((deps.env('LINE_AUTH_RECONCILE_DISABLED') || '').trim().toLowerCase() === 'true') {
+    return fail(503, 'reconcile_disabled', 'reconcile 暫停中')
+  }
+  const t = await call(deps, '/rest/v1/rpc/line_auth_reconcile_targets', { method: 'POST', key: 'service', body: { p_limit: RECONCILE_LIMIT } })
+  if (t.status === 404) return fail(503, 'db_not_migrated', '資料庫尚未更新（145）')
+  if (!t.ok || !t.data || t.data.success !== true || !Array.isArray(t.data.targets)) return fail(503, 'service_unavailable', '服務暫時無法使用')
+  const ids: string[] = t.data.targets.filter((x: unknown) => typeof x === 'string' && /^[0-9a-f-]{36}$/i.test(x as string))
+  let banned = 0, failed = 0
+  for (const id of ids) {
+    if (await banAuthUser(deps, id)) banned++
+    else failed++
+  }
+  const total = Number(t.data.total) || 0
+  if (banned || failed) log(`line-auth: reconcile banned=${banned} failed=${failed} total=${total}`)
+  return json({ ok: true, status: 200, banned, failed, remaining: Math.max(0, total - banned) }, 200)
+}
+
 const sameIds = (a: unknown, b: unknown) =>
   Array.isArray(a) && Array.isArray(b) && a.length === b.length && [...a].sort().join(',') === [...b].sort().join(',')
 
@@ -74,6 +117,7 @@ export async function handleLineAuth(req: Request, deps: Deps): Promise<Response
   }
   try {
     const body = await req.json().catch(() => null)
+    if (body && body.action === 'reconcile') return await reconcile(deps, log)
     const liffToken = body && typeof body.liff_access_token === 'string' ? body.liff_access_token : ''
     if (!liffToken) return fail(400, 'bad_request', '缺少必要參數')
 
@@ -90,7 +134,17 @@ export async function handleLineAuth(req: Request, deps: Deps): Promise<Response
       log('line-auth: resolve refused ' + String(r.error_code))
       return fail(r.error_code === 'duplicate_auth_user' ? 409 : 400, String(r.error_code || 'failed'), '登入帳號資料異常，請通知系統管理員')
     }
-    if (r.known !== true) return fail(403, 'not_linked', '此 LINE 帳號尚未綁定員工')
+    if (r.known !== true) {
+      // 已不在職但還有 Auth 帳號（離職後又打開 LIFF）→ 停權；已被停權（含人工停權）的不動
+      if (typeof r.auth_user_id === 'string') {
+        const u = await call(deps, `/auth/v1/admin/users/${r.auth_user_id}`, { method: 'GET', key: 'service' })
+        if (u.ok && u.data && !isBanned(u.data)) {
+          const ok = await banAuthUser(deps, r.auth_user_id)
+          log('line-auth: not_linked user ' + (ok ? 'banned' : 'ban failed'))
+        }
+      }
+      return fail(403, 'not_linked', '此 LINE 帳號尚未綁定員工')
+    }
     const companyIds: string[] = Array.isArray(r.company_ids) ? r.company_ids.filter((c: unknown) => typeof c === 'string') : []
     const appMetadata = { line_user_id: lineUserId, company_ids: companyIds }
 
@@ -130,13 +184,29 @@ export async function handleLineAuth(req: Request, deps: Deps): Promise<Response
     if (!created) {
       const u = await call(deps, `/auth/v1/admin/users/${userId}`, { method: 'GET', key: 'service' })
       if (!u.ok || !u.data) return fail(503, 'service_unavailable', '登入服務暫時無法使用')
+      let unban = false
+      if (isBanned(u.data)) {
+        // 本機制停權的（離職時）→ 現在又在職：解除；人工停權的 → 不解除
+        if (u.data.app_metadata?.line_auth_banned !== true) {
+          log('line-auth: account banned manually')
+          return fail(403, 'account_disabled', '此帳號已停用，請通知系統管理員')
+        }
+        unban = true
+      }
       const minInterval = Number(deps.env('LINE_AUTH_MIN_INTERVAL_SECONDS') || 10)
       const lastSignIn = Date.parse(u.data.last_sign_in_at || '')
       if (minInterval > 0 && Number.isFinite(lastSignIn) && Date.now() - lastSignIn < minInterval * 1000) {
         log('line-auth: too frequent for this LINE user')
         return fail(429, 'too_frequent', '登入太頻繁，請稍後再試')
       }
-      if (!sameIds(u.data.app_metadata?.company_ids, companyIds)) {
+      if (unban) {
+        const up = await call(deps, `/auth/v1/admin/users/${userId}`, {
+          method: 'PUT', key: 'service',
+          body: { ban_duration: 'none', app_metadata: { ...appMetadata, line_auth_banned: null, line_auth_banned_at: null } },
+        })
+        if (!up.ok) return fail(503, 'service_unavailable', '登入服務暫時無法使用')
+        log('line-auth: unbanned re-activated user')
+      } else if (!sameIds(u.data.app_metadata?.company_ids, companyIds)) {
         const up = await call(deps, `/auth/v1/admin/users/${userId}`, { method: 'PUT', key: 'service', body: { app_metadata: appMetadata } })
         if (!up.ok) return fail(503, 'service_unavailable', '登入服務暫時無法使用')
       }
