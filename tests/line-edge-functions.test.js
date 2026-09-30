@@ -525,6 +525,77 @@ const post = (url, body, headers = {}) => new Request(url, { method: 'POST', bod
     check('payroll_unlock：RPC 連不上 → 503（fail-closed，不放行）', t.res.status === 503 && !t.out.unlock_token);
     t = await run({ action: 'payroll_unlock', company_id: COMPANY, password: 'pw' }, missingRoute('payroll_password_unlock'));
     check('payroll_unlock：136 未套 → 503「資料庫尚未更新（136）」、不放行', t.res.status === 503 && t.out.code === 'db_not_migrated' && /（136）/.test(t.out.error) && !t.out.unlock_token);
+
+    // ---- 142：公務機（身分＝平板登入的公務機 LINE 帳號，前端報的 kiosk LINE ID 不採信）----
+    const KEMP = '00000000-0000-0000-0000-0000000000e3';
+    const PHOTO = 'https://db.test/storage/v1/object/public/selfies/kiosk_E03_1.jpg';
+    const kioskRoutes = (extra = []) => rpcRoutes([...extra,
+      ['/rpc/kiosk_get_company_verified', { body: { success: true, name: '大正科技', company_id: COMPANY, extra_field: 'SHOULD-NOT-LEAK' } }],
+      ['/rpc/kiosk_lookup_employee_verified', { body: { success: true, employee_id: KEMP, name: '員工三', employee_number: 'E03' } }],
+      ['/rpc/kiosk_check_in_verified', { body: { success: true, type: 'check_in', name: '員工三', is_late: false } }]]);
+    t = await run({ action: 'kiosk_get_company', kiosk_line_user_id: 'Ukiosk', p_kiosk_line_user_id: 'Ukiosk' }, kioskRoutes());
+    c = call(t.f, 'kiosk_get_company_verified');
+    check('kiosk_get_company：不需 company_id；以 LINE 驗出的 userId 呼叫、前端夾帶的 kiosk ID 不送進 DB',
+      t.res.status === 200 && c && c.body.p_line_user_id === LIFF_USER && Object.keys(c.body).join() === 'p_line_user_id' && !JSON.stringify(c.body).includes('Ukiosk'), JSON.stringify(c?.body));
+    check('kiosk_get_company：只回 success／name／company_id', t.out.result?.name === '大正科技' && t.out.result?.company_id === COMPANY && !JSON.stringify(t.out).includes('SHOULD-NOT-LEAK'), JSON.stringify(t.out));
+    t = await run({ action: 'kiosk_get_company' }, kioskRoutes([['/rpc/kiosk_get_company_verified', { body: { success: false, error: '此帳號非公務機', error_code: 'access_denied' } }]]));
+    check('kiosk_get_company：非公務機 → 403 access_denied、訊息照傳', t.res.status === 403 && t.out.code === 'access_denied' && t.out.error === '此帳號非公務機');
+    t = await run({ action: 'kiosk_get_company' }, rpcRoutes([['/v2/profile', { status: 401, body: {} }]]));
+    check('kiosk_get_company：LIFF token 驗不過 → 401、不呼叫 RPC', t.res.status === 401 && !t.f.calls.some(x => x.url.includes('/rpc/')));
+    {
+      const f = fakeFetch(kioskRoutes());
+      const res = await push.handleLinePush(post('https://fn/line-push', { action: 'kiosk_get_company' }), { fetch: f.fn, env });
+      check('kiosk_get_company：沒帶 LIFF token → 400、不驗、不呼叫 RPC', res.status === 400 && f.calls.length === 0);
+    }
+    t = await run({ action: 'kiosk_get_company' }, missingRoute('kiosk_get_company_verified'));
+    check('kiosk_get_company：142 未套 → 503「資料庫尚未更新（142）」', t.res.status === 503 && t.out.code === 'db_not_migrated' && /（142）/.test(t.out.error));
+
+    t = await run({ action: 'kiosk_lookup', identifier: ' E03 ', kiosk_line_user_id: 'Ukiosk' }, kioskRoutes());
+    c = call(t.f, 'kiosk_lookup_employee_verified');
+    check('kiosk_lookup：以 LINE userId 呼叫、輸入去空白', t.res.status === 200 && c.body.p_line_user_id === LIFF_USER && c.body.p_identifier === 'E03'
+      && t.out.result?.employee_id === KEMP && !JSON.stringify(c.body).includes('Ukiosk'), JSON.stringify(c?.body));
+    t = await run({ action: 'kiosk_lookup', identifier: '   ' }, kioskRoutes());
+    check('kiosk_lookup：空白 → 400、不呼叫 RPC', t.res.status === 400 && !t.f.calls.some(x => x.url.includes('/rpc/')));
+    t = await run({ action: 'kiosk_lookup', identifier: '1'.repeat(33) }, kioskRoutes());
+    check('kiosk_lookup：過長 → 400、不呼叫 RPC', t.res.status === 400 && !t.f.calls.some(x => x.url.includes('/rpc/')));
+    t = await run({ action: 'kiosk_lookup', identifier: 123 }, kioskRoutes());
+    check('kiosk_lookup：非字串 → 400', t.res.status === 400 && !t.f.calls.some(x => x.url.includes('/rpc/')));
+    t = await run({ action: 'kiosk_lookup', identifier: '0000' },
+      kioskRoutes([['/rpc/kiosk_lookup_employee_verified', { body: { success: false, error: '查無此員工。請輸入工號、手機或身分證後4碼', error_code: 'not_found' } }]]));
+    check('kiosk_lookup：查無此人 → 400、訊息照傳', t.res.status === 400 && t.out.code === 'not_found' && /查無此員工/.test(t.out.error));
+
+    t = await run({ action: 'kiosk_check_in', employee_id: KEMP, kiosk_action: 'check_in', photo_url: PHOTO, latitude: 24.08, longitude: 120.54, kiosk_line_user_id: 'Ukiosk', company_id: 'ignored' }, kioskRoutes());
+    c = call(t.f, 'kiosk_check_in_verified');
+    check('kiosk_check_in：以 LINE userId 呼叫，只轉送白名單欄位',
+      t.res.status === 200 && c && c.body.p_line_user_id === LIFF_USER && c.body.p_employee_id === KEMP && c.body.p_action === 'check_in'
+      && c.body.p_photo_url === PHOTO && c.body.p_latitude === 24.08 && c.body.p_longitude === 120.54
+      && Object.keys(c.body).sort().join() === 'p_action,p_employee_id,p_latitude,p_line_user_id,p_longitude,p_photo_url'
+      && t.out.result?.type === 'check_in', JSON.stringify(c?.body));
+    t = await run({ action: 'kiosk_check_in', employee_id: KEMP, kiosk_action: 'check_out' }, kioskRoutes());
+    c = call(t.f, 'kiosk_check_in_verified');
+    check('kiosk_check_in：無照片、無定位 → 送 null', t.res.status === 200 && c.body.p_photo_url === null && c.body.p_latitude === null && c.body.p_longitude === null && c.body.p_action === 'check_out');
+    for (const [why, extra] of [
+      ['員工 ID 不是 UUID', { employee_id: 'bad', kiosk_action: 'check_in' }],
+      ['kiosk_action 不合法', { employee_id: KEMP, kiosk_action: 'bogus' }],
+      ['沒帶 kiosk_action', { employee_id: KEMP }],
+      ['照片不是本專案 selfies 網址', { employee_id: KEMP, kiosk_action: 'check_in', photo_url: 'https://evil.example/x.jpg' }],
+      ['照片網址混充前綴', { employee_id: KEMP, kiosk_action: 'check_in', photo_url: 'https://db.test.evil/storage/v1/object/public/selfies/x.jpg' }],
+      ['緯度超出範圍', { employee_id: KEMP, kiosk_action: 'check_in', latitude: 91, longitude: 120 }],
+      ['經度是字串', { employee_id: KEMP, kiosk_action: 'check_in', latitude: 24, longitude: '120' }],
+    ]) {
+      t = await run({ action: 'kiosk_check_in', ...extra }, kioskRoutes());
+      check(`kiosk_check_in：${why} → 400、不呼叫 RPC`, t.res.status === 400 && !t.f.calls.some(x => x.url.includes('/rpc/')), JSON.stringify(t.out));
+    }
+    t = await run({ action: 'kiosk_check_in', employee_id: KEMP, kiosk_action: 'check_in' }, rpcRoutes([['/v2/profile', { status: 401, body: {} }]]));
+    check('kiosk_check_in：LIFF token 驗不過 → 401、不打卡', t.res.status === 401 && !call(t.f, 'kiosk_check_in_verified'));
+    t = await run({ action: 'kiosk_check_in', employee_id: KEMP, kiosk_action: 'check_in' },
+      kioskRoutes([['/rpc/kiosk_check_in_verified', { body: { success: false, error: '今日已完成上班打卡' } }]]));
+    check('kiosk_check_in：打卡規則拒絕 → 400、訊息照傳', t.res.status === 400 && t.out.error === '今日已完成上班打卡');
+    t = await run({ action: 'kiosk_check_in', employee_id: KEMP, kiosk_action: 'check_in' },
+      kioskRoutes([['/rpc/kiosk_check_in_verified', { body: { success: false, error: '此帳號非公務機', error_code: 'access_denied' } }]]));
+    check('kiosk_check_in：非公務機 → 403', t.res.status === 403 && t.out.code === 'access_denied');
+    t = await run({ action: 'kiosk_check_in', employee_id: KEMP, kiosk_action: 'check_in' }, kioskRoutes([['/rpc/kiosk_check_in_verified', { status: 500, body: { message: 'boom' } }]]));
+    check('kiosk_check_in：RPC 連不上 → 503', t.res.status === 503);
   }
 
   console.log('\n=== line-webhook ===');

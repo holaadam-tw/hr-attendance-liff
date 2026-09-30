@@ -15,6 +15,8 @@
 //     shift_swap_review（133：換班核准／拒絕；135 起前端不能直接寫 schedules）、
 //     shift_swap_create／shift_swap_respond（139：員工申請換班、對方同意／拒絕；140 起前端不能直接寫 shift_swap_requests）
 //     payroll_unlock（136：薪酬密碼在 DB 以 bcrypt 比對，前端讀不到密碼）
+//     kiosk_get_company／kiosk_lookup／kiosk_check_in（142：公務機；身分＝公務機平板登入的 LINE 帳號，
+//       由 DB 確認它恰好對到 1 個在職的公務機帳號；公司一律由 DB 依公務機帳號決定，前端不帶 company_id）
 //   員工發的訊息，DB 回傳寄件人前綴（［姓名 送出］），這裡一定加在最前面。
 //
 // 舊模式（相容還沒更新的頁面，前端帶 token）：必須帶 company_id，且 token 必須等於該公司設定
@@ -65,6 +67,7 @@ const RPC_MIGRATION: Record<string, string> = {
   review_shift_swap_request: '133',
   shift_swap_request_create: '139', shift_swap_request_respond: '139',
   payroll_password_unlock: '136',
+  kiosk_get_company_verified: '142', kiosk_lookup_employee_verified: '142', kiosk_check_in_verified: '142',
 }
 
 async function callRpc(deps: Deps, fn: string, args: Record<string, unknown>): Promise<{ ok: boolean; data: any; missing?: string }> {
@@ -235,7 +238,10 @@ const VERIFIED_ACTIONS = [
   'shift_swap_create', 'shift_swap_respond',
   // 136：薪酬密碼改在伺服器端比對（DB 只存 bcrypt 雜湊），成功回短效 unlock_token
   'payroll_unlock',
+  // 142：公務機（身分＝平板登入的公務機 LINE 帳號；前端報的 kiosk LINE ID 一律不採信）
+  'kiosk_get_company', 'kiosk_lookup', 'kiosk_check_in',
 ] as const
+const KIOSK_ACTIONS: readonly string[] = ['kiosk_get_company', 'kiosk_lookup', 'kiosk_check_in']
 export const MAX_BATCH_SETTINGS = 30
 export const MAX_BATCH_REVIEWS = 50
 export const MAX_BATCH_SCHEDULES = 400
@@ -255,7 +261,8 @@ async function handleVerifiedAction(body: any, deps: Deps): Promise<Response> {
   const action = String(body.action)
   const companyId = uuidOrNull(body.company_id)
   // company_save 的 company_id 可省略（＝新增）；有帶就必須是 UUID
-  const needsCompany = action !== 'platform_admin_save' && action !== 'company_save'
+  // 公務機動作的公司由 DB 依公務機帳號決定，不帶 company_id
+  const needsCompany = action !== 'platform_admin_save' && action !== 'company_save' && !KIOSK_ACTIONS.includes(action)
   if (!body.liff_access_token || (needsCompany && !companyId)) return badRequest()
   if (action === 'company_save' && body.company_id != null && !companyId) return badRequest()
   const lineUserId = await verifyLiffAccessToken(deps, String(body.liff_access_token))
@@ -280,6 +287,43 @@ async function handleVerifiedAction(body: any, deps: Deps): Promise<Response> {
       expires_at: d.expires_at ?? null,
       configured: d.configured === true,
     }))
+  }
+
+  // ---- 公務機（142）：身分＝LINE 驗證的公務機帳號 userId；公司由 DB 決定 ----
+  if (action === 'kiosk_get_company') {
+    return rpcResult(await callRpc(deps, 'kiosk_get_company_verified', { p_line_user_id: lineUserId }),
+      (d) => ({ result: { success: true, name: typeof d.name === 'string' ? d.name : '', company_id: d.company_id ?? null } }))
+  }
+  if (action === 'kiosk_lookup') {
+    const identifier = typeof body.identifier === 'string' ? body.identifier.trim() : ''
+    if (!identifier || identifier.length > 32) return badRequest('請輸入工號、手機或身分證後4碼')
+    return rpcResult(await callRpc(deps, 'kiosk_lookup_employee_verified', { p_line_user_id: lineUserId, p_identifier: identifier }), withResult)
+  }
+  if (action === 'kiosk_check_in') {
+    const employeeId = uuidOrNull(body.employee_id)
+    const kioskAction = body.kiosk_action === 'check_in' || body.kiosk_action === 'check_out' ? body.kiosk_action : null
+    if (!employeeId || !kioskAction) return badRequest()
+    // 照片只接受本專案 selfies bucket 的公開網址（前端上傳後取得）；其他網址不寫進出勤紀錄
+    const photoPrefix = `${deps.env('SUPABASE_URL') || ''}/storage/v1/object/public/selfies/`
+    let photoUrl: string | null = null
+    if (body.photo_url != null && body.photo_url !== '') {
+      if (typeof body.photo_url !== 'string' || body.photo_url.length > 500 || !deps.env('SUPABASE_URL') || !body.photo_url.startsWith(photoPrefix)) {
+        return badRequest('照片網址不正確')
+      }
+      photoUrl = body.photo_url
+    }
+    const coord = (v: unknown, max: number): number | null | undefined => {
+      if (v == null || v === '') return null
+      const n = typeof v === 'number' ? v : NaN
+      return Number.isFinite(n) && Math.abs(n) <= max ? n : undefined
+    }
+    const lat = coord(body.latitude, 90)
+    const lng = coord(body.longitude, 180)
+    if (lat === undefined || lng === undefined) return badRequest('定位資料不正確')
+    return rpcResult(await callRpc(deps, 'kiosk_check_in_verified', {
+      p_line_user_id: lineUserId, p_employee_id: employeeId, p_action: kioskAction,
+      p_photo_url: photoUrl, p_latitude: lat, p_longitude: lng,
+    }), withResult)
   }
 
   // ---- 員工管理（131：admin_* 由 DB 判斷公司、角色、公務機、受保護帳號）----

@@ -254,6 +254,54 @@
         ]);
     }
 
+    // ===== 公務機動作一律經 line-push 驗 LIFF 身分（142）=====
+    // line-push 先向 LINE 驗證 access token 取得「平板登入的公務機 LINE 帳號」userId，再以 service role 呼叫
+    // kiosk_*_verified；前端不再送公務機的 LINE ID（送了也不採信）。公司由 DB 依公務機帳號決定。
+    // 本頁不載入共用腳本，這裡是共用 callVerifiedAction 同一套約定的精簡版。回傳 { ok, code, message, data }
+    const KIOSK_RELOGIN_MARKER = 'kiosk_liff_relogin_at';
+    function kioskHandleSessionExpired() {
+        // 共用平板常整天開著，LIFF access token 會過期：重新整理一次拿新 token（2 分鐘內不重複，避免無限重整）
+        try {
+            const last = Number(sessionStorage.getItem(KIOSK_RELOGIN_MARKER) || 0);
+            if (last && Date.now() - last < 2 * 60 * 1000) return false;
+            sessionStorage.setItem(KIOSK_RELOGIN_MARKER, String(Date.now()));
+            if (typeof liff !== 'undefined' && liff && typeof liff.isInClient === 'function' && !liff.isInClient()) {
+                liff.login({ redirectUri: window.location.href });
+            } else {
+                window.location.reload();
+            }
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+    async function callVerifiedAction(action, payload) {
+        const expired = () => kioskHandleSessionExpired()
+            ? { ok: false, code: 'relogin_redirect', message: 'LINE 登入已過期，正在重新登入…' }
+            : { ok: false, code: 'unauthenticated', message: 'LINE 登入已過期，請重新開啟頁面' };
+        let accessToken = null;
+        try { accessToken = (typeof liff !== 'undefined' && liff && typeof liff.getAccessToken === 'function') ? liff.getAccessToken() : null; } catch (e) { accessToken = null; }
+        if (!accessToken) return expired();
+        try {
+            const res = await fetch(SUPABASE_URL + '/functions/v1/line-push', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_KEY },
+                body: JSON.stringify(Object.assign({}, payload || {}, { action, liff_access_token: accessToken }))
+            });
+            const result = await res.json().catch(() => null);
+            if (!result) return { ok: false, code: 'invalid_response', message: '伺服器回傳無法辨識的結果' };
+            if (!result.ok) {
+                const code = result.code || 'failed';
+                if (code === 'unauthenticated') return expired();
+                return { ok: false, code, message: result.error || '操作失敗', data: result };
+            }
+            try { sessionStorage.removeItem(KIOSK_RELOGIN_MARKER); } catch (e) { /* 無 sessionStorage */ }
+            return { ok: true, code: 'ok', data: result };
+        } catch (e) {
+            return { ok: false, code: 'network_error', message: '目前無法連線伺服器，請檢查網路後重試' };
+        }
+    }
+
     // ===== 時鐘 =====
     function updateClock() {
         const now = new Date();
@@ -284,9 +332,9 @@
 
         // 驗證公務機帳號
         try {
-            const { data } = await sb.rpc('kiosk_get_company', {
-                p_kiosk_line_user_id: kioskLineUserId
-            });
+            const r = await callVerifiedAction('kiosk_get_company', {});
+            if (r.code === 'relogin_redirect') return;
+            const data = r.ok ? r.data?.result : { success: false, error: r.message };
             if (data?.success && data.name) {
                 kioskCompanyId = data.company_id || null;
                 document.getElementById('companyName').textContent = data.name;
@@ -294,7 +342,7 @@
                 refreshKioskStaticText();
                 loadKioskLunchSettings(kioskCompanyId).catch(e => console.warn('公務機便當設定讀取失敗:', e));
             } else {
-                document.getElementById('stepInput').innerHTML = '<div class="error-card"><div class="icon">⚠️</div><div class="msg">' + (data?.error || '此帳號非公務機') + '<br><br><span style="font-size:13px;color:#64748B;">請聯繫管理員設定公務機帳號</span></div></div>';
+                document.getElementById('stepInput').innerHTML = '<div class="error-card"><div class="icon">⚠️</div><div class="msg">' + escapeHtml(data?.error || '此帳號非公務機') + '<br><br><span style="font-size:13px;color:#64748B;">請聯繫管理員設定公務機帳號</span></div></div>';
                 return;
             }
         } catch (e) {
@@ -390,14 +438,11 @@
         confirmBtn.classList.add('disabled');
 
         try {
-            const { data, error } = await sb.rpc('kiosk_lookup_employee', {
-                p_kiosk_line_user_id: kioskLineUserId,
-                p_identifier: inputStr
-            });
-
-            if (error) throw error;
+            const r = await callVerifiedAction('kiosk_lookup', { identifier: inputStr });
+            if (r.code === 'relogin_redirect') return;
+            const data = r.ok ? r.data?.result : null;
             if (!data?.success) {
-                showError(data?.error || tk('lookupFailed'));
+                showError(r.ok ? tk('lookupFailed') : (r.message || tk('lookupFailed')));
                 return;
             }
 
@@ -541,18 +586,17 @@
                 lng = pos.coords.longitude;
             }
 
-            const { data, error } = await sb.rpc('kiosk_check_in', {
-                p_kiosk_line_user_id: kioskLineUserId,
-                p_employee_id: currentEmployee.employee_id,
-                p_action: action,
-                p_photo_url: photoUrl,
-                p_latitude: lat,
-                p_longitude: lng
+            const r = await callVerifiedAction('kiosk_check_in', {
+                employee_id: currentEmployee.employee_id,
+                kiosk_action: action,
+                photo_url: photoUrl,
+                latitude: lat,
+                longitude: lng
             });
-
-            if (error) throw error;
+            if (r.code === 'relogin_redirect') return;
+            const data = r.ok ? r.data?.result : null;
             if (!data?.success) {
-                showError(formatKioskError(data?.error || '打卡失敗'));
+                showError(formatKioskError(r.ok ? '打卡失敗' : (r.message || '打卡失敗')));
                 return;
             }
 
