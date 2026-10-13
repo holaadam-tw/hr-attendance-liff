@@ -57,6 +57,7 @@ body{font-family:'Noto Sans TC',-apple-system,sans-serif;background:var(--bg);co
 .s-late{background:#FEF3C7;color:#92400E;}
 .s-on-leave{background:#F3F4F6;color:#6B7280;}
 .s-absent{background:#FEE2E2;color:#991B1B;}
+.s-not-shown{background:#F3F4F6;color:#9CA3AF;}
 .s-off-day{background:#F3F4F6;color:#9CA3AF;}
 .lunch-badge{padding:3px 8px;border-radius:8px;font-size:10px;font-weight:800;white-space:nowrap;display:inline-block;}
 .lunch-regular{background:#FEF3C7;color:#92400E;}
@@ -1195,8 +1196,8 @@ function hasPendingMakeupCorrection(row) {
     return hasPendingMakeup(row) && hasOfficialPunch(row);
 }
 
-function hasPendingLeave(row) {
-    return row?.daily_leave?.status === 'pending';
+function hasDailyLeave(row) {
+    return !!row?.daily_leave;
 }
 
 function leaveTypeLabel(type) {
@@ -1236,11 +1237,23 @@ function normalizePendingPunchType(type) {
 
 function buildDailyLeaveMap(requests, dateStr) {
     const map = new Map();
+    if (dateStr !== getTaiwanDate()) return map;
     (requests || []).forEach(r => {
-        if (dateStr < r.start_date || dateStr > (r.end_date || r.start_date)) return;
         map.set(r.employee_id, r);
     });
     return map;
+}
+
+function sanitizePublicDailyRows(rows, dateStr) {
+    const today = getTaiwanDate();
+    return (rows || []).map(row => {
+        const clean = { ...row, leave_type: null };
+        if (dateStr === today || row.status !== 'on_leave') return clean;
+        if (row.check_out_time) clean.status = 'completed';
+        else if (row.check_in_time) clean.status = 'working';
+        else clean.status = 'not_shown';
+        return clean;
+    });
 }
 
 function attachDailyMarkers(rows, pendingMap, leaveMap) {
@@ -1257,6 +1270,13 @@ async function runOptionalDailyQuery(query) {
     } catch (e) {
         return { data: [], error: e };
     }
+}
+
+async function loadPublicTodayLeaveEmployees(dateStr) {
+    if (dateStr !== getTaiwanDate()) return { data: [], error: null };
+    return runOptionalDailyQuery(sb.rpc('get_public_today_leave_employees', {
+        p_company_id: companyId
+    }));
 }
 
 async function loadDailyPendingMakeupRequests() {
@@ -1387,20 +1407,14 @@ async function loadDailyData() {
         const [dailyRes, makeupRes, leaveRes] = await Promise.all([
             sb.rpc('get_company_daily_attendance', { p_company_id: companyId, p_date: dateStr, p_line_user_id: currentLineUserId || null }),
             loadDailyPendingMakeupRequests(),
-            runOptionalDailyQuery(sb.from('leave_requests')
-                .select('employee_id, leave_type, leave_period, days, start_date, end_date, status, employees!leave_requests_employee_id_fkey!inner(company_id)')
-                .eq('employees.company_id', companyId)
-                .in('status', ['approved', 'pending'])
-                .lte('start_date', dateStr)
-                .gte('end_date', dateStr)
-                .limit(500))
+            loadPublicTodayLeaveEmployees(dateStr)
         ]);
         if (dailyRes.error) throw dailyRes.error;
         if (makeupRes.error) console.warn('Load pending makeup warning:', makeupRes.error);
         if (leaveRes.error) console.warn('Load daily leave warning:', leaveRes.error);
         dailyPendingMakeups = buildPendingMakeupMap(makeupRes.data || [], dateStr);
         dailyLeaveRequests = buildDailyLeaveMap(leaveRes.data || [], dateStr);
-        dailyData = attachDailyMarkers(dailyRes.data || [], dailyPendingMakeups, dailyLeaveRequests).filter(row => !shouldHideDailyEmployee(row));
+        dailyData = attachDailyMarkers(sanitizePublicDailyRows(dailyRes.data || [], dateStr), dailyPendingMakeups, dailyLeaveRequests).filter(row => !shouldHideDailyEmployee(row));
         dailyLunchOrders = new Map();
         updateDailyStats();
         updateDeptFilter();
@@ -1415,17 +1429,21 @@ async function loadDailyData() {
 }
 
 function updateDailyStats() {
-    const d = dailyData.filter(r => r.status !== 'off_day');
+    const d = dailyData.filter(isDailyStatRow);
     document.getElementById('dExpected').textContent = d.length;
     document.getElementById('dChecked').textContent = d.filter(r => r.status === 'working' || r.status === 'completed').length;
-    document.getElementById('dNotChecked').textContent = d.filter(r => (r.status === 'not_checked' || r.status === 'absent') && !hasPendingMakeup(r) && !hasPendingLeave(r)).length;
+    document.getElementById('dNotChecked').textContent = d.filter(r => (r.status === 'not_checked' || r.status === 'absent') && !hasPendingMakeup(r) && !hasDailyLeave(r)).length;
     document.getElementById('dLate').textContent = d.filter(r => r.is_late).length;
     document.getElementById('dEarly').textContent = d.filter(r => r.is_early_leave).length;
-    document.getElementById('dLeave').textContent = d.filter(r => r.status === 'on_leave' || hasPendingLeave(r)).length;
+    document.getElementById('dLeave').textContent = d.filter(r => r.status === 'on_leave' || hasDailyLeave(r)).length;
     const pendingEl = document.getElementById('dPendingMakeup');
     if (pendingEl) pendingEl.textContent = d.filter(hasPurePendingMakeup).length;
     const correctionEl = document.getElementById('dPendingMakeupCorrection');
     if (correctionEl) correctionEl.textContent = d.filter(hasPendingMakeupCorrection).length;
+}
+
+function isDailyStatRow(row) {
+    return row.status !== 'off_day' && row.status !== 'not_shown';
 }
 
 function updateDeptFilter() {
@@ -1478,8 +1496,9 @@ function updateDailySortHeaders() {
 }
 
 function dailyStatusRank(row) {
+    if (row.status === 'not_shown') return 8;
     if (hasPendingMakeup(row)) return -1;
-    if (hasPendingLeave(row)) return -0.5;
+    if (hasDailyLeave(row)) return 4;
     if (row.status === 'not_checked') return 0;
     if (row.status === 'absent') return 1;
     if (row.status === 'working') return row.is_late ? 2 : 3;
@@ -1513,9 +1532,15 @@ function pendingMakeupLabel(row) {
 
 function dailyLeaveLabel(row) {
     if (!row?.daily_leave) return '';
-    const leave = row.daily_leave;
-    const prefix = leave.status === 'pending' ? t('pendingLeave') : t('leave');
-    return `${prefix} ${leaveTypeLabel(leave.leave_type)} ${leavePeriodLabel(leave.leave_period)}`;
+    return t('leave');
+}
+
+function dailyExportStatus(row) {
+    if (row.status === 'not_shown') return '—';
+    return pendingMakeupLabel(row)
+        || (hasDailyLeave(row) ? dailyLeaveLabel(row) : '')
+        || { working:'上班中', completed:'完成', not_checked:'未打卡', on_leave:'請假', absent:'缺勤' }[row.status]
+        || row.status;
 }
 
 function dailyTimeSortValue(v) {
@@ -1564,7 +1589,7 @@ function getFilteredDaily() {
             : status === 'pending_makeup'
                 ? filtered.filter(hasPendingMakeup)
                 : status === 'on_leave'
-                    ? filtered.filter(r => r.status === 'on_leave' || hasPendingLeave(r))
+                    ? filtered.filter(r => r.status === 'on_leave' || hasDailyLeave(r))
                 : filtered.filter(r => r.status === status);
     }
     return sortDailyRows(filtered);
@@ -1910,22 +1935,20 @@ function shiftBadge(row) {
 }
 
 function statusBadge(row) {
-    const map = { working:[t('working'),'s-working'], completed:[t('completed'),'s-completed'], not_checked:[t('notChecked'),'s-not-checked'], on_leave:[t('leave'),'s-on-leave'], absent:[t('absent'),'s-absent'], off_day:[t('offDay'),'s-off-day'] };
+    const map = { working:[t('working'),'s-working'], completed:[t('completed'),'s-completed'], not_checked:[t('notChecked'),'s-not-checked'], on_leave:[t('leave'),'s-on-leave'], absent:[t('absent'),'s-absent'], not_shown:['—','s-not-shown'], off_day:[t('offDay'),'s-off-day'] };
     let label, cls;
-    if (hasPendingMakeup(row)) {
+    if (row.status === 'not_shown') {
+        [label, cls] = map.not_shown;
+    } else if (hasPendingMakeup(row)) {
         label = pendingMakeupLabel(row);
         cls = 'pending-makeup-badge';
-    } else if (hasPendingLeave(row)) {
+    } else if (hasDailyLeave(row)) {
         label = dailyLeaveLabel(row);
-        cls = 'pending-makeup-badge';
+        cls = 's-on-leave';
     } else if (row.is_late && (row.status === 'working' || row.status === 'completed')) {
         label = '?? ' + t('late') + '?' + (row.status === 'working' ? t('working') : t('completed')); cls = 's-late';
     } else { const m = map[row.status] || [t('unknown'),'']; label = m[0]; cls = m[1]; }
-    if (row.is_early_leave) label += ' ' + t('early');
-    if (!hasPendingLeave(row) && row.daily_leave && row.status !== 'on_leave') label += ' · ' + dailyLeaveLabel(row);
-    if (row.leave_type && row.status === 'on_leave') {
-        label = dailyLeaveLabel(row) || (t('leave') + ' ' + leaveTypeLabel(row.leave_type));
-    }
+    if (row.status !== 'not_shown' && row.is_early_leave) label += ' ' + t('early');
     return '<span class="status-badge ' + cls + '">' + label + '</span>';
 }
 
@@ -2331,7 +2354,7 @@ function exportExcel() {
             '工時': r.total_work_hours > 0 ? Math.round(r.total_work_hours * 10) / 10 : '',
             '遲到': r.is_late ? '是' : '', '早退': r.is_early_leave ? '是' : '',
             '打卡地點': r.check_in_location || '',
-            '狀態': pendingMakeupLabel(r) || (hasPendingLeave(r) ? dailyLeaveLabel(r) : '') || { working:'上班中', completed:'完成', not_checked:'未打卡', on_leave:'請假', absent:'缺勤' }[r.status] || r.status,
+            '狀態': dailyExportStatus(r),
             '便當狀態': lunchStatusInfo(r).label
         }));
         XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), '今日打卡');

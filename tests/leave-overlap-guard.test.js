@@ -78,9 +78,10 @@ check('有重疊時恢復按鈕狀態', /if \(mine\) \{[\s\S]*?setBtnLoading\(su
 
 let findSrc = '';
 try { findSrc = grab(commonSrc, 'findMyOverlappingLeave'); } catch (e) { check('找得到 findMyOverlappingLeave', false, e.message); }
-check('自查限定 employee_id', /\.eq\('employee_id', currentEmployee\.id\)/.test(findSrc));
-check('自查帶公司隔離', /employees\.company_id/.test(findSrc) && /window\.currentCompanyId/.test(findSrc));
-check('自查只看 approved/pending', /\.in\('status', \['approved', 'pending'\]\)/.test(findSrc));
+check('自查改走本人請假 RPC', /sb\.rpc\('get_my_leave_requests'/.test(findSrc));
+check('自查帶公司隔離', /p_company_id:\s*window\.currentCompanyId/.test(findSrc));
+check('自查帶員工 LINE 身分', /p_line_user_id:\s*lineUserId/.test(findSrc));
+check('自查只看 approved/pending', /p_statuses:\s*\['approved', 'pending'\]/.test(findSrc));
 check('查詢失敗不阻擋送出（交給 RPC）', /if \(error\) return null/.test(findSrc));
 
 console.log('\n=== migration 117：移除日曆天觸發器 ===');

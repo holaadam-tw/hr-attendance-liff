@@ -1199,14 +1199,15 @@ async function checkLeaveAvailability(startDate, endDate) {
         const concurrentSetting = getCachedSetting('max_concurrent_leave');
         if (concurrentSetting?.max) maxConcurrent = concurrentSetting.max;
 
-        // 2. 查詢日期範圍內所有已核准/待審假單（排除自己）
-        const { data: leaves } = await sb.from('leave_requests')
-            .select('employee_id, start_date, end_date, status, employees!leave_requests_employee_id_fkey!inner(name, company_id)')
-            .eq('employees.company_id', window.currentCompanyId)
-            .neq('employee_id', currentEmployee.id)
-            .in('status', ['approved', 'pending'])
-            .or(`and(start_date.lte.${endDate},end_date.gte.${startDate})`)
-            .limit(200);
+        // 2. 由 RPC 查詢同公司、排除自己的已核准/待審重疊假單
+        const lineUserId = currentEmployee?.line_user_id || liffProfile?.userId;
+        const { data: leaves, error: leaveError } = await sb.rpc('get_company_leave_overlap', {
+            p_line_user_id: lineUserId,
+            p_company_id: window.currentCompanyId,
+            p_from: startDate,
+            p_to: endDate
+        });
+        if (leaveError) throw leaveError;
 
         // 3. 查詢每一天的衝突人數
         const start = new Date(startDate), end = new Date(endDate);
@@ -1220,7 +1221,7 @@ async function checkLeaveAvailability(startDate, endDate) {
 
             const dayLeaves = (leaves || []).filter(l => ds >= l.start_date && ds <= (l.end_date || l.start_date));
             const count = dayLeaves.length;
-            const names = dayLeaves.map(l => l.employees?.name || '同事').filter((v, i, a) => a.indexOf(v) === i);
+            const names = dayLeaves.map(l => l.employee_name || '同事').filter((v, i, a) => a.indexOf(v) === i);
             
             if (count > 0) {
                 conflicts.push({ date: ds, count, names });
@@ -1258,7 +1259,15 @@ async function checkLeaveAvailability(startDate, endDate) {
         };
     } catch(e) {
         console.error('檢查請假可用性失敗', e);
-        return { ok: true, thresholdExceeded: false, conflicts: [], maxDayConflict: 0, staffWarning: '', message: '' };
+        return {
+            ok: true,
+            availabilityUnknown: true,
+            thresholdExceeded: false,
+            conflicts: [],
+            maxDayConflict: 0,
+            staffWarning: '',
+            message: '⚠️ 暫時無法確認同時請假人數，仍可送出並交由主管審核'
+        };
     }
 }
 
@@ -1379,15 +1388,15 @@ function leavePeriodLabel(period) {
 async function findMyOverlappingLeave(start, end) {
     if (!currentEmployee?.id || !window.currentCompanyId || !start) return null;
     try {
-        const { data, error } = await sb.from('leave_requests')
-            .select('id, start_date, end_date, leave_period, status, employees!leave_requests_employee_id_fkey!inner(company_id)')
-            .eq('employees.company_id', window.currentCompanyId)
-            .eq('employee_id', currentEmployee.id)
-            .in('status', ['approved', 'pending'])
-            .lte('start_date', end || start)
-            .gte('end_date', start)
-            .order('start_date')
-            .limit(5);
+        const lineUserId = currentEmployee?.line_user_id || liffProfile?.userId;
+        const { data, error } = await sb.rpc('get_my_leave_requests', {
+            p_line_user_id: lineUserId,
+            p_company_id: window.currentCompanyId,
+            p_from: start,
+            p_to: end || start,
+            p_statuses: ['approved', 'pending'],
+            p_limit: 5
+        });
         if (error) return null;   // 查不到就交給 RPC 擋，不因此阻擋送出
         return (data || []).find(r => leaveDateRangesOverlap(start, end, r.start_date, r.end_date)) || null;
     } catch (e) {
@@ -1445,7 +1454,7 @@ async function submitLeave() {
 
     // 先檢查是否超過同時請假警告門檻；超過仍可送出，由主管審核
     const check = await checkLeaveAvailability(start, end);
-    if (check.thresholdExceeded && statusEl) {
+    if ((check.thresholdExceeded || check.availabilityUnknown) && statusEl) {
         statusEl.className = 'status-box show info';
         statusEl.innerHTML = `${escapeHTML(check.message)}<br><span style="font-size:12px;color:#92400E;margin-top:4px;display:block;">申請將照常送出為待審，請主管確認當日人力。</span>`;
     }
@@ -1489,7 +1498,7 @@ async function submitLeave() {
             }
             statusEl.className = 'status-box show success';
             statusEl.innerHTML = `✅ 申請已提交並等待主管審核${daysNote}`
-                + (check.thresholdExceeded
+                + (check.thresholdExceeded || check.availabilityUnknown
                     ? `<br><span style="font-size:12px;color:#B45309;font-weight:700;">${escapeHTML(check.message)}</span>`
                     : check.conflicts.length > 0
                         ? `<br><span style="font-size:12px;color:#F59E0B;">💡 提醒：期間已有 ${check.maxDayConflict} 人請假</span>`
@@ -2178,13 +2187,16 @@ async function loadMonthlyAttendance() {
         try {
             const monthStart = `${year}-${String(month).padStart(2,'0')}-01`;
             const monthEnd = fmtDate(new Date(year, month, 0));
-            const { data: leaveData } = await sb.from('leave_requests')
-                .select('start_date, end_date, days')
-                .eq('employee_id', currentEmployee.id)
-                .eq('status', 'approved')
-                .lte('start_date', monthEnd)
-                .gte('end_date', monthStart)
-                .limit(50);
+            const lineUserId = currentEmployee?.line_user_id || liffProfile?.userId;
+            const { data: leaveData, error: leaveError } = await sb.rpc('get_my_leave_requests', {
+                p_line_user_id: lineUserId,
+                p_company_id: window.currentCompanyId,
+                p_from: monthStart,
+                p_to: monthEnd,
+                p_statuses: ['approved'],
+                p_limit: 1000
+            });
+            if (leaveError) throw leaveError;
             if (leaveData) {
                 const monthStartDate = new Date(monthStart + 'T00:00:00+08:00');
                 const monthEndDate = new Date(monthEnd + 'T00:00:00+08:00');

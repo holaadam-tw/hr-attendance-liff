@@ -345,7 +345,7 @@
         </div>
     </div>
 
-<script src="common.js?v=20260928-lineauth138"></script>
+<script src="common.js?v=20261013-leaverpc149c"></script>
     <script>
         // === 全域錯誤監控 ===
         window._errLogCount = 0; window._errLogResetTs = 0;
@@ -819,7 +819,14 @@
             try {
                 [attResult, lvResult] = await Promise.all([
                     sb.rpc('get_monthly_attendance', { p_line_user_id: currentEmployee?.line_user_id || liffProfile?.userId, p_year: attYear, p_month: attMonth+1 }),
-                    sb.from('leave_requests').select('*').eq('employee_id', currentEmployee.id).eq('status','approved').lte('start_date', me).gte('end_date', ms)
+                    sb.rpc('get_my_leave_requests', {
+                        p_line_user_id: currentEmployee?.line_user_id || liffProfile?.userId,
+                        p_company_id: window.currentCompanyId,
+                        p_from: ms,
+                        p_to: me,
+                        p_statuses: ['approved'],
+                        p_limit: 1000
+                    })
                 ]);
             } catch(e) { console.error('考勤查詢錯誤:', e); attResult = { data: null }; lvResult = { data: null }; }
             if (attResult.error) console.error('[考勤] RPC 錯誤:', attResult.error);
@@ -1069,6 +1076,11 @@
                 html += '</div>';
                 if (check.staffWarning) html += `<div style="margin-top:4px;font-weight:700;">${escapeHTML(check.staffWarning)}</div>`;
                 warn.innerHTML = html;
+                if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+            } else if (check.availabilityUnknown) {
+                warn.style.background = '#FFF7ED';
+                warn.style.color = '#B45309';
+                warn.innerHTML = `<b>${escapeHTML(check.message)}</b>`;
                 if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
             } else {
                 warn.style.background = '#ECFDF5';

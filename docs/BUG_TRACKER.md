@@ -5,6 +5,16 @@
 
 ---
 
+## 🟡 2026-10-13 RLS 收斂第二階段 149-C／員工端與公開頁 leave_requests 改走 RPC（已實作，未部署）
+
+- 員工端 `common.js` 的同時請假提示改呼叫 `get_company_leave_overlap`，本人重疊檢查、月請假天數與 `records.html` 月曆改呼叫 `get_my_leave_requests`；所有本人 RPC 都沿用 `currentEmployee?.line_user_id || liffProfile?.userId` 並傳 `p_company_id`。
+- `checkLeaveAvailability` 改讀頂層 `employee_name`；RPC 失敗時顯示「暫時無法確認」警告但不禁用送出，`findMyOverlappingLeave` 失敗則回到送假 RPC 的伺服器端重疊防線，不會無提示阻擋正常送假。
+- `attendance_public.html` 只有查看台灣今日時呼叫 `get_public_today_leave_employees`；今日只顯示「請假」，不顯示假別、時段或待審狀態。非今日不呼叫任何請假 RPC；既有日出勤 RPC 若帶回 `on_leave`，有打卡者仍依卡片顯示工作中／完成，無打卡者改為中性 `not_shown`（畫面與 Excel 顯示「—」），並排除於應出勤、未打卡／缺勤及請假統計。
+- 前端（排除 `tests/`）已無 `sb.from('leave_requests')`；14 個 HTML 的 `common.js?v=` 已機械式同步為 `20261013-leaverpc149c`。
+- 新增 `tests/leave-requests-employee-public-rpc.test.js` 並納入 `tests/run-all.js`，涵蓋靜態範圍、參數、版本一致、VM 衝突人數新舊行為、錯誤退路、公開頁非今日零 RPC、`not_shown` 顯示／統計／Excel 與還原成 `absent` 的反向突變，共 **51/51 通過**。
+- `npm.cmd test` 僅剩業主事先允許的 21:00 後既有 `attendance-schedules-write-lock` **84 通過／3 失敗**：兩項下班操作回 `checkout_time_expired`，另一項因第一項未完成而無法自動結案；與 149-C 無關。
+- 本輪未連線正式庫、未寫入 DB、未操作 Supabase Dashboard、未部署，且未執行 git add／commit／push；前端正式可用仍取決於 149-A migration 已在目標環境套用。
+
 ## 🟡 2026-10-13 RLS 收斂第二階段 149-B／管理端 leave_requests 改走 RPC（已實作，未部署）
 
 - 管理端 8 個讀取點（`attendance_overview.html` #1、`modules/audit.js` #6/#7、`modules/leave.js` #8/#9、`modules/payroll.js` #10/#11、`modules/schedules.js` #12）已改呼叫 `get_company_leave_requests`，並傳入 `p_company_id`、`p_line_user_id` 與各頁原有日期／狀態條件。
@@ -15,7 +25,10 @@
 - `npm.cmd test` 僅剩使用者事先允許的 21:00 後既有 `attendance-schedules-write-lock` **84 通過／3 失敗**（`checkout_time_expired`）；`qa_check.sh` 0 FAIL／1 既有 WARN，兩支 hook 無新警告，`git diff --check` 通過。
 - 本輪未連線正式庫、未寫入 DB、未操作 Supabase Dashboard、未部署，且依指示未執行 git add／commit／push；前端正式可用仍取決於 149-A migration 已在目標環境套用。
 
-## 🟡 2026-10-13 RLS 收斂第二階段 149-A／leave_requests 讀取 RPC（**已實作，未套正式庫**）
+## 🟢 2026-10-13 RLS 收斂第二階段 149-A／leave_requests 讀取 RPC（**已套用正式庫**；前端 149-B／C 待合併）
+
+- **套用**：2026-10-13 業主授權「授權套用 migration 149 到正式庫（PR #14）…」後套用（SHA256 ac62eb13…a6659bd7）。四支函式 SECURITY DEFINER、STABLE，ACL 僅 postgres／service_role／anon／authenticated。
+- **套用後實測（anon 金鑰打 REST，唯讀）**：大正 admin 查 2026 年 → 88 筆＝直接 SQL 計數 88；一般員工、無身分呼叫管理員 RPC → 42501 access_denied；E809 本人 → 4 筆＝SQL 4、只含本人；E809 帶本米公司 → 0 筆；重疊 RPC 10 月 → 8 筆＝SQL 8、不含本人、只 5 欄；區間 90 天 → 22023 date_range_too_large；公開今日 → 1 人＝SQL 1、只 2 欄；公開 RPC 帶日期參數 → 函式不存在（無法查歷史）。
 
 - 新增 `get_company_leave_requests(text,uuid,date,date,text[],uuid,integer)`：限 `is_company_manager_caller` 通過的同公司管理者，所有資料列以 `p_company_id` 隔離。
 - 新增 `get_my_leave_requests(text,uuid,date,date,text[],integer)`：由 `p_line_user_id + p_company_id` 唯一解析在職員工，只回本人資料；同公司重複身分時不猜測。
