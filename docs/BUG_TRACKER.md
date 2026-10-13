@@ -5,14 +5,17 @@
 
 ---
 
-## 🟡 2026-10-13 RLS 收斂第一階段／leave_requests 寫入鎖定（migration 148，**待業主套用／合併／部署**）
+## 🟢 2026-10-13 RLS 收斂第一階段／leave_requests 寫入鎖定（migration 148，**已套用正式庫**）
 
 - 問題：正式庫的 `Allow RPC access leaves`（ALL true）、`允許新增請假單`（INSERT true）與 `允許更新待審核請假單`（pending、無 WITH CHECK），加上 anon／authenticated 全部 table grant，使公開 anon key 可直接偽造、核准或刪除假單，並影響薪資。
 - 正式庫唯讀盤點：唯一寫入函式 `submit_leave_request`／`approve_leave_request` 均為 `SECURITY DEFINER`、owner=`postgres`；前端、Edge Function、pg_cron 無直接寫入，觸發器亦無會被鎖壞的 invoker 寫入路徑。
 - 148：只 DROP 三條寫入政策並撤 anon／authenticated 的表寫入權；`允許查看請假單` 與 SELECT grant 保留。第二階段 149 讀取 RPC 本輪未做。
 - 回滾：`148_leave_requests_write_lock_rollback.sql` 依 2026-10-13 正式庫快照原文還原三條政策與全部 grant；回滾會重新暴露直接寫入漏洞，只供故障時使用。
 - 測試：PGlite 19/19（套用前漏洞與 RPC 基線、套用後 anon/authenticated 三種直接寫入被拒、submit／核准／駁回 RPC 前後資料一致、跨公司拒絕、SELECT 保留、ACL 只剩 SELECT、rollback 精確還原七項 grant、可重套）；148 置空反向對照 4 項失敗。正式庫沒有獨立取消 RPC，故取消 RPC 為 N/A；原本可用直接 DELETE 取消／刪除的漏洞已納入正反向測試。`npm test` 41 套件全過；qa_check 0 FAIL（第 8 項改為不計 `*_rollback.sql`，回滾檔本來就要還原舊的全開政策）；兩支 hook 無新警告。實作：Codex；非作者審查：Claude。
-- **狀態：PR 待審；未套正式庫、未合併 main。純資料庫變更，前端不需部署。**
+- **狀態：2026-10-13 業主授權「授權套用 migration 148 到正式庫（PR #12）…」後套用（檔案 SHA256 b48fab84…ef81907；套用前唯讀盤點與 10/13 快照逐項相同，無漂移）。**
+- 套用後驗證：anon／authenticated grant 只剩 SELECT、政策只剩「允許查看請假單」；anon 金鑰直接打 REST 的 PATCH／DELETE／POST 皆回 42501 permission denied，SELECT 正常。
+- RPC smoke（以 anon 身分、整筆交易最後回復，正式庫 0 筆殘留）：E809 送兩張假皆 success → admin 核准一張（approved）、駁回一張（rejected）皆 success；同交易內 anon 直接 UPDATE 被拒。
+- 套用前快照：`.codex/production_rls_backup_leave_requests_before_148_20261013.json`。
 
 ---
 
