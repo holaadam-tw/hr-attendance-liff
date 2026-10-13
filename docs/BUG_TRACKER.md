@@ -25,7 +25,10 @@
 - `npm.cmd test` 僅剩使用者事先允許的 21:00 後既有 `attendance-schedules-write-lock` **84 通過／3 失敗**（`checkout_time_expired`）；`qa_check.sh` 0 FAIL／1 既有 WARN，兩支 hook 無新警告，`git diff --check` 通過。
 - 本輪未連線正式庫、未寫入 DB、未操作 Supabase Dashboard、未部署，且依指示未執行 git add／commit／push；前端正式可用仍取決於 149-A migration 已在目標環境套用。
 
-## 🟡 2026-10-13 RLS 收斂第二階段 149-A／leave_requests 讀取 RPC（**已實作，未套正式庫**）
+## 🟢 2026-10-13 RLS 收斂第二階段 149-A／leave_requests 讀取 RPC（**已套用正式庫**；前端 149-B／C 待合併）
+
+- **套用**：2026-10-13 業主授權「授權套用 migration 149 到正式庫（PR #14）…」後套用（SHA256 ac62eb13…a6659bd7）。四支函式 SECURITY DEFINER、STABLE，ACL 僅 postgres／service_role／anon／authenticated。
+- **套用後實測（anon 金鑰打 REST，唯讀）**：大正 admin 查 2026 年 → 88 筆＝直接 SQL 計數 88；一般員工、無身分呼叫管理員 RPC → 42501 access_denied；E809 本人 → 4 筆＝SQL 4、只含本人；E809 帶本米公司 → 0 筆；重疊 RPC 10 月 → 8 筆＝SQL 8、不含本人、只 5 欄；區間 90 天 → 22023 date_range_too_large；公開今日 → 1 人＝SQL 1、只 2 欄；公開 RPC 帶日期參數 → 函式不存在（無法查歷史）。
 
 - 新增 `get_company_leave_requests(text,uuid,date,date,text[],uuid,integer)`：限 `is_company_manager_caller` 通過的同公司管理者，所有資料列以 `p_company_id` 隔離。
 - 新增 `get_my_leave_requests(text,uuid,date,date,text[],integer)`：由 `p_line_user_id + p_company_id` 唯一解析在職員工，只回本人資料；同公司重複身分時不猜測。
