@@ -119,6 +119,12 @@ const WRITE_LOCKED = [
     rpcs: ['admin_create_employee', 'admin_update_employee', 'admin_delete_pending_employee', 'register_employee', 'set_my_preferred_language'],
     note: '13 處寫入改 RPC；anon 的 INSERT/UPDATE/DELETE grant 與全開政策已撤',
   },
+  {
+    table: 'leave_requests',
+    migration: '148',
+    rpcs: ['approve_leave_request'],
+    note: '寫入原本已全走 RPC；148 撤 anon/authenticated 寫入 grant 與三條放行政策',
+  },
 ];
 const VERIFIED_VIA_EDGE = { admin_create_employee: 'employee_create', admin_update_employee: 'employee_update', admin_delete_pending_employee: 'employee_delete_pending' };
 const VERIFIED_ACTION_NAME = VERIFIED_VIA_EDGE;
@@ -155,6 +161,11 @@ WRITE_LOCKED.forEach(({ table, migration, rpcs, note }) => {
   });
   console.log('');
 });
+const commonSource = sources.find(s => s.rel === 'common.js')?.text || '';
+const leavePayload = commonSource.match(/const leavePayload = \{[\s\S]{0,800}?\n\s*\};/)?.[0] || '';
+check('submit_leave_request 有被前端呼叫', /rpc\(\s*['"`]submit_leave_request['"`],\s*leavePayload\s*\)/.test(commonSource));
+check('submit_leave_request 主要 payload 帶 p_company_id 與 p_line_user_id',
+  leavePayload.includes('p_company_id') && leavePayload.includes('p_line_user_id'));
 check('寫入偵測探針：多行鏈式 update 抓得到', writeRe('employees').test("sb.from('employees')\n  .update({ role: 1 })\n  .eq('id', x)"));
 check('寫入偵測探針：純 select 不誤判', !writeRe('employees').test("sb.from('employees').select('id').eq('id', x);"));
 
