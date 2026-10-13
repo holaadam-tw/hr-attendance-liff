@@ -1,14 +1,14 @@
 // ============================================================
-// migration 145／147：Phase 2／3 前置——caller_line_user_id() 每次現查在職、離職者停權對象、擋自設密碼的 Auth Hook — PGlite 實跑
+// migration 145／147／150：Phase 2／3 前置——現查在職、離職者停權、ban 前重查、擋自設密碼 Hook — PGlite 實跑
 //
 // 不連線、不寫正式庫。流程：
 //   1. 正式庫快照（phase0 fixture）＋ auth schema 替身（auth.users 含 banned_until／deleted_at；auth.jwt()／auth.uid() 與正式庫同定義）
 //      ＋ supabase_auth_admin 角色替身
-//   2. 套 138 → 記錄套用前狀態 → 套 145
+//   2. 套 138 → 記錄套用前狀態 → 套 145、150
 //   3. caller_line_user_id()：在職 → 有身分；離職（is_active=false）、平台管理員停用、Auth 帳號停權／刪除／改綁／sub 對不上 → NULL；
 //      回任 → 立即恢復；138 原有的 JWT 條件（anon、user_metadata、格式）照舊
 //   4. caller_company_ids()：只回「現在」在職的公司（JWT 的 company_ids 不採信）
-//   5. line_auth_reconcile_targets／needed：只列「未停權、已不在職」的 LINE 帳號；權限只給 service role
+//   5. line_auth_reconcile_targets／needed 與 line_auth_reconcile_should_ban：只列／確認「未停權、已不在職」帳號；只給 service role
 //   6. 與 141 相容：若有 141（repo 內或 MIGRATION141_FILE），取出 assert_caller 實跑：enforce 下離職當下就被擋
 //   7. 零行為變更：除了 caller_line_user_id 與新增函式，其他 public 函式、政策、表權限完全不變；
 //      回滾 → caller_line_user_id 回到 138 原文（定義 md5 相同）、其他逐項相同；可重套
@@ -30,6 +30,8 @@ const m145 = read(process.env.MIGRATION145_FILE || path.join(root, 'migrations',
 const m145rb = mig('145_line_auth_live_identity_rollback.sql');
 const m146 = mig('146_line_auth_reconcile_cron.sql');
 const m146rb = mig('146_line_auth_reconcile_cron_rollback.sql');
+const m150 = mig('150_line_auth_reconcile_recheck.sql');
+const m150rb = mig('150_line_auth_reconcile_recheck_rollback.sql');
 const commonJs = read(path.join(root, 'common.js'));
 const m147 = mig('147_line_auth_password_block_hooks.sql');
 const m147rb = mig('147_line_auth_password_block_hooks_rollback.sql');
@@ -71,7 +73,7 @@ GRANT SELECT ON auth.users TO supabase_auth_admin;
 
 (async () => {
   console.log('\n═══════════════════════════════════════');
-  console.log('  Phase 2／3 前置：現查在職、停權對象、擋自設密碼 Hook（145／147，PGlite 實跑）');
+  console.log('  Phase 2／3 前置：現查在職、停權對象、ban 前重查、擋自設密碼 Hook（145／147／150，PGlite 實跑）');
   console.log('═══════════════════════════════════════');
 
   const db = new PGlite();
@@ -103,6 +105,7 @@ GRANT SELECT ON auth.users TO supabase_auth_admin;
   };
   const denied = r => typeof r?.error === 'string' && /permission denied/.test(r.error);
   const NEW_FNS = ['caller_line_user_id', 'line_auth_identity_is_active', 'caller_company_ids', 'line_auth_reconcile_targets', 'line_auth_reconcile_needed',
+    'line_auth_reconcile_should_ban',
     'line_auth_access_token_hook', 'line_auth_password_verification_hook'];
   const state = async () => JSON.stringify({
     fns: await q(`SELECT p.oid::regprocedure::text AS sig, md5(pg_get_functiondef(p.oid)) AS def, coalesce(p.proacl::text, '') AS acl
@@ -143,6 +146,7 @@ GRANT SELECT ON auth.users TO supabase_auth_admin;
   let ok = true;
   try { await x(m145); } catch (e) { ok = false; check('145 可套用', false, e.message); }
   if (ok) check('145 可套用', true);
+  try { await x(m150); check('150 可套用', true); } catch (e) { check('150 可套用', false, e.message); }
   check('其他 public 函式本體／權限、所有政策、表權限與 RLS 完全不變', (await state()) === before);
   const def145 = await callerDef();
   check('caller_line_user_id 權限與 138 相同（anon／authenticated／service_role 可執行）', def145.acl === def138.acl, def145.acl);
@@ -212,24 +216,39 @@ GRANT SELECT ON auth.users TO supabase_auth_admin;
     return t.error ? { error: t.error } : t.rows[0].v;
   };
   const needed = async () => (await as('service_role', { role: 'service_role' }, 'SELECT public.line_auth_reconcile_needed() AS v')).rows?.[0]?.v;
+  const shouldBan = async (id, role = 'service_role') => {
+    const t = await as(role, { role }, 'SELECT public.line_auth_reconcile_should_ban($1) AS v', [id]);
+    return t.error ? { error: t.error } : t.rows[0].v;
+  };
   for (const role of ['anon', 'authenticated']) {
     check(role + ' 不能呼叫 line_auth_reconcile_targets', denied(await targets(role)));
     check(role + ' 不能呼叫 line_auth_reconcile_needed', denied(await as(role, { role }, 'SELECT public.line_auth_reconcile_needed()')));
     check(role + ' 不能呼叫 line_auth_identity_is_active（不能拿來查誰在職）', denied(await as(role, { role }, 'SELECT public.line_auth_identity_is_active($1)', [U.e1])));
+    check(role + ' 不能呼叫 line_auth_reconcile_should_ban', denied(await shouldBan(AU.quit, role)));
   }
+  check('service_role 可呼叫逐筆重查；離職者仍應 ban', (await shouldBan(AU.quit)) === true);
+  check('在職者逐筆重查為 false', (await shouldBan(AU.e1)) === false);
+  check('非 LINE Auth 帳號逐筆重查為 false', (await shouldBan(AU.plain)) === false);
   r = await targets();
   check('只列離職者（在職、平台管理員、非 LINE 帳號都不列）', r?.success === true && r.total === 1 && JSON.stringify(r.targets) === JSON.stringify([AU.quit]), JSON.stringify(r));
   check('needed＝true', (await needed()) === true);
   await x(`UPDATE public.employees SET is_active = false WHERE line_user_id = '${U.e1}'`);
   await x(`UPDATE public.platform_admins SET is_active = false WHERE id = '${PA_ID}'`);
+  check('員工轉離職後，逐筆重查立即變 true', (await shouldBan(AU.e1)) === true);
   r = await targets('service_role', 2);
   check('多人離職＋平台管理員停用：total 3，limit 2 只回最早建立的 2 筆', r?.total === 3 && JSON.stringify(r.targets) === JSON.stringify([AU.e1, AU.quit]), JSON.stringify(r));
   await x(`UPDATE auth.users SET banned_until = now() + interval '100 years' WHERE id IN ('${AU.e1}', '${AU.quit}')`);
   await x(`UPDATE auth.users SET deleted_at = now() WHERE id = '${AU.pa}'`);
+  check('已停權或已刪除帳號逐筆重查為 false（冪等）', (await shouldBan(AU.e1)) === false && (await shouldBan(AU.pa)) === false);
   r = await targets();
   check('已停權、已刪除的不再列入（冪等）', r?.total === 0 && r.targets.length === 0, JSON.stringify(r));
   check('needed＝false（排程不會打 HTTP）', (await needed()) === false);
   await x(`UPDATE auth.users SET banned_until = NULL, deleted_at = NULL; UPDATE public.employees SET is_active = true WHERE line_user_id = '${U.e1}'; UPDATE public.platform_admins SET is_active = true WHERE id = '${PA_ID}';`);
+  const staleTarget = await targets();
+  check('競態前置：targets 快照含離職者', staleTarget?.targets?.includes(AU.quit), JSON.stringify(staleTarget));
+  await x(`UPDATE public.employees SET is_active = true, status = 'approved' WHERE line_user_id = '${U.quit}'`);
+  check('targets 快照後回任：逐筆重查立即 false，舊快照不得拿來 ban', (await shouldBan(AU.quit)) === false);
+  await x(`UPDATE public.employees SET is_active = false, status = 'resigned' WHERE line_user_id = '${U.quit}'`);
 
   console.log('\n=== 146 排程（pg_cron 在 PGlite 不存在：靜態檢查＋以 pg_net 替身實跑排程指令）===');
   {
@@ -289,6 +308,18 @@ GRANT SELECT ON auth.users TO supabase_auth_admin;
   }
 
   console.log('\n=== 145 回滾／重套 ===');
+  try { await x(m150); check('重複套用 150：中止', false); } catch (e) { await x('ROLLBACK'); check('重複套用 150：中止（已套用過）', /已套用過/.test(e.message), e.message); }
+  try {
+    await x(m145rb);
+    check('150 尚在時回滾 145：依賴會阻擋', false);
+  } catch (e) {
+    await x('ROLLBACK');
+    const depsRemain = await one(`SELECT to_regprocedure('public.line_auth_identity_is_active(text)') IS NOT NULL AS f145,
+      to_regprocedure('public.line_auth_reconcile_should_ban(uuid)') IS NOT NULL AS f150`);
+    check('150 尚在時回滾 145：依賴會阻擋，兩支函式都保留', /depend/i.test(e.message) && depsRemain.f145 === true && depsRemain.f150 === true, e.message);
+  }
+  await x(m150rb);
+  check('150 回滾後逐筆重查函式不存在', (await one(`SELECT to_regprocedure('public.line_auth_reconcile_should_ban(uuid)') IS NULL AS gone`)).gone === true);
   try { await x(m145); check('重複套用 145：中止', false); } catch (e) { await x('ROLLBACK'); check('重複套用 145：中止（已套用過）', /已套用過/.test(e.message), e.message); }
   await x(m145rb);
   const defRb = await callerDef();
@@ -298,6 +329,7 @@ GRANT SELECT ON auth.users TO supabase_auth_admin;
   ok = true;
   try { await x(m145); } catch (e) { ok = false; check('回滾後可重套 145', false, e.message); }
   if (ok) check('回滾後可重套 145', true);
+  try { await x(m150); check('回滾後可重套 150', true); } catch (e) { check('回滾後可重套 150', false, e.message); }
   check('重套後離職者仍是 NULL', (await caller(jwt(AU.quit, U.quit))) === null);
 
   console.log('\n=== 147：擋自設密碼的 Auth Hook ===');

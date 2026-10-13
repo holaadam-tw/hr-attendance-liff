@@ -2,8 +2,8 @@
 // line-auth：離職／停用者停權（ban）、回任解除、reconcile 動作（Phase 2／3 前置，145／146）handler.ts 實跑
 //
 // fetch 全部是假的（LINE、PostgREST、GoTrue admin／verify），不連線。
-//   - reconcile：依 line_auth_reconcile_targets 逐一 PUT ban（ban_duration＋app_metadata.line_auth_banned），不需要 LIFF token；
-//     回應不含 user id；關閉開關；145 未套 → 503；目標格式不對不處理
+//   - reconcile：依 line_auth_reconcile_targets 取得快照，每筆 PUT ban 前再用 service role 重查；
+//     回任競態會略過並計 skipped；回應不含 user id；關閉開關；145 未套 → 503；目標格式不對不處理
 //   - 登入時 not_linked 但已有 Auth 帳號 → 停權（已停權的不動，保留人工停權）→ 403
 //   - 在職者登入、帳號是本機制停權的 → 解除停權（ban_duration=none、清標記）再發 session；人工停權 → 403 account_disabled
 // 反向對照：LINE_AUTH_HANDLER 指向 main 舊版 handler → 失敗
@@ -31,13 +31,18 @@ function fakeFetch(routes) {
     calls.push({ method, url, body, headers: init.headers || {} });
     for (const [m, part, responder] of routes) {
       if (m === method && url.includes(part)) {
-        const r = typeof responder === 'function' ? responder(body, url) : responder;
+        const r = typeof responder === 'function' ? await responder(body, url) : responder;
         return new Response(JSON.stringify(r.body ?? {}), { status: r.status || 200, headers: { 'Content-Type': 'application/json' } });
       }
     }
     throw new Error('unexpected fetch ' + method + ' ' + url);
   };
   return { fn, calls };
+}
+function deferred() {
+  let resolve;
+  const promise = new Promise(r => { resolve = r; });
+  return { promise, resolve };
 }
 const baseEnv = { SUPABASE_URL: 'https://db.test', SUPABASE_SERVICE_ROLE_KEY: 'service-key-SECRET', SUPABASE_ANON_KEY: 'anon-key' };
 const post = body => new Request('https://fn/line-auth', { method: 'POST', body: JSON.stringify(body), headers: { 'Content-Type': 'application/json' } });
@@ -50,6 +55,7 @@ function routes(o = {}) {
     ['GET', '/oauth2/v2.1/verify', { body: { client_id: '2008962829', expires_in: 3600 } }],
     ['GET', '/v2/profile', { body: { userId: LINE_USER } }],
     ['POST', '/rest/v1/rpc/line_auth_reconcile_targets', o.targets || { body: { success: true, total: 0, targets: [] } }],
+    ['POST', '/rest/v1/rpc/line_auth_reconcile_should_ban', o.recheck || { body: true }],
     ['POST', '/rest/v1/rpc/line_auth_resolve', o.resolve || { body: { success: true, known: true, company_ids: [COMPANY], auth_user_id: AUTH_ID, auth_email: EMAIL } }],
     ['GET', '/auth/v1/admin/users/', o.getUser || { body: { id: AUTH_ID, app_metadata: { line_user_id: LINE_USER, company_ids: [COMPANY] } } }],
     ['PUT', '/auth/v1/admin/users/', o.update || { body: { id: AUTH_ID } }],
@@ -84,25 +90,66 @@ function routes(o = {}) {
   };
   const puts = f => f.calls.filter(c => c.method === 'PUT' && c.url.includes('/auth/v1/admin/users/'));
   const tgt = f => f.calls.find(c => c.url.includes('line_auth_reconcile_targets'));
+  const rechecks = f => f.calls.filter(c => c.url.includes('line_auth_reconcile_should_ban'));
 
   console.log('\n=== reconcile ===');
   let t = await run({ action: 'reconcile' }, { targets: { body: { success: true, total: 2, targets: [AUTH_ID, AUTH_ID2] } } });
   let p = puts(t.f);
-  check('逐一停權：PUT admin/users/{id}、ban_duration＝約 100 年、app_metadata 標 line_auth_banned', t.res.status === 200 && t.out.banned === 2 && t.out.failed === 0 && t.out.remaining === 0
+  check('逐一重查後停權：PUT admin/users/{id}、ban_duration＝約 100 年、app_metadata 標 line_auth_banned', t.res.status === 200 && t.out.banned === 2 && t.out.skipped === 0 && t.out.failed === 0 && t.out.remaining === 0
     && p.length === 2 && p[0].url.endsWith('/' + AUTH_ID) && p[1].url.endsWith('/' + AUTH_ID2)
     && p.every(c => c.body.ban_duration === '876000h' && c.body.app_metadata.line_auth_banned === true && typeof c.body.app_metadata.line_auth_banned_at === 'string'), JSON.stringify(t.out));
   check('停權只加標記，不覆寫 line_user_id／company_ids', p.every(c => Object.keys(c.body.app_metadata).sort().join(',') === 'line_auth_banned,line_auth_banned_at'));
-  check('用 service role 呼叫 admin API 與 targets', p.every(c => c.headers.Authorization === 'Bearer service-key-SECRET') && tgt(t.f).headers.Authorization === 'Bearer service-key-SECRET');
+  check('用 service role 呼叫 admin API、targets 與逐筆重查', p.every(c => c.headers.Authorization === 'Bearer service-key-SECRET') && tgt(t.f).headers.Authorization === 'Bearer service-key-SECRET'
+    && rechecks(t.f).length === 2 && rechecks(t.f).every(c => c.headers.Authorization === 'Bearer service-key-SECRET'));
   check('reconcile 不需要 LIFF token、不打 LINE', !t.f.calls.some(c => c.url.includes('api.line.me')));
   check('回應不含 user id', !JSON.stringify(t.out).includes(AUTH_ID) && !JSON.stringify(t.out).includes(AUTH_ID2));
   check('targets 每次最多 50', tgt(t.f).body.p_limit === 50);
   t = await run({ action: 'reconcile' });
-  check('沒有對象：200、banned 0、不呼叫 admin API', t.res.status === 200 && t.out.banned === 0 && puts(t.f).length === 0);
+  check('沒有對象：200、banned／skipped 0、不呼叫重查或 admin API', t.res.status === 200 && t.out.banned === 0 && t.out.skipped === 0 && rechecks(t.f).length === 0 && puts(t.f).length === 0);
   const failSecond = (body, url) => (url.endsWith(AUTH_ID2) ? { status: 500, body: {} } : { body: {} });
   t = await run({ action: 'reconcile' }, { targets: { body: { success: true, total: 3, targets: [AUTH_ID, AUTH_ID2] } }, update: failSecond });
   check('部分失敗：banned 1、failed 1、remaining 2（下一輪再試）', t.out.banned === 1 && t.out.failed === 1 && t.out.remaining === 2, JSON.stringify(t.out));
   t = await run({ action: 'reconcile' }, { targets: { body: { success: true, total: 2, targets: ['not-a-uuid', 42] } } });
   check('目標不是 UUID：不處理', puts(t.f).length === 0 && t.out.banned === 0);
+
+  console.log('\n=== reconcile：targets 快照後回任的競態 ===');
+  const recheckEntered = deferred();
+  const allowRecheck = deferred();
+  let activeAgain = false;
+  const raceFetch = fakeFetch(routes({
+    targets: { body: { success: true, total: 1, targets: [AUTH_ID] } },
+    recheck: async () => {
+      recheckEntered.resolve();
+      await allowRecheck.promise;
+      return { body: !activeAgain };
+    },
+  }));
+  const raceResponsePromise = mod.handleLineAuth(post({ action: 'reconcile' }), {
+    fetch: raceFetch.fn, env: key => baseEnv[key], log: m => logs.push(m),
+  });
+  const reachedBarrier = await Promise.race([
+    recheckEntered.promise.then(() => true),
+    raceResponsePromise.then(() => false),
+  ]);
+  activeAgain = true;
+  const loginDuringRace = await run({ liff_access_token: 'liff-at-SECRET' }, {
+    getUser: { body: { id: AUTH_ID, banned_until: future(), app_metadata: { line_user_id: LINE_USER, company_ids: [COMPANY], line_auth_banned: true } } },
+  });
+  allowRecheck.resolve();
+  const raceResponse = await raceResponsePromise;
+  const raceOut = await raceResponse.json();
+  check('可控 barrier 確實落在 targets 之後、ban 之前', reachedBarrier);
+  check('barrier 期間回任登入已先解除本機制停權並取得 session', loginDuringRace.res.status === 200 && loginDuringRace.out.mode === 'session'
+    && puts(loginDuringRace.f).length === 1 && puts(loginDuringRace.f)[0].body.ban_duration === 'none');
+  check('逐筆重查發現已回任：不得再次 ban，並計 skipped', raceResponse.status === 200 && raceOut.banned === 0 && raceOut.skipped === 1 && raceOut.failed === 0
+    && raceOut.remaining === 0 && rechecks(raceFetch).length === 1 && puts(raceFetch).length === 0, JSON.stringify(raceOut));
+
+  t = await run({ action: 'reconcile' }, { targets: { body: { success: true, total: 1, targets: [AUTH_ID] } }, recheck: { body: false } });
+  check('一般重查為 false：略過、不 ban、skipped 1', t.out.banned === 0 && t.out.skipped === 1 && t.out.failed === 0 && puts(t.f).length === 0, JSON.stringify(t.out));
+  t = await run({ action: 'reconcile' }, { targets: { body: { success: true, total: 1, targets: [AUTH_ID] } }, recheck: { status: 500, body: {} } });
+  check('重查失敗時 fail closed：不 ban、failed 1', t.out.banned === 0 && t.out.skipped === 0 && t.out.failed === 1 && puts(t.f).length === 0, JSON.stringify(t.out));
+  t = await run({ action: 'reconcile' }, { targets: { body: { success: true, total: 1, targets: [AUTH_ID] } }, recheck: { status: 404, body: { code: 'PGRST202' } } });
+  check('150 未套：503 db_not_migrated、不得 ban', t.res.status === 503 && t.out.code === 'db_not_migrated' && puts(t.f).length === 0);
   t = await run({ action: 'reconcile' }, { targets: { status: 404, body: { code: 'PGRST202' } } });
   check('145 未套：503 db_not_migrated', t.res.status === 503 && t.out.code === 'db_not_migrated');
   t = await run({ action: 'reconcile' }, { targets: { status: 500, body: {} } });

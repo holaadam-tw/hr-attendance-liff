@@ -62,6 +62,7 @@ async function saveSetting(key, value, description) {
 - **回歸測試清單**：CLAUDE.md 末尾有核心頁面開啟測試 + 修改影響範圍對照表，commit 前必確認
 
 ## 最近修改記錄
+- 2026-10-13: line-auth reconcile 在每筆 Auth Admin ban 前，必須以 service role 呼叫 `line_auth_reconcile_should_ban(auth_user_id)` 重新確認；targets 只視為候選快照。回任者略過並計 `skipped`，重查失敗 fail closed。函式由 migration 150 建立，只授權 service_role；新版 handler 必須在 150 之後部署。
 - 2026-03-10: 權限分級 + 薪酬密碼鎖
 - 2026-03-11: 首頁直接編輯功能開關，移除 admin 功能管理頁面
 - 2026-03-11: 員工視角修復（隱藏 toggle/編輯按鈕）

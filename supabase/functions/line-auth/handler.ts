@@ -20,7 +20,7 @@
 // 離職／停用（Phase 2／3 前置，145／146）：
 //   - 登入時 not_linked 但已有 Auth 帳號（例如離職後又打開 LIFF）→ 以 admin API 停權（ban，可逆）再回 403
 //   - {"action":"reconcile"}（146 的 pg_cron 在有對象時呼叫）：line_auth_reconcile_targets 列出「LINE Auth 帳號未停權、
-//     但已不在職」的帳號 → 逐一停權。只依 DB 現況、冪等、每次最多 50 筆 → 任何人觸發都不會停權到在職者。
+//     但已不在職」的帳號；每筆 ban 前再以 line_auth_reconcile_should_ban 現查，回任者略過。冪等、每次最多 50 筆。
 //     停權時在 app_metadata 標 line_auth_banned=true；已被人工停權（沒有這個標記）的帳號一律不碰。
 //   - 回任（再次在職）：登入時發現帳號是「本機制停權的」→ 自動解除停權；人工停權的 → 403 account_disabled
 //   關閉開關：secret LINE_AUTH_RECONCILE_DISABLED=true → reconcile 一律 503（登入時的停權／解除不受影響）
@@ -95,14 +95,27 @@ async function reconcile(deps: Deps, log: (m: string) => void): Promise<Response
   if (t.status === 404) return fail(503, 'db_not_migrated', '資料庫尚未更新（145）')
   if (!t.ok || !t.data || t.data.success !== true || !Array.isArray(t.data.targets)) return fail(503, 'service_unavailable', '服務暫時無法使用')
   const ids: string[] = t.data.targets.filter((x: unknown) => typeof x === 'string' && /^[0-9a-f-]{36}$/i.test(x as string))
-  let banned = 0, failed = 0
+  let banned = 0, skipped = 0, failed = 0
   for (const id of ids) {
+    // targets 是快照；ban 前必須再依目前 DB 狀態確認，避免回任登入剛解除後又被舊快照停權。
+    const current = await call(deps, '/rest/v1/rpc/line_auth_reconcile_should_ban', {
+      method: 'POST', key: 'service', body: { p_auth_user_id: id },
+    })
+    if (current.status === 404) return fail(503, 'db_not_migrated', '資料庫尚未更新（150）')
+    if (!current.ok || typeof current.data !== 'boolean') {
+      failed++
+      continue
+    }
+    if (!current.data) {
+      skipped++
+      continue
+    }
     if (await banAuthUser(deps, id)) banned++
     else failed++
   }
   const total = Number(t.data.total) || 0
-  if (banned || failed) log(`line-auth: reconcile banned=${banned} failed=${failed} total=${total}`)
-  return json({ ok: true, status: 200, banned, failed, remaining: Math.max(0, total - banned) }, 200)
+  if (banned || skipped || failed) log(`line-auth: reconcile banned=${banned} skipped=${skipped} failed=${failed} total=${total}`)
+  return json({ ok: true, status: 200, banned, skipped, failed, remaining: Math.max(0, total - banned - skipped) }, 200)
 }
 
 const sameIds = (a: unknown, b: unknown) =>

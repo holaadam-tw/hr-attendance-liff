@@ -1,12 +1,12 @@
-# P1 身分根治：Phase 2／3 前置三件事（145／146／147）
+# P1 身分根治：Phase 2／3 前置三件事（145／146／147／150）
 
-> 狀態：PR 待審。**未套 145／146／147、未部署 line-auth、未改任何 Dashboard 設定（含 Auth Hooks）。**
+> 狀態：PR 待審。**未套 145／146／147／150、未部署 line-auth、未改任何 Dashboard 設定（含 Auth Hooks）。**
 > 對應 `docs/LINE_AUTH_PHASE1.md` 末段「Phase 2／3 之前必須先處理」的 1～3 項。
 
 | # | 做什麼 | 檔案 | 生效方式 |
 |---|---|---|---|
 | 1 | 每次呼叫都在 DB 現查在職 | `migrations/145_line_auth_live_identity.sql` | 套 145 即生效 |
-| 2 | 離職／停用 → 停權（ban）Auth 帳號；line-auth 拒發 session | `supabase/functions/line-auth/handler.ts`、`migrations/146_line_auth_reconcile_cron.sql`（145 的 D 段） | 部署 line-auth → 套 146 |
+| 2 | 離職／停用 → 停權（ban）Auth 帳號；每筆 ban 前重查；line-auth 拒發 session | `supabase/functions/line-auth/handler.ts`、`migrations/145_line_auth_live_identity.sql`、`migrations/150_line_auth_reconcile_recheck.sql`、`migrations/146_line_auth_reconcile_cron.sql` | 套 145、150 → 部署 line-auth → 套 146 |
 | 3 | 擋「LINE 帳號改用密碼登入」 | `migrations/147_line_auth_password_block_hooks.sql` | 套 147 → **Dashboard 啟用 Hook** |
 
 ## 1. 現查在職（145）
@@ -32,8 +32,11 @@
 
 ### 設計：依「結果」比對，不掛在每一條寫入路徑上
 - **145 D 段**：`line_auth_reconcile_targets()` 列出「有 LINE Auth 帳號、未停權、但 `line_auth_identity_is_active` 為 false」的帳號（只給 service role）。
-- **line-auth `{"action":"reconcile"}`**：逐一以 admin API `PUT /auth/v1/admin/users/{id}` 停權（`ban_duration: 876000h`），
-  並在 `app_metadata` 標 `line_auth_banned: true`。每次最多 50 筆、冪等；回應不含 user id。
+- **150**：新增唯讀 `line_auth_reconcile_should_ban(auth_user_id)`。它直接由 auth user id 重新讀 `auth.users`，並以
+  `line_auth_identity_is_active()` 確認該帳號目前仍「未停權且不在職」；只授權 `service_role`，anon／authenticated 不可執行。
+- **line-auth `{"action":"reconcile"}`**：逐筆先以 service role 呼叫 150 重查；仍需停權才以 admin API
+  `PUT /auth/v1/admin/users/{id}`（`ban_duration: 876000h`），已回任則略過並計入 `skipped`。停權時在
+  `app_metadata` 標 `line_auth_banned: true`。每次最多 50 筆、冪等；回應不含 user id。重查失敗時 fail closed，不送 ban。
 - **146**：pg_cron 每 5 分鐘，**只有** `line_auth_reconcile_needed()` 為 true 時才用 pg_net 呼叫 reconcile（平常零 HTTP）。
 - **line-auth 登入時**：
   - 不在職但已有 Auth 帳號 → 停權後回 403 `not_linked`（已停權的不動）
@@ -49,7 +52,8 @@
 | **排程依結果比對（採用）** | 所有路徑一次涵蓋；員工資料的寫入完全不受影響。延遲最多約 5 分鐘，但**即時性由第 1 項保證**（DB 現查），停權只是第二道 |
 | ban vs 刪除 | **ban（可逆）**：回任自動解除、紀錄保留；刪除會讓 `auth.users` 的對應消失、回任要重建 |
 
-- reconcile 用 anon key 就能觸發（前端已公開的同一把）：它只依 DB 現況停權「已不在職」的帳號、冪等，任何人觸發都停權不到在職者；
+- reconcile 用 anon key 就能觸發（前端已公開的同一把）：真正的逐筆重查由 Edge Function 以 service role 執行，
+  只依 DB 現況停權「仍不在職」的帳號；任何人都不能藉觸發參數指定對象；
   最多只是多一次 DB 查詢。
 - 停權後 refresh 會被 Auth 拒絕；手上還沒過期的 access token 在第 1 項下也已經沒有身分。
 - 關閉：Edge Function secret `LINE_AUTH_RECONCILE_DISABLED=true`（只停 reconcile）；或回滾 146。
@@ -84,8 +88,9 @@
 前提：138 已套、line-auth Phase 1 已上線；**Allow new users to sign up 已關閉**（Phase 1 的硬性閘門）。
 
 1. 套 **145**（純新增＋改寫 `caller_line_user_id`；141 未套前沒有任何 RPC／政策用它，只有 `line_auth_whoami` 會讀）。
-2. 部署 line-auth：`supabase functions deploy line-auth`（本 PR 的 handler）。
-3. 套 **146**（排程）。觀察：
+2. 套 **150**（唯讀逐筆重查；只授權 service role）。
+3. 部署 line-auth：`supabase functions deploy line-auth`（本 PR 的 handler）。若 150 尚未套用，新 handler 會 fail closed 回 `db_not_migrated`，不會 ban。
+4. 套 **146**（排程）。觀察：
    ```sql
    SELECT public.line_auth_reconcile_targets(50);   -- service role／SQL Editor；total 應在 5 分鐘內變 0
    SELECT count(*) FILTER (WHERE banned_until > now()) AS banned,
@@ -93,17 +98,20 @@
    FROM auth.users;
    SELECT status_code, count(*) FROM net._http_response WHERE created > now() - interval '1 hour' GROUP BY 1;
    ```
-4. 套 **147** → Dashboard 啟用 Custom Access Token Hook（見上）。
-5. 與 #8：合併順序不拘（145 不改 141；兩邊檔案沒有衝突）。#8 合併後，本 PR 的 141 相容測試會自動執行。
+5. 套 **147** → Dashboard 啟用 Custom Access Token Hook（見上）。
+6. 與 #8：合併順序不拘（145／150 不改 141；兩邊檔案沒有衝突）。#8 合併後，本 PR 的 141 相容測試會自動執行。
 
 ## 回滾
-- 145：`145_line_auth_live_identity_rollback.sql`（`caller_line_user_id` 還原成 138 原文；146 排程還在會中止）。要回滾 138 前必須先回滾 145。
 - 146：`146_line_auth_reconcile_cron_rollback.sql`（只移除排程）。
 - 147：**先停用 Dashboard Hook**，再 `147_line_auth_password_block_hooks_rollback.sql`。
+- 150：`150_line_auth_reconcile_recheck_rollback.sql`。新版 handler 在函式缺少時會 fail closed；要回滾 145 前先回滾 150。
+- 145：`145_line_auth_live_identity_rollback.sql`（`caller_line_user_id` 還原成 138 原文；146 排程還在會中止）。要回滾 138 前必須先回滾 150、145。
 - 解除某個人的停權：Dashboard → Authentication → Users → 該使用者 → Unban；或讓他（在職狀態下）重新從 LINE 開頁面（本機制停權的會自動解除）。
 
 ## 已知限制／未驗證
 - 未在正式環境實跑（不得套用／部署）。GoTrue 行為（ban 後 refresh 被拒、`app_metadata` 逐鍵合併且 `null` 刪鍵、Hook 的輸入欄位）依官方文件與原始碼，
-  以假 fetch／PGlite 驗證；**第一次上線請照上面的觀察 SQL 與步驟 3 實機確認**。
+  以假 fetch／PGlite 驗證；**第一次上線請照上面的觀察 SQL 與步驟 4 實機確認**。
 - 146 的排程指令在 PGlite 以 pg_net 替身實跑（pg_cron 不存在於 PGlite）；排程本身只做靜態檢查。
+- 逐筆重查已阻止「targets 快照後回任、登入解除、舊 reconcile 再 ban」的可重現交錯；DB 重查與外部 Auth Admin API
+  仍無法形成單一交易，兩者之間仍有極短的理論競態窗。若未來要完全消除，需在停權／解除協定加入可比較的 generation。
 - Password Verification Hook 的方案支援依官方文件；本專案方案未確認。
