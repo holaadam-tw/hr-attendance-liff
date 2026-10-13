@@ -17,8 +17,15 @@ const { PGlite } = require('@electric-sql/pglite');
 
 const root = path.join(__dirname, '..');
 const read = f => fs.readFileSync(f, 'utf8');
-const snapshot = read(path.join(__dirname, 'fixtures', 'phase0_prod_snapshot.sql'))
-  + '\n' + read(path.join(__dirname, 'fixtures', 'attendance_schedules_prod_snapshot.sql'));
+// PGlite 沒有可直接覆寫的 pg_catalog.now()。測試載入正式庫快照時，僅在記憶體內
+// 把 now() 導向可控的測試替身；fixture、migration 與 production RPC 原檔都不修改。
+const useTestClock = sql => sql.replace(/\bnow\(\)/gi, 'public.test_now()');
+const snapshot = useTestClock(read(path.join(__dirname, 'fixtures', 'phase0_prod_snapshot.sql'))
+  + '\n' + read(path.join(__dirname, 'fixtures', 'attendance_schedules_prod_snapshot.sql')));
+const initialTestNow = process.env.TEST_TAIPEI_NOW || '2026-10-13T10:00:00+08:00';
+if (!/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}\+08(?::?00)?$/.test(initialTestNow)) {
+  throw new Error(`TEST_TAIPEI_NOW 格式錯誤：${initialTestNow}（例：2026-10-13T21:30:00+08:00）`);
+}
 const mig = n => read(path.join(root, 'migrations', n));
 const m130 = mig('130_companies_binding_attempts_lock.sql');
 const m131 = mig('131_verified_admin_rpcs.sql');
@@ -46,6 +53,8 @@ const E = {
   e3: '00000000-0000-0000-0000-0000000000e3',
   e4: '00000000-0000-0000-0000-0000000000e4',
   e5: '00000000-0000-0000-0000-0000000000e5',
+  e6: '00000000-0000-0000-0000-0000000000e6',
+  e7: '00000000-0000-0000-0000-0000000000e7',
   sched: '00000000-0000-0000-0000-0000000000e9',
   kiosk: '00000000-0000-0000-0000-0000000000c1',
   bAdmin: '00000000-0000-0000-0000-0000000000b1',
@@ -68,8 +77,15 @@ const SWAP_DATE = '2026-10-05';
   console.log('═══════════════════════════════════════');
 
   const db = new PGlite();
+  async function installTestClock(targetDb, value = initialTestNow) {
+    await targetDb.exec(`CREATE OR REPLACE FUNCTION public.test_now() RETURNS timestamptz
+      LANGUAGE sql STABLE AS $$ SELECT current_setting('test.fixed_now')::timestamptz $$`);
+    await targetDb.query(`SELECT set_config('test.fixed_now', $1, false)`, [value]);
+  }
   const q = async (sql, params) => (await db.query(sql, params)).rows;
   const one = async (sql, params) => (await q(sql, params))[0];
+  await installTestClock(db);
+  const setTestNow = value => db.query(`SELECT set_config('test.fixed_now', $1, false)`, [value]);
   await db.exec(snapshot);
 
   async function as(role, sql, params) {
@@ -101,8 +117,12 @@ const SWAP_DATE = '2026-10-05';
     }
   }
   const denied = r => typeof r?.error === 'string' && /permission denied/.test(r.error);
-  const today = (await one(`SELECT (now() AT TIME ZONE 'Asia/Taipei')::date::text AS d`)).d;
-  const yesterday = (await one(`SELECT ((now() AT TIME ZONE 'Asia/Taipei')::date - 1)::text AS d`)).d;
+  const fixedClock = await one(`SELECT public.test_now() = $1::timestamptz AS ok,
+    to_char(public.test_now() AT TIME ZONE 'Asia/Taipei', 'YYYY-MM-DD HH24:MI:SS') AS value`, [initialTestNow]);
+  check('測試時鐘可由 TEST_TAIPEI_NOW 控制', fixedClock.ok === true, fixedClock.value);
+  const today = (await one(`SELECT (public.test_now() AT TIME ZONE 'Asia/Taipei')::date::text AS d`)).d;
+  const yesterday = (await one(`SELECT ((public.test_now() AT TIME ZONE 'Asia/Taipei')::date - 1)::text AS d`)).d;
+  const taipeiAt = time => `${today}T${time}+08:00`;
   const attOf = (emp, d = today) => one(`SELECT * FROM public.attendance WHERE employee_id = $1 AND date = $2`, [emp, d]);
   const schedOf = (emp, d) => one(`SELECT shift_type_id, is_off_day, notes FROM public.schedules WHERE employee_id = $1 AND date = $2`, [emp, d]);
 
@@ -137,6 +157,8 @@ const SWAP_DATE = '2026-10-05';
         ('${E.e3}', '${A}', 'E03', '員工三', 'U3', 'user', false, false, 'approved', true, 'fixed'),
         ('${E.e4}', '${A}', 'E04', '員工四', 'U4', 'user', false, false, 'approved', true, 'scheduled'),
         ('${E.e5}', '${A}', 'E05', '員工五', 'U5', 'user', false, false, 'approved', true, 'scheduled'),
+        ('${E.e6}', '${A}', 'E06', '期限前員工', 'U6', 'user', false, false, 'approved', true, 'fixed'),
+        ('${E.e7}', '${A}', 'E07', '期限後員工', 'U7', 'user', false, false, 'approved', true, 'fixed'),
         ('${E.sched}', '${A}', 'E09', '排班員', 'U9', 'user', false, true, 'approved', true, 'fixed'),
         ('${E.kiosk}', '${A}', 'K01', '公務機', 'Ukiosk', 'user', true, false, 'approved', true, 'fixed'),
         ('${E.bAdmin}', '${B}', 'B01', '別家主管', 'UBadmin', 'admin', false, true, 'approved', true, 'fixed'),
@@ -151,7 +173,7 @@ const SWAP_DATE = '2026-10-05';
         ('${E.e4}', '${today}', '${ST.day}'), ('${E.bUser}', '${SWAP_DATE}', '${ST.b}'), ('${E.e1}', '${OFF_DATE}', '${ST.day}');
       INSERT INTO public.schedules (employee_id, date, shift_type_id, is_off_day, notes) VALUES ('${E.e2}', '${OFF_DATE}', NULL, true, '家中有事');
       INSERT INTO public.attendance (employee_id, date, check_in_time, check_out_time, is_late) VALUES
-        ('${E.bUser}', '${yesterday}', now() - interval '1 day 9 hours', now() - interval '1 day', false);
+        ('${E.bUser}', '${yesterday}', public.test_now() - interval '1 day 9 hours', public.test_now() - interval '1 day', false);
       INSERT INTO public.shift_swap_requests (id, requester_id, target_id, swap_date, status, target_agreed, requester_original_shift, target_original_shift) VALUES
         ('${SW.ok}', '${E.e4}', '${E.e5}', '${SWAP_DATE}', 'pending_admin', true, '早班', '晚班'),
         ('${SW.notAgreed}', '${E.e4}', '${E.e5}', '${SWAP_DATE}', 'pending_target', NULL, '早班', '晚班'),
@@ -172,7 +194,7 @@ const SWAP_DATE = '2026-10-05';
   console.log('\n=== 套用前（PR #3 之後的正式庫）：重現直接寫表 ===');
   await seed();
   let r = await as('anon', `INSERT INTO public.attendance (employee_id, date, check_in_time, check_out_time, is_manual)
-      VALUES ($1, $2, now() - interval '10 hours', now(), false) RETURNING id`, [E.bUser, today]);
+      VALUES ($1, $2, public.test_now() - interval '10 hours', public.test_now(), false) RETURNING id`, [E.bUser, today]);
   check('現況重現：anon 直接新增別家公司員工的出勤', !r.error && r.rows.length === 1, r.error);
   r = await as('anon', `UPDATE public.attendance SET is_late = true, check_in_time = check_in_time + interval '2 hours' WHERE employee_id = $1 AND date = $2 RETURNING id`, [E.bUser, yesterday]);
   check('現況重現：anon 直接改既有出勤（上班時間、遲到）', !r.error && r.rows.length === 1, r.error);
@@ -197,7 +219,7 @@ const SWAP_DATE = '2026-10-05';
   const attCount = async () => (await one(`SELECT count(*)::int AS n FROM public.attendance`)).n;
   const before = await attCount();
   for (const role of ['anon', 'authenticated']) {
-    r = await as(role, `INSERT INTO public.attendance (employee_id, date, check_in_time) VALUES ($1, $2, now())`, [E.bUser, today]);
+    r = await as(role, `INSERT INTO public.attendance (employee_id, date, check_in_time) VALUES ($1, $2, public.test_now())`, [E.bUser, today]);
     check(`${role} 直接新增出勤：permission denied`, denied(r), r.error);
     r = await as(role, `UPDATE public.attendance SET is_late = true WHERE employee_id = $1`, [E.bUser]);
     check(`${role} 直接改出勤：permission denied`, denied(r), r.error);
@@ -214,6 +236,7 @@ const SWAP_DATE = '2026-10-05';
   await db.exec(`DELETE FROM public.schedules WHERE date = '2026-10-21'`);
 
   console.log('\n--- 134 之後：打卡與補卡流程（與前端相同，以 anon 呼叫正式庫原文函式）---');
+  await setTestNow(taipeiAt('10:00:00'));
   await db.exec(`INSERT INTO public.attendance_anomalies (company_id, employee_id, date, anomaly_type, status) VALUES ('${A}', '${E.e1}', '${today}', 'missing_checkout', 'pending')`);
   r = await rpc('anon', 'quick_check_in', { p_line_user_id: 'U1', p_latitude: 25.03, p_longitude: 121.56, p_photo_url: null, p_device_id: 'dev1', p_action: 'check_in' });
   let row = await attOf(E.e1);
@@ -243,6 +266,24 @@ const SWAP_DATE = '2026-10-05';
   r = await rpc('anon', 'quick_check_out_after_clock_in_makeup', { p_line_user_id: 'U5', p_latitude: 25.03, p_longitude: 121.56, p_photo_url: null, p_device_id: null, p_action: 'check_out' });
   row = await attOf(E.e5);
   check('上班補卡待審時仍可下班（quick_check_out_after_clock_in_makeup）：成功、先建空白列再寫下班', r?.success === true && !!row?.check_out_time, JSON.stringify(r));
+
+  // 預設 17:00 下班、checkout_time_limit_hours 未設定時，期限固定為 21:00。
+  // 先在上午建立兩筆上班卡，再精確控制下班時鐘，避免測試受真實執行時間影響。
+  for (const uid of ['U6', 'U7']) {
+    r = await rpc('anon', 'quick_check_in', { p_line_user_id: uid, p_latitude: 25.03, p_longitude: 121.56, p_photo_url: null, p_device_id: null, p_action: 'check_in' });
+    check(`${uid} 邊界案例前置：上班成功`, r?.success === true && r.type === 'check_in', JSON.stringify(r));
+  }
+  await setTestNow(taipeiAt('20:59:59'));
+  r = await rpc('anon', 'quick_check_in', { p_line_user_id: 'U6', p_latitude: 25.03, p_longitude: 121.56, p_photo_url: null, p_device_id: null, p_action: 'check_out' });
+  row = await attOf(E.e6);
+  check('下班期限前 1 秒：成功下班', r?.success === true && r.type === 'check_out' && !!row?.check_out_time, JSON.stringify(r));
+  await setTestNow(taipeiAt('21:00:01'));
+  r = await rpc('anon', 'quick_check_in', { p_line_user_id: 'U7', p_latitude: 25.03, p_longitude: 121.56, p_photo_url: null, p_device_id: null, p_action: 'check_out' });
+  row = await attOf(E.e7);
+  check('下班期限後 1 秒：明確回 checkout_time_expired 且不寫下班卡', r?.success === false && r.error === 'checkout_time_expired'
+    && r.checkout_deadline === `${today} 21:00:00` && !row?.check_out_time, JSON.stringify(r));
+  await setTestNow(taipeiAt('10:00:00'));
+
   await db.exec(`INSERT INTO public.makeup_punch_requests (id, employee_id, punch_date, punch_type, punch_time, reason, status)
       VALUES ('${MK}', '${E.e2}', '${yesterday}', 'clock_in', '08:00', '忘記打卡', 'pending')`);
   r = await rpc('service_role', 'review_makeup_request', { p_company_id: A, p_line_user_id: 'Umgr', p_request_id: MK, p_decision: 'approve', p_reason: null });
@@ -304,6 +345,7 @@ const SWAP_DATE = '2026-10-05';
   console.log('\n=== 套用 135（schedules 寫入鎖）===');
   {
     const db2 = new PGlite();
+    await installTestClock(db2);
     await db2.exec(snapshot);
     let e2 = '';
     try { await db2.exec(m135); } catch (e) { e2 = e.message; }
