@@ -5,6 +5,16 @@
 
 ---
 
+## 🟡 2026-10-13 RLS 收斂第二階段 149-C／員工端與公開頁 leave_requests 改走 RPC（已實作，未部署）
+
+- 員工端 `common.js` 的同時請假提示改呼叫 `get_company_leave_overlap`，本人重疊檢查、月請假天數與 `records.html` 月曆改呼叫 `get_my_leave_requests`；所有本人 RPC 都沿用 `currentEmployee?.line_user_id || liffProfile?.userId` 並傳 `p_company_id`。
+- `checkLeaveAvailability` 改讀頂層 `employee_name`；RPC 失敗時顯示「暫時無法確認」警告但不禁用送出，`findMyOverlappingLeave` 失敗則回到送假 RPC 的伺服器端重疊防線，不會無提示阻擋正常送假。
+- `attendance_public.html` 只有查看台灣今日時呼叫 `get_public_today_leave_employees`；今日只顯示「請假」，不顯示假別、時段或待審狀態。非今日不呼叫任何請假 RPC；既有日出勤 RPC 若帶回 `on_leave`，有打卡者仍依卡片顯示工作中／完成，無打卡者改為中性 `not_shown`（畫面與 Excel 顯示「—」），並排除於應出勤、未打卡／缺勤及請假統計。
+- 前端（排除 `tests/`）已無 `sb.from('leave_requests')`；14 個 HTML 的 `common.js?v=` 已機械式同步為 `20261013-leaverpc149c`。
+- 新增 `tests/leave-requests-employee-public-rpc.test.js` 並納入 `tests/run-all.js`，涵蓋靜態範圍、參數、版本一致、VM 衝突人數新舊行為、錯誤退路、公開頁非今日零 RPC、`not_shown` 顯示／統計／Excel 與還原成 `absent` 的反向突變，共 **51/51 通過**。
+- `npm.cmd test` 僅剩業主事先允許的 21:00 後既有 `attendance-schedules-write-lock` **84 通過／3 失敗**：兩項下班操作回 `checkout_time_expired`，另一項因第一項未完成而無法自動結案；與 149-C 無關。
+- 本輪未連線正式庫、未寫入 DB、未操作 Supabase Dashboard、未部署，且未執行 git add／commit／push；前端正式可用仍取決於 149-A migration 已在目標環境套用。
+
 ## 🟡 2026-10-13 RLS 收斂第二階段 149-B／管理端 leave_requests 改走 RPC（已實作，未部署）
 
 - 管理端 8 個讀取點（`attendance_overview.html` #1、`modules/audit.js` #6/#7、`modules/leave.js` #8/#9、`modules/payroll.js` #10/#11、`modules/schedules.js` #12）已改呼叫 `get_company_leave_requests`，並傳入 `p_company_id`、`p_line_user_id` 與各頁原有日期／狀態條件。
