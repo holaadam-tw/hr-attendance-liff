@@ -1190,12 +1190,15 @@
                         .not('check_in_time', 'is', null)
                         .is('check_out_time', null)
                         .limit(1000),
-                    sb.from('leave_requests')
-                        .select('employee_id, start_date, end_date, employees!leave_requests_employee_id_fkey!inner(company_id)')
-                        .eq('employees.company_id', window.currentCompanyId)
-                        .eq('status', 'approved')
-                        .lte('start_date', ANOMALY_TRACKING_START).gte('end_date', LEGACY_GAP_FROM)
-                        .limit(1000)
+                    sb.rpc('get_company_leave_requests', {
+                        p_line_user_id: liffProfile?.userId || null,
+                        p_company_id: window.currentCompanyId,
+                        p_from: LEGACY_GAP_FROM,
+                        p_to: ANOMALY_TRACKING_START,
+                        p_statuses: ['approved'],
+                        p_employee_id: null,
+                        p_limit: 1000
+                    })
                 ]);
                 if (attRes.error) throw attRes.error;
                 if (lvRes.error) throw lvRes.error;

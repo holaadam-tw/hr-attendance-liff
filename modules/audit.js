@@ -81,10 +81,12 @@ export async function exportReport(type) {
                 sb.from('attendance')
                     .select('employee_id, date, check_in_time, check_out_time, total_work_hours, employees!inner(name, employee_number, department, company_id)')
                     .eq('employees.company_id', window.currentCompanyId).gte('date', first).lte('date', last),
-                sb.from('leave_requests')
-                    .select('employee_id, leave_type, leave_period, leave_hours, days, start_date, end_date, employees!leave_requests_employee_id_fkey!inner(name, employee_number, department, company_id)')
-                    .eq('employees.company_id', window.currentCompanyId).eq('status', 'approved')
-                    .lte('start_date', last).gte('end_date', first),
+                sb.rpc('get_company_leave_requests', {
+                    p_line_user_id: window.currentAdminEmployee?.line_user_id || null,
+                    p_company_id: window.currentCompanyId,
+                    p_from: first, p_to: last, p_statuses: ['approved'],
+                    p_employee_id: null, p_limit: 1000
+                }),
                 // overtime_requests 改走 RPC（migration 109；110 收 RLS 後直接查表會查不到）
                 sb.rpc('get_company_overtime_requests', {
                     p_company_id: window.currentCompanyId,
@@ -92,6 +94,7 @@ export async function exportReport(type) {
                     p_from: first, p_to: last, p_status: 'approved', p_limit: 1000
                 })
             ]);
+            if (lvRes.error) throw lvRes.error;
 
             // 台灣時區的當日分鐘數（0=00:00）。DB 存 UTC，不可用 getHours()
             const twMinutes = (ts) => {
@@ -174,7 +177,13 @@ export async function exportReport(type) {
             (data || []).forEach(r => rows.push([r.date, r.employees?.employee_number, r.employees?.name, r.employees?.department, r.check_in_time ? new Date(r.check_in_time).toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', hour12: false }) : '', r.check_out_time ? new Date(r.check_out_time).toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', hour12: false }) : '', r.status, r.late_minutes || 0, r.is_manual ? '是' : '', r.notes || '']));
             fn = `出勤報表_${ms}.csv`;
         } else if (type === 'leave') {
-            const { data } = await sb.from('leave_requests').select('*, employees!leave_requests_employee_id_fkey!inner(name, employee_number, department, company_id)').eq('employees.company_id', window.currentCompanyId).order('created_at', { ascending: false }).limit(200);
+            const { data, error } = await sb.rpc('get_company_leave_requests', {
+                p_line_user_id: window.currentAdminEmployee?.line_user_id || null,
+                p_company_id: window.currentCompanyId,
+                p_from: null, p_to: null, p_statuses: null,
+                p_employee_id: null, p_limit: 200
+            });
+            if (error) throw error;
             const tm = { annual: '特休', sick: '病假', personal: '事假', compensatory: '補休', maternity: '產假', marriage: '婚假', bereavement: '喪假' };
             const periodLabel = (r) => {
                 if (r.leave_period === 'hourly') return `${r.leave_hours || 0} 小時`;

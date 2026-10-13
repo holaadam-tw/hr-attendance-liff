@@ -12,7 +12,7 @@ import {
 
 import {
     loadAuditLogs, exportReport, initReportMonth
-} from './audit.js?v=20260806-batchfix';
+} from './audit.js?v=20261013-leaverpc149b';
 
 import {
     showAddEmployeeModal, closeAddEmployeeModal, initEmployeeFormHandler,
@@ -37,7 +37,7 @@ import {
     loadAdminLunchStats, loadStaffOverview, changeLeaveCal,
     resetLeaveCal, loadLeaveCal,
     clearLeaveState
-} from './leave.js?v=20260927-linesecure2';
+} from './leave.js?v=20261013-leaverpc149b';
 
 import {
     changeShiftWeek, resetShiftWeek, loadShiftMgr, cycleShift,
@@ -48,7 +48,7 @@ import {
     loadShiftTypeList, showAddShiftTypeForm, editShiftTypeById, deleteShiftTypeById, saveShiftType, deleteShiftType,
     loadEmployeeShiftModes, toggleShiftModeRow, saveAllShiftModes, smMarkChanged, smClearChanged, smHasUnsavedChanges,
     clearSchedulesState
-} from './schedules.js?v=20260928-attlock133';
+} from './schedules.js?v=20261013-leaverpc149b';
 
 import {
     BONUS_MATRIX, loadHybridBonusData, renderSelectedBonusCard,
@@ -64,7 +64,7 @@ import {
     editInsBracket, saveInsBracket, deleteInsBracket, updateAllInsRates,
     switchPayTab,
     initAuditPage, loadAuditData
-} from './payroll.js?v=20260927-linesecure2';
+} from './payroll.js?v=20261013-leaverpc149b';
 
 import {
     loadRestaurantList, openRestaurantDetail, previewStoreOrder, openKDS,
