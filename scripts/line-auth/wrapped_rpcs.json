@@ -1,0 +1,236 @@
+{
+  "generated_by": "scripts/line-auth/generate-rpc-wrappers.js",
+  "migration": "141",
+  "rpc_names": [
+    "admin_makeup_punch",
+    "approve_leave_request",
+    "confirm_daily_overtime",
+    "count_fw_trackpoints",
+    "create_shift_type",
+    "delete_company_holiday",
+    "delete_shift_type",
+    "get_attendance_anomalies",
+    "get_checkin_failures",
+    "get_company_current_salaries",
+    "get_company_daily_attendance",
+    "get_company_holidays",
+    "get_company_leave_requests_for_audit",
+    "get_company_monthly_attendance",
+    "get_company_monthly_missing_minutes",
+    "get_company_overtime_requests",
+    "get_company_payroll",
+    "get_company_shift_types",
+    "get_employee_current_salary",
+    "get_employee_schedule",
+    "get_fw_trackpoints",
+    "get_leave_approval_requests",
+    "get_leave_approval_requests_v2",
+    "get_leave_history",
+    "get_line_push_status",
+    "get_makeup_review_requests",
+    "get_missing_work_hours_notification_control",
+    "get_monthly_attendance",
+    "get_my_current_salary",
+    "get_my_makeup_requests",
+    "get_my_overtime_requests",
+    "get_my_payslip",
+    "get_my_year_end_stats",
+    "get_pending_makeup_requests",
+    "get_pending_overtime_requests",
+    "get_weekly_schedules",
+    "insert_fw_trackpoints",
+    "log_checkin_failure",
+    "preview_company_missing_work_hours",
+    "quick_check_in",
+    "quick_check_out_after_clock_in_makeup",
+    "register_employee",
+    "resolve_attendance_anomaly",
+    "save_payroll_records",
+    "set_missing_work_hours_notification_enabled",
+    "set_my_preferred_language",
+    "submit_leave_request",
+    "submit_makeup_punch",
+    "submit_overtime_request",
+    "update_shift_type",
+    "upsert_company_holiday",
+    "upsert_salary_setting"
+  ],
+  "functions": [
+    "admin_makeup_punch(p_company_id uuid, p_line_user_id text, p_employee_id uuid, p_punch_date date, p_punch_type text, p_punch_time time without time zone, p_note text)",
+    "approve_leave_request(p_company_id uuid, p_line_user_id text, p_request_id uuid, p_status text, p_rejection_reason text)",
+    "confirm_daily_overtime(p_company_id uuid, p_line_user_id text, p_employee_id uuid, p_ot_date date, p_decision text, p_minutes integer, p_note text)",
+    "count_fw_trackpoints(p_line_user_id text, p_trip_id uuid)",
+    "create_shift_type(p_company_id uuid, p_line_user_id text, p_name text, p_code text, p_start_time time without time zone, p_end_time time without time zone, p_is_overnight boolean)",
+    "delete_company_holiday(p_company_id uuid, p_line_user_id text, p_holiday_date date)",
+    "delete_shift_type(p_id uuid, p_company_id uuid, p_line_user_id text)",
+    "get_attendance_anomalies(p_company_id uuid, p_line_user_id text)",
+    "get_checkin_failures(p_company_id uuid, p_line_user_id text, p_days integer)",
+    "get_company_current_salaries(p_company_id uuid, p_line_user_id text)",
+    "get_company_daily_attendance(p_company_id uuid, p_date date, p_line_user_id text)",
+    "get_company_holidays(p_company_id uuid, p_line_user_id text, p_from date, p_to date)",
+    "get_company_leave_requests_for_audit(p_company_id uuid, p_line_user_id text, p_from date, p_to date, p_include_pending boolean)",
+    "get_company_monthly_attendance(p_company_id uuid, p_year integer, p_month integer, p_line_user_id text)",
+    "get_company_monthly_missing_minutes(p_company_id uuid, p_year integer, p_month integer, p_line_user_id text)",
+    "get_company_overtime_requests(p_company_id uuid, p_line_user_id text, p_from date, p_to date, p_status text, p_limit integer)",
+    "get_company_payroll(p_company_id uuid, p_line_user_id text, p_year integer, p_month integer)",
+    "get_company_shift_types(p_company_id uuid, p_line_user_id text)",
+    "get_employee_current_salary(p_company_id uuid, p_line_user_id text, p_employee_id uuid)",
+    "get_employee_schedule(p_line_user_id text, p_year integer, p_month integer)",
+    "get_fw_trackpoints(p_line_user_id text, p_trip_id uuid)",
+    "get_leave_approval_requests_v2(p_company_id uuid, p_status text, p_line_user_id text)",
+    "get_leave_approval_requests(p_company_id uuid, p_status text, p_line_user_id text)",
+    "get_leave_history(p_line_user_id text, p_company_id uuid, p_limit integer)",
+    "get_leave_history(p_line_user_id text, p_limit integer)",
+    "get_line_push_status(p_company_id uuid, p_line_user_id text)",
+    "get_makeup_review_requests(p_company_id uuid, p_status text, p_review_filter text, p_line_user_id text)",
+    "get_missing_work_hours_notification_control(p_company_id uuid, p_line_user_id text)",
+    "get_monthly_attendance(p_line_user_id text, p_year integer, p_month integer)",
+    "get_my_current_salary(p_line_user_id text)",
+    "get_my_makeup_requests(p_line_user_id text, p_limit integer, p_company_id uuid)",
+    "get_my_overtime_requests(p_line_user_id text, p_limit integer)",
+    "get_my_payslip(p_line_user_id text, p_year integer, p_month integer)",
+    "get_my_year_end_stats(p_line_user_id text, p_year integer)",
+    "get_pending_makeup_requests(p_company_id uuid, p_line_user_id text)",
+    "get_pending_overtime_requests(p_company_id uuid, p_status text, p_line_user_id text)",
+    "get_weekly_schedules(p_company_id uuid, p_start_date date, p_line_user_id text)",
+    "insert_fw_trackpoints(p_line_user_id text, p_trip_id uuid, p_points jsonb)",
+    "log_checkin_failure(p_line_user_id text, p_punch_type text, p_stage text, p_failure_code text, p_outcome text, p_detail jsonb, p_company_id uuid)",
+    "preview_company_missing_work_hours(p_company_id uuid, p_line_user_id text, p_days_back integer)",
+    "quick_check_in(p_line_user_id text, p_latitude double precision, p_longitude double precision, p_photo_url text, p_device_id text, p_action text)",
+    "quick_check_out_after_clock_in_makeup(p_line_user_id text, p_latitude double precision, p_longitude double precision, p_photo_url text, p_device_id text, p_action text)",
+    "register_employee(p_company_id uuid, p_line_user_id text, p_data jsonb)",
+    "resolve_attendance_anomaly(p_anomaly_id uuid, p_company_id uuid, p_line_user_id text)",
+    "save_payroll_records(p_company_id uuid, p_line_user_id text, p_year integer, p_month integer, p_records jsonb, p_is_published boolean)",
+    "set_missing_work_hours_notification_enabled(p_company_id uuid, p_line_user_id text, p_enabled boolean)",
+    "set_my_preferred_language(p_company_id uuid, p_line_user_id text, p_language text)",
+    "submit_leave_request(p_line_user_id text, p_company_id uuid, p_leave_type character varying, p_start_date date, p_end_date date, p_reason text, p_leave_period text, p_leave_start_time time without time zone, p_leave_end_time time without time zone)",
+    "submit_leave_request(p_line_user_id text, p_leave_type character varying, p_start_date date, p_end_date date, p_reason text, p_leave_period text, p_leave_hours numeric)",
+    "submit_makeup_punch(p_line_user_id text, p_punch_date date, p_punch_type text, p_punch_time time without time zone, p_reason text, p_note text, p_company_id uuid)",
+    "submit_overtime_request(p_line_user_id text, p_ot_date date, p_hours numeric, p_reason text, p_compensation_type text)",
+    "update_shift_type(p_id uuid, p_company_id uuid, p_line_user_id text, p_name text, p_code text, p_start_time time without time zone, p_end_time time without time zone, p_is_overnight boolean)",
+    "upsert_company_holiday(p_company_id uuid, p_line_user_id text, p_holiday_date date, p_holiday_name text, p_holiday_type text)",
+    "upsert_salary_setting(p_company_id uuid, p_line_user_id text, p_employee_id uuid, p_salary_type text, p_base_salary numeric, p_meal_allowance numeric, p_position_allowance numeric, p_full_attendance_bonus numeric, p_pension_self_rate numeric, p_sync_employee_rate boolean)"
+  ],
+  "excluded": [
+    {
+      "function": "admin_create_employee(p_company_id uuid, p_line_user_id text, p_data jsonb)",
+      "reason": "132 已撤 anon／authenticated 執行權"
+    },
+    {
+      "function": "admin_delete_pending_employee(p_company_id uuid, p_line_user_id text, p_employee_id uuid)",
+      "reason": "132 已撤 anon／authenticated 執行權"
+    },
+    {
+      "function": "admin_save_setting(p_company_id uuid, p_line_user_id text, p_key text, p_value jsonb, p_description text)",
+      "reason": "正式庫已是 service role only"
+    },
+    {
+      "function": "admin_update_employee(p_company_id uuid, p_line_user_id text, p_employee_id uuid, p_updates jsonb)",
+      "reason": "132 已撤 anon／authenticated 執行權"
+    },
+    {
+      "function": "bind_employee_secure(p_company_code text, p_employee_number text, p_id_card_last_4 text, p_line_user_id text, p_device_info text)",
+      "reason": "131 已撤 anon／authenticated 執行權"
+    },
+    {
+      "function": "bind_employee(p_device_info text, p_employee_id character varying, p_id_card_last_4 character varying, p_line_user_id character varying, p_verification_code character varying)",
+      "reason": "131 已撤 anon／authenticated 執行權"
+    },
+    {
+      "function": "bind_employee(p_line_user_id text, p_employee_number text, p_device_info text, p_id_card_last_4 text, p_verification_code text)",
+      "reason": "131 已撤 anon／authenticated 執行權"
+    },
+    {
+      "function": "bind_existing_employee(p_line_user_id text, p_employee_number text, p_verify_code text)",
+      "reason": "131 已撤 anon／authenticated 執行權"
+    },
+    {
+      "function": "bind_line_id(p_employee_number character varying, p_verification_code character varying, p_line_user_id character varying)",
+      "reason": "131 已撤 anon／authenticated 執行權"
+    },
+    {
+      "function": "can_manage_company_settings(p_line_user_id text, p_company_id uuid)",
+      "reason": "正式庫已是 service role only"
+    },
+    {
+      "function": "check_schedule_permission(p_line_user_id text)",
+      "reason": "131 已撤 anon／authenticated 執行權"
+    },
+    {
+      "function": "check_user_status(p_line_user_id text)",
+      "reason": "131 已撤 anon／authenticated 執行權"
+    },
+    {
+      "function": "get_annual_stats(p_year integer, p_line_user_id text)",
+      "reason": "131 已撤 anon／authenticated 執行權"
+    },
+    {
+      "function": "get_annual_summary(p_line_user_id text, p_year integer)",
+      "reason": "131 已撤 anon／authenticated 執行權"
+    },
+    {
+      "function": "get_employee_payroll(p_line_user_id text, p_year integer, p_month integer)",
+      "reason": "131 已撤 anon／authenticated 執行權"
+    },
+    {
+      "function": "get_line_messaging_config(p_company_id uuid, p_line_user_id text)",
+      "reason": "正式庫已是 service role only"
+    },
+    {
+      "function": "get_monthly_attendance_v2(p_line_user_id text, p_year integer, p_month integer)",
+      "reason": "131 已撤 anon／authenticated 執行權"
+    },
+    {
+      "function": "has_company_access(p_line_user_id text, p_company_id uuid, p_require_manager boolean)",
+      "reason": "正式庫已是 service role only"
+    },
+    {
+      "function": "has_missing_work_hours_notification_access(p_line_user_id text, p_company_id uuid)",
+      "reason": "正式庫已是 service role only"
+    },
+    {
+      "function": "is_company_admin_caller(p_line_user_id text, p_company_id uuid)",
+      "reason": "正式庫已是 service role only"
+    },
+    {
+      "function": "line_pull_todo(p_line_user_id text)",
+      "reason": "正式庫已是 service role only"
+    },
+    {
+      "function": "line_push_authorize(p_company_id uuid, p_line_user_id text, p_target text, p_employee_id uuid, p_category text, p_priority text)",
+      "reason": "正式庫已是 service role only"
+    },
+    {
+      "function": "order_lunch(p_line_user_id character varying, p_order_date date, p_is_vegetarian boolean, p_special_requirements text)",
+      "reason": "131 已撤 anon／authenticated 執行權"
+    },
+    {
+      "function": "platform_admin_save(p_caller_line_user_id text, p_admin_id uuid, p_line_user_id text, p_name text, p_is_active boolean, p_company_ids uuid[])",
+      "reason": "正式庫已是 service role only"
+    },
+    {
+      "function": "quick_check_in_debug(p_line_user_id text)",
+      "reason": "131 已撤 anon／authenticated 執行權"
+    },
+    {
+      "function": "quick_check_in_debug2(p_line_user_id text)",
+      "reason": "131 已撤 anon／authenticated 執行權"
+    },
+    {
+      "function": "quick_check_in_v2(p_line_user_id text, p_latitude double precision, p_longitude double precision, p_photo_url text, p_device_id text)",
+      "reason": "131 已撤 anon／authenticated 執行權"
+    },
+    {
+      "function": "sync_late_close_overtime_request(p_line_user_id text, p_attendance_date date)",
+      "reason": "131 已撤 anon／authenticated 執行權"
+    },
+    {
+      "function": "update_office_locations(p_locations jsonb, p_line_user_id text)",
+      "reason": "131 已撤 anon／authenticated 執行權"
+    }
+  ],
+  "preseed_soft": [
+    "register_employee",
+    "log_checkin_failure"
+  ]
+}

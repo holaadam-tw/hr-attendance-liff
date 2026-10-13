@@ -136,9 +136,9 @@ fi
 
 # 8b. 新表建立後必須 ENABLE ROW LEVEL SECURITY（略過底線開頭的內部表，如 _migrations）
 for f in $(ls migrations/*.sql 2>/dev/null); do
-    for t in $(grep -oE "CREATE TABLE IF NOT EXISTS [a-z_]+|CREATE TABLE [a-z_]+" "$f" 2>/dev/null | awk '{print $NF}'); do
+    for t in $(grep -oE "CREATE TABLE( IF NOT EXISTS)? (public\.)?[a-z_]+" "$f" 2>/dev/null | sed -E 's/.* (public\.)?//'); do
         case "$t" in _*) continue ;; esac
-        if ! grep -rq "ALTER TABLE $t ENABLE ROW LEVEL SECURITY" migrations/*.sql 2>/dev/null; then
+        if ! grep -rqE "ALTER TABLE (public\.)?$t ENABLE ROW LEVEL SECURITY" migrations/*.sql 2>/dev/null; then
             RLS_ISSUES="${RLS_ISSUES}  · $t（$(basename $f)）建立後從未 ENABLE ROW LEVEL SECURITY\n"
         fi
     done
