@@ -128,7 +128,9 @@ echo "--- 8. RLS 政策靜態檢查 ---"
 RLS_ISSUES=""
 
 # 8a. 新政策不得使用 USING (true) / WITH CHECK (true)
-PERMISSIVE_CNT=$(grep -rn "CREATE POLICY" -A 6 migrations/*.sql 2>/dev/null \
+# rollback 會刻意還原舊政策，只檢查正向 migration，避免把必要回滾能力誤報成新漏洞。
+PERMISSIVE_CNT=$(find migrations -maxdepth 1 -type f -name '*.sql' ! -name '*_rollback.sql' -print0 2>/dev/null \
+    | xargs -0 grep -n "CREATE POLICY" -A 6 2>/dev/null \
     | grep -icE "USING *\( *true *\)|WITH CHECK *\( *true *\)")
 if [ "$PERMISSIVE_CNT" -gt 0 ]; then
     RLS_ISSUES="${RLS_ISSUES}  · ${PERMISSIVE_CNT} 條 USING(true)／WITH CHECK(true) 政策（等於不設限）\n"

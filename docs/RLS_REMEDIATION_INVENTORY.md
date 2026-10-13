@@ -44,7 +44,7 @@
 | `store_profiles` | 5 | 3 | insert / update |
 | `service_items` | 4 | 3 | insert / update / delete |
 | `attendance` | 6 | 0 | （寫入已全走 RPC ✅） |
-| `leave_requests` | 8 | 0 | （寫入已全走 RPC ✅） |
+| `leave_requests` | 8 | 0 | 前端寫入已全走 RPC；148 待套用以封鎖直接 REST 寫入 |
 | `overtime_requests` | 3 | 0 | （寫入已全走 RPC ✅） |
 
 **好消息**：`attendance` / `leave_requests` / `overtime_requests` 這三張最敏感的表，**寫入已經全部走 RPC 了**（`check-rls-bypass.sh` hook 的功勞），只剩讀取要處理。
@@ -126,6 +126,15 @@
 - 寫入部分：`attendance` / `leave_requests` / `overtime_requests` 已完成，只剩 `employees`（7 個寫入點）、`schedules`（1 個）、`salary_settings`（2 個）、`payroll`（1 個）
 - 讀取部分是主要工作量：`employees` 15 個、`leave_requests` 8 個、`attendance` 6 個
 - **`overtime_requests` 連 RLS 都沒開**，這張最快——`ENABLE ROW LEVEL SECURITY` 之後只剩 3 個讀取點要改（其中 1 個是 2026-08-05 新增的加班確認卡片）
+
+#### 🟡 `leave_requests` 第一階段已實作（migration 148，待業主套用）
+
+2026-10-13 正式庫唯讀盤點確認：表 owner=`postgres`、RLS 已開；寫入函式只有 `submit_leave_request` 與 `approve_leave_request`，皆為 `SECURITY DEFINER` 且 owner=`postgres`。前端、Edge Function、pg_cron 均無直接寫入；兩支 trigger 也沒有會因撤 table grant 而失效的 SECURITY INVOKER 寫入路徑。
+
+- 148 只撤三條寫入政策與 anon／authenticated 的 INSERT／UPDATE／DELETE／TRUNCATE／REFERENCES／TRIGGER／MAINTAIN；保留 SELECT grant 與「允許查看請假單」。
+- PGlite 已重現套用前直接 INSERT／改 pending 為 approved／DELETE 漏洞；套用後兩個公開角色皆被拒，而申請、核准、駁回 RPC 照常。rollback 後政策與 ACL 逐項等同正式快照並可重套。
+- 本階段不做 149、不改任何直接讀取點、不撤 SELECT 政策。第二階段必須另案遵守「先 RPC → 前端改 → 部署驗證 → 最後撤讀取政策」。
+- 業主套用 148 前應再次核對 migration SHA、正式庫函式 owner／`prosecdef` 與現有政策名稱；套用後先以唯讀 metadata 驗證 grant／policy，再做員工送單與主管核准／駁回 smoke。異常即以 rollback 單一交易還原。
 
 ### P1 — 營運設定
 
