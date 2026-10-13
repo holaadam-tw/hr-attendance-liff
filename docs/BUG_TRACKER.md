@@ -5,6 +5,15 @@
 
 ---
 
+## 🟡 2026-10-13 PR #9 reconcile 回任解除競態（migration 150，**本機已修、待審／未套用／未部署**）
+
+- 問題：`line_auth_reconcile_targets` 先產生快照，舊 handler 在逐筆 ban 前不重查；若員工在空窗回任並登入解除停權，延遲中的 reconcile 仍會再次 ban。
+- 修法：150 新增 service-role-only 的唯讀 `line_auth_reconcile_should_ban(auth_user_id)`；handler 每筆 ban 前重查，已回任計 `skipped`，重查錯誤 fail closed 不 ban。
+- 測試：`tests/line-auth-ban.test.js` 加可控 Promise/barrier，固定重現 targets 後回任登入；舊 reconcile 實測 22/7（競態仍 ban），修正後必須全過。`tests/line-auth-prereq.pglite.test.js` 覆蓋函式真值、回任轉 false 與 anon/authenticated permission denied。
+- 限制：DB 重查與外部 Auth Admin API 不是同一交易，仍有極短理論競態窗；完整消除需另設 generation 協定。
+
+---
+
 ## 🟡 2026-09-28 shift_swap_requests 只能經伺服器端函式寫入（migration 139／140，**待業主套用／合併／部署**）
 
 - 問題：正式庫唯一政策「Allow all for authenticated」實際套用對象是 PUBLIC（含 anon），anon／authenticated 有全部 grant → 前端可直接新增、修改（例如直接改成已同意／已核准）、刪除任何人的換班申請（目前 0 列）
