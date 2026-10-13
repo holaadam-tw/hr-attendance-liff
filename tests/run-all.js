@@ -42,6 +42,7 @@ const SUITES = [
   { name: 'attendance／schedules 只能經伺服器端函式寫入（133／134／135，PGlite 實跑）', file: 'attendance-schedules-write-lock.pglite.test.js' },
   { name: '前端不直接寫 attendance／schedules、換班審核走 LIFF 驗證（133／135）', file: 'attendance-schedules-frontend.test.js' },
   { name: 'leave_requests 只能經 SECURITY DEFINER RPC 寫入（148，PGlite 實跑）', file: 'rls-leave-requests-write-lock.pglite.test.js' },
+  { name: 'leave_requests 公司／本人／同公司重疊／公開今日讀取 RPC（149-A，PGlite 實跑）', file: 'leave-requests-read-rpcs.pglite.test.js' },
   { name: '薪酬密碼伺服器端比對（136／137，PGlite 實跑）', file: 'payroll-password-server.pglite.test.js' },
   { name: '薪酬密碼前端改伺服器端比對（jsdom 實跑）', file: 'payroll-password-frontend.test.js' },
   { name: 'P1 Phase 1：caller_line_user_id／line_auth_resolve（138，PGlite 實跑）', file: 'line-auth-phase1.pglite.test.js' },

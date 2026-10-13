@@ -5,6 +5,18 @@
 
 ---
 
+## 🟡 2026-10-13 RLS 收斂第二階段 149-A／leave_requests 讀取 RPC（**已實作，未套正式庫**）
+
+- 新增 `get_company_leave_requests(text,uuid,date,date,text[],uuid,integer)`：限 `is_company_manager_caller` 通過的同公司管理者，所有資料列以 `p_company_id` 隔離。
+- 新增 `get_my_leave_requests(text,uuid,date,date,text[],integer)`：由 `p_line_user_id + p_company_id` 唯一解析在職員工，只回本人資料；同公司重複身分時不猜測。
+- 新增 `get_company_leave_overlap(text,uuid,date,date)`：同樣只允許該公司唯一在職員工身分，排除本人後只回同公司 approved／pending 重疊假單的員工、姓名、日期與狀態；最長 62 天、最多 200 筆，不揭露假別或原因。
+- 新增 `get_public_today_leave_employees(uuid)`：不接受日期參數，只以伺服器 `Asia/Taipei` 當日查 approved／pending，`DISTINCT` 且只回 `employee_id`、`employee_name`。
+- 四支皆為 `STABLE SECURITY DEFINER SET search_path=public`，先 `REVOKE PUBLIC`，只授予 anon／authenticated；本批不撤 `leave_requests` SELECT grant 或讀取政策，不改前端（149-B/C 另批）。
+- PGlite **45/45 通過**，涵蓋非管理員、一般跨公司與跨公司管理員身分、本人隔離、重疊查詢排除本人／最小欄位／62 天上限／200 筆上限、固定測試時鐘、公開固定兩欄、rollback 與重套；`MIGRATION149_EMPTY=1` 作反向對照。
+- 提醒：含 `p_line_user_id` 的前三支 RPC 日後須加入 migration 141 wrapper 產生器清單；公開 RPC 不加入。
+
+---
+
 ## 🟢 2026-10-13 RLS 收斂第一階段／leave_requests 寫入鎖定（migration 148，**已套用正式庫**）
 
 - 問題：正式庫的 `Allow RPC access leaves`（ALL true）、`允許新增請假單`（INSERT true）與 `允許更新待審核請假單`（pending、無 WITH CHECK），加上 anon／authenticated 全部 table grant，使公開 anon key 可直接偽造、核准或刪除假單，並影響薪資。
