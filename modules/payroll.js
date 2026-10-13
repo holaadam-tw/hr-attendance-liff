@@ -362,13 +362,18 @@ export async function loadHybridBonusData() {
             sb.from('employees').select('id, name, employee_number, department, hire_date').eq('company_id', window.currentCompanyId).eq('is_active', true).order('department').order('name'),
             sb.rpc('get_company_current_salaries', { p_company_id: window.currentCompanyId, p_line_user_id: window.currentAdminEmployee?.line_user_id }),
             sb.from('attendance').select('employee_id, is_late, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).gte('date', `${year}-01-01`).lte('date', `${year}-12-31`),
-            sb.from('leave_requests').select('employee_id, days, start_date, end_date, employees!leave_requests_employee_id_fkey!inner(company_id)').eq('employees.company_id', window.currentCompanyId).eq('status', 'approved').lte('start_date', `${year}-12-31`).gte('end_date', `${year}-01-01`)
+            sb.rpc('get_company_leave_requests', {
+                p_line_user_id: window.currentAdminEmployee?.line_user_id || null,
+                p_company_id: window.currentCompanyId,
+                p_from: `${year}-01-01`, p_to: `${year}-12-31`,
+                p_statuses: ['approved'], p_employee_id: null, p_limit: 1000
+            })
         ]);
         if (empRes.error) throw empRes.error;
+        if (leaveRes.error) throw leaveRes.error;
         const queryErrors = [];
         if (salaryRes.error) queryErrors.push('薪資設定');
         if (attRes.error) queryErrors.push('出勤紀錄');
-        if (leaveRes.error) queryErrors.push('請假紀錄');
         if (queryErrors.length > 0) {
             showToast(`⚠️ ${queryErrors.join('、')}載入失敗，獎金計算可能不準確`, 'error');
         }
@@ -877,7 +882,12 @@ export async function loadPayrollData() {
             sb.from('employees').select('id, name, employee_number, department, is_active, status, resigned_date').eq('company_id', window.currentCompanyId).eq('no_checkin', false).in('status', ['approved', 'resigned']),
             sb.rpc('get_company_current_salaries', { p_company_id: window.currentCompanyId, p_line_user_id: window.currentAdminEmployee?.line_user_id }),
             sb.from('attendance').select('employee_id, date, is_late, total_work_hours, overtime_hours, check_in_time, check_out_time, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).gte('date', startDate).lte('date', endDate),
-            sb.from('leave_requests').select('employee_id, days, leave_type, start_date, end_date, employees!leave_requests_employee_id_fkey!inner(company_id)').eq('employees.company_id', window.currentCompanyId).eq('status', 'approved').lte('start_date', endDate).gte('end_date', startDate),
+            sb.rpc('get_company_leave_requests', {
+                p_line_user_id: window.currentAdminEmployee?.line_user_id || null,
+                p_company_id: window.currentCompanyId,
+                p_from: startDate, p_to: endDate,
+                p_statuses: ['approved'], p_employee_id: null, p_limit: 1000
+            }),
             // 同上：改走 RPC（migration 109）
             sb.rpc('get_company_overtime_requests', {
                 p_company_id: window.currentCompanyId,
@@ -891,10 +901,10 @@ export async function loadPayrollData() {
         ]);
 
         if (empRes.error) throw empRes.error;
+        if (leaveRes.error) throw leaveRes.error;
         const payrollQueryErrors = [];
         if (salaryRes.error) payrollQueryErrors.push('薪資設定');
         if (attRes.error) payrollQueryErrors.push('出勤紀錄');
-        if (leaveRes.error) payrollQueryErrors.push('請假紀錄');
         if (existRes.error) payrollQueryErrors.push('已發薪資');
         if (payrollQueryErrors.length > 0) {
             showToast(`⚠️ ${payrollQueryErrors.join('、')}載入失敗，薪資計算可能不準確`, 'error');

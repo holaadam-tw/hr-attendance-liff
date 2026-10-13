@@ -384,10 +384,16 @@ export async function loadStaffOverview() {
             return;
         }
         const todayStr = getTaiwanDate();
-        const { data: todayLeaves } = await sb.from('leave_requests').select('id, employees!leave_requests_employee_id_fkey!inner(company_id)')
-            .eq('employees.company_id', window.currentCompanyId)
-            .in('status', ['approved', 'pending'])
-            .lte('start_date', todayStr).gte('end_date', todayStr);
+        const { data: todayLeaves, error: leaveError } = await sb.rpc('get_company_leave_requests', {
+            p_line_user_id: window.currentAdminEmployee?.line_user_id || liffProfile?.userId || null,
+            p_company_id: window.currentCompanyId,
+            p_from: todayStr,
+            p_to: todayStr,
+            p_statuses: ['approved', 'pending'],
+            p_employee_id: null,
+            p_limit: 1000
+        });
+        if (leaveError) throw leaveError;
         const onLeave = todayLeaves?.length || 0;
         el.innerHTML = `
             <div style="display:flex;gap:8px;margin-bottom:8px;">
@@ -433,9 +439,16 @@ export async function loadLeaveCal() {
     try {
         const { data: emps } = await sb.from('employees').select('id, name, department').eq('company_id', window.currentCompanyId).eq('is_active', true).order('department').order('name');
         employees = emps || [];
-        const { data: lvs } = await sb.from('leave_requests').select('employee_id, start_date, end_date, days, leave_type, leave_period, status, employees!leave_requests_employee_id_fkey!inner(company_id)')
-            .eq('employees.company_id', window.currentCompanyId)
-            .in('status', ['approved', 'pending']).or(`and(start_date.lte.${me},end_date.gte.${ms})`);
+        const { data: lvs, error: leaveError } = await sb.rpc('get_company_leave_requests', {
+            p_line_user_id: window.currentAdminEmployee?.line_user_id || liffProfile?.userId || null,
+            p_company_id: window.currentCompanyId,
+            p_from: ms,
+            p_to: me,
+            p_statuses: ['approved', 'pending'],
+            p_employee_id: null,
+            p_limit: 1000
+        });
+        if (leaveError) throw leaveError;
         leaves = lvs || [];
     } catch (e) { console.error(e); }
 

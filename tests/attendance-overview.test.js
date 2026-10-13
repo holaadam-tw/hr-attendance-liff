@@ -426,7 +426,7 @@ const OTR = [
   const LEG_LV = [
     { employee_id: 'L2', start_date: '2026-06-03', end_date: '2026-06-03', employees: { company_id: 'COMPANY-A' } },
   ];
-  ctx.sb = makeSb({ attendance: LEG_ATT, leave_requests: LEG_LV });
+  ctx.sb = makeSb({ attendance: LEG_ATT }, { get_company_leave_requests: LEG_LV });
   await ctx.loadLegacyGaps();
 
   const legCard = el('legacyGapCard'), legBadge = el('legacyGapBadge'), legDetail = el('legacyGapDetail');
@@ -444,14 +444,18 @@ const OTR = [
   check('依日期分組顯示', lh.includes('2026-06-16') && lh.includes('2026-06-17'));
 
   const legAttQ = ctx.sb.calls.find(c => c.table === 'attendance');
-  const legLvQ = ctx.sb.calls.find(c => c.table === 'leave_requests');
+  const legLvRpc = ctx.sb.rpcCalls.find(c => c.name === 'get_company_leave_requests');
   check('attendance 查詢帶 employees.company_id（多租戶）', legAttQ.chain.some(s => s === 'eq(employees.company_id,COMPANY-A)'));
-  check('leave_requests 查詢帶 employees.company_id（多租戶）', legLvQ.chain.some(s => s === 'eq(employees.company_id,COMPANY-A)'));
+  check('leave_requests 改走管理端 RPC 且帶公司與呼叫者身分', !!legLvRpc
+    && legLvRpc.args.p_company_id === 'COMPANY-A' && legLvRpc.args.p_line_user_id === 'U1');
+  check('請假 RPC 限定歷史窗期、approved 與 1000 筆', !!legLvRpc
+    && legLvRpc.args.p_from === '2026-06-01' && legLvRpc.args.p_to === '2026-07-13'
+    && JSON.stringify(legLvRpc.args.p_statuses) === JSON.stringify(['approved']) && legLvRpc.args.p_limit === 1000);
   check('只查追蹤啟用日之前（lt 2026-07-13，不與現行缺卡追蹤重疊）',
     legAttQ.chain.some(s => s === 'lt(date,2026-07-13)'), legAttQ.chain.join(' '));
   check('只查有上班卡且無下班卡', legAttQ.chain.some(s => s === 'not(check_in_time,is,)') && legAttQ.chain.some(s => s === 'is(check_out_time,)'));
 
-  ctx.sb = makeSb({ attendance: [], leave_requests: [] });
+  ctx.sb = makeSb({ attendance: [] }, { get_company_leave_requests: [] });
   await ctx.loadLegacyGaps();
   check('全部補完後卡片自動隱藏', legCard.style.display === 'none');
 

@@ -5,6 +5,16 @@
 
 ---
 
+## 🟡 2026-10-13 RLS 收斂第二階段 149-B／管理端 leave_requests 改走 RPC（已實作，未部署）
+
+- 管理端 8 個讀取點（`attendance_overview.html` #1、`modules/audit.js` #6/#7、`modules/leave.js` #8/#9、`modules/payroll.js` #10/#11、`modules/schedules.js` #12）已改呼叫 `get_company_leave_requests`，並傳入 `p_company_id`、`p_line_user_id` 與各頁原有日期／狀態條件。
+- RPC 回傳沿用 149-A 的欄位契約，包含 `days`、`leave_period`、`leave_hours` 與 `employees` 巢狀物件；呼叫端不需擴張資料形狀。
+- 薪資與報表讀取若 RPC 失敗會丟出錯誤並中止，不會把失敗誤當成零請假；概覽與排班則沿用既有錯誤處理，排班會先清空請假覆蓋狀態，避免顯示前一週舊資料。
+- 產品檔共 7 個、產品差異 102 行（+72/-30），未超過 8 個產品檔或 300 行門檻；未修改 `common.js`、`records.html`、`attendance_public.html`、migration 或 schema。
+- 新增 `tests/leave-requests-admin-rpc.test.js`：靜態範圍、參數、RPC 欄位契約、錯誤中止、薪資兩處行為與反向突變共 **50/50 通過**；`attendance-overview` **136/136**、`payroll-overtime` **23/23**、`attendance-schedules-frontend` **29/29** 通過。
+- `npm.cmd test` 僅剩使用者事先允許的 21:00 後既有 `attendance-schedules-write-lock` **84 通過／3 失敗**（`checkout_time_expired`）；`qa_check.sh` 0 FAIL／1 既有 WARN，兩支 hook 無新警告，`git diff --check` 通過。
+- 本輪未連線正式庫、未寫入 DB、未操作 Supabase Dashboard、未部署，且依指示未執行 git add／commit／push；前端正式可用仍取決於 149-A migration 已在目標環境套用。
+
 ## 🟡 2026-10-13 RLS 收斂第二階段 149-A／leave_requests 讀取 RPC（**已實作，未套正式庫**）
 
 - 新增 `get_company_leave_requests(text,uuid,date,date,text[],uuid,integer)`：限 `is_company_manager_caller` 通過的同公司管理者，所有資料列以 `p_company_id` 隔離。

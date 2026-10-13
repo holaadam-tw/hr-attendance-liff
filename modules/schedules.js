@@ -85,10 +85,17 @@ export async function loadShiftMgr() {
             if (code) smScheduleData[`${s.employee_id}_${s.date}`] = code;
         });
         smScheduleOriginal = { ...smScheduleData };
-        const { data: lvs } = await sb.from('leave_requests').select('employee_id, start_date, end_date, status, employees!leave_requests_employee_id_fkey!inner(company_id)')
-            .eq('employees.company_id', window.currentCompanyId)
-            .in('status', ['approved']).or(`and(start_date.lte.${endStr},end_date.gte.${startStr})`);
         smLeaveData = {};
+        const { data: lvs, error: leaveError } = await sb.rpc('get_company_leave_requests', {
+            p_line_user_id: window.currentAdminEmployee?.line_user_id || null,
+            p_company_id: window.currentCompanyId,
+            p_from: startStr,
+            p_to: endStr,
+            p_statuses: ['approved'],
+            p_employee_id: null,
+            p_limit: 1000
+        });
+        if (leaveError) throw leaveError;
         (lvs || []).forEach(l => {
             const rangeStart = l.start_date > startStr ? l.start_date : startStr;
             const rangeEnd = (l.end_date || l.start_date) < endStr ? (l.end_date || l.start_date) : endStr;
