@@ -1,7 +1,7 @@
 // migration 151：公務機代送請假／補卡，共用正式員工自助規則（純本機 PGlite）
 //
 // 驗收重點：
-//   1. 從 .codex/handoffs/kiosk_prod_reference.md 直接抽出正式庫函式原文，先跑基準。
+//   1. 從 tests/fixtures/kiosk_151_prod_reference.md（2026-10-14 正式庫唯讀快照） 直接抽出正式庫函式原文，先跑基準。
 //   2. 套 151 後重跑同一批成功／錯誤情境，JSON.stringify 結果與寫入列逐字相同。
 //   3. verified RPC 只給 service_role；裝置、公司、在職狀態、pending 與稽核標記皆由 DB 保證。
 //   4. internal 不可由 anon／authenticated／service_role 直接執行；rollback 精確還原函式 metadata。
@@ -12,7 +12,7 @@ const { PGlite } = require('@electric-sql/pglite');
 
 const root = path.join(__dirname, '..');
 const read = file => fs.readFileSync(file, 'utf8');
-const reference = read(path.join(root, '.codex', 'handoffs', 'kiosk_prod_reference.md'));
+const reference = read(path.join(__dirname, 'fixtures', 'kiosk_151_prod_reference.md'));
 const migration = process.env.MIGRATION151_EMPTY === '1' ? '' : read(
   process.env.MIGRATION151_FILE || path.join(root, 'migrations', '151_kiosk_leave_makeup_verified.sql'));
 const rollback = read(path.join(root, 'migrations', '151_kiosk_leave_makeup_verified_rollback.sql'));

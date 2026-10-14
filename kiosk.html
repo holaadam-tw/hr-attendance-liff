@@ -45,7 +45,7 @@
         .btn-checkin:active, .btn-checkout:active { transform: scale(0.97); }
         .btn-cancel { width: 100%; padding: 14px; background: #334155; border: 2px solid #475569; border-radius: 14px; color: #94A3B8; font-size: 14px; font-weight: 700; cursor: pointer; font-family: inherit; }
         .request-entry { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:10px 0; }
-        .request-btn { padding:16px 8px; border:2px solid #38BDF8; border-radius:14px; background:#0C4A6E; color:#E0F2FE; font-size:16px; font-weight:900; font-family:inherit; cursor:pointer; }
+        .request-btn { padding:10px 8px; border:1px solid #475569; border-radius:12px; background:#1E293B; color:#94A3B8; font-size:14px; font-weight:700; font-family:inherit; cursor:pointer; }
         .request-card { background:#1E293B; border-radius:18px; padding:16px; }
         .request-card h2 { font-size:21px; margin-bottom:6px; }
         .request-card .request-hint { color:#94A3B8; font-size:12px; line-height:1.5; margin-bottom:12px; }
@@ -134,10 +134,6 @@
                 <div id="empName" class="name"></div>
                 <div id="empInfo" class="info"></div>
             </div>
-            <div class="request-entry">
-                <button id="kioskLeaveEntry" class="request-btn" onclick="openKioskRequest('leave')">📝 <span data-i18n="leave">請假</span></button>
-                <button id="kioskMakeupEntry" class="request-btn" onclick="openKioskRequest('makeup')">🔧 <span data-i18n="makeupPunch">補卡</span></button>
-            </div>
             <button id="photoBtn" class="photo-btn" onclick="takePhoto()" data-i18n="photo">📸 拍照</button>
             <div class="camera-section">
                 <video id="kioskVideo" autoplay playsinline muted style="display:none;"></video>
@@ -148,6 +144,10 @@
             <div class="action-buttons" id="actionBtns" style="display:none;">
                 <button class="action-btn btn-checkin" onclick="doCheckin('check_in')">☀️ <span data-i18n="checkIn">上班打卡</span></button>
                 <button class="action-btn btn-checkout" onclick="doCheckin('check_out')">🌙 <span data-i18n="checkOut">下班打卡</span></button>
+            </div>
+            <div class="request-entry">
+                <button id="kioskLeaveEntry" class="request-btn" onclick="openKioskRequest('leave')">📝 <span data-i18n="leave">請假</span></button>
+                <button id="kioskMakeupEntry" class="request-btn" onclick="openKioskRequest('makeup')">🔧 <span data-i18n="makeupPunch">補卡</span></button>
             </div>
             <button class="btn-cancel" onclick="resetToInput()" data-i18n="cancel">← 取消</button>
         </div>
@@ -694,7 +694,9 @@
         document.getElementById('photoBtn').disabled = true;
         document.getElementById('photoStatus').style.display = 'block';
         setActionButtonsBusy(false);
-        document.getElementById('actionBtns').style.display = 'flex';
+        const actionBtns = document.getElementById('actionBtns');
+        actionBtns.style.display = 'flex';
+        actionBtns.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
 
     // ===== 打卡 =====
