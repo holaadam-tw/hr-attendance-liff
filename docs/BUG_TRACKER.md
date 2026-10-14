@@ -5,7 +5,9 @@
 
 ---
 
-## 🟡 2026-10-14 公務機代送請假／補卡（migration 151＋Edge＋前端，**待業主套用／合併／部署**）
+## 🟢 2026-10-14 公務機代送請假／補卡（migration 151＋Edge＋前端，**待業主套用／合併／部署**）
+
+- **migration 151 已套用正式庫（2026-10-14，業主授權；SHA256 29e836e3…a9830）**：套用前五支目標函式與當日參考原文 md5 逐支相同（無漂移）。員工自助 6 情境（成功、重複、時段錯、非員工、補卡逾 7 天、未來日期）套用前後回應逐字相同；三支自助函式 ACL 不變；internal 只有 postgres；兩支公務機 RPC 只有 postgres／service_role，anon 帶完整參數呼叫回 42501。service_role 交易內實測（最後回復，0 殘留）：公務機替 E001（未綁 LINE）送假與補卡皆 success 且為 pending、請假原因與補卡備註帶「[公務機送出]」；本米員工、離職員工被拒；非公務機 LINE 帳號回 access_denied。Edge Function 與前端尚未部署。
 
 - 公務機辨識仍走既有 LIFF access token → `line-push` → service-role verified RPC；新增 `kiosk_leave`／`kiosk_makeup`，公司與公務機身分都由 DB 決定，不採信前端公司、狀態或核准人。
 - migration 151 的 `kiosk_submit_leave_verified`／`kiosk_submit_makeup_verified` 只建立 `pending`，同公司在職員工（含未綁 LINE）才能送；請假／補卡沿用員工自助共用規則，補卡仍限 7 天並保留時間合理性檢查，來源以 `[公務機送出]` 標記。
