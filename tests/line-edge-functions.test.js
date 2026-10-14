@@ -6,6 +6,9 @@
 const path = require('path');
 const { pathToFileURL } = require('url');
 const crypto = require('crypto');
+const fs = require('fs');
+const os = require('os');
+const { execFileSync } = require('child_process');
 
 let pass = 0, fail = 0;
 function check(name, condition, detail = '') {
@@ -41,8 +44,14 @@ const post = (url, body, headers = {}) => new Request(url, { method: 'POST', bod
 
   let push, hook;
   try {
-    // 反向對照：LINE_PUSH_HANDLER 可指向舊版 handler.ts（例如 git show origin/main:… 存出來的副本）
-    push = await import(pathToFileURL(process.env.LINE_PUSH_HANDLER || path.join(__dirname, '..', 'supabase', 'functions', 'line-push', 'handler.ts')).href);
+    // 反向對照：可直接指定舊檔，或讓測試從 Git ref 取出暫存副本。
+    let handlerPath = process.env.LINE_PUSH_HANDLER || path.join(__dirname, '..', 'supabase', 'functions', 'line-push', 'handler.ts');
+    if (process.env.LINE_PUSH_HANDLER_GIT_REF) {
+      handlerPath = path.join(os.tmpdir(), `line-push-handler-${process.pid}.ts`);
+      fs.writeFileSync(handlerPath, execFileSync('git', ['show', `${process.env.LINE_PUSH_HANDLER_GIT_REF}:supabase/functions/line-push/handler.ts`], { encoding: 'utf8' }));
+      process.on('exit', () => { try { fs.unlinkSync(handlerPath); } catch (_) {} });
+    }
+    push = await import(pathToFileURL(handlerPath).href);
     hook = await import(pathToFileURL(path.join(__dirname, '..', 'supabase', 'functions', 'line-webhook', 'handler.ts')).href);
   } catch (e) {
     if (e && e.code === 'ERR_UNKNOWN_FILE_EXTENSION') {
@@ -532,7 +541,9 @@ const post = (url, body, headers = {}) => new Request(url, { method: 'POST', bod
     const kioskRoutes = (extra = []) => rpcRoutes([...extra,
       ['/rpc/kiosk_get_company_verified', { body: { success: true, name: '大正科技', company_id: COMPANY, extra_field: 'SHOULD-NOT-LEAK' } }],
       ['/rpc/kiosk_lookup_employee_verified', { body: { success: true, employee_id: KEMP, name: '員工三', employee_number: 'E03' } }],
-      ['/rpc/kiosk_check_in_verified', { body: { success: true, type: 'check_in', name: '員工三', is_late: false } }]]);
+      ['/rpc/kiosk_check_in_verified', { body: { success: true, type: 'check_in', name: '員工三', is_late: false } }],
+      ['/rpc/kiosk_submit_leave_verified', { body: { success: true, days: 1, leave_period: 'full_day' } }],
+      ['/rpc/kiosk_submit_makeup_verified', { body: { success: true } }]]);
     t = await run({ action: 'kiosk_get_company', kiosk_line_user_id: 'Ukiosk', p_kiosk_line_user_id: 'Ukiosk' }, kioskRoutes());
     c = call(t.f, 'kiosk_get_company_verified');
     check('kiosk_get_company：不需 company_id；以 LINE 驗出的 userId 呼叫、前端夾帶的 kiosk ID 不送進 DB',
@@ -596,6 +607,41 @@ const post = (url, body, headers = {}) => new Request(url, { method: 'POST', bod
     check('kiosk_check_in：非公務機 → 403', t.res.status === 403 && t.out.code === 'access_denied');
     t = await run({ action: 'kiosk_check_in', employee_id: KEMP, kiosk_action: 'check_in' }, kioskRoutes([['/rpc/kiosk_check_in_verified', { status: 500, body: { message: 'boom' } }]]));
     check('kiosk_check_in：RPC 連不上 → 503', t.res.status === 503);
+
+    const leave = { action: 'kiosk_leave', employee_id: KEMP, leave_type: 'annual', start_date: '2026-10-20', end_date: '2026-10-20', leave_period: 'full_day', leave_start_time: null, leave_end_time: null, reason: '家庭事務' };
+    t = await run(leave, kioskRoutes());
+    c = call(t.f, 'kiosk_submit_leave_verified');
+    check('kiosk_leave：嚴格白名單後只轉送 verified RPC 需要的欄位', t.res.status === 200 && c?.body.p_line_user_id === LIFF_USER && c.body.p_employee_id === KEMP
+      && c.body.p_leave_type === 'annual' && c.body.p_leave_period === 'full_day' && c.body.p_leave_start_time === null
+      && Object.keys(c.body).sort().join() === 'p_employee_id,p_end_date,p_leave_end_time,p_leave_period,p_leave_start_time,p_leave_type,p_line_user_id,p_reason,p_start_date');
+    check('kiosk_leave：只建申請，不呼叫 LINE 即時推播', !t.f.calls.some(x => x.url.includes('api.line.me/v2/bot/message')));
+
+    const makeup = { action: 'kiosk_makeup', employee_id: KEMP, punch_date: '2026-10-14', punch_type: 'clock_out', punch_time: '17:05', reason: '忘記打卡' };
+    t = await run(makeup, kioskRoutes());
+    c = call(t.f, 'kiosk_submit_makeup_verified');
+    check('kiosk_makeup：只轉送日期／類型／時間／原因', t.res.status === 200 && c?.body.p_line_user_id === LIFF_USER && c.body.p_employee_id === KEMP
+      && c.body.p_punch_type === 'clock_out' && c.body.p_punch_time === '17:05'
+      && Object.keys(c.body).sort().join() === 'p_employee_id,p_line_user_id,p_punch_date,p_punch_time,p_punch_type,p_reason');
+
+    for (const [why, payload] of [
+      ['假別不在白名單', { ...leave, leave_type: 'admin_leave' }],
+      ['日期不存在', { ...leave, start_date: '2026-02-30' }],
+      ['半天跨日', { ...leave, leave_period: 'am', end_date: '2026-10-21' }],
+      ['時數假時間反向', { ...leave, leave_period: 'hourly', leave_start_time: '10:00', leave_end_time: '09:00' }],
+      ['夾帶 status', { ...leave, status: 'approved' }],
+      ['夾帶 approver_id', { ...leave, approver_id: KEMP }],
+      ['補卡日期格式錯', { ...makeup, punch_date: '10/14/2026' }],
+      ['補卡類型錯', { ...makeup, punch_type: 'approved' }],
+      ['補卡時間錯', { ...makeup, punch_time: '25:00' }],
+      ['補卡夾帶 status', { ...makeup, status: 'approved' }],
+    ]) {
+      t = await run(payload, kioskRoutes());
+      check(`${payload.action}：${why} → 400、不呼叫送單 RPC`, t.res.status === 400 && !call(t.f, payload.action === 'kiosk_leave' ? 'kiosk_submit_leave_verified' : 'kiosk_submit_makeup_verified'));
+    }
+    t = await run(leave, kioskRoutes([['/rpc/kiosk_submit_leave_verified', { body: { success: false, error: '此帳號非公務機', error_code: 'access_denied' } }]]));
+    check('kiosk_leave：未驗證公務機裝置 → 403 access_denied', t.res.status === 403 && t.out.code === 'access_denied');
+    t = await run(makeup, missingRoute('kiosk_submit_makeup_verified'));
+    check('kiosk_makeup：151 未套 → 503 db_not_migrated（151）', t.res.status === 503 && t.out.code === 'db_not_migrated' && /（151）/.test(t.out.error));
   }
 
   console.log('\n=== line-webhook ===');

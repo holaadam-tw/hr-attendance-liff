@@ -7,7 +7,7 @@
     <title>公務機打卡</title>
     <script src="https://static.line-scdn.net/liff/edge/versions/2.31.0/sdk.js" integrity="sha384-T6WhT96rkehAFkTtmiRZ60sehxj4zgbifvzi7oGH792T3NN++f2rCvyb/WrHAz2D" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js" integrity="sha384-Rj26LVGvoeRVR6+mwQmFfcR3QOBEwT+ZmuCWpuiqeTzJpCs0ER4ITAWGb4Hiy3Ok" crossorigin="anonymous"></script>
-<script src="i18n.js?v=20260814-leavetimeaudit"></script>
+<script src="i18n.js?v=20261014-kioskrequests"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0F172A; color: #fff; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; -webkit-user-select: none; user-select: none; }
@@ -44,6 +44,16 @@
         .btn-checkout { background: linear-gradient(135deg, #7C3AED, #8B5CF6); color: #fff; }
         .btn-checkin:active, .btn-checkout:active { transform: scale(0.97); }
         .btn-cancel { width: 100%; padding: 14px; background: #334155; border: 2px solid #475569; border-radius: 14px; color: #94A3B8; font-size: 14px; font-weight: 700; cursor: pointer; font-family: inherit; }
+        .request-entry { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:10px 0; }
+        .request-btn { padding:16px 8px; border:2px solid #38BDF8; border-radius:14px; background:#0C4A6E; color:#E0F2FE; font-size:16px; font-weight:900; font-family:inherit; cursor:pointer; }
+        .request-card { background:#1E293B; border-radius:18px; padding:16px; }
+        .request-card h2 { font-size:21px; margin-bottom:6px; }
+        .request-card .request-hint { color:#94A3B8; font-size:12px; line-height:1.5; margin-bottom:12px; }
+        .request-card label { display:block; color:#CBD5E1; font-size:13px; font-weight:800; margin:10px 0 5px; }
+        .request-card input, .request-card select, .request-card textarea { width:100%; padding:12px; border:2px solid #475569; border-radius:10px; background:#0F172A; color:#F8FAFC; font:16px inherit; }
+        .request-card textarea { min-height:72px; resize:vertical; }
+        .request-submit { width:100%; margin:14px 0 9px; padding:15px; border:0; border-radius:12px; background:#059669; color:#fff; font-size:16px; font-weight:900; font-family:inherit; }
+        .request-error { min-height:20px; color:#FCA5A5; font-size:13px; margin-top:8px; }
 
         /* 結果畫面 */
         .result-card { background: #1E293B; border-radius: 20px; padding: 32px; text-align: center; }
@@ -124,6 +134,10 @@
                 <div id="empName" class="name"></div>
                 <div id="empInfo" class="info"></div>
             </div>
+            <div class="request-entry">
+                <button id="kioskLeaveEntry" class="request-btn" onclick="openKioskRequest('leave')">📝 <span data-i18n="leave">請假</span></button>
+                <button id="kioskMakeupEntry" class="request-btn" onclick="openKioskRequest('makeup')">🔧 <span data-i18n="makeupPunch">補卡</span></button>
+            </div>
             <button id="photoBtn" class="photo-btn" onclick="takePhoto()" data-i18n="photo">📸 拍照</button>
             <div class="camera-section">
                 <video id="kioskVideo" autoplay playsinline muted style="display:none;"></video>
@@ -136,6 +150,42 @@
                 <button class="action-btn btn-checkout" onclick="doCheckin('check_out')">🌙 <span data-i18n="checkOut">下班打卡</span></button>
             </div>
             <button class="btn-cancel" onclick="resetToInput()" data-i18n="cancel">← 取消</button>
+        </div>
+
+        <div id="stepLeave" class="hidden request-card">
+            <h2>📝 <span data-i18n="leaveRequest">請假申請</span></h2>
+            <p class="request-hint" data-i18n="kioskRequestHint"></p>
+            <label data-i18n="leaveType">假別</label>
+            <select id="kioskLeaveType">
+                <option value="annual" data-i18n="leaveAnnualFull">特休假</option><option value="sick" data-i18n="leaveSick">病假</option>
+                <option value="personal" data-i18n="leavePersonal">事假</option><option value="compensatory" data-i18n="leaveCompensatory">補休</option>
+                <option value="bereavement" data-i18n="leaveBereavement">喪假</option>
+            </select>
+            <label data-i18n="startDate">開始日期</label><input id="kioskLeaveStart" type="date">
+            <label data-i18n="endDate">結束日期</label><input id="kioskLeaveEnd" type="date">
+            <label data-i18n="leavePeriod">請假時段</label>
+            <select id="kioskLeavePeriod" onchange="toggleKioskLeaveTimes()">
+                <option value="full_day" data-i18n="leaveFullDay">全日</option><option value="am" data-i18n="leaveAM">上午半天</option>
+                <option value="pm" data-i18n="leavePM">下午半天</option><option value="hourly" data-i18n="hourlyLeave">小時請假</option>
+            </select>
+            <div id="kioskLeaveTimes" class="hidden"><label data-i18n="leaveHours">時數假起訖時間</label><div style="display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:center;"><input id="kioskLeaveStartTime" type="time"><span>～</span><input id="kioskLeaveEndTime" type="time"></div></div>
+            <label data-i18n="leaveReason">原因</label><textarea id="kioskLeaveReason" maxlength="1000"></textarea>
+            <div id="kioskLeaveError" class="request-error"></div>
+            <button id="kioskLeaveSubmit" class="request-submit" onclick="submitKioskLeave()" data-i18n="submitRequest">📤 提交申請</button>
+            <button class="btn-cancel" onclick="backToEmployeeStep()" data-i18n="kioskBackEmployee"></button>
+        </div>
+
+        <div id="stepMakeup" class="hidden request-card">
+            <h2>🔧 <span data-i18n="makeupPunchRequest">補打卡申請</span></h2>
+            <p class="request-hint" data-i18n="kioskRequestHint"></p>
+            <label data-i18n="makeupDate">補打卡日期</label><input id="kioskMakeupDate" type="date">
+            <label data-i18n="makeupType">補打卡類型</label><select id="kioskMakeupType"><option value="clock_in" data-i18n="makeupClockIn">上班補打卡</option><option value="clock_out" data-i18n="makeupClockOut">下班補打卡</option></select>
+            <label data-i18n="actualPunchTime">實際打卡時間</label><input id="kioskMakeupTime" type="time">
+            <p class="request-hint" data-i18n="kioskMakeupWindowHint"></p>
+            <label data-i18n="leaveReason">原因</label><textarea id="kioskMakeupReason" maxlength="1000"></textarea>
+            <div id="kioskMakeupError" class="request-error"></div>
+            <button id="kioskMakeupSubmit" class="request-submit" onclick="submitKioskMakeup()" data-i18n="submitMakeup">📤 提交補打卡申請</button>
+            <button class="btn-cancel" onclick="backToEmployeeStep()" data-i18n="kioskBackEmployee"></button>
         </div>
 
         <!-- Step 3: 結果 -->
@@ -397,7 +447,8 @@
     function resetIdleTimer() {
         clearTimeout(idleTimer);
         idleTimer = setTimeout(() => {
-            if (inputStr.length > 0) clearInput();
+            const onInput = !document.getElementById('stepInput').classList.contains('hidden');
+            if (onInput) clearInput(); else resetToInput();
         }, 30000);
     }
 
@@ -471,6 +522,96 @@
         document.getElementById('photoBtn').disabled = false;
         refreshKioskStaticText();
         openCamera();
+        resetIdleTimer();
+    }
+
+    function openKioskRequest(kind) {
+        if (!currentEmployee?.employee_id) return;
+        stopCamera();
+        document.getElementById('stepEmployee').classList.add('hidden');
+        const today = getKioskTaiwanDate();
+        if (kind === 'leave') {
+            document.getElementById('stepLeave').classList.remove('hidden');
+            document.getElementById('kioskLeaveStart').value = today;
+            document.getElementById('kioskLeaveEnd').value = today;
+            document.getElementById('kioskLeaveError').textContent = '';
+        } else {
+            const date = document.getElementById('kioskMakeupDate');
+            date.min = getKioskTaiwanDate(-6); date.max = today; date.value = today;
+            document.getElementById('stepMakeup').classList.remove('hidden');
+            document.getElementById('kioskMakeupError').textContent = '';
+        }
+        refreshKioskStaticText();
+        resetIdleTimer();
+    }
+
+    function backToEmployeeStep() {
+        document.getElementById('stepLeave').classList.add('hidden');
+        document.getElementById('stepMakeup').classList.add('hidden');
+        showEmployeeStep();
+    }
+
+    function toggleKioskLeaveTimes() {
+        document.getElementById('kioskLeaveTimes').classList.toggle('hidden', document.getElementById('kioskLeavePeriod').value !== 'hourly');
+    }
+
+    function kioskFormError(kind, message) {
+        document.getElementById(kind === 'leave' ? 'kioskLeaveError' : 'kioskMakeupError').textContent = message;
+    }
+
+    function setKioskFormBusy(id, busy) {
+        const btn = document.getElementById(id);
+        btn.disabled = busy; btn.style.opacity = busy ? '0.55' : '1';
+    }
+
+    async function submitKioskLeave() {
+        const type = document.getElementById('kioskLeaveType').value;
+        const start = document.getElementById('kioskLeaveStart').value;
+        const end = document.getElementById('kioskLeaveEnd').value;
+        const period = document.getElementById('kioskLeavePeriod').value;
+        const startTime = document.getElementById('kioskLeaveStartTime').value;
+        const endTime = document.getElementById('kioskLeaveEndTime').value;
+        const reason = document.getElementById('kioskLeaveReason').value.trim();
+        if (!start || !end || end < start || !reason || (period !== 'full_day' && start !== end)
+            || (period === 'hourly' && (!startTime || !endTime || endTime <= startTime))) return kioskFormError('leave', tk('kioskCompleteForm'));
+        setKioskFormBusy('kioskLeaveSubmit', true); kioskFormError('leave', '');
+        const r = await callVerifiedAction('kiosk_leave', {
+            employee_id: currentEmployee.employee_id, leave_type: type, start_date: start, end_date: end,
+            leave_period: period, leave_start_time: period === 'hourly' ? startTime : null,
+            leave_end_time: period === 'hourly' ? endTime : null, reason
+        });
+        setKioskFormBusy('kioskLeaveSubmit', false);
+        if (r.code === 'relogin_redirect') return;
+        if (!r.ok || !r.data?.result?.success) return kioskFormError('leave', r.message || tk('networkRetry'));
+        showKioskRequestResult();
+    }
+
+    async function submitKioskMakeup() {
+        const date = document.getElementById('kioskMakeupDate').value;
+        const type = document.getElementById('kioskMakeupType').value;
+        const time = document.getElementById('kioskMakeupTime').value;
+        const reason = document.getElementById('kioskMakeupReason').value.trim();
+        const today = getKioskTaiwanDate(), earliest = getKioskTaiwanDate(-6);
+        if (!date || date < earliest || date > today || !time || !reason) return kioskFormError('makeup', tk('kioskCompleteForm'));
+        setKioskFormBusy('kioskMakeupSubmit', true); kioskFormError('makeup', '');
+        const r = await callVerifiedAction('kiosk_makeup', {
+            employee_id: currentEmployee.employee_id, punch_date: date, punch_type: type, punch_time: time, reason
+        });
+        setKioskFormBusy('kioskMakeupSubmit', false);
+        if (r.code === 'relogin_redirect') return;
+        if (!r.ok || !r.data?.result?.success) return kioskFormError('makeup', r.message || tk('networkRetry'));
+        showKioskRequestResult();
+    }
+
+    function showKioskRequestResult() {
+        stopCamera();
+        ['stepEmployee', 'stepLeave', 'stepMakeup'].forEach(id => document.getElementById(id).classList.add('hidden'));
+        document.getElementById('stepResult').classList.remove('hidden');
+        document.getElementById('resultIcon').textContent = '✅';
+        document.getElementById('resultName').textContent = currentEmployee?.name || '';
+        document.getElementById('resultMsg').textContent = tk('kioskRequestSubmitted');
+        document.getElementById('resultTime').textContent = '';
+        startResultCountdown(3);
     }
 
     // ===== 相機 =====
@@ -545,6 +686,7 @@
             img.src = URL.createObjectURL(file);
             this.value = '';
         });
+        ['pointerdown', 'input', 'change'].forEach(eventName => document.addEventListener(eventName, resetIdleTimer, { passive: true }));
     });
 
     function onPhotoReady() {
@@ -843,6 +985,8 @@
         stopCamera();
         document.getElementById('stepInput').classList.add('hidden');
         document.getElementById('stepEmployee').classList.add('hidden');
+        document.getElementById('stepLeave').classList.add('hidden');
+        document.getElementById('stepMakeup').classList.add('hidden');
         document.getElementById('stepResult').classList.add('hidden');
         document.getElementById('stepError').classList.remove('hidden');
         document.getElementById('errorMsg').textContent = msg;
@@ -851,6 +995,7 @@
     // ===== 重設 =====
     function resetToInput() {
         stopCamera();
+        clearTimeout(idleTimer);
         clearInterval(resultTimer);
         resultTimer = null;
         document.getElementById('kioskLunchOverlay')?.remove();
@@ -862,6 +1007,10 @@
         lunchPromptEmployee = null;
         lunchSkipWarned = false;
         isPunching = false;
+        ['kioskLeaveReason', 'kioskLeaveStartTime', 'kioskLeaveEndTime', 'kioskMakeupTime', 'kioskMakeupReason'].forEach(id => { document.getElementById(id).value = ''; });
+        ['kioskLeaveError', 'kioskMakeupError'].forEach(id => { document.getElementById(id).textContent = ''; });
+        document.getElementById('kioskLeavePeriod').value = 'full_day';
+        toggleKioskLeaveTimes();
         setActionButtonsBusy(false);
         updateInputDisplay();
         document.getElementById('stepInput').classList.remove('hidden');
