@@ -56,6 +56,7 @@ const SUITES = [
   { name: '公務機改由 LINE 驗證身分（142／143，PGlite 實跑）', file: 'kiosk-verified.pglite.test.js' },
   { name: '公務機請假／補卡共用規則與 verified RPC（151，PGlite 實跑）', file: 'kiosk-leave-makeup-verified.pglite.test.js' },
   { name: '公務機前端改走 LIFF 驗證（142／143）', file: 'kiosk-frontend.test.js' },
+  { name: '公務機請假／補卡前端（jsdom／靜態）', file: 'kiosk-leave-makeup-frontend.test.js' },
   { name: '打卡總覽', file: 'attendance-overview.test.js' },
   { name: '薪資頁加班來源', file: 'payroll-overtime.test.js' },
   { name: 'RLS 已鎖定資料表', file: 'rls-locked-tables.test.js' },

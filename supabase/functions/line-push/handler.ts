@@ -15,7 +15,7 @@
 //     shift_swap_review（133：換班核准／拒絕；135 起前端不能直接寫 schedules）、
 //     shift_swap_create／shift_swap_respond（139：員工申請換班、對方同意／拒絕；140 起前端不能直接寫 shift_swap_requests）
 //     payroll_unlock（136：薪酬密碼在 DB 以 bcrypt 比對，前端讀不到密碼）
-//     kiosk_get_company／kiosk_lookup／kiosk_check_in（142：公務機；身分＝公務機平板登入的 LINE 帳號，
+//     kiosk_get_company／kiosk_lookup／kiosk_check_in（142）與 kiosk_leave／kiosk_makeup（151）：公務機；身分＝公務機平板登入的 LINE 帳號，
 //       由 DB 確認它恰好對到 1 個在職的公務機帳號；公司一律由 DB 依公務機帳號決定，前端不帶 company_id）
 //   員工發的訊息，DB 回傳寄件人前綴（［姓名 送出］），這裡一定加在最前面。
 //
@@ -68,6 +68,7 @@ const RPC_MIGRATION: Record<string, string> = {
   shift_swap_request_create: '139', shift_swap_request_respond: '139',
   payroll_password_unlock: '136',
   kiosk_get_company_verified: '142', kiosk_lookup_employee_verified: '142', kiosk_check_in_verified: '142',
+  kiosk_submit_leave_verified: '151', kiosk_submit_makeup_verified: '151',
 }
 
 async function callRpc(deps: Deps, fn: string, args: Record<string, unknown>): Promise<{ ok: boolean; data: any; missing?: string }> {
@@ -239,9 +240,9 @@ const VERIFIED_ACTIONS = [
   // 136：薪酬密碼改在伺服器端比對（DB 只存 bcrypt 雜湊），成功回短效 unlock_token
   'payroll_unlock',
   // 142：公務機（身分＝平板登入的公務機 LINE 帳號；前端報的 kiosk LINE ID 一律不採信）
-  'kiosk_get_company', 'kiosk_lookup', 'kiosk_check_in',
+  'kiosk_get_company', 'kiosk_lookup', 'kiosk_check_in', 'kiosk_leave', 'kiosk_makeup',
 ] as const
-const KIOSK_ACTIONS: readonly string[] = ['kiosk_get_company', 'kiosk_lookup', 'kiosk_check_in']
+const KIOSK_ACTIONS: readonly string[] = ['kiosk_get_company', 'kiosk_lookup', 'kiosk_check_in', 'kiosk_leave', 'kiosk_makeup']
 export const MAX_BATCH_SETTINGS = 30
 export const MAX_BATCH_REVIEWS = 50
 export const MAX_BATCH_SCHEDULES = 400
@@ -249,6 +250,10 @@ export const MAX_BATCH_SCHEDULES = 400
 const isObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
 const uuidOrNull = (v: unknown): string | null => (typeof v === 'string' && UUID_RE.test(v) ? v : null)
 const withResult = (d: any) => ({ result: d })
+const KIOSK_LEAVE_TYPES = new Set(['annual', 'sick', 'personal', 'compensatory', 'bereavement'])  // 與員工自助 records.html 選項一致
+const KIOSK_LEAVE_PERIODS = new Set(['full_day', 'am', 'pm', 'hourly'])
+const TIME_RE = /^(?:[01]\d|2[0-3]):[0-5]\d$/
+const onlyKeys = (body: Record<string, unknown>, allowed: string[]) => Object.keys(body).every((k) => allowed.includes(k))
 
 // YYYY-MM-DD 且是真的日期（2026-02-30 這種交給 DB 會變成 503，這裡先回 400）
 export function isRealDate(v: unknown): v is string {
@@ -323,6 +328,39 @@ async function handleVerifiedAction(body: any, deps: Deps): Promise<Response> {
     return rpcResult(await callRpc(deps, 'kiosk_check_in_verified', {
       p_line_user_id: lineUserId, p_employee_id: employeeId, p_action: kioskAction,
       p_photo_url: photoUrl, p_latitude: lat, p_longitude: lng,
+    }), withResult)
+  }
+  if (action === 'kiosk_leave') {
+    const allowed = ['action', 'liff_access_token', 'employee_id', 'leave_type', 'start_date', 'end_date', 'reason', 'leave_period', 'leave_start_time', 'leave_end_time']
+    const employeeId = uuidOrNull(body.employee_id)
+    const leaveType = typeof body.leave_type === 'string' && KIOSK_LEAVE_TYPES.has(body.leave_type) ? body.leave_type : null
+    const period = typeof body.leave_period === 'string' && KIOSK_LEAVE_PERIODS.has(body.leave_period) ? body.leave_period : null
+    const start = isRealDate(body.start_date) ? body.start_date : null
+    const end = isRealDate(body.end_date) ? body.end_date : null
+    const reason = typeof body.reason === 'string' ? body.reason.trim() : ''
+    const startTime = typeof body.leave_start_time === 'string' && TIME_RE.test(body.leave_start_time) ? body.leave_start_time : null
+    const endTime = typeof body.leave_end_time === 'string' && TIME_RE.test(body.leave_end_time) ? body.leave_end_time : null
+    if (!onlyKeys(body, allowed) || !employeeId || !leaveType || !period || !start || !end || end < start || !reason || reason.length > 1000) return badRequest('請假資料不正確')
+    if ((period !== 'full_day' && start !== end) || (period === 'hourly' && (!startTime || !endTime || endTime <= startTime)))
+      return badRequest('請假時段不正確')
+    if (period !== 'hourly' && (body.leave_start_time != null || body.leave_end_time != null)) return badRequest('請假時段不正確')
+    return rpcResult(await callRpc(deps, 'kiosk_submit_leave_verified', {
+      p_line_user_id: lineUserId, p_employee_id: employeeId, p_leave_type: leaveType,
+      p_start_date: start, p_end_date: end, p_reason: reason, p_leave_period: period,
+      p_leave_start_time: period === 'hourly' ? startTime : null, p_leave_end_time: period === 'hourly' ? endTime : null,
+    }), withResult)
+  }
+  if (action === 'kiosk_makeup') {
+    const allowed = ['action', 'liff_access_token', 'employee_id', 'punch_date', 'punch_type', 'punch_time', 'reason']
+    const employeeId = uuidOrNull(body.employee_id)
+    const date = isRealDate(body.punch_date) ? body.punch_date : null
+    const type = body.punch_type === 'clock_in' || body.punch_type === 'clock_out' ? body.punch_type : null
+    const time = typeof body.punch_time === 'string' && TIME_RE.test(body.punch_time) ? body.punch_time : null
+    const reason = typeof body.reason === 'string' ? body.reason.trim() : ''
+    if (!onlyKeys(body, allowed) || !employeeId || !date || !type || !time || !reason || reason.length > 1000) return badRequest('補卡資料不正確')
+    return rpcResult(await callRpc(deps, 'kiosk_submit_makeup_verified', {
+      p_line_user_id: lineUserId, p_employee_id: employeeId, p_punch_date: date,
+      p_punch_type: type, p_punch_time: time, p_reason: reason,
     }), withResult)
   }
 

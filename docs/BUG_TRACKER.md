@@ -1,9 +1,18 @@
 # RunPiston Bug 追蹤 & 測試清單
 
-> 更新日期：2026-10-13
+> 更新日期：2026-10-14
 > 每次修改後更新此檔案
 
 ---
+
+## 🟡 2026-10-14 公務機代送請假／補卡（migration 151＋Edge＋前端，**待業主套用／合併／部署**）
+
+- 公務機辨識仍走既有 LIFF access token → `line-push` → service-role verified RPC；新增 `kiosk_leave`／`kiosk_makeup`，公司與公務機身分都由 DB 決定，不採信前端公司、狀態或核准人。
+- migration 151 的 `kiosk_submit_leave_verified`／`kiosk_submit_makeup_verified` 只建立 `pending`，同公司在職員工（含未綁 LINE）才能送；請假／補卡沿用員工自助共用規則，補卡仍限 7 天並保留時間合理性檢查，來源以 `[公務機送出]` 標記。
+- `kiosk.html` 員工確認頁新增「📝 請假」「🔧 補卡」與中越雙語精簡表單；申請不拍照，不傳 `status`／`approver`，成功顯示「已送出，等待主管審核」後自動回輸入畫面，30 秒閒置計時涵蓋新表單。
+- 沒有新增即時 LINE 推播；pending 申請沿用既有每日 09:10 主管待辦彙總。Edge 對型別、真實日期、假別／時段白名單、時間與欄位白名單 fail-closed；DB 未套 151 時回 `db_not_migrated`。
+- 離線測試涵蓋 PGlite 權限／跨公司／離職／pending／7 天／重疊／員工自助一致性，Edge 參數與未驗證裝置，及 kiosk 靜態／jsdom 互動；反向對照會在缺少 B 包時失敗。
+- **上線順序固定：套 151 → 部署 `line-push` Edge Function → 合併前端。** 不可先上前端；回滾則反向操作：先回退前端，再回退 Edge，最後由函式擁有者套用 151 rollback。
 
 ## 🟡 2026-10-13 RLS 收斂第二階段 149-C／員工端與公開頁 leave_requests 改走 RPC（已實作，未部署）
 
