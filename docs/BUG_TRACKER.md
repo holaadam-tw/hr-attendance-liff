@@ -5,7 +5,9 @@
 
 ---
 
-## 🟡 2026-10-14 RLS 收斂第二階段收尾／leave_requests 撤除公開讀取（migration 152，**待業主套用**）
+## 🟢 2026-10-14 RLS 收斂第二階段收尾／leave_requests 撤除公開讀取（migration 152，**待業主套用**）
+
+- **migration 152 已套用正式庫（2026-10-14，業主授權；SHA256 6dcac9ec…b378700）**：套用前掃描線上 40 個 HTML／JS 檔 0 處直接讀 leave_requests；套用前狀態備份 `.codex/production_rls_backup_leave_requests_before_152_20261014.json`。套用後 anon／authenticated 無任何 table 權限、無政策；anon 金鑰直接讀 REST 回 42501。RPC 實測：管理員 90 筆、員工本人 4 筆、同時請假 10 筆（5 欄）、公開今日 1 人（2 欄）、一般員工呼叫管理員 RPC 被拒、既有審核清單與請假紀錄 RPC 正常；送假／核准／公務機送單（交易回復，0 殘留）皆成功。
 
 - migration 152 會移除最後一條公開政策「允許查看請假單」，並撤除 PUBLIC／anon／authenticated 對 `leave_requests` 的全部 table 權限；RLS 保持開啟，postgres／service_role 不變。結果為公開角色只能透過 RPC 存取，與 `overtime_requests`（110）、`attendance_anomalies`（092）一致。
 - 套用前硬性前提：149-B／149-C 線上前端已部署；實際套用當下必須用 curl 重抓線上 `common.js`、`modules/*.js` 與各 HTML，確認 0 處 `from('leave_requests')`／`from("leave_requests")`。本機掃描目前為 0，但不可拿本機結果取代上線前檢查。
