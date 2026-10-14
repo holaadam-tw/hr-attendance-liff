@@ -35,6 +35,10 @@ const dom = new JSDOM(page, { url: 'https://example.test/kiosk.html', runScripts
 const d = dom.window.document;
 
 check('Step 2 有請假與補卡入口', !!d.querySelector('#kioskLeaveEntry[onclick*="openKioskRequest"]') && !!d.querySelector('#kioskMakeupEntry[onclick*="openKioskRequest"]'));
+const actionBtns = d.getElementById('actionBtns');
+const requestEntry = d.getElementById('kioskLeaveEntry')?.parentElement;
+check('請假／補卡入口排列在主要打卡按鈕之後', !!actionBtns && !!requestEntry
+  && !!(actionBtns.compareDocumentPosition(requestEntry) & dom.window.Node.DOCUMENT_POSITION_FOLLOWING));
 check('兩張精簡表單欄位齊全', ['kioskLeaveType', 'kioskLeaveStart', 'kioskLeaveEnd', 'kioskLeavePeriod', 'kioskLeaveReason', 'kioskMakeupDate', 'kioskMakeupType', 'kioskMakeupTime', 'kioskMakeupReason'].every(id => d.getElementById(id)));
 check('中越雙語鍵存在', ['kioskRequestHint', 'kioskBackEmployee', 'kioskRequestSubmitted', 'kioskCompleteForm', 'kioskMakeupWindowHint'].every(k => (i18n.match(new RegExp(`${k}:`, 'g')) || []).length === 2));
 check('i18n 快取版本已更新', /i18n\.js\?v=20261014-kioskrequests/.test(page));
@@ -42,6 +46,19 @@ check('送出函式走正確 action', grab(page, 'submitKioskLeave').includes("c
 check('送出 payload 不含核准控制欄位', !/status\s*:|approver|approved_at/.test(grab(page, 'submitKioskLeave') + grab(page, 'submitKioskMakeup')));
 check('申請流程不拍照、不上傳', !/photo|storage|upload/i.test(grab(page, 'submitKioskLeave') + grab(page, 'submitKioskMakeup')));
 check('新表單受閒置回首頁保護', /else resetToInput\(\)/.test(grab(page, 'resetIdleTimer')) && /resetIdleTimer\(\)/.test(grab(page, 'openKioskRequest')));
+
+const photoDom = new JSDOM(page, { runScripts: 'outside-only' });
+let scrollOptions = null;
+photoDom.window.document.getElementById('actionBtns').scrollIntoView = options => { scrollOptions = options; };
+photoDom.window.eval(`
+  function tk(k) { return k; }
+  function setActionButtonsBusy() {}
+  ${grab(page, 'onPhotoReady')}
+`);
+photoDom.window.onPhotoReady();
+check('拍照後顯示打卡按鈕並置中捲入可視範圍',
+  photoDom.window.document.getElementById('actionBtns').style.display === 'flex'
+  && scrollOptions?.behavior === 'smooth' && scrollOptions?.block === 'center');
 
 const actions = [];
 dom.window.eval(`
