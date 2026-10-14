@@ -5,6 +5,17 @@
 
 ---
 
+## 🟢 2026-10-14 RLS 收斂第二階段收尾／leave_requests 撤除公開讀取（migration 152，**待業主套用**）
+
+- **migration 152 已套用正式庫（2026-10-14，業主授權；SHA256 6dcac9ec…b378700）**：套用前掃描線上 40 個 HTML／JS 檔 0 處直接讀 leave_requests；套用前狀態備份 `.codex/production_rls_backup_leave_requests_before_152_20261014.json`。套用後 anon／authenticated 無任何 table 權限、無政策；anon 金鑰直接讀 REST 回 42501。RPC 實測：管理員 90 筆、員工本人 4 筆、同時請假 10 筆（5 欄）、公開今日 1 人（2 欄）、一般員工呼叫管理員 RPC 被拒、既有審核清單與請假紀錄 RPC 正常；送假／核准／公務機送單（交易回復，0 殘留）皆成功。
+
+- migration 152 會移除最後一條公開政策「允許查看請假單」，並撤除 PUBLIC／anon／authenticated 對 `leave_requests` 的全部 table 權限；RLS 保持開啟，postgres／service_role 不變。結果為公開角色只能透過 RPC 存取，與 `overtime_requests`（110）、`attendance_anomalies`（092）一致。
+- 套用前硬性前提：149-B／149-C 線上前端已部署；實際套用當下必須用 curl 重抓線上 `common.js`、`modules/*.js` 與各 HTML，確認 0 處 `from('leave_requests')`／`from("leave_requests")`。本機掃描目前為 0，但不可拿本機結果取代上線前檢查。
+- 安全依據：四條讀取路徑已走 149 的 SECURITY DEFINER RPC；`submit_leave_request`、`approve_leave_request` 與 151 公務機請假／補卡送單同樣由 SECURITY DEFINER 委派，不依賴 anon／authenticated table grant 或 policy。
+- migration 檔尾會檢查 RLS on、anon／authenticated 無任何有效 table privilege、且沒有 policy 適用於 PUBLIC／anon／authenticated；任一殘留即 `RAISE`，整筆交易回復。rollback 只精確還原原政策與兩個 SELECT grant。
+- PGlite 23/23 通過：148 後直接 SELECT 基準、152 後兩角色 permission denied、149 四支 RPC 前後結果一致、submit／approve／151 公務機請假與補卡正常、rollback 恢復、可重套及政策漂移時整筆回復；`MIGRATION152_EMPTY=1` 反向對照 7 項失敗。`rls-locked-tables` 已把 `leave_requests` 升為讀寫皆鎖且 45/45 通過。
+- 本輪只寫本機 migration、測試與文件；未連線或寫入正式庫、未操作 Supabase Dashboard、未執行 git add／commit／push、未部署。正式套用須待 Claude 審查及業主另行授權（預計 2026-10-16 之後）。
+
 ## 🟢 2026-10-14 公務機代送請假／補卡（migration 151＋Edge＋前端，**待業主套用／合併／部署**）
 
 - **migration 151 已套用正式庫（2026-10-14，業主授權；SHA256 29e836e3…a9830）**：套用前五支目標函式與當日參考原文 md5 逐支相同（無漂移）。員工自助 6 情境（成功、重複、時段錯、非員工、補卡逾 7 天、未來日期）套用前後回應逐字相同；三支自助函式 ACL 不變；internal 只有 postgres；兩支公務機 RPC 只有 postgres／service_role，anon 帶完整參數呼叫回 42501。service_role 交易內實測（最後回復，0 殘留）：公務機替 E001（未綁 LINE）送假與補卡皆 success 且為 pending、請假原因與補卡備註帶「[公務機送出]」；本米員工、離職員工被拒；非公務機 LINE 帳號回 access_denied。Edge Function 與前端尚未部署。

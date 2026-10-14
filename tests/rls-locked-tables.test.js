@@ -33,6 +33,17 @@ const LOCKED = [
     note: '讀取改 RPC；寫入本來就走 072/108 的 RPC',
   },
   {
+    table: 'leave_requests',
+    migration: '148 + 149 + 152',
+    rpcs: [
+      'get_company_leave_requests',
+      'get_my_leave_requests',
+      'get_company_leave_overlap',
+      { name: 'get_public_today_leave_employees', requireCaller: false },
+    ],
+    note: '讀取改走 149 四支 RPC；寫入走 submit／approve／151 公務機 RPC；152 撤除公開 table 權限與政策',
+  },
+  {
     table: 'payroll',
     migration: '111 + 112',
     rpcs: ['save_payroll_records'],
@@ -86,7 +97,9 @@ LOCKED.forEach(({ table, migration, rpcs, note }) => {
     offenders.length ? '違規：' + offenders.join(', ') : undefined);
 
   // 2. 取代它的 RPC 必須存在於前端，且每個呼叫都要帶身分與公司
-  rpcs.forEach(rpc => {
+  rpcs.forEach(rpcConfig => {
+    const { name: rpc, requireCompany = true, requireCaller = true } =
+      typeof rpcConfig === 'string' ? { name: rpcConfig } : rpcConfig;
     const users = sources.filter(s => s.text.includes(rpc));
     check(rpc + ' 有被前端呼叫', users.length > 0, users.map(u => u.rel).join(', '));
 
@@ -99,14 +112,20 @@ LOCKED.forEach(({ table, migration, rpcs, note }) => {
         const before = s.text.slice(Math.max(0, i - 40), i);
         if (!/rpc\(\s*['"`]$/.test(before)) continue;
         const win = s.text.slice(i, i + 600);
-        if (!win.includes('p_company_id')) missingCompany.push(s.rel);
-        if (!win.includes('p_line_user_id')) missingCaller.push(s.rel);
+        if (requireCompany && !win.includes('p_company_id')) missingCompany.push(s.rel);
+        if (requireCaller && !win.includes('p_line_user_id')) missingCaller.push(s.rel);
       }
     });
-    check(rpc + ' 每個呼叫都帶 p_company_id（多租戶）', missingCompany.length === 0,
-      missingCompany.length ? '缺漏：' + [...new Set(missingCompany)].join(', ') : undefined);
-    check(rpc + ' 每個呼叫都帶 p_line_user_id（身分驗證）', missingCaller.length === 0,
-      missingCaller.length ? '缺漏：' + [...new Set(missingCaller)].join(', ') : undefined);
+    if (requireCompany) {
+      check(rpc + ' 每個呼叫都帶 p_company_id（多租戶）', missingCompany.length === 0,
+        missingCompany.length ? '缺漏：' + [...new Set(missingCompany)].join(', ') : undefined);
+    }
+    if (requireCaller) {
+      check(rpc + ' 每個呼叫都帶 p_line_user_id（身分驗證）', missingCaller.length === 0,
+        missingCaller.length ? '缺漏：' + [...new Set(missingCaller)].join(', ') : undefined);
+    } else {
+      check(rpc + ' 為公開今日最小資料 RPC，不接受 p_line_user_id', true);
+    }
   });
   console.log('');
 });
@@ -118,12 +137,6 @@ const WRITE_LOCKED = [
     migration: '124',
     rpcs: ['admin_create_employee', 'admin_update_employee', 'admin_delete_pending_employee', 'register_employee', 'set_my_preferred_language'],
     note: '13 處寫入改 RPC；anon 的 INSERT/UPDATE/DELETE grant 與全開政策已撤',
-  },
-  {
-    table: 'leave_requests',
-    migration: '148',
-    rpcs: ['approve_leave_request'],
-    note: '寫入原本已全走 RPC；148 撤 anon/authenticated 寫入 grant 與三條放行政策',
   },
 ];
 const VERIFIED_VIA_EDGE = { admin_create_employee: 'employee_create', admin_update_employee: 'employee_update', admin_delete_pending_employee: 'employee_delete_pending' };
