@@ -44,10 +44,10 @@
 | `store_profiles` | 5 | 3 | insert / update |
 | `service_items` | 4 | 3 | insert / update / delete |
 | `attendance` | 6 | 0 | （寫入已全走 RPC ✅） |
-| `leave_requests` | 8 | 0 | 前端寫入已全走 RPC；148 待套用以封鎖直接 REST 寫入 |
+| `leave_requests` | 0 | 0 | ✅ 讀寫皆已改走 RPC；148／149 已套用，152 收尾待業主套用 |
 | `overtime_requests` | 3 | 0 | （寫入已全走 RPC ✅） |
 
-**好消息**：`attendance` / `leave_requests` / `overtime_requests` 這三張最敏感的表，**寫入已經全部走 RPC 了**（`check-rls-bypass.sh` hook 的功勞），只剩讀取要處理。
+**好消息**：`attendance` / `leave_requests` / `overtime_requests` 這三張最敏感的表，**寫入已經全部走 RPC 了**（`check-rls-bypass.sh` hook 的功勞）；`leave_requests` 的讀取也已完成 RPC 化，剩 migration 152 待業主授權套用以撤掉公開讀取。
 
 ---
 
@@ -127,14 +127,15 @@
 - 讀取部分是主要工作量：`employees` 15 個、`leave_requests` 8 個、`attendance` 6 個
 - **`overtime_requests` 連 RLS 都沒開**，這張最快——`ENABLE ROW LEVEL SECURITY` 之後只剩 3 個讀取點要改（其中 1 個是 2026-08-05 新增的加班確認卡片）
 
-#### 🟡 `leave_requests` 第一階段已實作（migration 148，待業主套用）
+#### ✅ `leave_requests` 讀寫整治實作完成（148＋149＋152；152 **待業主套用**）
 
-2026-10-13 正式庫唯讀盤點確認：表 owner=`postgres`、RLS 已開；寫入函式只有 `submit_leave_request` 與 `approve_leave_request`，皆為 `SECURITY DEFINER` 且 owner=`postgres`。前端、Edge Function、pg_cron 均無直接寫入；兩支 trigger 也沒有會因撤 table grant 而失效的 SECURITY INVOKER 寫入路徑。
+2026-10-14 正式庫唯讀參考確認：表 owner=`postgres`、RLS 已開；148 已撤公開寫入政策與寫入 grant，149 四支 SECURITY DEFINER 讀取 RPC 已套用，151 的員工／公務機送單也不依賴公開 table 權限。線上前端直接 `from('leave_requests')` 已為 0。
 
-- 148 只撤三條寫入政策與 anon／authenticated 的 INSERT／UPDATE／DELETE／TRUNCATE／REFERENCES／TRIGGER／MAINTAIN；保留 SELECT grant 與「允許查看請假單」。
-- PGlite 已重現套用前直接 INSERT／改 pending 為 approved／DELETE 漏洞；套用後兩個公開角色皆被拒，而申請、核准、駁回 RPC 照常。rollback 後政策與 ACL 逐項等同正式快照並可重套。
-- 本階段不做 149、不改任何直接讀取點、不撤 SELECT 政策。第二階段必須另案遵守「先 RPC → 前端改 → 部署驗證 → 最後撤讀取政策」。
-- 業主套用 148 前應再次核對 migration SHA、正式庫函式 owner／`prosecdef` 與現有政策名稱；套用後先以唯讀 metadata 驗證 grant／policy，再做員工送單與主管核准／駁回 smoke。異常即以 rollback 單一交易還原。
+- 148 已完成寫入鎖：anon／authenticated 只暫留 SELECT；申請、核准、駁回 RPC 不受影響。
+- 149 已完成讀取 RPC 與前端切換：管理端、本人、同公司重疊提示、公開今日名單都有各自最小權限入口；本機全前端掃描 0 處直接存取。
+- 152 收尾已在本機完成：移除「允許查看請假單」，撤 PUBLIC／anon／authenticated 全部 table 權限，保持 RLS on；檔尾遇到任何公開權限或政策殘留即整筆回復。rollback 精確還原政策原文與 anon／authenticated SELECT。
+- PGlite 已覆蓋 148 後基準、149 四支讀 RPC、submit／approve、151 公務機請假／補卡、rollback、重套及置空反向對照。`tests/rls-locked-tables.test.js` 已將 `leave_requests` 納入 `LOCKED`（讀寫皆鎖）。
+- 上線仍須遵守「先 RPC → 前端部署 → curl 驗線上 0 直接讀取 → 業主另行授權套 152」。目前狀態只代表本機實作完成，不代表正式庫已收鎖。
 
 ### P1 — 營運設定
 
