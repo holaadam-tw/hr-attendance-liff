@@ -35,10 +35,11 @@ import {
     applySchedulingModeUI, applyShiftTabMode, saveSchedulingMode,
     loadLunchManagers, addLunchManager, removeLunchManager, saveLunchDeadline, loadLunchDeadline,
     saveAttendanceSettings, loadAttendanceSettings,
-    loadAdminLunchStats, loadStaffOverview, changeLeaveCal,
+    loadAdminLunchStats, openAdminLunchTodayModal, closeAdminLunchTodayModal, submitAdminLunchToday,
+    loadStaffOverview, changeLeaveCal,
     resetLeaveCal, loadLeaveCal,
     clearLeaveState
-} from './leave.js?v=20261119-adminproxyleave';
+} from './leave.js?v=20261119-adminlunch154';
 
 import {
     changeShiftWeek, resetShiftWeek, loadShiftMgr, cycleShift,
@@ -190,6 +191,9 @@ window.loadLunchDeadline = loadLunchDeadline;
 window.saveAttendanceSettings = saveAttendanceSettings;
 window.loadAttendanceSettings = loadAttendanceSettings;
 window.loadAdminLunchStats = loadAdminLunchStats;
+window.openAdminLunchTodayModal = openAdminLunchTodayModal;
+window.closeAdminLunchTodayModal = closeAdminLunchTodayModal;
+window.submitAdminLunchToday = submitAdminLunchToday;
 window.loadStaffOverview = loadStaffOverview;
 window.changeLeaveCal = changeLeaveCal;
 window.resetLeaveCal = resetLeaveCal;

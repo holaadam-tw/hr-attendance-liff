@@ -560,6 +560,27 @@ const post = (url, body, headers = {}) => new Request(url, { method: 'POST', bod
     t = await run(proxyLeave, missingRoute('admin_submit_leave_for_employee_verified'));
     check('admin_proxy_leave：153 未套 → 503 db_not_migrated（153）', t.res.status === 503 && t.out.code === 'db_not_migrated' && /（153）/.test(t.out.error));
 
+    // ---- 154：管理員補訂當天便當（公司必填；日期由 DB 決定）----
+    const LUNCH_EMP = '00000000-0000-0000-0000-0000000000e5';
+    const adminLunch = { action: 'admin_lunch_today', company_id: COMPANY, employee_id: LUNCH_EMP, choice: 'vegetarian' };
+    const lunchRoutes = (extra = []) => rpcRoutes([...extra,
+      ['/rpc/admin_order_lunch_today_verified', { body: { success: true, order_date: '2026-11-19', status: 'ordered', is_vegetarian: true } }]]);
+    t = await run(adminLunch, lunchRoutes());
+    c = call(t.f, 'admin_order_lunch_today_verified');
+    check('admin_lunch_today：白名單 action 可用，呼叫 154 RPC 且不接受前端日期', t.res.status === 200
+      && c?.body.p_company_id === COMPANY && c.body.p_employee_id === LUNCH_EMP && c.body.p_choice === 'vegetarian'
+      && c.body.p_line_user_id === LIFF_USER && !('p_order_date' in c.body)
+      && Object.keys(c.body).sort().join() === 'p_choice,p_company_id,p_employee_id,p_line_user_id', JSON.stringify(c?.body));
+    check('admin_lunch_today：呼叫者 lineUserId 只取自 LIFF 驗證', c?.body.p_line_user_id === LIFF_USER);
+    t = await run({ ...adminLunch, company_id: undefined }, lunchRoutes());
+    check('admin_lunch_today：缺 company_id → 400、不驗 LIFF、不呼叫 RPC', t.res.status === 400 && t.f.calls.length === 0);
+    t = await run({ ...adminLunch, choice: 'meat' }, lunchRoutes());
+    check('admin_lunch_today：錯誤 choice → 400、不呼叫 RPC', t.res.status === 400 && !call(t.f, 'admin_order_lunch_today_verified'));
+    t = await run({ ...adminLunch, order_date: '2026-11-18' }, lunchRoutes());
+    check('admin_lunch_today：白名單拒絕日期或其他多餘欄位', t.res.status === 400 && !call(t.f, 'admin_order_lunch_today_verified'));
+    t = await run(adminLunch, missingRoute('admin_order_lunch_today_verified'));
+    check('admin_lunch_today：154 未套 → 503 db_not_migrated（154）', t.res.status === 503 && t.out.code === 'db_not_migrated' && /（154）/.test(t.out.error));
+
     // ---- 142：公務機（身分＝平板登入的公務機 LINE 帳號，前端報的 kiosk LINE ID 不採信）----
     const KEMP = '00000000-0000-0000-0000-0000000000e3';
     const PHOTO = 'https://db.test/storage/v1/object/public/selfies/kiosk_E03_1.jpg';

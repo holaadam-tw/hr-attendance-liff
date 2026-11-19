@@ -475,12 +475,38 @@ export async function loadAttendanceSettings() {
     if (checkoutLimit !== null && checkoutLimit !== undefined && el7) el7.value = checkoutLimit;
 }
 
+let adminLunchTodayStatusByEmployee = new Map();
+
+function adminLunchStatusLabel(order) {
+    if (!order) return '未選';
+    if (order.status === 'cancelled') return '不訂';
+    if (order.status === 'ordered') return order.is_vegetarian ? '素' : '葷';
+    return '未選';
+}
+
+function setAdminLunchTodayError(message) {
+    const el = document.getElementById('adminLunchTodayError');
+    if (el) el.textContent = message || '';
+}
+
+function setAdminLunchTodayBusy(busy) {
+    document.querySelectorAll('[data-admin-lunch-choice]').forEach(btn => {
+        btn.disabled = busy;
+        btn.style.opacity = busy ? '0.55' : '1';
+    });
+}
+
 export async function loadAdminLunchStats() {
     const el = document.getElementById('adminLunchStats');
-    if (!el) return;
+    if (!el) return false;
     const todayStr = getTaiwanDate(0);
     try {
-        const { data } = await sb.from('lunch_orders').select('id, is_vegetarian, status, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).eq('order_date', todayStr);
+        const { data, error } = await sb.from('lunch_orders')
+            .select('id, employee_id, is_vegetarian, status, employees!inner(company_id)')
+            .eq('employees.company_id', window.currentCompanyId)
+            .eq('order_date', todayStr);
+        if (error) throw error;
+        adminLunchTodayStatusByEmployee = new Map((data || []).map(order => [order.employee_id, adminLunchStatusLabel(order)]));
         const orders = (data || []).filter(o => o.status === 'ordered');
         const veg = orders.filter(o => o.is_vegetarian).length;
         const regular = orders.filter(o => !o.is_vegetarian).length;
@@ -504,7 +530,105 @@ export async function loadAdminLunchStats() {
                     <div style="font-size:11px;font-weight:600;color:#DC2626;">🚫 不訂</div>
                 </div>
             </div>`;
-    } catch (e) { el.innerHTML = '<p style="color:#94A3B8;">載入失敗</p>'; }
+        return true;
+    } catch (e) {
+        console.error(e);
+        adminLunchTodayStatusByEmployee = new Map();
+        el.innerHTML = '<p style="color:#94A3B8;">載入失敗</p>';
+        return false;
+    }
+}
+
+export async function openAdminLunchTodayModal() {
+    const modal = document.getElementById('adminLunchTodayModal');
+    const select = document.getElementById('adminLunchTodayEmployee');
+    if (!modal || !select) return;
+    modal.style.display = 'flex';
+    setAdminLunchTodayError('');
+    setAdminLunchTodayBusy(false);
+    select.disabled = true;
+    select.innerHTML = '<option value="">載入中...</option>';
+
+    try {
+        if (!window.currentCompanyId) throw new Error('目前沒有公司資料');
+        const statsLoaded = await loadAdminLunchStats();
+        if (!statsLoaded) throw new Error('今日便當狀態載入失敗');
+
+        const { data, error } = await sb.from('employees')
+            .select('id, name, employee_number, department, is_kiosk')
+            .eq('company_id', window.currentCompanyId)
+            .eq('is_active', true)
+            .order('department', { ascending: true })
+            .order('name', { ascending: true });
+        if (error) throw error;
+
+        const employees = (data || []).filter(emp => emp.is_kiosk !== true);
+        select.replaceChildren();
+        const placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = employees.length ? '請選擇員工' : '目前沒有可補訂的在職員工';
+        select.appendChild(placeholder);
+        employees.forEach(emp => {
+            const option = document.createElement('option');
+            option.value = emp.id;
+            option.dataset.employeeName = emp.name || '員工';
+            const employeeText = [emp.employee_number, emp.name, emp.department].filter(Boolean).join(' · ');
+            option.textContent = `${employeeText}（${adminLunchTodayStatusByEmployee.get(emp.id) || '未選'}）`;
+            select.appendChild(option);
+        });
+        select.disabled = employees.length === 0;
+    } catch (err) {
+        console.error(err);
+        select.innerHTML = '<option value="">員工清單載入失敗</option>';
+        setAdminLunchTodayError(err?.message || '員工清單載入失敗，請稍後再試');
+    }
+}
+
+export function closeAdminLunchTodayModal() {
+    const modal = document.getElementById('adminLunchTodayModal');
+    if (modal) modal.style.display = 'none';
+    setAdminLunchTodayError('');
+    setAdminLunchTodayBusy(false);
+}
+
+export async function submitAdminLunchToday(choice) {
+    const companyId = window.currentCompanyId;
+    const select = document.getElementById('adminLunchTodayEmployee');
+    const employeeId = select?.value || '';
+    const labels = { regular: '葷食', vegetarian: '素食', none: '不訂' };
+    if (!companyId || !employeeId) {
+        setAdminLunchTodayError('請先選擇員工');
+        return;
+    }
+    if (!Object.prototype.hasOwnProperty.call(labels, choice)) {
+        setAdminLunchTodayError('便當選項不正確');
+        return;
+    }
+
+    const employeeName = select.selectedOptions?.[0]?.dataset.employeeName || '員工';
+    setAdminLunchTodayError('');
+    setAdminLunchTodayBusy(true);
+    try {
+        const r = await callVerifiedAction('admin_lunch_today', {
+            company_id: companyId,
+            employee_id: employeeId,
+            choice
+        });
+        setAdminLunchTodayBusy(false);
+        if (r.code === 'relogin_redirect') return;
+        if (!r.ok || !r.data?.result?.success) {
+            setAdminLunchTodayError(r.message || '補訂失敗，請稍後再試');
+            return;
+        }
+
+        closeAdminLunchTodayModal();
+        showToast(`已幫 ${employeeName} 補訂：${labels[choice]}`);
+        await loadAdminLunchStats();
+    } catch (err) {
+        console.error(err);
+        setAdminLunchTodayBusy(false);
+        setAdminLunchTodayError(err?.message || '補訂失敗，請稍後再試');
+    }
 }
 
 export async function loadStaffOverview() {

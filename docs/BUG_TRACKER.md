@@ -5,9 +5,17 @@
 
 ---
 
-## 🟡 2026-11-19 管理員代請假（153）
+## 🟡 2026-11-19 管理員補訂當天便當（154）
 
-- **狀態：待業主授權套用 153 → 部署 line-push → 合併前端。** 本輪只建立本地 migration／程式／測試，未連線或寫入正式庫，未操作 Supabase Dashboard，未部署。
+- **狀態：待業主授權套用 154 → 部署 line-push → 合併前端。** 本輪只建立本地 migration／程式／測試，未連線或寫入正式庫，未操作 Supabase Dashboard，未部署。
+- `admin_order_lunch_today_verified` 只給 `service_role`：先用 `is_company_manager_caller` 驗 admin／manager／platform_admin，再鎖定同公司在職、非公務機目標員工；日期固定由 DB 取台灣今日，不接受前端日期，也不受一般訂餐截止時間限制。
+- `regular`／`vegetarian` 寫成 `ordered`，`none` 寫成 `cancelled`；同員工同日以 upsert 更新既有訂單。稽核 `notes` 固定為 `[管理員補訂：<DB 查得姓名>]`，不採信前端姓名。
+- `line-push` action=`admin_lunch_today` 只接受 `company_id`／`employee_id`／`choice` 白名單，呼叫者 LINE userId 取自 LIFF token 驗證。便當統計卡新增補訂對話框，員工下拉限定目前公司、在職並排除公務機，並以同一份今日訂單查詢顯示葷／素／不訂／未選。
+- 上線順序不可顛倒：154 → `line-push` → 前端；回滾時先回退前端，再回退 Edge，最後由具授權者套用 `154_admin_lunch_order_today_verified_rollback.sql`。本次不更動 kiosk／services／checkin，也不撤 `lunch_orders` 既有政策。
+
+## 🟢 2026-11-19 管理員代請假（153）
+
+- **狀態：2026-11-19 已上線（153 已套、line-push v13、PR #20 565a493）。**
 - `admin_submit_leave_for_employee_verified` 只給 `service_role`：先用 `is_company_manager_caller` 驗 admin／manager／platform_admin，再鎖定同公司在職、非公務機目標員工，委派 151 的 `submit_leave_request_internal`，固定建立 `pending`。
 - 稽核前綴固定為 `[管理員代送：<DB 查得姓名>] `，不採信前端姓名；`line-push` action=`admin_proxy_leave` 只接受假別／時段／日期／時間／原因白名單與必填 `company_id`，呼叫者 LINE userId 取自 LIFF token 驗證。
 - 審核中心請假分頁新增「＋ 代員工請假」對話框；員工清單限定目前公司、在職並排除公務機，成功後關閉對話框、顯示「已代送，等待審核」並重載 pending 清單。
