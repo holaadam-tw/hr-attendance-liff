@@ -5,13 +5,15 @@
 
 ---
 
-## 🟡 2026-11-19 管理員補訂當天便當（154）
+## 🟡 2026-11-19 管理員補訂＋公務機截止前重選當天便當（154／155）
 
-- **狀態：待業主授權套用 154 → 部署 line-push → 合併前端。** 本輪只建立本地 migration／程式／測試，未連線或寫入正式庫，未操作 Supabase Dashboard，未部署。
+- **狀態：待業主授權套用 154、155 → 部署 line-push → 合併前端。** 本輪只建立本地 migration／程式／測試，未連線或寫入正式庫，未操作 Supabase Dashboard，未部署。
 - `admin_order_lunch_today_verified` 只給 `service_role`：先用 `is_company_manager_caller` 驗 admin／manager／platform_admin，再鎖定同公司在職、非公務機目標員工；日期固定由 DB 取台灣今日，不接受前端日期，也不受一般訂餐截止時間限制。
 - `regular`／`vegetarian` 寫成 `ordered`，`none` 寫成 `cancelled`；同員工同日以 upsert 更新既有訂單。稽核 `notes` 固定為 `[管理員補訂：<DB 查得姓名>]`，不採信前端姓名。
 - `line-push` action=`admin_lunch_today` 只接受 `company_id`／`employee_id`／`choice` 白名單，呼叫者 LINE userId 取自 LIFF token 驗證。便當統計卡新增補訂對話框，員工下拉限定目前公司、在職並排除公務機，並以同一份今日訂單查詢顯示葷／素／不訂／未選。
-- 上線順序不可顛倒：154 → `line-push` → 前端；回滾時先回退前端，再回退 Edge，最後由具授權者套用 `154_admin_lunch_order_today_verified_rollback.sql`。本次不更動 kiosk／services／checkin，也不撤 `lunch_orders` 既有政策。
+- migration 155 新增公務機 `kiosk_lunch_today_verified`／`kiosk_lunch_today_status_verified`：公司只由已驗證的公務機 LINE 身分解析，目標鎖同公司在職、非公務機；日期只取 DB 台灣今日。`lunch_deadline` 支援 `"10:00"`、`"9"` 或 JSONB 數字，無設定／格式錯誤預設 10:00；截止後回 `deadline_passed` 且零寫入。
+- `kiosk.html` 在請假／補卡同排加入只於 lunch 功能開啟時顯示的「🍱 便當」，先讀 server status，截止前可把今日葷／素／不訂重選，截止後只提示找管理員；打卡後既有自動彈窗也改走 155，不再從公務機前端直接 upsert `lunch_orders`。`services.html`、`checkin.html` 與第一部分 154 行為不變。
+- 上線順序不可顛倒：154、155 → `line-push` → 前端；回滾時先回退前端，再回退 Edge，最後由具授權者依序套用 155、154 rollback。`lunch_orders` 既有政策不撤除。
 
 ## 🟢 2026-11-19 管理員代請假（153）
 
