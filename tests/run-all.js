@@ -64,6 +64,7 @@ const SUITES = [
   { name: '管理員補訂當天便當前端（jsdom／靜態）', file: 'admin-lunch-today-frontend.test.js' },
   { name: '公務機當天便當前端（jsdom／Chromium 360×640）', file: 'kiosk-lunch-today-frontend.test.js' },
   { name: '打卡總覽', file: 'attendance-overview.test.js' },
+  { name: '公開出勤頁請假月曆', file: 'leave-calendar-display.test.js' },
   { name: '薪資頁加班來源', file: 'payroll-overtime.test.js' },
   { name: 'RLS 已鎖定資料表', file: 'rls-locked-tables.test.js' },
   { name: '批次薪資設定', file: 'salary-batch.test.js' },
