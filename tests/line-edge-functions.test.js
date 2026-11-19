@@ -560,6 +560,27 @@ const post = (url, body, headers = {}) => new Request(url, { method: 'POST', bod
     t = await run(proxyLeave, missingRoute('admin_submit_leave_for_employee_verified'));
     check('admin_proxy_leave：153 未套 → 503 db_not_migrated（153）', t.res.status === 503 && t.out.code === 'db_not_migrated' && /（153）/.test(t.out.error));
 
+    // ---- 154：管理員補訂當天便當（公司必填；日期由 DB 決定）----
+    const LUNCH_EMP = '00000000-0000-0000-0000-0000000000e5';
+    const adminLunch = { action: 'admin_lunch_today', company_id: COMPANY, employee_id: LUNCH_EMP, choice: 'vegetarian' };
+    const lunchRoutes = (extra = []) => rpcRoutes([...extra,
+      ['/rpc/admin_order_lunch_today_verified', { body: { success: true, order_date: '2026-11-19', status: 'ordered', is_vegetarian: true } }]]);
+    t = await run(adminLunch, lunchRoutes());
+    c = call(t.f, 'admin_order_lunch_today_verified');
+    check('admin_lunch_today：白名單 action 可用，呼叫 154 RPC 且不接受前端日期', t.res.status === 200
+      && c?.body.p_company_id === COMPANY && c.body.p_employee_id === LUNCH_EMP && c.body.p_choice === 'vegetarian'
+      && c.body.p_line_user_id === LIFF_USER && !('p_order_date' in c.body)
+      && Object.keys(c.body).sort().join() === 'p_choice,p_company_id,p_employee_id,p_line_user_id', JSON.stringify(c?.body));
+    check('admin_lunch_today：呼叫者 lineUserId 只取自 LIFF 驗證', c?.body.p_line_user_id === LIFF_USER);
+    t = await run({ ...adminLunch, company_id: undefined }, lunchRoutes());
+    check('admin_lunch_today：缺 company_id → 400、不驗 LIFF、不呼叫 RPC', t.res.status === 400 && t.f.calls.length === 0);
+    t = await run({ ...adminLunch, choice: 'meat' }, lunchRoutes());
+    check('admin_lunch_today：錯誤 choice → 400、不呼叫 RPC', t.res.status === 400 && !call(t.f, 'admin_order_lunch_today_verified'));
+    t = await run({ ...adminLunch, order_date: '2026-11-18' }, lunchRoutes());
+    check('admin_lunch_today：白名單拒絕日期或其他多餘欄位', t.res.status === 400 && !call(t.f, 'admin_order_lunch_today_verified'));
+    t = await run(adminLunch, missingRoute('admin_order_lunch_today_verified'));
+    check('admin_lunch_today：154 未套 → 503 db_not_migrated（154）', t.res.status === 503 && t.out.code === 'db_not_migrated' && /（154）/.test(t.out.error));
+
     // ---- 142：公務機（身分＝平板登入的公務機 LINE 帳號，前端報的 kiosk LINE ID 不採信）----
     const KEMP = '00000000-0000-0000-0000-0000000000e3';
     const PHOTO = 'https://db.test/storage/v1/object/public/selfies/kiosk_E03_1.jpg';
@@ -567,6 +588,8 @@ const post = (url, body, headers = {}) => new Request(url, { method: 'POST', bod
       ['/rpc/kiosk_get_company_verified', { body: { success: true, name: '大正科技', company_id: COMPANY, extra_field: 'SHOULD-NOT-LEAK' } }],
       ['/rpc/kiosk_lookup_employee_verified', { body: { success: true, employee_id: KEMP, name: '員工三', employee_number: 'E03' } }],
       ['/rpc/kiosk_check_in_verified', { body: { success: true, type: 'check_in', name: '員工三', is_late: false } }],
+      ['/rpc/kiosk_lunch_today_status_verified', { body: { success: true, order_date: '2026-11-19', choice: 'vegetarian', deadline: '10:00', deadline_passed: false } }],
+      ['/rpc/kiosk_lunch_today_verified', { body: { success: true, order_date: '2026-11-19', status: 'ordered', is_vegetarian: true } }],
       ['/rpc/kiosk_submit_leave_verified', { body: { success: true, days: 1, leave_period: 'full_day' } }],
       ['/rpc/kiosk_submit_makeup_verified', { body: { success: true } }]]);
     t = await run({ action: 'kiosk_get_company', kiosk_line_user_id: 'Ukiosk', p_kiosk_line_user_id: 'Ukiosk' }, kioskRoutes());
@@ -632,6 +655,31 @@ const post = (url, body, headers = {}) => new Request(url, { method: 'POST', bod
     check('kiosk_check_in：非公務機 → 403', t.res.status === 403 && t.out.code === 'access_denied');
     t = await run({ action: 'kiosk_check_in', employee_id: KEMP, kiosk_action: 'check_in' }, kioskRoutes([['/rpc/kiosk_check_in_verified', { status: 500, body: { message: 'boom' } }]]));
     check('kiosk_check_in：RPC 連不上 → 503', t.res.status === 503);
+
+    const kioskLunchStatus = { action: 'kiosk_lunch_status', employee_id: KEMP };
+    t = await run(kioskLunchStatus, kioskRoutes());
+    c = call(t.f, 'kiosk_lunch_today_status_verified');
+    check('kiosk_lunch_status：白名單 action 可用、不帶 company_id，只送 LIFF 身分與目標員工', t.res.status === 200
+      && c?.body.p_line_user_id === LIFF_USER && c.body.p_employee_id === KEMP
+      && Object.keys(c.body).sort().join() === 'p_employee_id,p_line_user_id'
+      && t.out.result?.choice === 'vegetarian', JSON.stringify(c?.body));
+    t = await run({ ...kioskLunchStatus, company_id: COMPANY }, kioskRoutes());
+    check('kiosk_lunch_status：嚴格白名單拒絕 company_id', t.res.status === 400 && !call(t.f, 'kiosk_lunch_today_status_verified'));
+
+    const kioskLunch = { action: 'kiosk_lunch', employee_id: KEMP, choice: 'vegetarian' };
+    t = await run(kioskLunch, kioskRoutes());
+    c = call(t.f, 'kiosk_lunch_today_verified');
+    check('kiosk_lunch：白名單 action 可用，只轉送 employee_id／choice 與 LIFF 身分', t.res.status === 200
+      && c?.body.p_line_user_id === LIFF_USER && c.body.p_employee_id === KEMP && c.body.p_choice === 'vegetarian'
+      && Object.keys(c.body).sort().join() === 'p_choice,p_employee_id,p_line_user_id', JSON.stringify(c?.body));
+    t = await run({ ...kioskLunch, choice: 'meat' }, kioskRoutes());
+    check('kiosk_lunch：錯誤 choice → 400、不呼叫 RPC', t.res.status === 400 && !call(t.f, 'kiosk_lunch_today_verified'));
+    t = await run({ ...kioskLunch, order_date: '2026-11-19' }, kioskRoutes());
+    check('kiosk_lunch：拒絕前端日期或其他多餘欄位', t.res.status === 400 && !call(t.f, 'kiosk_lunch_today_verified'));
+    t = await run(kioskLunch, kioskRoutes([['/rpc/kiosk_lunch_today_verified', { body: { success: false, error: '今日便當已截止，請找管理員補訂', error_code: 'deadline_passed' } }]]));
+    check('kiosk_lunch：截止後回 deadline_passed／400', t.res.status === 400 && t.out.code === 'deadline_passed' && /管理員補訂/.test(t.out.error));
+    t = await run(kioskLunchStatus, missingRoute('kiosk_lunch_today_status_verified'));
+    check('kiosk_lunch_status：155 未套 → 503 db_not_migrated（155）', t.res.status === 503 && t.out.code === 'db_not_migrated' && /（155）/.test(t.out.error));
 
     const leave = { action: 'kiosk_leave', employee_id: KEMP, leave_type: 'annual', start_date: '2026-10-20', end_date: '2026-10-20', leave_period: 'full_day', leave_start_time: null, leave_end_time: null, reason: '家庭事務' };
     t = await run(leave, kioskRoutes());

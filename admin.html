@@ -890,6 +890,36 @@
             </div>
         </div>
 
+        <!-- 管理員替員工補訂當天便當 Modal（154） -->
+        <div id="adminLunchTodayModal" class="modal" style="display:none;">
+            <div class="modal-content" style="max-width:440px;max-height:calc(100vh - 24px);margin:12px;overflow-y:auto;">
+                <div class="modal-header">
+                    <h3>🍱 幫員工補訂（今天）</h3>
+                    <button type="button" class="modal-close" onclick="closeAdminLunchTodayModal()">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p style="margin:0 0 14px;padding:10px 12px;border-radius:10px;background:#FFF7ED;color:#9A3412;font-size:12px;line-height:1.6;">
+                        只補訂台灣今天；不受一般訂餐截止時間限制。
+                    </p>
+                    <div class="form-group">
+                        <label for="adminLunchTodayEmployee">員工 *</label>
+                        <select id="adminLunchTodayEmployee"><option value="">載入中...</option></select>
+                    </div>
+                    <div style="font-size:12px;font-weight:700;color:#475569;margin:4px 0 8px;">請選擇便當</div>
+                    <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;">
+                        <button type="button" data-admin-lunch-choice="regular" onclick="submitAdminLunchToday('regular')"
+                                style="min-height:68px;padding:10px 6px;border:2px solid #BFDBFE;border-radius:12px;background:#EFF6FF;color:#1D4ED8;font-weight:900;font-size:14px;cursor:pointer;font-family:inherit;">🍖<br>葷食</button>
+                        <button type="button" data-admin-lunch-choice="vegetarian" onclick="submitAdminLunchToday('vegetarian')"
+                                style="min-height:68px;padding:10px 6px;border:2px solid #C4B5FD;border-radius:12px;background:#F5F3FF;color:#6D28D9;font-weight:900;font-size:14px;cursor:pointer;font-family:inherit;">🥗<br>素食</button>
+                        <button type="button" data-admin-lunch-choice="none" onclick="submitAdminLunchToday('none')"
+                                style="min-height:68px;padding:10px 6px;border:2px solid #FECACA;border-radius:12px;background:#FEF2F2;color:#B91C1C;font-weight:900;font-size:14px;cursor:pointer;font-family:inherit;">🚫<br>不訂</button>
+                    </div>
+                    <div id="adminLunchTodayError" style="min-height:18px;margin-top:10px;color:#DC2626;font-size:12px;"></div>
+                    <button type="button" class="btn btn-secondary" onclick="closeAdminLunchTodayModal()" style="width:100%;margin-top:4px;">取消</button>
+                </div>
+            </div>
+        </div>
+
         <!-- ====== 申請管理（報修+採購） ====== -->
         <div id="requestsMgrPage" class="page">
             <button class="btn btn-secondary" onclick="showPage('adminHomePage')" style="width:auto;margin-bottom:10px;">← 返回</button>
@@ -982,6 +1012,10 @@
                 <div style="background:#fff;border-radius:14px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,0.08);margin-bottom:16px;">
                     <div style="font-size:14px;font-weight:800;color:#0F172A;margin-bottom:12px;">📊 今日便當統計</div>
                     <div id="adminLunchStats" style="font-size:13px;color:#64748B;">載入中...</div>
+                    <button type="button" data-require="admin" onclick="openAdminLunchTodayModal()"
+                            style="margin-top:12px;width:100%;padding:11px;border:none;border-radius:10px;background:#EA580C;color:#fff;font-weight:800;font-size:13px;cursor:pointer;font-family:inherit;">
+                        ＋ 幫員工補訂（今天）
+                    </button>
                 </div>
 
                 <div style="background:#FFF7ED;border-radius:14px;padding:14px;">
@@ -2387,7 +2421,7 @@
     </div>
 
 <script src="common.js?v=20261013-leaverpc149c"></script>
-<script type="module" src="modules/index.js?v=20261119-adminproxyleave"></script>
+<script type="module" src="modules/index.js?v=20261119-adminlunch154"></script>
     <script type="module" src="admin_fixes.js?v=20260708-audit2"></script>
     <script>
     // ===== 公務機打卡 =====

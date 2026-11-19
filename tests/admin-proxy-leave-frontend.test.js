@@ -48,8 +48,8 @@ check('員工清單查詢限定公司與在職，並排除公務機', /from\('em
   && /is_kiosk !== true/.test(grab(leave, 'openAdminProxyLeaveModal')));
 check('leave 模組 export 皆掛到 window', ['openAdminProxyLeaveModal', 'closeAdminProxyLeaveModal',
   'toggleAdminProxyLeaveTimes', 'submitAdminProxyLeave'].every(name => index.includes(`window.${name} = ${name}`)));
-check('admin 與 leave 模組快取版本均更新', /modules\/index\.js\?v=20261119-adminproxyleave/.test(page)
-  && /leave\.js\?v=20261119-adminproxyleave/.test(index));
+check('admin 與 leave 模組快取版本均更新', /modules\/index\.js\?v=20261119-adminlunch154/.test(page)
+  && /leave\.js\?v=20261119-adminlunch154/.test(index));
 
 const submitSource = grab(leave, 'submitAdminProxyLeave');
 check('送出使用 admin_proxy_leave 且不含核准控制欄位', submitSource.includes("callVerifiedAction('admin_proxy_leave'")

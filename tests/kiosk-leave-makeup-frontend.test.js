@@ -41,7 +41,7 @@ check('請假／補卡入口排列在主要打卡按鈕之後', !!actionBtns && 
   && !!(actionBtns.compareDocumentPosition(requestEntry) & dom.window.Node.DOCUMENT_POSITION_FOLLOWING));
 check('兩張精簡表單欄位齊全', ['kioskLeaveType', 'kioskLeaveStart', 'kioskLeaveEnd', 'kioskLeavePeriod', 'kioskLeaveReason', 'kioskMakeupDate', 'kioskMakeupType', 'kioskMakeupTime', 'kioskMakeupReason'].every(id => d.getElementById(id)));
 check('中越雙語鍵存在', ['kioskRequestHint', 'kioskBackEmployee', 'kioskRequestSubmitted', 'kioskCompleteForm', 'kioskMakeupWindowHint'].every(k => (i18n.match(new RegExp(`${k}:`, 'g')) || []).length === 2));
-check('i18n 快取版本已更新', /i18n\.js\?v=20261014-kioskrequests/.test(page));
+check('i18n 快取版本已更新', /i18n\.js\?v=20261119-kiosklunch/.test(page));
 check('送出函式走正確 action', grab(page, 'submitKioskLeave').includes("callVerifiedAction('kiosk_leave'") && grab(page, 'submitKioskMakeup').includes("callVerifiedAction('kiosk_makeup'"));
 check('送出 payload 不含核准控制欄位', !/status\s*:|approver|approved_at/.test(grab(page, 'submitKioskLeave') + grab(page, 'submitKioskMakeup')));
 check('申請流程不拍照、不上傳', !/photo|storage|upload/i.test(grab(page, 'submitKioskLeave') + grab(page, 'submitKioskMakeup')));
