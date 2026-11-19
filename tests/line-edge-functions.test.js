@@ -535,6 +535,31 @@ const post = (url, body, headers = {}) => new Request(url, { method: 'POST', bod
     t = await run({ action: 'payroll_unlock', company_id: COMPANY, password: 'pw' }, missingRoute('payroll_password_unlock'));
     check('payroll_unlock：136 未套 → 503「資料庫尚未更新（136）」、不放行', t.res.status === 503 && t.out.code === 'db_not_migrated' && /（136）/.test(t.out.error) && !t.out.unlock_token);
 
+    // ---- 153：管理員代員工請假（公司必填；呼叫者＝LINE 驗出的 userId）----
+    const PROXY_EMP = '00000000-0000-0000-0000-0000000000e4';
+    const proxyLeave = {
+      action: 'admin_proxy_leave', company_id: COMPANY, employee_id: PROXY_EMP,
+      leave_type: 'annual', start_date: '2026-11-23', end_date: '2026-11-23',
+      leave_period: 'full_day', leave_start_time: null, leave_end_time: null, reason: '家庭事務'
+    };
+    const proxyRoutes = (extra = []) => rpcRoutes([...extra,
+      ['/rpc/admin_submit_leave_for_employee_verified', { body: { success: true, days: 1, leave_period: 'full_day' } }]]);
+    t = await run(proxyLeave, proxyRoutes());
+    c = call(t.f, 'admin_submit_leave_for_employee_verified');
+    check('admin_proxy_leave：以 LINE 驗出的 userId 呼叫 153 RPC 並轉送完整白名單參數', t.res.status === 200
+      && c?.body.p_company_id === COMPANY && c.body.p_line_user_id === LIFF_USER && c.body.p_employee_id === PROXY_EMP
+      && c.body.p_leave_type === 'annual' && c.body.p_leave_period === 'full_day'
+      && c.body.p_leave_start_time === null && c.body.p_leave_end_time === null
+      && Object.keys(c.body).sort().join() === 'p_company_id,p_employee_id,p_end_date,p_leave_end_time,p_leave_period,p_leave_start_time,p_leave_type,p_line_user_id,p_reason,p_start_date', JSON.stringify(c?.body));
+    t = await run({ ...proxyLeave, company_id: undefined }, proxyRoutes());
+    check('admin_proxy_leave：缺 company_id → 400、不驗 LIFF、不呼叫 RPC', t.res.status === 400 && t.f.calls.length === 0);
+    t = await run({ ...proxyLeave, status: 'approved' }, proxyRoutes());
+    check('admin_proxy_leave：多餘欄位 → 400、不呼叫送單 RPC', t.res.status === 400 && !call(t.f, 'admin_submit_leave_for_employee_verified'));
+    t = await run({ ...proxyLeave, leave_period: 'night' }, proxyRoutes());
+    check('admin_proxy_leave：時段錯誤 → 400、不呼叫送單 RPC', t.res.status === 400 && !call(t.f, 'admin_submit_leave_for_employee_verified'));
+    t = await run(proxyLeave, missingRoute('admin_submit_leave_for_employee_verified'));
+    check('admin_proxy_leave：153 未套 → 503 db_not_migrated（153）', t.res.status === 503 && t.out.code === 'db_not_migrated' && /（153）/.test(t.out.error));
+
     // ---- 142：公務機（身分＝平板登入的公務機 LINE 帳號，前端報的 kiosk LINE ID 不採信）----
     const KEMP = '00000000-0000-0000-0000-0000000000e3';
     const PHOTO = 'https://db.test/storage/v1/object/public/selfies/kiosk_E03_1.jpg';

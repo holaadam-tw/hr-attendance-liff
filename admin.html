@@ -778,6 +778,12 @@
 
                 <!-- 請假審核 -->
                 <div id="aprLeave" class="aprContent">
+                    <div style="margin:0 0 10px;text-align:right;">
+                        <button type="button" data-require="admin" onclick="openAdminProxyLeaveModal()"
+                                style="padding:9px 14px;border:none;border-radius:10px;background:#4F46E5;color:#fff;font-weight:800;font-size:12px;cursor:pointer;font-family:inherit;">
+                            ＋ 代員工請假
+                        </button>
+                    </div>
                     <div class="tabs" id="leaveApprovalTabs">
                         <button class="tab-btn active" onclick="switchLeaveTab('pending', this)">待審核</button>
                         <button class="tab-btn inactive" onclick="switchLeaveTab('approved', this)">已通過</button>
@@ -815,6 +821,71 @@
                 <div id="aprSwap" class="aprContent" style="display:none;">
                     <p style="color:#94A3B8;font-size:12px;margin-bottom:12px;">雙方同意後才會出現在此列表</p>
                     <div id="swapApprovalList"><p style="text-align:center;color:#666;">載入中...</p></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 管理員代員工請假 Modal（153） -->
+        <div id="adminProxyLeaveModal" class="modal" style="display:none;">
+            <div class="modal-content" style="max-width:440px;max-height:calc(100vh - 24px);margin:12px;overflow-y:auto;">
+                <div class="modal-header">
+                    <h3>📝 代員工請假</h3>
+                    <button type="button" class="modal-close" onclick="closeAdminProxyLeaveModal()">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p style="margin:0 0 14px;padding:10px 12px;border-radius:10px;background:#EEF2FF;color:#3730A3;font-size:12px;line-height:1.6;">
+                        送出後一律進入待審核，仍需由主管核准。
+                    </p>
+                    <div class="form-group">
+                        <label for="adminProxyLeaveEmployee">員工 *</label>
+                        <select id="adminProxyLeaveEmployee"><option value="">載入中...</option></select>
+                    </div>
+                    <div class="form-group">
+                        <label for="adminProxyLeaveType">假別 *</label>
+                        <select id="adminProxyLeaveType">
+                            <option value="annual">特休假</option>
+                            <option value="sick">病假</option>
+                            <option value="personal">事假</option>
+                            <option value="compensatory">補休</option>
+                            <option value="bereavement">喪假</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="adminProxyLeavePeriod">請假時段 *</label>
+                        <select id="adminProxyLeavePeriod" onchange="toggleAdminProxyLeaveTimes()">
+                            <option value="full_day">全日</option>
+                            <option value="am">上午半天</option>
+                            <option value="pm">下午半天</option>
+                            <option value="hourly">小時請假</option>
+                        </select>
+                    </div>
+                    <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;">
+                        <div class="form-group">
+                            <label for="adminProxyLeaveStart">開始日期 *</label>
+                            <input id="adminProxyLeaveStart" type="date">
+                        </div>
+                        <div class="form-group">
+                            <label for="adminProxyLeaveEnd">結束日期 *</label>
+                            <input id="adminProxyLeaveEnd" type="date">
+                        </div>
+                    </div>
+                    <div id="adminProxyLeaveTimes" class="form-group" style="display:none;">
+                        <label>時數假起訖時間 *</label>
+                        <div style="display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:8px;align-items:center;">
+                            <input id="adminProxyLeaveStartTime" type="time" aria-label="時數假開始時間">
+                            <span>～</span>
+                            <input id="adminProxyLeaveEndTime" type="time" aria-label="時數假結束時間">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="adminProxyLeaveReason">原因 *</label>
+                        <textarea id="adminProxyLeaveReason" maxlength="1000" placeholder="請填寫請假原因"></textarea>
+                    </div>
+                    <div id="adminProxyLeaveError" style="min-height:18px;margin-top:-4px;color:#DC2626;font-size:12px;"></div>
+                    <div style="display:flex;gap:10px;margin-top:12px;">
+                        <button type="button" class="btn btn-secondary" onclick="closeAdminProxyLeaveModal()" style="flex:1;">取消</button>
+                        <button type="button" id="adminProxyLeaveSubmit" class="btn btn-primary" onclick="submitAdminProxyLeave()" style="flex:1;">送出申請</button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -2316,7 +2387,7 @@
     </div>
 
 <script src="common.js?v=20261013-leaverpc149c"></script>
-<script type="module" src="modules/index.js?v=20261013-leaverpc149b"></script>
+<script type="module" src="modules/index.js?v=20261119-adminproxyleave"></script>
     <script type="module" src="admin_fixes.js?v=20260708-audit2"></script>
     <script>
     // ===== 公務機打卡 =====

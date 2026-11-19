@@ -29,6 +29,7 @@ import {
 
 import {
     switchApprovalType, switchLeaveTab, loadLeaveApprovals, approveLeave,
+    openAdminProxyLeaveModal, closeAdminProxyLeaveModal, toggleAdminProxyLeaveTimes, submitAdminProxyLeave,
     switchStaffTab, adjustMaxLeave, loadMaxLeaveSetting, saveMaxLeave,
     loadSchedulingMode, selectSchedulingMode, setFixedPreset,
     applySchedulingModeUI, applyShiftTabMode, saveSchedulingMode,
@@ -37,7 +38,7 @@ import {
     loadAdminLunchStats, loadStaffOverview, changeLeaveCal,
     resetLeaveCal, loadLeaveCal,
     clearLeaveState
-} from './leave.js?v=20261013-leaverpc149b';
+} from './leave.js?v=20261119-adminproxyleave';
 
 import {
     changeShiftWeek, resetShiftWeek, loadShiftMgr, cycleShift,
@@ -167,6 +168,10 @@ window.switchApprovalType = switchApprovalType;
 window.switchLeaveTab = switchLeaveTab;
 window.loadLeaveApprovals = loadLeaveApprovals;
 window.approveLeave = approveLeave;
+window.openAdminProxyLeaveModal = openAdminProxyLeaveModal;
+window.closeAdminProxyLeaveModal = closeAdminProxyLeaveModal;
+window.toggleAdminProxyLeaveTimes = toggleAdminProxyLeaveTimes;
+window.submitAdminProxyLeave = submitAdminProxyLeave;
 window.switchStaffTab = switchStaffTab;
 window.adjustMaxLeave = adjustMaxLeave;
 window.loadMaxLeaveSetting = loadMaxLeaveSetting;
