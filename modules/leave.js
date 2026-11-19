@@ -98,6 +98,143 @@ export async function loadLeaveApprovals(status) {
     }
 }
 
+// ===== 管理員代員工請假（153） =====
+function setAdminProxyLeaveError(message) {
+    const el = document.getElementById('adminProxyLeaveError');
+    if (el) el.textContent = message || '';
+}
+
+function setAdminProxyLeaveBusy(busy) {
+    const btn = document.getElementById('adminProxyLeaveSubmit');
+    if (!btn) return;
+    btn.disabled = busy;
+    btn.style.opacity = busy ? '0.55' : '1';
+    btn.textContent = busy ? '送出中...' : '送出申請';
+}
+
+export async function openAdminProxyLeaveModal() {
+    const modal = document.getElementById('adminProxyLeaveModal');
+    const select = document.getElementById('adminProxyLeaveEmployee');
+    if (!modal || !select) return;
+    modal.style.display = 'flex';
+    setAdminProxyLeaveError('');
+    setAdminProxyLeaveBusy(false);
+
+    const today = getTaiwanDate();
+    document.getElementById('adminProxyLeaveStart').value = today;
+    document.getElementById('adminProxyLeaveEnd').value = today;
+    document.getElementById('adminProxyLeaveType').value = 'annual';
+    document.getElementById('adminProxyLeavePeriod').value = 'full_day';
+    document.getElementById('adminProxyLeaveStartTime').value = '';
+    document.getElementById('adminProxyLeaveEndTime').value = '';
+    document.getElementById('adminProxyLeaveReason').value = '';
+    toggleAdminProxyLeaveTimes();
+
+    select.disabled = true;
+    select.innerHTML = '<option value="">載入中...</option>';
+    try {
+        const { data, error } = await sb.from('employees')
+            .select('id, name, employee_number, department, is_kiosk')
+            .eq('company_id', window.currentCompanyId)
+            .eq('is_active', true)
+            .order('department', { ascending: true })
+            .order('name', { ascending: true });
+        if (error) throw error;
+
+        const employees = (data || []).filter(emp => emp.is_kiosk !== true);
+        select.replaceChildren();
+        const placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = employees.length ? '請選擇員工' : '目前沒有可代送的在職員工';
+        select.appendChild(placeholder);
+        employees.forEach(emp => {
+            const option = document.createElement('option');
+            option.value = emp.id;
+            option.textContent = [emp.employee_number, emp.name, emp.department].filter(Boolean).join(' · ');
+            select.appendChild(option);
+        });
+        select.disabled = employees.length === 0;
+    } catch (err) {
+        console.error(err);
+        select.innerHTML = '<option value="">員工清單載入失敗</option>';
+        setAdminProxyLeaveError(err?.message || '員工清單載入失敗，請稍後再試');
+    }
+}
+
+export function closeAdminProxyLeaveModal() {
+    const modal = document.getElementById('adminProxyLeaveModal');
+    if (modal) modal.style.display = 'none';
+    setAdminProxyLeaveError('');
+    setAdminProxyLeaveBusy(false);
+}
+
+export function toggleAdminProxyLeaveTimes() {
+    const period = document.getElementById('adminProxyLeavePeriod')?.value;
+    const times = document.getElementById('adminProxyLeaveTimes');
+    if (times) times.style.display = period === 'hourly' ? 'block' : 'none';
+    if (period !== 'hourly') {
+        const startTime = document.getElementById('adminProxyLeaveStartTime');
+        const endTime = document.getElementById('adminProxyLeaveEndTime');
+        if (startTime) startTime.value = '';
+        if (endTime) endTime.value = '';
+    }
+}
+
+export async function submitAdminProxyLeave() {
+    const companyId = window.currentCompanyId;
+    const employeeId = document.getElementById('adminProxyLeaveEmployee')?.value || '';
+    const leaveType = document.getElementById('adminProxyLeaveType')?.value || '';
+    const period = document.getElementById('adminProxyLeavePeriod')?.value || '';
+    const start = document.getElementById('adminProxyLeaveStart')?.value || '';
+    const end = document.getElementById('adminProxyLeaveEnd')?.value || '';
+    const startTime = document.getElementById('adminProxyLeaveStartTime')?.value || '';
+    const endTime = document.getElementById('adminProxyLeaveEndTime')?.value || '';
+    const reason = (document.getElementById('adminProxyLeaveReason')?.value || '').trim();
+    const allowedTypes = ['annual', 'sick', 'personal', 'compensatory', 'bereavement'];
+    const allowedPeriods = ['full_day', 'am', 'pm', 'hourly'];
+
+    if (!companyId || !employeeId || !allowedTypes.includes(leaveType) || !allowedPeriods.includes(period)
+        || !start || !end || end < start || !reason || reason.length > 1000
+        || (period !== 'full_day' && start !== end)
+        || (period === 'hourly' && (!startTime || !endTime || endTime <= startTime))) {
+        setAdminProxyLeaveError('請完整填寫正確的請假資料');
+        return;
+    }
+
+    setAdminProxyLeaveError('');
+    setAdminProxyLeaveBusy(true);
+    try {
+        const r = await callVerifiedAction('admin_proxy_leave', {
+            company_id: companyId,
+            employee_id: employeeId,
+            leave_type: leaveType,
+            start_date: start,
+            end_date: end,
+            leave_period: period,
+            leave_start_time: period === 'hourly' ? startTime : null,
+            leave_end_time: period === 'hourly' ? endTime : null,
+            reason
+        });
+        setAdminProxyLeaveBusy(false);
+        if (r.code === 'relogin_redirect') return;
+        if (!r.ok || !r.data?.result?.success) {
+            setAdminProxyLeaveError(r.message || '代送失敗，請稍後再試');
+            return;
+        }
+
+        closeAdminProxyLeaveModal();
+        showToast('已代送，等待審核');
+        document.querySelectorAll('#leaveApprovalTabs .tab-btn').forEach((btn, index) => {
+            btn.className = index === 0 ? 'tab-btn active' : 'tab-btn inactive';
+        });
+        loadLeaveApprovals('pending');
+    } catch (err) {
+        console.error(err);
+        setAdminProxyLeaveBusy(false);
+        setAdminProxyLeaveError(err?.message || '代送失敗，請稍後再試');
+    }
+}
+
 export async function approveLeave(requestId, newStatus) {
     let rejectionReason = null;
     if (newStatus === 'rejected') {
@@ -234,7 +371,8 @@ function renderLunchManagerList() {
         el.innerHTML = '<p style="text-align:center;color:#94A3B8;font-size:12px;">尚未指定便當管理員</p>';
         return;
     }
-    sb.from('employees').select('id, name, employee_number').in('id', lunchManagerIds).then(({ data }) => {
+    sb.from('employees').select('id, name, employee_number')
+        .eq('company_id', window.currentCompanyId).in('id', lunchManagerIds).then(({ data }) => {
         if (!data || data.length === 0) { el.innerHTML = '<p style="color:#94A3B8;">無資料</p>'; return; }
         el.innerHTML = data.map(e => `
             <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #F1F5F9;">

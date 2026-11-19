@@ -1,9 +1,17 @@
 # RunPiston Bug 追蹤 & 測試清單
 
-> 更新日期：2026-10-14
+> 更新日期：2026-11-19
 > 每次修改後更新此檔案
 
 ---
+
+## 🟡 2026-11-19 管理員代請假（153）
+
+- **狀態：待業主授權套用 153 → 部署 line-push → 合併前端。** 本輪只建立本地 migration／程式／測試，未連線或寫入正式庫，未操作 Supabase Dashboard，未部署。
+- `admin_submit_leave_for_employee_verified` 只給 `service_role`：先用 `is_company_manager_caller` 驗 admin／manager／platform_admin，再鎖定同公司在職、非公務機目標員工，委派 151 的 `submit_leave_request_internal`，固定建立 `pending`。
+- 稽核前綴固定為 `[管理員代送：<DB 查得姓名>] `，不採信前端姓名；`line-push` action=`admin_proxy_leave` 只接受假別／時段／日期／時間／原因白名單與必填 `company_id`，呼叫者 LINE userId 取自 LIFF token 驗證。
+- 審核中心請假分頁新增「＋ 代員工請假」對話框；員工清單限定目前公司、在職並排除公務機，成功後關閉對話框、顯示「已代送，等待審核」並重載 pending 清單。
+- 上線順序不可顛倒：153 → `line-push` → 前端；回滾時先回退前端，再回退 Edge，最後由具授權者套用 `153_admin_proxy_leave_verified_rollback.sql`。
 
 ## 🟢 2026-10-14 公務機代送請假／補卡（migration 151＋Edge＋前端，**待業主套用／合併／部署**）
 
