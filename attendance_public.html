@@ -2151,28 +2151,54 @@ function renderLeaveCalendar() {
     const names = [...new Set(rows.map(leaveEmployeeName))].sort((a, b) => a.localeCompare(b, 'zh-Hant'));
     const colorOf = new Map(names.map((n, i) => [n, LEAVE_COLOR_PALETTE[i % LEAVE_COLOR_PALETTE.length]]));
 
-    // 日期 → 請假清單（跨日假鋪滿整個區間，超出本月的部分裁掉）
+    // 日期 → 請假清單（跨日假超出本月的部分裁掉）
     const dayMap = {};
     const leaveDayCount = new Map();
+    const isRestDay = (ds, date) =>
+        (currentWeekendPolicy !== 'working' && (date.getDay() === 0 || date.getDay() === 6)) || !!monthHolidayMap[ds];
     rows.forEach(r => {
         const clipStart = r.start_date < startDate ? startDate : r.start_date;
         const rawEnd = r.end_date || r.start_date;
         const clipEnd = rawEnd > endDate ? endDate : rawEnd;
         let d = parseLocalDate(clipStart);
         const end = parseLocalDate(clipEnd);
+        if (d > end) return;
+
+        const period = r.leave_period || 'full_day';
+        let excludeRestDays = false;
+        if (period === 'full_day' && r.days !== null && r.days !== undefined) {
+            let workdays = 0;
+            let fullDate = parseLocalDate(r.start_date);
+            const fullEnd = parseLocalDate(rawEnd);
+            while (fullDate <= fullEnd) {
+                if (!isRestDay(fmtDate(fullDate), fullDate)) workdays++;
+                fullDate = addDays(fullDate, 1);
+            }
+            excludeRestDays = Number.isFinite(Number(r.days)) && workdays === Number(r.days);
+        }
+
+        const name = leaveEmployeeName(r);
         while (d <= end) {
             const ds = fmtDate(d); // YYYY-MM-DD（formatYMD 是斜線格式，勿混用）
-            (dayMap[ds] = dayMap[ds] || []).push(r);
-            const name = leaveEmployeeName(r);
-            leaveDayCount.set(name, (leaveDayCount.get(name) || 0) + 1);
+            const shouldDraw = period !== 'full_day' || !excludeRestDays || !isRestDay(ds, d);
+            if (shouldDraw) {
+                (dayMap[ds] = dayMap[ds] || []).push(r);
+                if (period === 'full_day') leaveDayCount.set(name, (leaveDayCount.get(name) || 0) + 1);
+            }
             d = addDays(d, 1);
+        }
+        if (period === 'am' || period === 'pm') {
+            leaveDayCount.set(name, (leaveDayCount.get(name) || 0) + 0.5);
+        } else if (period === 'hourly') {
+            leaveDayCount.set(name, (leaveDayCount.get(name) || 0) + (Number(r.days) || 0));
         }
     });
 
     // 圖例：員工 → 顏色（附本月請假天數）
     document.getElementById('leaveCalLegend').innerHTML = names.map(n => {
         const [bg, fg] = colorOf.get(n);
-        return '<span class="leave-legend-chip" style="background:' + bg + ';color:' + fg + ';border-left-color:' + fg + ';">' + esc(n) + ' · ' + (leaveDayCount.get(n) || 0) + t('dayUnit') + '</span>';
+        const days = Math.round((leaveDayCount.get(n) || 0) * 10) / 10;
+        return '<span class="leave-legend-chip" style="background:' + bg + ';color:' + fg + ';border-left-color:' + fg + ';">' + esc(n) + ' · ' + days + t('dayUnit') + '</span>';
     }).join('');
     document.getElementById('leaveCalSummary').textContent = names.length === 0
         ? t('leaveCalEmpty')

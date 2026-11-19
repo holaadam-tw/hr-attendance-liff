@@ -5,6 +5,14 @@
 
 ---
 
+## 🟢 2026-11-19 公開出勤頁請假月曆顯示修正（本地待審）
+
+- 問題：`attendance_public.html` 的請假月曆原本把 full-day 假單的所有日曆日都畫出，週末／公司假日也計入右上圖例；半天與時數假也一律以每格 1 天累計，與 DB 已扣除休假日的 `leave_requests.days` 不一致。
+- 修正：只在完整假單區間的非休假日數等於 DB `days` 時排除週末／公司假日；若 `days` 缺值或數字顯示該員工可能在休假日有排班，則保守維持全部畫出。上午／下午半天與時數假仍照原日期顯示。
+- 圖例改用本月實際畫出的 full-day 格數，加上半天 0.5 與 hourly 的 DB `days`，總數四捨五入到一位小數；pending 仍納入，chip title 與「請假(h)」欄不變。
+- 新增 `tests/leave-calendar-display.test.js` 並接入 `npm test`：真實案例、保守退回、公司假日、週末工作公司、跨月、`days=null` 共 12 項通過；移除休假日過濾的反向 mutation 會有 6 項失敗。
+- 本輪只改前端顯示與離線測試，未連線或寫入正式庫、未操作 Supabase Dashboard、未部署，且未執行 git add／commit／push。
+
 ## 🟡 2026-11-19 管理員補訂＋公務機截止前重選當天便當（154／155）
 
 - **狀態：待業主授權套用 154、155 → 部署 line-push → 合併前端。** 本輪只建立本地 migration／程式／測試，未連線或寫入正式庫，未操作 Supabase Dashboard，未部署。
