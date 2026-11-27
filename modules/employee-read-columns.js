@@ -1,2 +1,2 @@
-// 權限收緊前置：明確列出員工欄位。
-export const EMPLOYEE_READ_COLUMNS = 'id,employee_number,name,department,position,join_date,line_user_id,phone,email,is_active,is_bound,bound_at,created_at,updated_at,id_card_last_4,is_admin,company_id,role,hire_date,employment_type,salary_type,hourly_rate,emergency_contact,emergency_phone,status,resigned_date,resign_reason,resign_note,shift_mode,fixed_shift_start,fixed_shift_end,can_schedule,no_checkin,is_kiosk,preferred_language,gps_relaxed,default_lunch';
+// employees 前端一般讀取欄位；管理端敏感欄位必須改走 LINE 驗證。
+export const EMPLOYEE_READ_COLUMNS = 'id,employee_number,name,department,position,join_date,line_user_id,is_active,is_bound,bound_at,created_at,updated_at,is_admin,company_id,role,hire_date,employment_type,salary_type,status,resigned_date,resign_reason,resign_note,shift_mode,fixed_shift_start,fixed_shift_end,can_schedule,no_checkin,is_kiosk,preferred_language,gps_relaxed,default_lunch';

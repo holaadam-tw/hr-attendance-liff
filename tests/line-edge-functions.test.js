@@ -581,6 +581,33 @@ const post = (url, body, headers = {}) => new Request(url, { method: 'POST', bod
     t = await run(adminLunch, missingRoute('admin_order_lunch_today_verified'));
     check('admin_lunch_today：154 未套 → 503 db_not_migrated（154）', t.res.status === 503 && t.out.code === 'db_not_migrated' && /（154）/.test(t.out.error));
 
+    // ---- 159：管理端員工敏感欄位（公司必填；員工 ID 最多 500 筆）----
+    const SENSITIVE_EMP = '00000000-0000-0000-0000-0000000000e6';
+    const adminSensitive = { action: 'admin_employee_sensitive', company_id: COMPANY, employee_ids: [SENSITIVE_EMP] };
+    const sensitiveRows = [{ employee_id: SENSITIVE_EMP, phone: '0912345678', email: null,
+      emergency_contact: null, emergency_phone: null, id_card_last_4: '1234', salary_type: 'monthly' }];
+    const sensitiveRoutes = (extra = []) => rpcRoutes([...extra,
+      ['/rpc/admin_get_employee_sensitive_verified', { body: { success: true, employees: sensitiveRows } }]]);
+    t = await run(adminSensitive, sensitiveRoutes());
+    c = call(t.f, 'admin_get_employee_sensitive_verified');
+    check('admin_employee_sensitive：白名單 action 可用並呼叫 159 RPC', t.res.status === 200
+      && c?.body.p_line_user_id === LIFF_USER && c.body.p_company_id === COMPANY
+      && c.body.p_employee_ids?.[0] === SENSITIVE_EMP
+      && Object.keys(c.body).sort().join() === 'p_company_id,p_employee_ids,p_line_user_id', JSON.stringify(c?.body));
+    t = await run({ action: 'admin_employee_sensitive', company_id: COMPANY }, sensitiveRoutes());
+    c = call(t.f, 'admin_get_employee_sensitive_verified');
+    check('admin_employee_sensitive：employee_ids 可省略並以 NULL 呼叫 RPC', t.res.status === 200 && c?.body.p_employee_ids === null);
+    t = await run({ ...adminSensitive, company_id: undefined }, sensitiveRoutes());
+    check('admin_employee_sensitive：缺 company_id → 400、不驗 LIFF、不呼叫 RPC', t.res.status === 400 && t.f.calls.length === 0);
+    t = await run({ ...adminSensitive, extra: true }, sensitiveRoutes());
+    check('admin_employee_sensitive：多餘欄位 → 400、不呼叫 RPC', t.res.status === 400 && !call(t.f, 'admin_get_employee_sensitive_verified'));
+    t = await run({ ...adminSensitive, employee_ids: ['not-a-uuid'] }, sensitiveRoutes());
+    check('admin_employee_sensitive：非 UUID 員工 ID → 400、不呼叫 RPC', t.res.status === 400 && !call(t.f, 'admin_get_employee_sensitive_verified'));
+    t = await run({ ...adminSensitive, employee_ids: Array(501).fill(SENSITIVE_EMP) }, sensitiveRoutes());
+    check('admin_employee_sensitive：超過 500 筆 → 400、不呼叫 RPC', t.res.status === 400 && !call(t.f, 'admin_get_employee_sensitive_verified'));
+    t = await run(adminSensitive, missingRoute('admin_get_employee_sensitive_verified'));
+    check('admin_employee_sensitive：159 未套 → 503 db_not_migrated（159）', t.res.status === 503 && t.out.code === 'db_not_migrated' && /（159）/.test(t.out.error));
+
     // ---- 142：公務機（身分＝平板登入的公務機 LINE 帳號，前端報的 kiosk LINE ID 不採信）----
     const KEMP = '00000000-0000-0000-0000-0000000000e3';
     const PHOTO = 'https://db.test/storage/v1/object/public/selfies/kiosk_E03_1.jpg';

@@ -8,7 +8,7 @@ import {
     applyRoleVisibility, applyAdminFeatureVisibility,
     switchFieldSalesAdmin,
     renderAdminCompanySwitcher, switchCompanyAdmin
-} from './auth.js?v=20261127-empcols158';
+} from './auth.js?v=20261127-empcols159';
 
 import {
     loadAuditLogs, exportReport, initReportMonth
@@ -25,7 +25,7 @@ import {
     loadUnbindEmployees, quickBindLine,
     showResignModal, closeResignModal, confirmResign, restoreEmployee,
     loadResignedEmployees, loadAllEmployees
-} from './employees.js?v=20261127-empcols158';
+} from './employees.js?v=20261127-empcols159';
 
 import {
     switchApprovalType, switchLeaveTab, loadLeaveApprovals, approveLeave,
@@ -66,7 +66,7 @@ import {
     editInsBracket, saveInsBracket, deleteInsBracket, updateAllInsRates,
     switchPayTab,
     initAuditPage, loadAuditData
-} from './payroll.js?v=20261013-leaverpc149b';
+} from './payroll.js?v=20261127-empcols159';
 
 import {
     loadRestaurantList, openRestaurantDetail, previewStoreOrder, openKDS,

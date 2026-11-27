@@ -4,7 +4,7 @@
 //   escapeHTML, populateYearSelect, loadSettings, friendlyError
 // ============================================================
 
-import { EMPLOYEE_READ_COLUMNS } from './employee-read-columns.js';
+import { EMPLOYEE_READ_COLUMNS } from './employee-read-columns.js?v=20261127-empcols159';
 
 // URL hash → page ID 對照
 const HASH_PAGE_MAP = {

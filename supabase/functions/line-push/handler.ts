@@ -20,6 +20,7 @@
 //       由 DB 確認它恰好對到 1 個在職的公務機帳號；公司一律由 DB 依公務機帳號決定，前端不帶 company_id）
 //     admin_proxy_leave（153）：管理員代同公司在職、非公務機員工建立 pending 請假申請，權限與稽核姓名由 DB 驗證）
 //     admin_lunch_today（154）：管理員替同公司在職、非公務機員工補訂台灣當天便當，日期與稽核姓名由 DB 決定）
+//     admin_employee_sensitive（159）：已驗證的管理者讀取同公司員工的管理端敏感欄位）
 //   員工發的訊息，DB 回傳寄件人前綴（［姓名 送出］），這裡一定加在最前面。
 //
 // 舊模式（相容還沒更新的頁面，前端帶 token）：必須帶 company_id，且 token 必須等於該公司設定
@@ -76,6 +77,7 @@ const RPC_MIGRATION: Record<string, string> = {
   kiosk_lunch_apply_default_verified: '156',
   admin_submit_leave_for_employee_verified: '153',
   admin_order_lunch_today_verified: '154',
+  admin_get_employee_sensitive_verified: '159',
 }
 
 async function callRpc(deps: Deps, fn: string, args: Record<string, unknown>): Promise<{ ok: boolean; data: any; missing?: string }> {
@@ -252,6 +254,8 @@ const VERIFIED_ACTIONS = [
   'admin_proxy_leave',
   // 154：管理員補訂當天便當（公司必填；日期只由 DB 決定）
   'admin_lunch_today',
+  // 159：管理端員工敏感欄位（公司必填；非公務機動作）
+  'admin_employee_sensitive',
 ] as const
 const KIOSK_ACTIONS: readonly string[] = ['kiosk_get_company', 'kiosk_lookup', 'kiosk_check_in', 'kiosk_leave', 'kiosk_makeup', 'kiosk_lunch', 'kiosk_lunch_status', 'kiosk_lunch_default']
 export const MAX_BATCH_SETTINGS = 30
@@ -283,6 +287,21 @@ async function handleVerifiedAction(body: any, deps: Deps): Promise<Response> {
   if (action === 'company_save' && body.company_id != null && !companyId) return badRequest()
   const lineUserId = await verifyLiffAccessToken(deps, String(body.liff_access_token))
   if (!lineUserId) return unauthenticated()
+
+  // ---- 管理端員工敏感欄位（159）：身分＝LINE 驗證的 userId；DB 再驗管理權與公司 ----
+  if (action === 'admin_employee_sensitive') {
+    const allowed = ['action', 'liff_access_token', 'company_id', 'employee_ids']
+    const hasEmployeeIds = body.employee_ids != null
+    const employeeIds = Array.isArray(body.employee_ids)
+      && body.employee_ids.length <= 500
+      && body.employee_ids.every((id: unknown) => uuidOrNull(id) !== null)
+      ? body.employee_ids
+      : null
+    if (!onlyKeys(body, allowed) || (hasEmployeeIds && employeeIds === null)) return badRequest('員工清單不正確')
+    return rpcResult(await callRpc(deps, 'admin_get_employee_sensitive_verified', {
+      p_line_user_id: lineUserId, p_company_id: companyId, p_employee_ids: employeeIds,
+    }), withResult)
+  }
 
   // ---- 管理員補訂當天便當（154）：身分＝LINE 驗證的 userId；DB 決定台灣日期並再驗公司與員工 ----
   if (action === 'admin_lunch_today') {
