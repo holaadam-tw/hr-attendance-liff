@@ -4,6 +4,8 @@
 //   escapeHTML, populateYearSelect, loadSettings, friendlyError
 // ============================================================
 
+import { EMPLOYEE_READ_COLUMNS } from './employee-read-columns.js';
+
 // URL hash → page ID 對照
 const HASH_PAGE_MAP = {
     restaurant: 'restaurantPage',
@@ -120,7 +122,7 @@ export async function checkAdminPermission() {
 
             // 嘗試取得該公司的 employee 記錄
             const { data: empData } = await sb.from('employees')
-                .select('*')
+                .select(EMPLOYEE_READ_COLUMNS)
                 .eq('line_user_id', liffProfile.userId)
                 .eq('company_id', currentCompanyId)
                 .maybeSingle();
@@ -159,7 +161,7 @@ export async function checkAdminPermission() {
 
         // === 一般管理員/主管流程（原邏輯）===
         const { data: adminRows, error } = await sb.from('employees')
-            .select('*')
+            .select(EMPLOYEE_READ_COLUMNS)
             .eq('line_user_id', liffProfile.userId)
             .in('role', ['admin', 'manager'])
             .eq('is_active', true);
@@ -192,7 +194,7 @@ export async function checkAdminPermission() {
             if (EMPLOYEE_ALLOWED_HASHES.includes(hash)) {
                 // 以一般員工身分載入
                 const { data: empData } = await sb.from('employees')
-                    .select('*')
+                    .select(EMPLOYEE_READ_COLUMNS)
                     .eq('line_user_id', liffProfile.userId)
                     .eq('is_active', true)
                     .maybeSingle();
@@ -360,7 +362,7 @@ export async function switchCompanyAdmin(companyId) {
 
     // 嘗試取得該公司的 employee 記錄
     const { data: empData } = await sb.from('employees')
-        .select('*')
+        .select(EMPLOYEE_READ_COLUMNS)
         .eq('line_user_id', liffProfile.userId)
         .eq('company_id', companyId)
         .maybeSingle();
