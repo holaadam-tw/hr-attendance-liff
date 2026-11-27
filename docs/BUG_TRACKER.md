@@ -5,6 +5,13 @@
 
 ---
 
+## 🟡 2026-11-27 attendance 明確列出欄位（本地完成、未部署）
+
+- 權限收緊前置：出勤明細 CSV 的 attendance 查詢改為只讀實際使用欄位，既有公司隔離與員工嵌入欄位不變。
+- 新增共用 19 欄清單、產品讀點靜態掃描與本機 PGlite 欄位授權／回滾測試；新測試已接入 `npm test`。
+- `modules/audit.js` 與 `modules/index.js` 快取版本已同步更新；`checkin.html`、`index.html`、`common.js` 未修改。
+- 上線順序固定：先合併前端，觀察 1 個工作天後，再由具授權者執行後續權限調整；本輪不套用資料庫變更。
+
 ## 🟡 2026-11-27 管理端員工敏感欄位改走驗證（159，本地完成、未部署）
 
 - `employees` 的一般前端讀取清單由 37 欄縮為 31 欄；保留 `salary_type` 給既有薪資 fallback，手機、Email、緊急聯絡、身分證後四碼則改由 `line-push` 驗證 LINE 身分後呼叫只授 `service_role` 的 `admin_get_employee_sensitive_verified`。

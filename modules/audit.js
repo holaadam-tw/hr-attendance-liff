@@ -172,7 +172,7 @@ export async function exportReport(type) {
                     r.late, r.lateEx, r.halfDay, r1(r.annualD), r1(r.annualH), r1(r.otherD), r1(r.otherH), r.noOut]));
             fn = `薪資計算彙總_${ms}.csv`;
         } else if (type === 'attendance') {
-            const { data } = await sb.from('attendance').select('*, employees!inner(name, employee_number, department, company_id)').eq('employees.company_id', window.currentCompanyId).gte('date', first).lte('date', last).order('date');
+            const { data } = await sb.from('attendance').select('date, check_in_time, check_out_time, status, late_minutes, is_manual, notes, employees!inner(name, employee_number, department, company_id)').eq('employees.company_id', window.currentCompanyId).gte('date', first).lte('date', last).order('date');
             rows.push(['日期', '工號', '姓名', '部門', '上班', '下班', '狀態', '遲到(分)', '補卡', '備註']);
             (data || []).forEach(r => rows.push([r.date, r.employees?.employee_number, r.employees?.name, r.employees?.department, r.check_in_time ? new Date(r.check_in_time).toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', hour12: false }) : '', r.check_out_time ? new Date(r.check_out_time).toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', hour12: false }) : '', r.status, r.late_minutes || 0, r.is_manual ? '是' : '', r.notes || '']));
             fn = `出勤報表_${ms}.csv`;
