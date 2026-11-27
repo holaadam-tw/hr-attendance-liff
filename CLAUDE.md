@@ -54,10 +54,11 @@
    - 每次 Edit/Write 後 `.claude/hooks/check-rls-bypass.sh` 和 `.claude/hooks/check-multitenant.sh` 會自動跑
    - **看到 ⚠️ 警告必須立刻檢查**
    - **新出現的警告 = 視同 FAIL，必須修正才能 commit**（對齊 Guardrails §6）
-   - 已知低風險警告（員工自查）可以忽略：
-     - common.js:524, 614, 646, 1097
-     - modules/employees.js:233, 801
-     - modules/leave.js:280
+   - 已知低風險警告可以忽略（2026-11-27 對照 main ee6775e 逐一重新驗證）：
+     - common.js:1042（`attendance` 以 `currentEmployee.id` 查本人今日打卡＝員工自查）
+     - modules/schedules.js:263（`schedules` 以 `employee_id IN` 本次異動清單查，ID 來自本公司排班畫面）
+     - modules/employees.js:601（核准登記時讀全部 `employee_number` 產生下一個工號；工號全域唯一，只讀工號欄）
+   - ❗ **已知真問題、不可列入 allowlist**：common.js:1171 `loadLunchSummary()`（services.html 便當頁統計）以日期查 `lunch_orders` 沒有公司隔離，統計數字會混入其他公司，待修（見 `docs/BUG_TRACKER.md`）
    - ⚠️ **Allowlist 失效條件**：若上述行號對應的程式碼結構改變（例如查詢邏輯改動、不再是員工自查），例外立即失效，必須重新驗證
 
 ### 改程式後（自我驗證 5 步 — 快速 checklist）
@@ -67,7 +68,7 @@
 2. 找出至少 3 個受影響的情境
 3. 對每個情境做 logic walkthrough
 4. 跑 `bash scripts/qa_check.sh`（必須 0 FAIL）
-5. 跑 `npm test`（3 個套件必須全數通過：冒煙測試 52、打卡總覽 104、薪資頁加班來源 15）
+5. 跑 `npm test`（`tests/run-all.js` 的 SUITES 必須全數通過；2026-11-27 為 57 個套件，數量以 run-all.js 為準）
 
 **如果任一情境走不通 → 不可 commit**
 
@@ -139,18 +140,22 @@
 
 ## 自動執行
 
-**測試通過後**（`qa_check.sh` 0 FAIL + `npm test` 3 套件全過 + Hook 無新警告），再執行 `git add`, `commit`, `push origin dev`。不動 main branch。
+**測試通過後**（`qa_check.sh` 0 FAIL + `npm test` 全部套件通過 + Hook 無新警告），再執行 `git add`, `commit`, `push origin dev`。不動 main branch。
 
 ### 測試套件（`npm test` 一次跑完，任一失敗即整體失敗）
 
-| 套件 | 檔案 | 測什麼 |
+完整清單見 `tests/run-all.js` 的 SUITES（2026-11-27 共 57 個）。主要類別：
+
+| 類別 | 代表檔案 | 測什麼 |
 |------|------|--------|
-| 冒煙測試 | `tests/smoke-test.js` | Supabase 連線、HTML 語法、設定一致性、common.js 函式 |
-| 打卡總覽 | `tests/attendance-overview.test.js` | `attendance_overview.html` 的 inline script 原樣載入 vm 執行：定位距離／分群／90 天窗期／代補打卡預設時間／加班確認清單與防呆 |
-| 薪資頁加班來源 | `tests/payroll-overtime.test.js` | `modules/payroll.js` 兩處 otMap 區塊原樣抽出執行，防止 `late_close_auto` 排除被改回去 |
+| 冒煙測試 | `tests/smoke-test.js` | HTML 語法、設定一致性、common.js 函式（`npm test` 內跳過外部連線） |
+| 前端頁面行為（jsdom／vm／Chromium） | `attendance-overview.test.js`、`payroll-overtime.test.js`、`kiosk-*-frontend.test.js` 等 | inline script 原樣載入執行；公務機畫面量 360×640 |
+| 資料庫 migration（PGlite 實跑） | `*.pglite.test.js` | 每支 RPC／權限 migration 的正向、拒絕情境、ACL 與 rollback 可重套 |
+| Edge Functions | `line-edge-functions.test.js`、`line-auth-edge.test.js` | line-push／line-webhook／line-auth 的白名單與驗證 |
+| 權限防回歸 | `rls-locked-tables.test.js`、`employees-read-columns.test.js` | 已鎖表不可被前端直接寫；employees 讀取欄位必須在 `modules/employee-read-columns.js` 清單內 |
 
 新增前端功能時**必須一併補測試並加進 `tests/run-all.js` 的 SUITES**，否則等於沒接上。
-兩支新套件都支援環境變數指向改壞的副本（`AO_FILE` / `PAYROLL_FILE`），可做反向對照確認測試真的擋得住回歸。
+部分套件支援環境變數指向改壞的副本或拿掉防線（如 `AO_FILE`、`PAYROLL_FILE`、`MIGRATION156_NO_*`），可做反向對照確認測試真的擋得住回歸。
 合併到 main **必須 user 明確、結構化授權**（僅一句「可以」不算授權，對齊 Guardrails §1/§3）；觸發 GitHub Pages 自動部署。
 
 ---
