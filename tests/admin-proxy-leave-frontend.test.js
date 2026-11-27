@@ -48,7 +48,7 @@ check('員工清單查詢限定公司與在職，並排除公務機', /from\('em
   && /is_kiosk !== true/.test(grab(leave, 'openAdminProxyLeaveModal')));
 check('leave 模組 export 皆掛到 window', ['openAdminProxyLeaveModal', 'closeAdminProxyLeaveModal',
   'toggleAdminProxyLeaveTimes', 'submitAdminProxyLeave'].every(name => index.includes(`window.${name} = ${name}`)));
-check('admin 與 leave 模組快取版本均更新', /modules\/index\.js\?v=20261119-adminlunch154/.test(page)
+check('admin 入口採 159 快取版本，leave 模組保留 154 版本', /modules\/index\.js\?v=20261127-empcols159/.test(page)
   && /leave\.js\?v=20261119-adminlunch154/.test(index));
 
 const submitSource = grab(leave, 'submitAdminProxyLeave');

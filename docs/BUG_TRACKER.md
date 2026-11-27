@@ -1,9 +1,20 @@
 # RunPiston Bug 追蹤 & 測試清單
 
-> 更新日期：2026-11-19
+> 更新日期：2026-11-27
 > 每次修改後更新此檔案
 
 ---
+
+## 🟡 2026-11-27 管理端員工敏感欄位改走驗證（159，本地完成、未部署）
+
+- `employees` 的一般前端讀取清單由 37 欄縮為 31 欄；保留 `salary_type` 給既有薪資 fallback，手機、Email、緊急聯絡、身分證後四碼則改由 `line-push` 驗證 LINE 身分後呼叫只授 `service_role` 的 `admin_get_employee_sensitive_verified`。
+- verified 讀取會在 DB 再驗同公司 admin／manager／platform_admin，指定員工最多 500 筆，跨公司 ID 不回傳；RPC 可繼續回傳無害的 `salary_type`，但不回 `hourly_rate` 與其他驗證、裝置、GPS 欄位。
+- verified 暫時失敗時，員工基本資料仍照常顯示，敏感欄位顯示「—」且只提示一次；編輯畫面未取得敏感原值時，儲存 payload 不帶該欄位，避免空值覆寫。
+- **2026-11-27 急救修正：** 本米 E010、E012 等員工可能沒有 `salary_settings.is_current`，因此薪資稽核的 employees select 與 `(salaryMap[emp.id]?.salary_type) || emp.salary_type || 'monthly'` fallback 已逐字還原為 `origin/main`；不得再只依賴 salaryMap。
+- 私有 159b 只在 158 已完成的前提下，把 anon／authenticated 的 37 欄再收斂為 31 欄；只撤 `phone, email, emergency_contact, emergency_phone, id_card_last_4, hourly_rate` 六欄，rollback 回到 158 的 37 欄狀態，交易內 drill 最後固定 `ROLLBACK`。
+- **上線順序固定：套 159 → 部署 line-push → 合併前端 → 等 1 個工作天 → 取得授權後套 159b。** 回滾依反向順序處理；不得先套 159b。
+- 本機驗證：`npm.cmd test` 61/61 套件全過；`qa_check.sh` 0 FAIL／1 個既有 WARN；159b 私有 apply／rollback／drill PGlite 48/48 通過；薪資 fallback、欄位讀取、敏感寫入與 RPC 權限四組反向突變均如預期失敗。
+- 本輪只建立本地 migration／程式／測試與私有 SQL，未連線或寫入正式庫、未部署，且未執行 git add／commit／push。
 
 ## 🟢 2026-11-19 公開出勤頁請假月曆顯示修正（本地待審）
 

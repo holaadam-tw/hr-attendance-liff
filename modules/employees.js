@@ -2,12 +2,43 @@
 // modules/employees.js — 員工管理 CRUD + 薪資設定
 // 依賴 common.js 全域: sb, showToast, escapeHTML, friendlyError,
 //   fmtDate, setBtnLoading, formatMoneyInput, parseMoney, toMoneyStr,
-//   formatNT, writeAuditLog, CONFIG
+//   formatNT, writeAuditLog, CONFIG, callVerifiedAction
 // ============================================================
 
-import { EMPLOYEE_READ_COLUMNS } from './employee-read-columns.js';
+import { EMPLOYEE_READ_COLUMNS } from './employee-read-columns.js?v=20261127-empcols159';
 
 let currentSalaryEmpId = null;
+let employeeSensitiveWarningShown = false;
+
+function showEmployeeSensitiveWarningOnce() {
+    if (employeeSensitiveWarningShown) return;
+    employeeSensitiveWarningShown = true;
+    showToast('⚠️ 部分敏感資料暫時無法載入，其他員工資料仍可使用');
+}
+
+async function loadEmployeeSensitiveMap(employeeIds) {
+    const ids = [...new Set((employeeIds || []).filter(Boolean))];
+    if (ids.length === 0) return new Map();
+    try {
+        const result = await callVerifiedAction('admin_employee_sensitive', {
+            company_id: window.currentCompanyId,
+            employee_ids: ids.slice(0, 500)
+        });
+        const rows = result.data?.result?.employees;
+        if (!result.ok || !Array.isArray(rows)) throw new Error(result.message || '敏感資料載入失敗');
+        return new Map(rows.map(row => [row.employee_id, row]));
+    } catch (error) {
+        console.error('Load employee sensitive data error:', error);
+        showEmployeeSensitiveWarningOnce();
+        return null;
+    }
+}
+
+function mergeEmployeeSensitiveRows(rows, sensitiveMap) {
+    return (rows || []).map(row => sensitiveMap?.has(row.id)
+        ? { ...row, ...sensitiveMap.get(row.id) }
+        : row);
+}
 
 // ===== 部門下拉選單 =====
 export function loadDepartmentOptions(selectId, currentValue) {
@@ -158,10 +189,12 @@ export async function loadEmployeeList() {
 
         if (error) throw error;
 
+        const sensitiveMap = await loadEmployeeSensitiveMap((data || []).map(emp => emp.id));
+        const employees = mergeEmployeeSensitiveRows(data, sensitiveMap);
         const roleNames = { 'admin': '管理員', 'manager': '主管', 'user': '一般員工' };
 
         const rolePriority = { admin: 0, manager: 1, user: 2 };
-        const sortedEmployees = [...(data || [])].sort((a, b) => {
+        const sortedEmployees = [...employees].sort((a, b) => {
             const roleDiff = (rolePriority[a.role] ?? 99) - (rolePriority[b.role] ?? 99);
             if (roleDiff !== 0) return roleDiff;
 
@@ -189,10 +222,10 @@ export async function loadEmployeeList() {
                     </div>
                     <div class="details">
                         <span>${escapeHTML(emp.department || '-')} · ${escapeHTML(emp.position || '-')}</span>
-                        <span style="font-size:12px;">驗證碼: ${escapeHTML(emp.id_card_last_4 || '未設定')}</span>
+                        <span style="font-size:12px;">驗證碼: ${escapeHTML(emp.id_card_last_4 || '—')}</span>
                     </div>
                     <div style="font-size:12px;color:#666;margin-top:5px;">
-                        ${emp.phone ? '📱 ' + escapeHTML(emp.phone) + ' · ' : ''}到職: ${emp.hire_date || '未設定'} · ${emp.employment_type === 'parttime' ? '兼職' : '正職'} · ${emp.is_kiosk ? '📱 公務機' : emp.no_checkin ? '🚫 免打卡' : ''} · ${emp.line_user_id ? '✅ 已綁定' : '⏳ 未綁定'}
+                        📱 ${escapeHTML(emp.phone || '—')} · 到職: ${emp.hire_date || '未設定'} · ${emp.employment_type === 'parttime' ? '兼職' : '正職'} · ${emp.is_kiosk ? '📱 公務機' : emp.no_checkin ? '🚫 免打卡' : ''} · ${emp.line_user_id ? '✅ 已綁定' : '⏳ 未綁定'}
                     </div>
                     <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;">
                         <button data-id="${emp.id}" onclick="openEditEmployeeModal(this.dataset.id)" style="padding:7px 12px;border:1px solid #E5E7EB;border-radius:8px;background:#fff;font-size:11px;font-weight:700;cursor:pointer;color:#4F46E5;">✏️ 編輯</button>
@@ -526,7 +559,7 @@ export async function loadPendingEmployees() {
 
     try {
         const { data, error } = await sb.from('employees')
-            .select('id, name, phone, department, position, hire_date, line_user_id, emergency_contact, emergency_phone, created_at, status, preferred_language')
+            .select('id, name, department, position, hire_date, line_user_id, created_at, status, preferred_language')
             .eq('company_id', window.currentCompanyId)
             .eq('status', 'pending')
             .eq('is_active', false)
@@ -534,24 +567,27 @@ export async function loadPendingEmployees() {
 
         if (error) throw error;
 
+        const sensitiveMap = await loadEmployeeSensitiveMap((data || []).map(emp => emp.id));
+        const employees = mergeEmployeeSensitiveRows(data, sensitiveMap);
+
         // 更新 badge
         const badge = document.getElementById('pendingBadge');
         if (badge) {
-            if (data && data.length > 0) {
-                badge.textContent = data.length;
+            if (employees.length > 0) {
+                badge.textContent = employees.length;
                 badge.style.display = 'inline-block';
             } else {
                 badge.style.display = 'none';
             }
         }
 
-        if (!data || data.length === 0) {
+        if (employees.length === 0) {
             listEl.innerHTML = '<p style="text-align:center;color:#999;padding:40px 0;">🎉 目前沒有待審核的員工</p>';
             return;
         }
 
         let html = '';
-        data.forEach(emp => {
+        employees.forEach(emp => {
             const createdDate = emp.created_at ? new Date(emp.created_at).toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei' }) : '未知';
             html += `
                 <div class="attendance-item" style="border-left:4px solid #F59E0B;">
@@ -571,7 +607,7 @@ export async function loadPendingEmployees() {
                     <div style="font-size:12px;color:#666;margin-top:5px;">
                         到職: ${emp.hire_date || '未填'} · 登記: ${createdDate}
                     </div>
-                    ${emp.emergency_contact ? `<div style="font-size:12px;color:#666;margin-top:3px;">🆘 緊急聯絡: ${escapeHTML(emp.emergency_contact)} ${escapeHTML(emp.emergency_phone || '')}</div>` : ''}
+                    <div style="font-size:12px;color:#666;margin-top:3px;">🆘 緊急聯絡: ${escapeHTML(emp.emergency_contact || '—')} ${escapeHTML(emp.emergency_phone || '')}</div>
                     <div style="margin-top:10px;display:flex;gap:8px;">
                         <button data-id="${emp.id}" data-name="${escapeHTML(emp.name)}" onclick="approveEmployee(this.dataset.id, this.dataset.name)" style="flex:1;padding:10px;border:none;border-radius:8px;background:#10B981;color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">
                             ✅ 通過
@@ -664,7 +700,7 @@ export async function loadVietnameseEmployees() {
 
     try {
         const { data, error } = await sb.from('employees')
-            .select('id, name, employee_number, department, position, role, phone, line_user_id, preferred_language')
+            .select('id, name, employee_number, department, position, role, line_user_id, preferred_language')
             .eq('company_id', window.currentCompanyId)
             .eq('is_active', true)
             .eq('status', 'approved')
@@ -674,23 +710,25 @@ export async function loadVietnameseEmployees() {
 
         if (error) throw error;
 
+        const sensitiveMap = await loadEmployeeSensitiveMap((data || []).map(emp => emp.id));
+        const employees = mergeEmployeeSensitiveRows(data, sensitiveMap);
         const badge = document.getElementById('vietnameseBadge');
         if (badge) {
-            if (data && data.length > 0) {
-                badge.textContent = data.length;
+            if (employees.length > 0) {
+                badge.textContent = employees.length;
                 badge.style.display = 'inline-block';
             } else {
                 badge.style.display = 'none';
             }
         }
 
-        if (!data || data.length === 0) {
+        if (employees.length === 0) {
             listEl.innerHTML = '<p style="text-align:center;color:#999;padding:40px 0;">目前沒有員工使用越南文介面</p>';
             return;
         }
 
         const roleNames = { admin: '管理員', manager: '主管', user: '一般員工' };
-        listEl.innerHTML = data.map(emp => `
+        listEl.innerHTML = employees.map(emp => `
             <div class="attendance-item" style="border-left:4px solid #10B981;">
                 <div class="date">
                     <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
@@ -704,7 +742,7 @@ export async function loadVietnameseEmployees() {
                     <span>${emp.line_user_id ? '✅ 已綁定' : '⏳ 未綁定'}</span>
                 </div>
                 <div style="font-size:12px;color:#64748B;margin-top:5px;">
-                    ${emp.phone ? '📱 ' + escapeHTML(emp.phone) : '📱 未設定手機'}
+                    📱 ${escapeHTML(emp.phone || '—')}
                 </div>
                 <div style="margin-top:8px;">
                     <button data-id="${emp.id}" onclick="openEditEmployeeModal(this.dataset.id)" style="padding:7px 12px;border:1px solid #BBF7D0;border-radius:8px;background:#F0FDF4;font-size:11px;font-weight:800;cursor:pointer;color:#047857;">✏️ 編輯語言</button>
@@ -934,6 +972,12 @@ export async function loadAllEmployees() {
 // ===== 編輯員工 Modal =====
 export async function openEditEmployeeModal(empId) {
     document.getElementById('editEmpId').value = empId;
+    const phoneEl = document.getElementById('editEmpPhone');
+    if (phoneEl) {
+        phoneEl.value = '';
+        phoneEl.placeholder = '—（暫時無法載入）';
+        phoneEl.dataset.sensitiveLoaded = '0';
+    }
     try {
         const { data } = await sb.from('employees')
             .select(EMPLOYEE_READ_COLUMNS)
@@ -941,10 +985,16 @@ export async function openEditEmployeeModal(empId) {
             .eq('company_id', window.currentCompanyId)
             .single();
         if (data) {
+            const sensitiveMap = await loadEmployeeSensitiveMap([empId]);
+            const sensitive = sensitiveMap?.get(empId);
             document.getElementById('editEmpName').value = data.name || '';
             loadDepartmentOptions('editEmpDept', data.department || '');
             document.getElementById('editEmpPosition').value = data.position || '';
-            document.getElementById('editEmpPhone').value = data.phone || '';
+            if (phoneEl && sensitive) {
+                phoneEl.value = sensitive.phone || '';
+                phoneEl.placeholder = '';
+                phoneEl.dataset.sensitiveLoaded = '1';
+            }
             document.getElementById('editEmpHireDate').value = data.hire_date || '';
             document.getElementById('editEmpType').value = data.employment_type || 'fulltime';
             const langEl = document.getElementById('editEmpPreferredLanguage');
@@ -1008,7 +1058,6 @@ export async function saveEditEmployee() {
         name: document.getElementById('editEmpName').value.trim(),
         department: document.getElementById('editEmpDept').value,
         position: document.getElementById('editEmpPosition').value.trim(),
-        phone: document.getElementById('editEmpPhone').value.trim() || null,
         hire_date: document.getElementById('editEmpHireDate').value || null,
         employment_type: document.getElementById('editEmpType').value,
         preferred_language: document.getElementById('editEmpPreferredLanguage')?.value || 'zh-TW',
@@ -1020,6 +1069,10 @@ export async function saveEditEmployee() {
         gps_relaxed: !!document.getElementById('editGpsRelaxed')?.checked,
         default_lunch: document.getElementById('editDefaultLunch')?.value || null
     };
+    const phoneEl = document.getElementById('editEmpPhone');
+    if (phoneEl?.dataset.sensitiveLoaded === '1') {
+        updates.phone = phoneEl.value.trim() || null;
+    }
     // 角色欄位：只有 platform_admin 看得到這組 UI 時才寫入 role
     const roleGroup = document.getElementById('editEmpRoleGroup');
     const roleSel = document.getElementById('editEmpRole');

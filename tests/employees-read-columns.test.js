@@ -14,15 +14,16 @@ const EXCLUDED_ROOT_FILES = new Set([
 ]);
 const EXPECTED_COLUMNS = [
   'id', 'employee_number', 'name', 'department', 'position', 'join_date',
-  'line_user_id', 'phone', 'email', 'is_active', 'is_bound', 'bound_at',
-  'created_at', 'updated_at', 'id_card_last_4', 'is_admin', 'company_id',
-  'role', 'hire_date', 'employment_type', 'salary_type', 'hourly_rate',
-  'emergency_contact', 'emergency_phone', 'status', 'resigned_date',
+  'line_user_id', 'is_active', 'is_bound', 'bound_at', 'created_at',
+  'updated_at', 'is_admin', 'company_id', 'role', 'hire_date',
+  'employment_type', 'salary_type', 'status', 'resigned_date',
   'resign_reason', 'resign_note', 'shift_mode', 'fixed_shift_start',
   'fixed_shift_end', 'can_schedule', 'no_checkin', 'is_kiosk',
   'preferred_language', 'gps_relaxed', 'default_lunch'
 ];
 const NOT_FRONTEND_READABLE = [
+  'phone', 'email', 'emergency_contact', 'emergency_phone',
+  'id_card_last_4', 'hourly_rate',
   'verify_code', 'id_last_four', 'device_info',
   'check_in_lat', 'check_in_lng', 'max_distance_meters'
 ];
@@ -161,7 +162,7 @@ console.log('\n═════════════════════�
 console.log('  員工欄位明確讀取');
 console.log('═══════════════════════════════════════');
 check('EMPLOYEE_READ_COLUMNS 存在', Boolean(constantMatch));
-check('EMPLOYEE_READ_COLUMNS 正好 37 欄', actualColumns.length === 37, `實際 ${actualColumns.length}`);
+check('EMPLOYEE_READ_COLUMNS 正好 31 欄', actualColumns.length === 31, `實際 ${actualColumns.length}`);
 check('EMPLOYEE_READ_COLUMNS 無重複欄位', new Set(actualColumns).size === actualColumns.length);
 check('EMPLOYEE_READ_COLUMNS 順序與允許清單一致',
   JSON.stringify(actualColumns) === JSON.stringify(EXPECTED_COLUMNS));
@@ -175,7 +176,10 @@ const embeddedProblems = [];
 let directQueries = 0;
 let embeddedRelations = 0;
 for (const relative of files) {
-  const source = fs.readFileSync(path.join(ROOT, relative), 'utf8');
+  let source = fs.readFileSync(path.join(ROOT, relative), 'utf8');
+  if (process.env.EMPLOYEE_READ_COLUMNS_MUTATION && relative === path.join('modules', 'employees.js')) {
+    source += `\nasync function __mutation(sb) { return sb.from('employees').select('${process.env.EMPLOYEE_READ_COLUMNS_MUTATION}'); }\n`;
+  }
   const fromEmployees = /\.from\(\s*(['"])employees\1\s*\)/g;
   let match;
   while ((match = fromEmployees.exec(source))) {

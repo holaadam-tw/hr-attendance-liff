@@ -57,7 +57,7 @@
    - 已知低風險警告可以忽略（2026-11-27 對照 main ee6775e 逐一重新驗證）：
      - common.js:1042（`attendance` 以 `currentEmployee.id` 查本人今日打卡＝員工自查）
      - modules/schedules.js:263（`schedules` 以 `employee_id IN` 本次異動清單查，ID 來自本公司排班畫面）
-     - modules/employees.js:601（核准登記時讀全部 `employee_number` 產生下一個工號；工號全域唯一，只讀工號欄）
+     - modules/employees.js:637（核准登記時讀全部 `employee_number` 產生下一個工號；工號全域唯一，只讀工號欄）
    - ⚠️ **Allowlist 失效條件**：若上述行號對應的程式碼結構改變（例如查詢邏輯改動、不再是員工自查），例外立即失效，必須重新驗證
 
 ### 改程式後（自我驗證 5 步 — 快速 checklist）
