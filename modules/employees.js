@@ -5,6 +5,8 @@
 //   formatNT, writeAuditLog, CONFIG
 // ============================================================
 
+import { EMPLOYEE_READ_COLUMNS } from './employee-read-columns.js';
+
 let currentSalaryEmpId = null;
 
 // ===== 部門下拉選單 =====
@@ -149,7 +151,7 @@ export async function loadEmployeeList() {
 
     try {
         const { data, error } = await sb.from('employees')
-            .select('*')
+            .select(EMPLOYEE_READ_COLUMNS)
             .eq('company_id', window.currentCompanyId)
             .eq('is_active', true)
             .order('department', { ascending: true });
@@ -934,7 +936,7 @@ export async function openEditEmployeeModal(empId) {
     document.getElementById('editEmpId').value = empId;
     try {
         const { data } = await sb.from('employees')
-            .select('*')
+            .select(EMPLOYEE_READ_COLUMNS)
             .eq('id', empId)
             .eq('company_id', window.currentCompanyId)
             .single();

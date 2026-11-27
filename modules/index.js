@@ -8,7 +8,7 @@ import {
     applyRoleVisibility, applyAdminFeatureVisibility,
     switchFieldSalesAdmin,
     renderAdminCompanySwitcher, switchCompanyAdmin
-} from './auth.js?v=20260805-payrollsummary';
+} from './auth.js?v=20261127-empcols158';
 
 import {
     loadAuditLogs, exportReport, initReportMonth
@@ -25,7 +25,7 @@ import {
     loadUnbindEmployees, quickBindLine,
     showResignModal, closeResignModal, confirmResign, restoreEmployee,
     loadResignedEmployees, loadAllEmployees
-} from './employees.js?v=20260927-linesecure2';
+} from './employees.js?v=20261127-empcols158';
 
 import {
     switchApprovalType, switchLeaveTab, loadLeaveApprovals, approveLeave,
