@@ -13,17 +13,17 @@
 - 新增 `tests/leave-calendar-display.test.js` 並接入 `npm test`：真實案例、保守退回、公司假日、週末工作公司、跨月、`days=null` 共 12 項通過；移除休假日過濾的反向 mutation 會有 6 項失敗。
 - 本輪只改前端顯示與離線測試，未連線或寫入正式庫、未操作 Supabase Dashboard、未部署，且未執行 git add／commit／push。
 
-## 🟡 2026-11-27 公務機固定便當＋彈窗防跳過＋入口移位（156）
+## ✅ 2026-11-27 公務機固定便當＋彈窗防跳過＋入口移位（156）
 
-- **狀態：本地實作與離線驗證完成，未套正式庫、未部署、未合併。** `employees.default_lunch` 支援不固定（NULL）／葷／素／不訂；`admin_update_employee` 只增加此欄位白名單與三值驗證，其餘以 2026-11-27 正式庫唯讀定義為準。
+- **狀態：2026-11-27 已上線（156 已套用並唯讀驗證、line-push v15（部署前備份 v14）、PR #23 合併 52049d0、E001 已設固定葷食）。待辦：E001 下一個上班日（11/30）唯讀查 lunch_orders notes＝`[公務機][固定]`；現場確認公務機 🍱 按鈕位置。** `employees.default_lunch` 支援不固定（NULL）／葷／素／不訂；`admin_update_employee` 只增加此欄位白名單與三值驗證，其餘以 2026-11-27 正式庫唯讀定義為準。
 - 公務機上班打卡成功後先走 `kiosk_lunch_default` → `kiosk_lunch_apply_default_verified`；公司與員工由 verified 身分鏈及 DB 鎖定。DB 以台灣日期、截止時間與三層 lunch 功能開關裁決，今日已有任何 `lunch_orders` 列（含 cancelled）都不覆蓋；新列以 `[公務機][固定]` 標記，競態以 `ON CONFLICT DO NOTHING` 收斂。
 - 沒有固定設定或自動套用服務失敗才回到原本詢問流程；result 模式移除「稍後再決定」，選項放大，60 秒無操作只關閉並回首頁、不寫資料。employee 模式保留關閉鈕。🍱 入口移到上下班按鈕下方整行顯示，固定套用成功的結果頁提供大顆「🍱 改便當」。
 - 後台員工編輯新增固定便當下拉，保存仍只走 `rpcUpdateEmployee`；員工清單顯示「🍱固定葷／素／不訂」，公務機帳號隱藏欄位。
 - **上線順序不可顛倒：套用 156 → 部署 `line-push` → 合併前端 → 後台把 E001 設為固定葷食。** 回滾時先回退前端，再回退 Edge，最後由具授權者套用 `156_employee_default_lunch_rollback.sql`；不得直接改正式資料。
 
-## 🟡 2026-11-19 管理員補訂＋公務機截止前重選當天便當（154／155）
+## ✅ 2026-11-19 管理員補訂＋公務機截止前重選當天便當（154／155）
 
-- **狀態：待業主授權套用 154、155 → 部署 line-push → 合併前端。** 本輪只建立本地 migration／程式／測試，未連線或寫入正式庫，未操作 Supabase Dashboard，未部署。
+- **狀態：2026-11-19 已上線（154、155 已套、line-push v14、PR #21 合併 08d7428）。** 本輪只建立本地 migration／程式／測試，未連線或寫入正式庫，未操作 Supabase Dashboard，未部署。
 - `admin_order_lunch_today_verified` 只給 `service_role`：先用 `is_company_manager_caller` 驗 admin／manager／platform_admin，再鎖定同公司在職、非公務機目標員工；日期固定由 DB 取台灣今日，不接受前端日期，也不受一般訂餐截止時間限制。
 - `regular`／`vegetarian` 寫成 `ordered`，`none` 寫成 `cancelled`；同員工同日以 upsert 更新既有訂單。稽核 `notes` 固定為 `[管理員補訂：<DB 查得姓名>]`，不採信前端姓名。
 - `line-push` action=`admin_lunch_today` 只接受 `company_id`／`employee_id`／`choice` 白名單，呼叫者 LINE userId 取自 LIFF token 驗證。便當統計卡新增補訂對話框，員工下拉限定目前公司、在職並排除公務機，並以同一份今日訂單查詢顯示葷／素／不訂／未選。
@@ -1372,3 +1372,5 @@ PostgREST（anon key，無寫入）另測兩種呼叫形狀都能正確解析：
 # 2026-11-27 權限收緊（P1 第一階段）
 
 - selfies Storage 已新增 migration 157：保留公開讀取與新增，上傳政策收斂為一條，移除公開覆寫與刪除；含精確回滾及 PGlite 正反向測試。employees、attendance、lunch_orders 本階段完成讀取點盤點，未變更其讀取政策。
+- **157 狀態：2026-11-27 已套用正式庫、PR #24 合併 3923dfd。** 套用後以正式站 checkin.html／kiosk.html 的上傳程式在無頭 Chrome 實測：新增上傳成功、公開讀取 200、覆寫被拒、刪除無效；測試物件已清除（DB 確認 0 筆）。
+- **employees 讀取前置（PR #25 合併 63accbf，2026-11-27）：** admin 端 6 處 `select('*')` 改用 `modules/employee-read-columns.js` 的明確欄位清單；新增 `tests/employees-read-columns.test.js` 掃描所有產品檔的 employees 直接／嵌入查詢必須在清單內。正式後台以 Puppeteer 驗證員工清單正常。後續權限調整待業主授權。

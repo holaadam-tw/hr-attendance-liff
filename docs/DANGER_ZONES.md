@@ -55,7 +55,7 @@
 
 | 表 | 風險 | 注意 |
 |----|------|------|
-| employees | 多處 JOIN | company_id 多租戶隔離、status CHECK 約束 |
+| employees | 多處 JOIN | company_id 多租戶隔離、status CHECK 約束；前端讀取**不可用 `select('*')`**，欄位必須在 `modules/employee-read-columns.js` 清單內（`tests/employees-read-columns.test.js` 會擋）；新增欄位要前端讀到時，先加進清單並確認資料庫讀取權限 |
 | attendance | UNIQUE(employee_id, date) | 每人每天只能一筆 |
 | system_settings | company_id NOT NULL | 必須帶 company_id |
 | payroll | is_published 控制員工可見 | 發布後不可隨意刪除 |
