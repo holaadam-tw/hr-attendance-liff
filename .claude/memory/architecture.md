@@ -190,3 +190,4 @@ async function saveSetting(key, value, description) {
 
 - selfies 維持 public bucket，前端只以時間戳新路徑 upload 並以 getPublicUrl 讀取。
 - migration 157 僅允許 anon/authenticated INSERT；不允許 UPDATE/DELETE。若未來需要替換或刪除物件，必須新增具身分與物件歸屬驗證的伺服器端流程，不可恢復公開政策。
+- 2026-11-27: employees 前端讀取改為明確欄位清單（`modules/employee-read-columns.js`，37 欄），admin 6 處 `select('*')` 已移除；新增掃描測試保證所有直接與嵌入查詢欄位都在清單內。之後 employees 新增欄位若前端要讀，必須同步加進清單。
