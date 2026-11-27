@@ -244,9 +244,9 @@ hr-attendance-liff-git/
 
 ### Git 工作流程
 
-- **開發分支**：`dev`（所有修改先在此進行）
+- **開發分支**：每個任務從 `origin/main` 開功能分支（`feat/…`、`fix/…`、`docs/…`）；`dev` 已停用
 - **正式分支**：`main`（GitHub Pages 部署來源）
-- **推送指令**：`git push origin dev` → 測好後合併 → `git push origin main`
+- **推送指令**：`git push origin <功能分支>` → 開 PR → 使用者結構化授權後合併 main（不直接 push main）
 - **Commit 前必做**：`bash scripts/qa_check.sh`
 
 ### 程式碼風格

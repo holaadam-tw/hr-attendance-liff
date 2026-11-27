@@ -112,7 +112,7 @@ Agent 必須偏好小的、可回退的、有證據的變更，而非大規模�
 
 1. **多租戶強制隔離**：所有 Supabase 查詢必須 `.eq('company_id', window.currentCompanyId)` 或用關聯 filter（employees!inner）或員工自查（`.eq('employee_id', currentEmployee.id)`）。絕對禁止無 filter SELECT。違反即視為 production 安全事件。
 2. **RLS 表禁止直接寫入**：`attendance` / `makeup_punch_requests` / `overtime_requests` / `leave_requests` / `schedules` 必須用 SECURITY DEFINER RPC。hook `.claude/hooks/check-rls-bypass.sh` 會自動檢查。
-3. **Git 紀律**：所有變更在 `dev` 分支上做。`git push origin dev` 後由使用者手動合併 `main`。**絕對禁止直接改 `main`**。GitHub Pages 從 `main` 自動部署。
+3. **Git 紀律**：所有變更在從 `origin/main` 開出的功能分支上做，`git push origin <功能分支>` 後開 PR；合併 PR 到 `main` 須使用者結構化授權。**絕對禁止直接改或直接 push `main`**。GitHub Pages 從 `main` 自動部署。
 4. **優先 L1 入口修復**：對 user-visible bug，先確認實際流程能重現，再動程式。
 5. **文件與程式同步**：改動影響 `docs/BUG_TRACKER.md`（功能狀態）、`.claude/memory/architecture.md`（技術決策）、`SKILL.md`（若功能架構變）時，必須同步更新。
 6. **複雜任務走 rls-checker**：改動 ≥ 3 個檔案或涉及多租戶 / RLS / RPC 時，commit 前必須派 `@rls-checker` 做最終審查。

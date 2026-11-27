@@ -46,7 +46,7 @@ Scope: 本 repo（hr-attendance-liff-git）之 Claude Code 自動 / 長時間執
 - Supabase production DB 寫入（INSERT / UPDATE / DELETE / UPSERT / DDL / migration apply）
 - 對 **未驗證目標** 的任何 DB 寫入
 - RLS 表（attendance / makeup_punch_requests / overtime_requests / leave_requests / schedules）直接 SQL 寫入（必須走 SECURITY DEFINER RPC）
-- GitHub Pages deploy（含 `git push origin main`、`git merge dev` into main）
+- GitHub Pages deploy（含 `git push origin main`、合併 PR／分支到 main）
 - 改 Supabase secrets / env / vault / RLS policy / auth / access control
 - 改 LINE LIFF ID / LINE 官方帳號設定
 - `git reset --hard`、`git clean -fd`、刪 migration、刪 Supabase 資料、不可逆破壞性操作
@@ -76,8 +76,8 @@ Scope: 本 repo（hr-attendance-liff-git）之 Claude Code 自動 / 長時間執
   - 不直接接入 production runtime path
   - 不產生外部副作用
 - 小範圍、低風險修改（≤ 8 檔、≤ 300 行），且未超出 §3 的門檻
-- `git add` / `git commit` 到 **dev 分支**（本地 commit 無副作用）
-- `git push origin dev`（不動 main；GitHub Pages 部署來源是 main，push dev 不觸發部署）
+- `git add` / `git commit` 到**功能分支**（從 `origin/main` 開出；本地 commit 無副作用）
+- `git push origin <功能分支>` 並開 PR（不動 main；GitHub Pages 部署來源是 main，push 功能分支不觸發部署）
 
 L1 的默認原則：
 
@@ -176,7 +176,7 @@ LAST_TEST_STATUS: <pass/fail/not-run>
 - 可一句話說明 rollback
 - commit 前已通過 §6
 - commit 後可附 §7 證據
-- 只 commit 到 `dev` 分支（不動 main）
+- 只 commit 到功能分支（不動 main）
 
 ### Commit 回報格式
 
