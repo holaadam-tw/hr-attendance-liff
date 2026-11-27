@@ -84,10 +84,10 @@
    - 不可只寫「fix bug」
 
 3. **Git 流程**：
-   - 永遠在 `dev` 分支改
-   - **測試通過後**（qa_check + npm test 綠）才 `git add` → `commit` → `git push origin dev`
-   - 由使用者手動合併 main
-   - **絕對禁止直接改 main**（觸發 GitHub Pages 部署，對齊 Guardrails §1 Hard Block）
+   - 每個任務從最新 `origin/main` 開**功能分支**（`feat/…`、`fix/…`、`docs/…`＋日期；可用 worktree）
+   - **測試通過後**（qa_check + npm test 綠）才 `git add` → `commit` → `git push origin <功能分支>` → 開 PR 到 main
+   - 合併 PR **必須 user 結構化授權**（例如「授權：合併 PR #N 到 main」），合併前確認 CI 通過、MERGEABLE
+   - **絕對禁止直接改或直接 push main**（main 觸發 GitHub Pages 部署，對齊 Guardrails §1 Hard Block）
 
 ---
 
@@ -139,7 +139,7 @@
 
 ## 自動執行
 
-**測試通過後**（`qa_check.sh` 0 FAIL + `npm test` 全部套件通過 + Hook 無新警告），再執行 `git add`, `commit`, `push origin dev`。不動 main branch。
+**測試通過後**（`qa_check.sh` 0 FAIL + `npm test` 全部套件通過 + Hook 無新警告），再執行 `git add`、`commit`、`push origin <功能分支>`、開 PR。不直接動 main。
 
 ### 測試套件（`npm test` 一次跑完，任一失敗即整體失敗）
 
@@ -160,8 +160,9 @@
 ---
 
 ## Git 規則
-- **所有變更先在 dev 分支進行**，測試沒問題才合併到 main
-- 合併流程：`git checkout main && git merge dev && git push origin main` — **僅在 user 明確授權後執行**
+- **所有變更在從 `origin/main` 開出的功能分支進行**，測試沒問題後開 PR 到 main（2026-11 起的做法；`dev` 分支已停用，停在 cc10469）
+- 合併流程：`gh pr merge <N> --merge` — **僅在 user 明確、結構化授權後執行**；合併後確認 Pages 部署成功、線上檔案已是新版
+- 涉及正式庫 migration 或 Edge Function 時，依 PR 描述的上線順序逐步授權（通常先套 migration／部署 Edge，再合併前端）
 - 不要直接在 main 上開發
 - GitHub Pages 部署來源是 main 分支（合併 = 自動部署，屬 Guardrails §1 Hard Block 範圍）
 - `node_modules/` 已加入 `.gitignore`，**絕對不可上傳到 git**

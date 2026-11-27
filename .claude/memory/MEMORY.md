@@ -13,7 +13,7 @@
 - 全域變數必須掛 `window.`（跨檔案共用），但 common.js 頂層用 `let` 宣告的變數（currentCompanyId 等）不會自動掛到 window，同檔案內直接用變數名存取
 - system_settings 的 company_id 是 NOT NULL
 - 快取：修改設定後 `invalidateSettingsCache()` + `loadSettings(true)`
-- Git 工作流：dev 分支開發 → 測試通過 → 合併到 main
+- Git 工作流：從 origin/main 開功能分支 → 測試通過 → push 分支開 PR → 使用者結構化授權後合併 main（dev 分支 2026-11 起停用）
 - node_modules 已加入 .gitignore，不可上傳
 - 全域錯誤監控：所有 HTML 頁面有 window.onerror → Supabase error_logs
 - OpenSpec SDD 已初始化：openspec/project.md 為專案總覽

@@ -40,7 +40,7 @@
 3. **Build** — 只做單一意圖的修改，避免 bug fix / 重構 / 格式化混改。
 4. **Verify** — 跑 `qa_check.sh`、`npm test`、logic walkthrough、前端頁面手驗或 Supabase 查詢對照。
 5. **Review** — 檢查是否引入回歸、多租戶洩漏、RLS 破口、未覆蓋分支、過大 diff。
-6. **Ship** — 整理 commit，`git push origin dev`（不動 main）；未經明確要求不部署。
+6. **Ship** — 整理 commit，`git push origin <功能分支>` 並開 PR（不動 main）；未經明確要求不合併、不部署。
 
 ---
 
@@ -149,7 +149,7 @@ npm test                    # 必須 53 通過
 
 1. **Atomic commit** — 每個 commit 單一目的、可獨立理解、可單獨回退。
 2. **Commit 前先驗證** — `qa_check.sh` + `npm test` 綠後再 commit。
-3. **Dev 分支開發** — 所有變更先在 `dev` 分支；`git push origin dev` 後由使用者手動合併 main。**絕對禁止直接改 main**。
+3. **功能分支＋PR** — 所有變更在從 `origin/main` 開出的功能分支；push 後開 PR，合併 main 須使用者結構化授權。**絕對禁止直接改或直接 push main**。
 4. **不自動 push main / 不自動 deploy** — 除非使用者明確要求。
 5. **不做破壞性 git 操作** — 未經同意，不做 `reset --hard`、強制覆蓋、回退他人變更。
 6. **Dirty tree awareness** — 若工作樹本來就髒，agent 只能處理與本次任務直接相關的部分。
