@@ -128,8 +128,8 @@ check('儲存前有 confirm 對話框', /if \(!confirm\(msg\)\) return;/.test(sr
 check('確認框列出「從什麼變成什麼」', src.includes('c.before') && src.includes('c.after'));
 check('確認框說明津貼維持原值', src.includes('維持原值不變'));
 check('沒有變更時直接提示不寫入', src.includes("showToast('沒有任何變更')"));
-check('RPC 呼叫有帶四個津貼參數',
-  ['p_meal_allowance: c.meal', 'p_position_allowance: c.pos', 'p_full_attendance_bonus: c.fab', 'p_pension_self_rate: c.pension']
+check('verified action 有帶四個津貼參數', src.includes("callPayrollVerified('salary_setting_upsert'")
+  && ['meal_allowance: c.meal', 'position_allowance: c.pos', 'full_attendance_bonus: c.fab', 'pension_self_rate: c.pension']
     .every(s => src.includes(s)));
 check('存檔後重載清單以更新快照', src.includes('if (ok > 0) loadSalarySettingList();'));
 

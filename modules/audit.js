@@ -219,7 +219,9 @@ export async function exportReport(type) {
             });
             fn = `獎金報表_${y}.csv`;
         } else if (type === 'payroll') {
-            const { data } = await sb.rpc('get_company_payroll', { p_company_id: window.currentCompanyId, p_line_user_id: window.currentAdminEmployee?.line_user_id, p_year: y, p_month: m });
+            const payrollResult = await callVerifiedAction('payroll_company_get', { company_id: window.currentCompanyId, year: y, month: m });
+            if (!payrollResult.ok) throw new Error(payrollResult.message || '薪資資料載入失敗');
+            const data = payrollResult.data?.result || [];
             rows.push(['工號', '姓名', '部門', '薪資類型', '底薪', '加班費', '全勤獎金', '伙食津貼', '職務加給', '勞保', '健保', '勞退', '所得稅', '遲到扣', '請假扣', '手動調整', '總收入', '總扣款', '實發', '狀態']);
             (data || []).forEach(r => {
                 const typeMap = { monthly: '月薪', daily: '日薪', hourly: '時薪' };

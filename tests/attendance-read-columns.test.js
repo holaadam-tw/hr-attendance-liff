@@ -33,7 +33,7 @@ const DYNAMIC_SELECT_ALLOWLIST = new Set([
   'modules/auth.js:197',
   'modules/auth.js:365',
   'modules/employees.js:185',
-  'modules/employees.js:983',
+  'modules/employees.js:984',
   'modules/store.js:522',
   'modules/store.js:1709',
   'modules/store.js:2757',

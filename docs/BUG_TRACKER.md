@@ -5,6 +5,13 @@
 
 ---
 
+## 🟡 2026-11-27 薪資與請假核准改走 LINE 驗證（161，本地完成、未部署）
+
+- 六支薪資／請假核准入口新增只授權 `service_role` 的 verified wrapper；wrapper 以 `SECURITY DEFINER`、固定 `pg_catalog, public, pg_temp` `search_path` 委派現行函式，以相容三支未自行固定 `search_path` 的正式唯讀舊函式，並把暫存 schema 放最後。請假核准委派前另以既有主管 helper 排除公務機帳號；161 本身不撤舊函式權限。
+- `line-push` 新增六個嚴格白名單 action，LINE userId 只取自 LIFF access token 驗證結果；12 個前端呼叫點已改走 `callVerifiedAction`，不再傳前端自報 LINE ID，薪資解鎖 UI 與短效狀態流程未改。
+- 私有撤權、ACL 還原與全交易 drill 放在交接目錄，不進公開 repo。正式上線順序固定為：套 161 → 部署 `line-push` → 合併前端 → 觀察 1 個工作天 → 取得明確授權後才套私有撤權；每一步前後須跑 punch guard。
+- 本輪只建立本地 migration、Edge／前端程式、離線測試與私有 SQL；未連線或寫入正式庫、未部署，且未執行 git add／commit／push。`checkin.html`、`index.html`、`common.js` 與打卡 RPC 均未修改。
+
 ## 🟡 2026-11-27 attendance 明確列出欄位（本地完成、未部署）
 
 - 權限收緊前置：出勤明細 CSV 的 attendance 查詢改為只讀實際使用欄位，既有公司隔離與員工嵌入欄位不變。

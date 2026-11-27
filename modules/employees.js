@@ -303,11 +303,12 @@ export async function openSalarySettingModal(empId, empName) {
         formatMoneyInput(document.getElementById(id));
     });
     try {
-        const { data } = await sb.rpc('get_employee_current_salary', {
-            p_company_id: window.currentCompanyId,
-            p_line_user_id: window.currentAdminEmployee?.line_user_id,
-            p_employee_id: empId
+        const salaryResult = await callVerifiedAction('salary_setting_get', {
+            company_id: window.currentCompanyId,
+            employee_id: empId
         });
+        if (!salaryResult.ok) throw new Error(salaryResult.message || '薪資設定載入失敗');
+        const data = salaryResult.data?.result ?? null;
         if (data) {
             document.getElementById('ssSalaryType').value = data.salary_type || 'monthly';
             document.getElementById('ssBaseSalary').value = toMoneyStr(data.base_salary) || '';
@@ -352,19 +353,19 @@ export async function saveSalarySetting() {
     try {
         // 改走 RPC（migration 111）：舊版失效與新版寫入在同一交易，
         // 且伺服器端驗管理員身分與目標員工是否屬於本公司
-        const { data: res, error } = await sb.rpc('upsert_salary_setting', {
-            p_company_id: window.currentCompanyId,
-            p_line_user_id: window.currentAdminEmployee?.line_user_id || null,
-            p_employee_id: currentSalaryEmpId,
-            p_salary_type: record.salary_type,
-            p_base_salary: record.base_salary,
-            p_meal_allowance: record.meal_allowance,
-            p_position_allowance: record.position_allowance,
-            p_full_attendance_bonus: record.full_attendance_bonus,
-            p_pension_self_rate: record.pension_self_rate,
-            p_sync_employee_rate: false
+        const salaryResult = await callVerifiedAction('salary_setting_upsert', {
+            company_id: window.currentCompanyId,
+            employee_id: currentSalaryEmpId,
+            salary_type: record.salary_type,
+            base_salary: record.base_salary,
+            meal_allowance: record.meal_allowance,
+            position_allowance: record.position_allowance,
+            full_attendance_bonus: record.full_attendance_bonus,
+            pension_self_rate: record.pension_self_rate,
+            sync_employee_rate: false
         });
-        if (error) throw error;
+        if (!salaryResult.ok) throw new Error(salaryResult.message || '儲存失敗');
+        const res = salaryResult.data?.result;
         if (!res || !res.success) throw new Error(res?.error || '儲存失敗');
         showToast('✅ 薪資設定已儲存');
         closeSalarySettingModal();
