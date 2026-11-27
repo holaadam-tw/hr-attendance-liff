@@ -627,9 +627,19 @@
                             <span>🚫 免打卡（不需出勤管理，不出現在打卡總覽）</span>
                         </label>
                     </div>
+                    <div class="form-group" id="editDefaultLunchGroup">
+                        <label for="editDefaultLunch">🍱 固定便當</label>
+                        <select id="editDefaultLunch">
+                            <option value="">不固定（每天問）</option>
+                            <option value="regular">葷食</option>
+                            <option value="vegetarian">素食</option>
+                            <option value="none">不訂</option>
+                        </select>
+                        <div style="font-size:11px;color:#64748B;margin-top:4px;">公務機上班打卡成功後，會在截止前自動套用；已有今日選擇時不覆蓋。</div>
+                    </div>
                     <div class="form-group">
                         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-                            <input type="checkbox" id="editIsKiosk" style="width:18px;height:18px;" onchange="if(this.checked){document.getElementById('editNoCheckin').checked=true;}">
+                            <input type="checkbox" id="editIsKiosk" style="width:18px;height:18px;" onchange="if(this.checked){document.getElementById('editNoCheckin').checked=true;}document.getElementById('editDefaultLunchGroup').style.display=this.checked?'none':'';">
                             <span>📱 公務機帳號（此員工的 LINE 用作公務機打卡入口）</span>
                         </label>
                     </div>
