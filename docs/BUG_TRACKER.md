@@ -13,11 +13,11 @@
 - 新增 `tests/leave-calendar-display.test.js` 並接入 `npm test`：真實案例、保守退回、公司假日、週末工作公司、跨月、`days=null` 共 12 項通過；移除休假日過濾的反向 mutation 會有 6 項失敗。
 - 本輪只改前端顯示與離線測試，未連線或寫入正式庫、未操作 Supabase Dashboard、未部署，且未執行 git add／commit／push。
 
-## 🔴 2026-11-27 便當頁統計未做公司隔離（common.js `loadLunchSummary`，未修）
+## ✅ 2026-11-27 便當頁統計未做公司隔離（common.js `loadLunchSummary`，已修）
 
 - `services.html` 便當頁呼叫 `loadLunchSummary()`，以日期查 `lunch_orders`（`limit 500`）沒有公司條件，總數／葷／素統計會把其他公司的訂單一起算進去。
 - 發現方式：2026-11-27 重新驗證 `check-multitenant.sh` 警告（common.js:1171）時確認，不屬於員工自查，**不可列入 CLAUDE.md allowlist**。
-- 修法方向：改為只統計本公司（例如 `employees!inner(company_id)` 加 `.eq('employees.company_id', window.currentCompanyId)`，或併入 lunch_orders 讀取改 RPC 的那一批）。
+- 修法：select 加 `employees!inner(company_id)`、`.eq('employees.company_id', window.currentCompanyId)`；沒有公司時不查詢。14 個 HTML 的 `common.js?v=` 同步為 `20261127-lunchsum`。新增 `tests/lunch-summary-company.test.js`（原樣抽出函式執行；舊版 4 通過 3 失敗）。正式庫 11/27 驗證：新查詢大正 ordered 17 筆，與 DB 依公司彙總一致。
 
 ## ✅ 2026-11-27 公務機固定便當＋彈窗防跳過＋入口移位（156）
 

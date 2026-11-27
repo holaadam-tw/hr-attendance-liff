@@ -1167,10 +1167,15 @@ async function loadLunchSummary() {
     const lunchDateEl = document.getElementById('lunchDate');
     if (lunchDateEl && !lunchDateEl.value) lunchDateEl.value = dateStr;
 
+    // 只統計本公司：lunch_orders 沒有 company_id，經 employees!inner 限定公司
+    const companyId = window.currentCompanyId;
+    if (!companyId) return;
+
     try {
         const { data, error } = await sb.from('lunch_orders')
-            .select('id, is_vegetarian, status')
+            .select('id, is_vegetarian, status, employees!inner(company_id)')
             .eq('order_date', dateStr)
+            .eq('employees.company_id', companyId)
             .limit(500);
 
         if (error) throw error;
