@@ -12,7 +12,7 @@ import {
 
 import {
     loadAuditLogs, exportReport, initReportMonth
-} from './audit.js?v=20261013-leaverpc149b';
+} from './audit.js?v=20261127-attcols160';
 
 import {
     showAddEmployeeModal, closeAddEmployeeModal, initEmployeeFormHandler,

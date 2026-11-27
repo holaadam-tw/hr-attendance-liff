@@ -62,6 +62,8 @@ const SUITES = [
   { name: 'selfies Storage 只允許新增（157，PGlite 實跑）', file: 'selfies-storage-write-lock.pglite.test.js' },
   { name: '員工欄位明確讀取', file: 'employees-read-columns.test.js' },
   { name: '員工欄位讀取授權（PGlite 實跑）', file: 'employees-column-read-grant.pglite.test.js' },
+  { name: '出勤欄位明確讀取', file: 'attendance-read-columns.test.js' },
+  { name: '出勤欄位讀取授權（PGlite 實跑）', file: 'attendance-column-read-grant.pglite.test.js' },
   { name: '管理端員工敏感欄位 verified RPC（159，PGlite 實跑）', file: 'admin-employee-sensitive-verified.pglite.test.js' },
   { name: '員工欄位讀取授權第二階段（PGlite 實跑）', file: 'employees-column-read-grant-v2.pglite.test.js' },
   { name: '管理端員工敏感欄位前端', file: 'admin-employee-sensitive-frontend.test.js' },
