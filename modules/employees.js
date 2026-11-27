@@ -131,6 +131,13 @@ function employeeLanguageBadge(emp) {
     return `<span title="此員工使用越南文介面" style="padding:3px 9px;border-radius:999px;font-size:11px;background:#ECFDF5;color:#047857;border:1px solid #A7F3D0;font-weight:800;">越南文介面</span>`;
 }
 
+function employeeDefaultLunchBadge(emp) {
+    if (emp?.is_kiosk || !emp?.default_lunch) return '';
+    const label = { regular: '葷', vegetarian: '素', none: '不訂' }[emp.default_lunch];
+    if (!label) return '';
+    return `<span title="公務機上班打卡後自動套用" style="padding:3px 9px;border-radius:999px;font-size:11px;background:#FFF7ED;color:#9A3412;border:1px solid #FDBA74;font-weight:800;">🍱固定${label}</span>`;
+}
+
 // ===== 載入員工列表 =====
 export async function loadEmployeeList() {
     const listEl = document.getElementById('employeeList');
@@ -175,6 +182,7 @@ export async function loadEmployeeList() {
                                 ${roleNames[emp.role] || '未知'}
                             </span>
                             ${employeeLanguageBadge(emp)}
+                            ${employeeDefaultLunchBadge(emp)}
                         </div>
                     </div>
                     <div class="details">
@@ -946,6 +954,10 @@ export async function openEditEmployeeModal(empId) {
             if (noCheckinEl) noCheckinEl.checked = !!data.no_checkin;
             const isKioskEl = document.getElementById('editIsKiosk');
             if (isKioskEl) isKioskEl.checked = !!data.is_kiosk;
+            const defaultLunchEl = document.getElementById('editDefaultLunch');
+            if (defaultLunchEl) defaultLunchEl.value = data.default_lunch || '';
+            const defaultLunchGroup = document.getElementById('editDefaultLunchGroup');
+            if (defaultLunchGroup) defaultLunchGroup.style.display = data.is_kiosk ? 'none' : '';
             const gpsRelaxedEl = document.getElementById('editGpsRelaxed');
             if (gpsRelaxedEl) gpsRelaxedEl.checked = !!data.gps_relaxed;
             // LINE 綁定狀態
@@ -1003,7 +1015,8 @@ export async function saveEditEmployee() {
         can_schedule: !!document.getElementById('editCanSchedule')?.checked,
         no_checkin: !!document.getElementById('editNoCheckin')?.checked,
         is_kiosk: !!document.getElementById('editIsKiosk')?.checked,
-        gps_relaxed: !!document.getElementById('editGpsRelaxed')?.checked
+        gps_relaxed: !!document.getElementById('editGpsRelaxed')?.checked,
+        default_lunch: document.getElementById('editDefaultLunch')?.value || null
     };
     // 角色欄位：只有 platform_admin 看得到這組 UI 時才寫入 role
     const roleGroup = document.getElementById('editEmpRoleGroup');

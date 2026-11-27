@@ -15,7 +15,8 @@
 //     shift_swap_review（133：換班核准／拒絕；135 起前端不能直接寫 schedules）、
 //     shift_swap_create／shift_swap_respond（139：員工申請換班、對方同意／拒絕；140 起前端不能直接寫 shift_swap_requests）
 //     payroll_unlock（136：薪酬密碼在 DB 以 bcrypt 比對，前端讀不到密碼）
-//     kiosk_get_company／kiosk_lookup／kiosk_check_in（142）、kiosk_leave／kiosk_makeup（151）與 kiosk_lunch／kiosk_lunch_status（155）：公務機；身分＝公務機平板登入的 LINE 帳號，
+//     kiosk_get_company／kiosk_lookup／kiosk_check_in（142）、kiosk_leave／kiosk_makeup（151）、kiosk_lunch／kiosk_lunch_status（155）
+//     與 kiosk_lunch_default（156）：公務機；身分＝公務機平板登入的 LINE 帳號，
 //       由 DB 確認它恰好對到 1 個在職的公務機帳號；公司一律由 DB 依公務機帳號決定，前端不帶 company_id）
 //     admin_proxy_leave（153）：管理員代同公司在職、非公務機員工建立 pending 請假申請，權限與稽核姓名由 DB 驗證）
 //     admin_lunch_today（154）：管理員替同公司在職、非公務機員工補訂台灣當天便當，日期與稽核姓名由 DB 決定）
@@ -72,6 +73,7 @@ const RPC_MIGRATION: Record<string, string> = {
   kiosk_get_company_verified: '142', kiosk_lookup_employee_verified: '142', kiosk_check_in_verified: '142',
   kiosk_submit_leave_verified: '151', kiosk_submit_makeup_verified: '151',
   kiosk_lunch_today_verified: '155', kiosk_lunch_today_status_verified: '155',
+  kiosk_lunch_apply_default_verified: '156',
   admin_submit_leave_for_employee_verified: '153',
   admin_order_lunch_today_verified: '154',
 }
@@ -245,13 +247,13 @@ const VERIFIED_ACTIONS = [
   // 136：薪酬密碼改在伺服器端比對（DB 只存 bcrypt 雜湊），成功回短效 unlock_token
   'payroll_unlock',
   // 142：公務機（身分＝平板登入的公務機 LINE 帳號；前端報的 kiosk LINE ID 一律不採信）
-  'kiosk_get_company', 'kiosk_lookup', 'kiosk_check_in', 'kiosk_leave', 'kiosk_makeup', 'kiosk_lunch', 'kiosk_lunch_status',
+  'kiosk_get_company', 'kiosk_lookup', 'kiosk_check_in', 'kiosk_leave', 'kiosk_makeup', 'kiosk_lunch', 'kiosk_lunch_status', 'kiosk_lunch_default',
   // 153：管理員代員工請假（公司必填；不可歸類為公務機動作）
   'admin_proxy_leave',
   // 154：管理員補訂當天便當（公司必填；日期只由 DB 決定）
   'admin_lunch_today',
 ] as const
-const KIOSK_ACTIONS: readonly string[] = ['kiosk_get_company', 'kiosk_lookup', 'kiosk_check_in', 'kiosk_leave', 'kiosk_makeup', 'kiosk_lunch', 'kiosk_lunch_status']
+const KIOSK_ACTIONS: readonly string[] = ['kiosk_get_company', 'kiosk_lookup', 'kiosk_check_in', 'kiosk_leave', 'kiosk_makeup', 'kiosk_lunch', 'kiosk_lunch_status', 'kiosk_lunch_default']
 export const MAX_BATCH_SETTINGS = 30
 export const MAX_BATCH_REVIEWS = 50
 export const MAX_BATCH_SCHEDULES = 400
@@ -377,6 +379,14 @@ async function handleVerifiedAction(body: any, deps: Deps): Promise<Response> {
     const employeeId = uuidOrNull(body.employee_id)
     if (!onlyKeys(body, allowed) || !employeeId) return badRequest('便當資料不正確')
     return rpcResult(await callRpc(deps, 'kiosk_lunch_today_status_verified', {
+      p_line_user_id: lineUserId, p_employee_id: employeeId,
+    }), withResult)
+  }
+  if (action === 'kiosk_lunch_default') {
+    const allowed = ['action', 'liff_access_token', 'employee_id']
+    const employeeId = uuidOrNull(body.employee_id)
+    if (!onlyKeys(body, allowed) || !employeeId) return badRequest('便當資料不正確')
+    return rpcResult(await callRpc(deps, 'kiosk_lunch_apply_default_verified', {
       p_line_user_id: lineUserId, p_employee_id: employeeId,
     }), withResult)
   }

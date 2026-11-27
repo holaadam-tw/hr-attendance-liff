@@ -588,6 +588,7 @@ const post = (url, body, headers = {}) => new Request(url, { method: 'POST', bod
       ['/rpc/kiosk_get_company_verified', { body: { success: true, name: '大正科技', company_id: COMPANY, extra_field: 'SHOULD-NOT-LEAK' } }],
       ['/rpc/kiosk_lookup_employee_verified', { body: { success: true, employee_id: KEMP, name: '員工三', employee_number: 'E03' } }],
       ['/rpc/kiosk_check_in_verified', { body: { success: true, type: 'check_in', name: '員工三', is_late: false } }],
+      ['/rpc/kiosk_lunch_apply_default_verified', { body: { success: true, applied: true, choice: 'regular', order_date: '2026-11-27' } }],
       ['/rpc/kiosk_lunch_today_status_verified', { body: { success: true, order_date: '2026-11-19', choice: 'vegetarian', deadline: '10:00', deadline_passed: false } }],
       ['/rpc/kiosk_lunch_today_verified', { body: { success: true, order_date: '2026-11-19', status: 'ordered', is_vegetarian: true } }],
       ['/rpc/kiosk_submit_leave_verified', { body: { success: true, days: 1, leave_period: 'full_day' } }],
@@ -665,6 +666,20 @@ const post = (url, body, headers = {}) => new Request(url, { method: 'POST', bod
       && t.out.result?.choice === 'vegetarian', JSON.stringify(c?.body));
     t = await run({ ...kioskLunchStatus, company_id: COMPANY }, kioskRoutes());
     check('kiosk_lunch_status：嚴格白名單拒絕 company_id', t.res.status === 400 && !call(t.f, 'kiosk_lunch_today_status_verified'));
+
+    const kioskLunchDefault = { action: 'kiosk_lunch_default', employee_id: KEMP };
+    t = await run(kioskLunchDefault, kioskRoutes());
+    c = call(t.f, 'kiosk_lunch_apply_default_verified');
+    check('kiosk_lunch_default：白名單 action 可用、不帶 company_id，只送 LIFF 身分與目標員工', t.res.status === 200
+      && c?.body.p_line_user_id === LIFF_USER && c.body.p_employee_id === KEMP
+      && Object.keys(c.body).sort().join() === 'p_employee_id,p_line_user_id'
+      && t.out.result?.applied === true && t.out.result?.choice === 'regular', JSON.stringify(c?.body));
+    t = await run({ ...kioskLunchDefault, company_id: COMPANY }, kioskRoutes());
+    check('kiosk_lunch_default：嚴格白名單拒絕 company_id', t.res.status === 400 && !call(t.f, 'kiosk_lunch_apply_default_verified'));
+    t = await run({ ...kioskLunchDefault, choice: 'regular' }, kioskRoutes());
+    check('kiosk_lunch_default：嚴格白名單拒絕 choice／其他多餘欄位', t.res.status === 400 && !call(t.f, 'kiosk_lunch_apply_default_verified'));
+    t = await run(kioskLunchDefault, missingRoute('kiosk_lunch_apply_default_verified'));
+    check('kiosk_lunch_default：156 未套 → 503 db_not_migrated（156）', t.res.status === 503 && t.out.code === 'db_not_migrated' && /（156）/.test(t.out.error));
 
     const kioskLunch = { action: 'kiosk_lunch', employee_id: KEMP, choice: 'vegetarian' };
     t = await run(kioskLunch, kioskRoutes());
