@@ -173,7 +173,7 @@ function rest() {
     check('supabase-js：全部固定 2.117.2＋SRI＋crossorigin', sb.length >= 20 && sb.every(t => t.url.endsWith('@2.117.2/dist/umd/supabase.js')
       && /integrity="sha384-Rj26LVGvoeRVR6\+mwQmFfcR3QOBEwT\+ZmuCWpuiqeTzJpCs0ER4ITAWGb4Hiy3Ok"/.test(t.tag) && /crossorigin="anonymous"/.test(t.tag)), sb.length + ' 處');
     check('LIFF SDK：沒有任何頁面載入浮動的 edge/2', !liffTags.some(t => /liff\/edge\/2\//.test(t.url)), liffTags.filter(t => /edge\/2\//.test(t.url)).map(t => t.rel).join(', '));
-    check('LIFF SDK：全部固定 versions/2.31.0＋SRI＋crossorigin', liffTags.length >= 18 && liffTags.every(t => t.url.endsWith('/liff/edge/versions/2.31.0/sdk.js')
+    check('LIFF SDK：全部固定 versions/2.31.0＋SRI＋crossorigin', liffTags.length >= 17 && /* 11/27 下架 checkin-debug.html 後為 17 頁 */ liffTags.every(t => t.url.endsWith('/liff/edge/versions/2.31.0/sdk.js')
       && /integrity="sha384-T6WhT96rkehAFkTtmiRZ60sehxj4zgbifvzi7oGH792T3NN\+\+f2rCvyb\/WrHAz2D"/.test(t.tag) && /crossorigin="anonymous"/.test(t.tag)), liffTags.length + ' 處');
     check('index.html（LIFF endpoint）也已固定', tags.some(t => t.rel === 'index.html' && /@2\.117\.2/.test(t.url)) && tags.some(t => t.rel === 'index.html' && /versions\/2\.31\.0/.test(t.url)));
   }

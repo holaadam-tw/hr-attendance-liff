@@ -1230,7 +1230,7 @@ PostgREST（anon key，無寫入）另測兩種呼叫形狀都能正確解析：
 | 17 | GitHub Actions CI | push dev 自動跑 | 每次 push |
 | 18 | QA 腳本 | bash scripts/qa_check.sh | 每次 commit 前 |
 | 19 | 冒煙測試 | npm test（51 項） | 每次 commit 前 |
-| 20 | 打卡診斷 | checkin-debug.html | 有問題時 |
+| 20 | 打卡診斷 | checkin.html 內建「打卡環境自我檢查」（`checkin-debug.html` 已於 2026-11-27 下架：含會實際寫入打卡的測試按鈕） | 有問題時 |
 
 ---
 
@@ -1269,7 +1269,7 @@ PostgREST（anon key，無寫入）另測兩種呼叫形狀都能正確解析：
 
 ```
 1. 確認問題：截圖 + Supabase 查詢
-2. checkin-debug.html 診斷（打卡相關）
+2. 打卡相關：checkin.html 內建打卡環境自我檢查＋Supabase 唯讀查詢（checkin-debug.html 已下架）
 3. 貼進 Claude Code 修復
 4. bash scripts/qa_check.sh（0 FAIL）
 5. npm test（48/48）
