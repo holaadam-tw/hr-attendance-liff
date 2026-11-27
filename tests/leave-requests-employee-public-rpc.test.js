@@ -178,7 +178,7 @@ function buildPublicContext(source = publicSrc) {
     return matches.map(match => ({ name, version: match[1] }));
   });
   check('所有 HTML 的 common.js 引用版本一致',
-    commonRefs.length > 0 && commonRefs.every(ref => ref.version === '20261013-leaverpc149c'),
+    commonRefs.length > 0 && commonRefs.every(ref => ref.version === '20261127-lunchsum'),
     [...new Set(commonRefs.map(ref => ref.version))].join(', '));
 
   console.log('\n=== 2. VM：checkLeaveAvailability 改前／改後行為 ===');

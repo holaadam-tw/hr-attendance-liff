@@ -58,7 +58,6 @@
      - common.js:1042（`attendance` 以 `currentEmployee.id` 查本人今日打卡＝員工自查）
      - modules/schedules.js:263（`schedules` 以 `employee_id IN` 本次異動清單查，ID 來自本公司排班畫面）
      - modules/employees.js:601（核准登記時讀全部 `employee_number` 產生下一個工號；工號全域唯一，只讀工號欄）
-   - ❗ **已知真問題、不可列入 allowlist**：common.js:1171 `loadLunchSummary()`（services.html 便當頁統計）以日期查 `lunch_orders` 沒有公司隔離，統計數字會混入其他公司，待修（見 `docs/BUG_TRACKER.md`）
    - ⚠️ **Allowlist 失效條件**：若上述行號對應的程式碼結構改變（例如查詢邏輯改動、不再是員工自查），例外立即失效，必須重新驗證
 
 ### 改程式後（自我驗證 5 步 — 快速 checklist）
