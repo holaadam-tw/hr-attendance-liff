@@ -168,6 +168,11 @@ check('submit_leave_request 主要 payload 帶 p_company_id 與 p_line_user_id',
   leavePayload.includes('p_company_id') && leavePayload.includes('p_line_user_id'));
 check('寫入偵測探針：多行鏈式 update 抓得到', writeRe('employees').test("sb.from('employees')\n  .update({ role: 1 })\n  .eq('id', x)"));
 check('寫入偵測探針：純 select 不誤判', !writeRe('employees').test("sb.from('employees').select('id').eq('id', x);"));
+const migration157 = fs.readFileSync(path.join(ROOT, 'migrations', '157_selfies_storage_write_lock.sql'), 'utf8');
+check('157 移除 selfies UPDATE/DELETE 政策',
+  ['Allow public deletes','Allow public updates','selfies_anon_update'].every(p => migration157.includes('DROP POLICY IF EXISTS "'+p+'"')));
+check('157 將 selfies INSERT 收斂為單一政策',
+  migration157.includes('CREATE POLICY "selfies_insert_only"') && migration157.includes("bucket_id = 'selfies'"));
 
 // 3. 反向健全性檢查：測試本身要有偵測能力，否則清單寫錯也不會有人發現
 console.log('--- 測試自身健全性 ---');

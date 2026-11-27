@@ -59,6 +59,7 @@ const SUITES = [
   { name: '管理員補訂當天便當 verified RPC（154，PGlite 實跑）', file: 'admin-lunch-today-verified.pglite.test.js' },
   { name: '公務機當天便當 verified RPC（155，PGlite 可控時鐘）', file: 'kiosk-lunch-today-verified.pglite.test.js' },
   { name: '員工固定便當 verified RPC（156，PGlite 可控時鐘）', file: 'kiosk-default-lunch-verified.pglite.test.js' },
+  { name: 'selfies Storage 只允許新增（157，PGlite 實跑）', file: 'selfies-storage-write-lock.pglite.test.js' },
   { name: '公務機前端改走 LIFF 驗證（142／143）', file: 'kiosk-frontend.test.js' },
   { name: '公務機請假／補卡前端（jsdom／靜態）', file: 'kiosk-leave-makeup-frontend.test.js' },
   { name: '管理員代員工請假前端（jsdom／靜態）', file: 'admin-proxy-leave-frontend.test.js' },

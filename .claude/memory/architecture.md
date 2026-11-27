@@ -186,3 +186,7 @@ async function saveSetting(key, value, description) {
 - 2026-11-19: 管理員補訂當天便當（migration 154，待套用／部署）。身分鏈固定為 `admin.html` → `callVerifiedAction('admin_lunch_today')` → `line-push` 驗 LIFF token → service-role 呼叫 `admin_order_lunch_today_verified`；DB 以 `is_company_manager_caller` 驗權並鎖同公司、在職、非公務機目標，日期只取台灣今日，regular／vegetarian／none 以同員工同日 upsert 成 ordered 葷／ordered 素／cancelled，notes 的管理員姓名只由 DB 決定；RPC 撤 PUBLIC／anon／authenticated EXECUTE，部署順序為 154 → line-push → 前端。
 - 2026-11-19: 公務機截止前重選當天便當（migration 155，待套用／部署）。`kiosk_lunch_today_verified`／status 只由 service-role 經 line-push 呼叫，公司由 `kiosk_resolve_verified` 決定，DB 台灣今日與 `lunch_deadline`（`10:00`／`9`／數字，無效預設 10:00）共同裁決；截止後 `deadline_passed` 零寫入。kiosk 的按鈕與打卡後彈窗都走 verified action，不再直接 upsert `lunch_orders`；154 管理員截止後補訂行為不變。部署順序為 154、155 → line-push → 前端。
 - 2026-11-27: migration 156 新增 `employees.default_lunch`（NULL／regular／vegetarian／none）與僅 service-role 可執行的 `kiosk_lunch_apply_default_verified`；公務機上班後依 DB 台灣日期、截止、三層 lunch 開關及「今日任何列都不覆蓋」規則自動套用，前端 result 彈窗不可略過且 60 秒零寫入回首頁，上線順序固定為 156 → line-push → 前端 → 後台設定 E001。
+# 2026-11-27 Storage 權限決策
+
+- selfies 維持 public bucket，前端只以時間戳新路徑 upload 並以 getPublicUrl 讀取。
+- migration 157 僅允許 anon/authenticated INSERT；不允許 UPDATE/DELETE。若未來需要替換或刪除物件，必須新增具身分與物件歸屬驗證的伺服器端流程，不可恢復公開政策。

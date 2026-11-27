@@ -1369,3 +1369,6 @@ PostgREST（anon key，無寫入）另測兩種呼叫形狀都能正確解析：
 ## 2026-09-01 修復紀錄
 
 - **B58**（已實作、待 dev 實機驗收）：請假送出或審核後沒有收到 LINE，但管理端測試推播與畫面仍可能顯示成功。根因是正式 `line-push` Edge Function 會以 HTTP 200 包裝 LINE 的實際 400/401 等 status，舊版 `sendLineMessage()` 只檢查外層 HTTP 與 `result.error`，且三層 helper 吞掉失敗，導致 Token 無效、群組 ID 錯誤、員工未綁定或網路異常都被當成成功。修法：共用 helper 統一回傳不含 Token 的 `{ok,status,code,message}`，同時判斷外層 HTTP 與內層 LINE status；主管／員工 helper 傳遞結果，員工查詢補上 `company_id` 隔離。請假申請或審核資料成功後，LINE 失敗顯示獨立白話警告且不回滾資料；管理端「測試推播」只有真實成功才顯示綠色。本機 Edge Function 原始碼同步改為沿用 LINE HTTP status 與安全錯誤摘要，但本次未部署，前端已相容正式站舊格式。新增 `tests/line-notification-delivery.test.js`，離線涵蓋舊版包裝 401、HTTP 403、缺 Token、缺群組、網路失敗、無效回傳、員工公司隔離及畫面警告；未連線 LINE、未發送通知、未存取正式資料庫。
+# 2026-11-27 權限收緊（P1 第一階段）
+
+- selfies Storage 已新增 migration 157：保留公開讀取與新增，上傳政策收斂為一條，移除公開覆寫與刪除；含精確回滾及 PGlite 正反向測試。employees、attendance、lunch_orders 本階段完成讀取點盤點，未變更其讀取政策。
