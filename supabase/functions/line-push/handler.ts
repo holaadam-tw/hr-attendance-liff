@@ -21,6 +21,8 @@
 //     admin_proxy_leave（153）：管理員代同公司在職、非公務機員工建立 pending 請假申請，權限與稽核姓名由 DB 驗證）
 //     admin_lunch_today（154）：管理員替同公司在職、非公務機員工補訂台灣當天便當，日期與稽核姓名由 DB 決定）
 //     admin_employee_sensitive（159）：已驗證的管理者讀取同公司員工的管理端敏感欄位）
+//     payroll_company_get／payroll_salaries_get／salary_setting_get／salary_setting_upsert／payroll_save／leave_review
+//     （161：薪資讀寫與請假核准；身分＝LINE 驗證的 userId，DB 再驗公司與管理權限）
 //   員工發的訊息，DB 回傳寄件人前綴（［姓名 送出］），這裡一定加在最前面。
 //
 // 舊模式（相容還沒更新的頁面，前端帶 token）：必須帶 company_id，且 token 必須等於該公司設定
@@ -78,6 +80,9 @@ const RPC_MIGRATION: Record<string, string> = {
   admin_submit_leave_for_employee_verified: '153',
   admin_order_lunch_today_verified: '154',
   admin_get_employee_sensitive_verified: '159',
+  get_company_payroll_verified: '161', get_company_current_salaries_verified: '161',
+  get_employee_current_salary_verified: '161', upsert_salary_setting_verified: '161',
+  save_payroll_records_verified: '161', approve_leave_request_verified: '161',
 }
 
 async function callRpc(deps: Deps, fn: string, args: Record<string, unknown>): Promise<{ ok: boolean; data: any; missing?: string }> {
@@ -236,6 +241,24 @@ function rpcResult(saved: { ok: boolean; data: any; missing?: string }, extra: (
   return json({ ok: true, status: 200, ...extra(saved.data) }, 200)
 }
 
+// JSONB 讀取 RPC 可能合法回 array／object／null，不能套只接受 {success:true} 的 rpcResult。
+function rpcValueResult(saved: { ok: boolean; data: any; missing?: string }): Response {
+  if (saved.missing) {
+    return json({ ok: false, status: 503, code: 'db_not_migrated', error: `資料庫尚未更新（${saved.missing}），請通知系統管理員` }, 503)
+  }
+  if (!saved.ok) {
+    const message = typeof saved.data?.message === 'string' ? saved.data.message : ''
+    const denied = /管理員權限|無權存取|access_denied/i.test(message)
+    return json({
+      ok: false,
+      status: denied ? 403 : 503,
+      code: denied ? 'access_denied' : 'service_unavailable',
+      error: denied ? '需要管理員權限' : '服務暫時無法使用，請稍後再試',
+    }, denied ? 403 : 503)
+  }
+  return json({ ok: true, status: 200, result: saved.data ?? null }, 200)
+}
+
 const VERIFIED_ACTIONS = [
   'save_config', 'save_setting', 'save_settings', 'get_line_config', 'platform_admin_save', 'platform_link_company',
   // 131／132：員工管理、補卡／加班審核、排班（身分＝LINE 驗證的 userId；前端報的核准人／排班人一律不採信）
@@ -256,11 +279,16 @@ const VERIFIED_ACTIONS = [
   'admin_lunch_today',
   // 159：管理端員工敏感欄位（公司必填；非公務機動作）
   'admin_employee_sensitive',
+  // 161：薪資讀寫與請假核准（公司必填；LINE 驗出的 userId 由 DB 再驗權）
+  'payroll_company_get', 'payroll_salaries_get', 'salary_setting_get',
+  'salary_setting_upsert', 'payroll_save', 'leave_review',
 ] as const
 const KIOSK_ACTIONS: readonly string[] = ['kiosk_get_company', 'kiosk_lookup', 'kiosk_check_in', 'kiosk_leave', 'kiosk_makeup', 'kiosk_lunch', 'kiosk_lunch_status', 'kiosk_lunch_default']
 export const MAX_BATCH_SETTINGS = 30
 export const MAX_BATCH_REVIEWS = 50
 export const MAX_BATCH_SCHEDULES = 400
+export const MAX_PAYROLL_RECORDS = 500
+export const MAX_PAYROLL_JSON_BYTES = 1024 * 1024
 
 const isObject = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
 const uuidOrNull = (v: unknown): string | null => (typeof v === 'string' && UUID_RE.test(v) ? v : null)
@@ -269,6 +297,34 @@ const VERIFIED_LEAVE_TYPES = new Set(['annual', 'sick', 'personal', 'compensator
 const VERIFIED_LEAVE_PERIODS = new Set(['full_day', 'am', 'pm', 'hourly'])
 const TIME_RE = /^(?:[01]\d|2[0-3]):[0-5]\d$/
 const onlyKeys = (body: Record<string, unknown>, allowed: string[]) => Object.keys(body).every((k) => allowed.includes(k))
+const intInRange = (v: unknown, min: number, max: number): v is number => Number.isInteger(v) && Number(v) >= min && Number(v) <= max
+const numberInRange = (v: unknown, min: number, max: number): v is number => typeof v === 'number' && Number.isFinite(v) && v >= min && v <= max
+
+const PAYROLL_RECORD_KEYS = [
+  'employee_id', 'year', 'month', 'salary_type', 'base_salary', 'overtime_pay', 'bonus',
+  'full_attendance_bonus', 'meal_allowance', 'position_allowance', 'night_allowance',
+  'late_deduction', 'absence_deduction', 'personal_leave_deduction', 'labor_insurance',
+  'health_insurance', 'pension_self', 'income_tax', 'manual_adjustment', 'adjustment_note',
+  'total_deduction', 'gross_salary', 'net_salary', 'calculation_details', 'is_published', 'updated_at',
+]
+const PAYROLL_NUMERIC_KEYS = [
+  'base_salary', 'overtime_pay', 'bonus', 'full_attendance_bonus', 'meal_allowance',
+  'position_allowance', 'night_allowance', 'late_deduction', 'absence_deduction',
+  'personal_leave_deduction', 'labor_insurance', 'health_insurance', 'pension_self',
+  'income_tax', 'manual_adjustment', 'total_deduction', 'gross_salary', 'net_salary',
+]
+
+function validPayrollRecord(record: unknown, year: number, month: number): record is Record<string, unknown> {
+  if (!isObject(record) || !onlyKeys(record, PAYROLL_RECORD_KEYS) || !uuidOrNull(record.employee_id)) return false
+  if (record.salary_type !== 'monthly' && record.salary_type !== 'daily' && record.salary_type !== 'hourly') return false
+  if (record.year !== year || record.month !== month || typeof record.is_published !== 'boolean') return false
+  if (typeof record.updated_at !== 'string' || record.updated_at.length > 40 || Number.isNaN(Date.parse(record.updated_at))) return false
+  if (PAYROLL_NUMERIC_KEYS.some((key) => !numberInRange(record[key], -100000000, 100000000))) return false
+  if (Number(record.base_salary) < 0) return false
+  if (record.adjustment_note != null && (typeof record.adjustment_note !== 'string' || record.adjustment_note.length > 1000)) return false
+  if (record.calculation_details != null && typeof record.calculation_details !== 'object') return false
+  return true
+}
 
 // YYYY-MM-DD 且是真的日期（2026-02-30 這種交給 DB 會變成 503，這裡先回 400）
 export function isRealDate(v: unknown): v is string {
@@ -287,6 +343,79 @@ async function handleVerifiedAction(body: any, deps: Deps): Promise<Response> {
   if (action === 'company_save' && body.company_id != null && !companyId) return badRequest()
   const lineUserId = await verifyLiffAccessToken(deps, String(body.liff_access_token))
   if (!lineUserId) return unauthenticated()
+
+  // ---- 161：薪資讀寫與請假核准。所有 action 嚴格白名單，身分只採 LINE 驗證結果。 ----
+  if (action === 'payroll_company_get') {
+    const allowed = ['action', 'liff_access_token', 'company_id', 'year', 'month']
+    if (!onlyKeys(body, allowed) || !intInRange(body.year, 2000, 2100) || !intInRange(body.month, 1, 12)) return badRequest('薪資年月不正確')
+    return rpcValueResult(await callRpc(deps, 'get_company_payroll_verified', {
+      p_line_user_id: lineUserId, p_company_id: companyId, p_year: body.year, p_month: body.month,
+    }))
+  }
+
+  if (action === 'payroll_salaries_get') {
+    const allowed = ['action', 'liff_access_token', 'company_id']
+    if (!onlyKeys(body, allowed)) return badRequest('薪資查詢資料不正確')
+    return rpcValueResult(await callRpc(deps, 'get_company_current_salaries_verified', {
+      p_line_user_id: lineUserId, p_company_id: companyId,
+    }))
+  }
+
+  if (action === 'salary_setting_get') {
+    const allowed = ['action', 'liff_access_token', 'company_id', 'employee_id']
+    const employeeId = uuidOrNull(body.employee_id)
+    if (!onlyKeys(body, allowed) || !employeeId) return badRequest('員工資料不正確')
+    return rpcValueResult(await callRpc(deps, 'get_employee_current_salary_verified', {
+      p_line_user_id: lineUserId, p_company_id: companyId, p_employee_id: employeeId,
+    }))
+  }
+
+  if (action === 'salary_setting_upsert') {
+    const allowed = ['action', 'liff_access_token', 'company_id', 'employee_id', 'salary_type', 'base_salary',
+      'meal_allowance', 'position_allowance', 'full_attendance_bonus', 'pension_self_rate', 'sync_employee_rate']
+    const employeeId = uuidOrNull(body.employee_id)
+    const salaryType = body.salary_type === 'monthly' || body.salary_type === 'daily' || body.salary_type === 'hourly' ? body.salary_type : null
+    const allowances = [body.meal_allowance, body.position_allowance, body.full_attendance_bonus]
+    if (!onlyKeys(body, allowed) || !employeeId || !salaryType
+      || !numberInRange(body.base_salary, 0.01, 100000000)
+      || allowances.some((v) => !numberInRange(v, 0, 100000000))
+      || !numberInRange(body.pension_self_rate, 0, 100)
+      || typeof body.sync_employee_rate !== 'boolean') return badRequest('薪資設定資料不正確')
+    return rpcResult(await callRpc(deps, 'upsert_salary_setting_verified', {
+      p_line_user_id: lineUserId, p_company_id: companyId, p_employee_id: employeeId,
+      p_salary_type: salaryType, p_base_salary: body.base_salary,
+      p_meal_allowance: body.meal_allowance, p_position_allowance: body.position_allowance,
+      p_full_attendance_bonus: body.full_attendance_bonus, p_pension_self_rate: body.pension_self_rate,
+      p_sync_employee_rate: body.sync_employee_rate,
+    }), withResult)
+  }
+
+  if (action === 'payroll_save') {
+    const allowed = ['action', 'liff_access_token', 'company_id', 'year', 'month', 'records', 'is_published']
+    const records = Array.isArray(body.records) ? body.records : null
+    let bytes = Number.POSITIVE_INFINITY
+    try { bytes = records ? new TextEncoder().encode(JSON.stringify(records)).length : Number.POSITIVE_INFINITY } catch (_) { /* bad request */ }
+    if (!onlyKeys(body, allowed) || !intInRange(body.year, 2000, 2100) || !intInRange(body.month, 1, 12)
+      || !records || records.length === 0 || records.length > MAX_PAYROLL_RECORDS
+      || bytes > MAX_PAYROLL_JSON_BYTES || typeof body.is_published !== 'boolean'
+      || records.some((record) => !validPayrollRecord(record, body.year, body.month))) return badRequest('薪資資料不正確')
+    return rpcResult(await callRpc(deps, 'save_payroll_records_verified', {
+      p_line_user_id: lineUserId, p_company_id: companyId, p_year: body.year, p_month: body.month,
+      p_records: records, p_is_published: body.is_published,
+    }), withResult)
+  }
+
+  if (action === 'leave_review') {
+    const allowed = ['action', 'liff_access_token', 'company_id', 'request_id', 'status', 'rejection_reason']
+    const requestId = uuidOrNull(body.request_id)
+    const status = body.status === 'approved' || body.status === 'rejected' ? body.status : null
+    const reason = body.rejection_reason == null ? null : (typeof body.rejection_reason === 'string' ? body.rejection_reason.trim() : false)
+    if (!onlyKeys(body, allowed) || !requestId || !status || reason === false || (typeof reason === 'string' && reason.length > 500)) return badRequest('請假審核資料不正確')
+    return rpcResult(await callRpc(deps, 'approve_leave_request_verified', {
+      p_line_user_id: lineUserId, p_company_id: companyId, p_request_id: requestId,
+      p_status: status, p_rejection_reason: status === 'rejected' ? (reason || '不符合規定') : null,
+    }), withResult)
+  }
 
   // ---- 管理端員工敏感欄位（159）：身分＝LINE 驗證的 userId；DB 再驗管理權與公司 ----
   if (action === 'admin_employee_sensitive') {

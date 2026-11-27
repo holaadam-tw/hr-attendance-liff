@@ -56,8 +56,8 @@ check('下拉狀態沿用 loadAdminLunchStats 的同一份訂單資料', /await 
   && /adminLunchTodayStatusByEmployee\.get\(emp\.id\)/.test(openSource));
 check('leave 模組 export 皆掛到 window', ['openAdminLunchTodayModal', 'closeAdminLunchTodayModal', 'submitAdminLunchToday']
   .every(name => index.includes(`window.${name} = ${name}`)));
-check('admin 入口採 159 快取版本，leave 模組保留 154 版本', /modules\/index\.js\?v=20261127-empcols159/.test(page)
-  && /leave\.js\?v=20261119-adminlunch154/.test(index));
+check('admin 入口與 leave 模組採 161 快取版本', /modules\/index\.js\?v=20261127-planb161/.test(page)
+  && /leave\.js\?v=20261127-planb161/.test(index));
 
 const submitSource = grab(leave, 'submitAdminLunchToday');
 check('送出只使用 admin_lunch_today 的公司、員工與 choice', submitSource.includes("callVerifiedAction('admin_lunch_today'")

@@ -243,14 +243,14 @@ export async function approveLeave(requestId, newStatus) {
     }
     try {
         // 119：核准人由 RPC 依 LINE 身分解析並驗證管理員權限，不再由前端傳 approver_id
-        const { data: result, error } = await sb.rpc('approve_leave_request', {
-            p_company_id: window.currentCompanyId,
-            p_line_user_id: window.currentAdminEmployee?.line_user_id || liffProfile?.userId || null,
-            p_request_id: requestId,
-            p_status: newStatus,
-            p_rejection_reason: newStatus === 'rejected' ? (rejectionReason || '不符合規定') : null
+        const reviewResult = await callVerifiedAction('leave_review', {
+            company_id: window.currentCompanyId,
+            request_id: requestId,
+            status: newStatus,
+            rejection_reason: newStatus === 'rejected' ? (rejectionReason || '不符合規定') : null
         });
-        if (error) throw error;
+        if (!reviewResult.ok) throw new Error(reviewResult.message || '審核失敗');
+        const result = reviewResult.data?.result;
         if (!result?.success) throw new Error(result?.error || '審核失敗');
 
         let notifyResult = null;

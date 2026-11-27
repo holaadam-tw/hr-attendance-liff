@@ -63,6 +63,10 @@ const files = [];
 })(ROOT);
 
 const sources = files.map(f => ({ rel: path.relative(ROOT, f).replace(/\\/g, '/'), text: fs.readFileSync(f, 'utf8') }));
+const VERIFIED_RPC_ACTIONS = {
+  save_payroll_records: 'payroll_save',
+  upsert_salary_setting: 'salary_setting_upsert',
+};
 
 let pass = 0, fail = 0;
 function check(name, cond, extra) {
@@ -87,6 +91,17 @@ LOCKED.forEach(({ table, migration, rpcs, note }) => {
 
   // 2. 取代它的 RPC 必須存在於前端，且每個呼叫都要帶身分與公司
   rpcs.forEach(rpc => {
+    if (VERIFIED_RPC_ACTIONS[rpc]) {
+      const action = VERIFIED_RPC_ACTIONS[rpc];
+      const users = sources.filter(s => new RegExp("(?:callVerifiedAction|callPayrollVerified)\\(\\s*['\"`]" + action + "['\"`]").test(s.text));
+      check(rpc + ' 改經 line-push 驗證動作 ' + action, users.length > 0, users.map(u => u.rel).join(', '));
+      check(action + ' payload 帶 company_id、身分不由前端提供', users.every(s => {
+        const i = s.text.indexOf(action);
+        const win = s.text.slice(i, i + 600);
+        return win.includes('company_id') && !win.includes('line_user_id');
+      }));
+      return;
+    }
     const users = sources.filter(s => s.text.includes(rpc));
     check(rpc + ' 有被前端呼叫', users.length > 0, users.map(u => u.rel).join(', '));
 
@@ -126,7 +141,10 @@ const WRITE_LOCKED = [
     note: '寫入原本已全走 RPC；148 撤 anon/authenticated 寫入 grant 與三條放行政策',
   },
 ];
-const VERIFIED_VIA_EDGE = { admin_create_employee: 'employee_create', admin_update_employee: 'employee_update', admin_delete_pending_employee: 'employee_delete_pending' };
+const VERIFIED_VIA_EDGE = {
+  admin_create_employee: 'employee_create', admin_update_employee: 'employee_update',
+  admin_delete_pending_employee: 'employee_delete_pending', approve_leave_request: 'leave_review'
+};
 const VERIFIED_ACTION_NAME = VERIFIED_VIA_EDGE;
 const writeRe = table => new RegExp("sb\\s*\\.\\s*from\\(\\s*['\"`]" + table + "['\"`]\\s*\\)[^;]{0,400}?\\.(insert|update|upsert|delete)\\(");
 WRITE_LOCKED.forEach(({ table, migration, rpcs, note }) => {

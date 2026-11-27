@@ -75,7 +75,8 @@ check('新舊簽章都 GRANT（舊的只回訊息）', /GRANT EXECUTE ON FUNCTIO
 console.log('\n=== 前端：leave.js 核准改新簽章 ===');
 let apSrc = '';
 try { apSrc = grab(leaveSrc, 'approveLeave'); } catch (e) { check('找得到 approveLeave', false, e.message); }
-check('傳 p_company_id 與 p_line_user_id', /p_company_id: window\.currentCompanyId/.test(apSrc) && /p_line_user_id: window\.currentAdminEmployee\?\.line_user_id \|\| liffProfile\?\.userId \|\| null/.test(apSrc));
+check('改走 leave_review，帶 company_id 且不由前端傳 LINE ID', /callVerifiedAction\('leave_review'/.test(apSrc)
+  && /company_id: window\.currentCompanyId/.test(apSrc) && !/line_user_id|liffProfile/.test(apSrc));
 check('不再傳 p_approver_id', !/p_approver_id/.test(apSrc));
 check('仍處理 result.success=false', /if \(!result\?\.success\) throw new Error/.test(apSrc));
 
