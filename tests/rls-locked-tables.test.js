@@ -153,6 +153,18 @@ WRITE_LOCKED.forEach(({ table, migration, rpcs, note }) => {
   check(table + ' 前端 0 處直接寫入（insert/update/upsert/delete）', offenders.length === 0,
     offenders.length ? '違規：' + offenders.join(', ') : undefined);
   rpcs.forEach(rpc => {
+    if (rpc === 'register_employee') {
+      const direct = sources.filter(s => /sb\.rpc\(\s*['"`]register_employee['"`]/.test(s.text)).map(s => s.rel);
+      check('register_employee 前端 0 處直接 sb.rpc', direct.length === 0, direct.join(', '));
+      const users = sources.filter(s => /callRegisterSelfRpc\(\s*['"`]register_employee['"`]/.test(s.text));
+      check('register_employee 改經 self_rpc 驗證呼叫', users.length > 0, users.map(s => s.rel).join(', '));
+      check('register_employee verified 呼叫帶 p_company_id 且不帶 p_line_user_id', users.every(s => {
+        const start = s.text.indexOf("callRegisterSelfRpc('register_employee'");
+        const win = s.text.slice(start, start + 700);
+        return win.includes('p_company_id') && !win.includes('p_line_user_id');
+      }));
+      return;
+    }
     // 131／132：admin_* 改經 line-push 驗 LIFF 身分代呼叫（身分來自 LINE，不由前端帶 p_line_user_id），前端不得直接 rpc
     if (VERIFIED_VIA_EDGE[rpc]) {
       const direct = sources.filter(s => new RegExp("rpc\\(\\s*['\"`]" + rpc + "['\"`]").test(s.text)).map(s => s.rel);

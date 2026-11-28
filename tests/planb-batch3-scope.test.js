@@ -37,8 +37,12 @@ const untracked = git(['ls-files', '--others', '--exclude-standard', '--', '*.ht
 changed = [...new Set([...changed, ...untracked])];
 if (process.env.PLANB163_PROTECTED_DIFF === '1') changed.push('common.js');
 
-check('所有 .html、common.js、modules/* 對基準無 diff', changed.length === 0,
-  changed.length ? changed.join(', ') : `baseline=${baseline.slice(0, 8)}`);
+const allowed = new Set([
+  'employee_register.html', 'fieldwork.html', 'schedule.html', 'salary.html', 'modules/verified-rpc.js',
+]);
+const protectedChanges = changed.filter(file => !allowed.has(file.replace(/\\/g, '/')));
+check('C0＋C1 只修改工作單允許的 HTML／module', protectedChanges.length === 0,
+  protectedChanges.length ? protectedChanges.join(', ') : `baseline=${baseline.slice(0, 8)}`);
 check('migration 與 rollback 不含交易控制語句',
   !/^\s*(BEGIN|COMMIT)\s*;/im.test(migration) && !/^\s*(BEGIN|COMMIT)\s*;/im.test(rollback));
 

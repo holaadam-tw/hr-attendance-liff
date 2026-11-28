@@ -233,7 +233,7 @@ async function init() {
         companyName = company.name;
         document.getElementById('companyNameBadge').textContent = companyName;
 
-        // === 取得 LINE profile（優先 LIFF 直接取，fallback sessionStorage）===
+        // === 取得 LINE profile（只採本頁 LIFF 登入）===
         try {
             await liff.init({ liffId: '2008962829-bnsS1bbB' });
             if (liff.isLoggedIn()) {
@@ -244,12 +244,7 @@ async function init() {
         } catch (e) {
             console.log('LIFF init skipped:', e.message);
         }
-        // fallback: 從 sessionStorage 讀取（由 index.html LIFF 跳轉時寫入）
-        if (!lineUserId) {
-            lineUserId = sessionStorage.getItem('register_line_user_id') || null;
-            lineDisplayName = sessionStorage.getItem('register_line_name') || '';
-        }
-        // 清除 sessionStorage，避免殘留
+        // 清除舊版暫存，避免被後續流程誤用
         sessionStorage.removeItem('register_line_user_id');
         sessionStorage.removeItem('register_line_name');
 
@@ -336,6 +331,38 @@ function validatePhone(phone) {
     return /^09\d{8}$/.test(phone);
 }
 
+async function callRegisterSelfRpc(fn, args) {
+    let accessToken = null;
+    try {
+        accessToken = liff && typeof liff.getAccessToken === 'function' ? liff.getAccessToken() : null;
+    } catch (e) {}
+    if (!accessToken) {
+        return { data: null, error: { code: 'unauthenticated', message: '請從公司提供的 LINE QR Code 重新開啟' } };
+    }
+
+    const safeArgs = { ...(args || {}) };
+    delete safeArgs.p_line_user_id;
+    try {
+        const response = await fetch(SUPABASE_URL + '/functions/v1/line-push', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY },
+            body: JSON.stringify({
+                action: 'self_rpc',
+                liff_access_token: accessToken,
+                company_id: safeArgs.p_company_id,
+                fn: fn,
+                args: safeArgs
+            })
+        });
+        const result = await response.json().catch(() => null);
+        if (!result) return { data: null, error: { code: 'invalid_response', message: '伺服器回傳無法辨識的結果' } };
+        if (!result.ok) return { data: null, error: { code: result.code || 'failed', message: result.error || '送出失敗' } };
+        return { data: result.result ?? null, error: null };
+    } catch (error) {
+        return { data: null, error: { code: 'network_error', message: '目前無法連線伺服器，請檢查網路後重試' } };
+    }
+}
+
 // ===== 送出登記 =====
 async function submitRegistration() {
     const btn = document.getElementById('submitBtn');
@@ -400,9 +427,8 @@ async function submitRegistration() {
         }
 
         // 124：重複檢查與寫入都在 register_employee RPC 內（強制 pending／user／inactive，company_id 須存在）
-        const { data: regRes, error } = await sb.rpc('register_employee', {
+        const { data: regRes, error } = await callRegisterSelfRpc('register_employee', {
             p_company_id: companyId,
-            p_line_user_id: lineUserId || null,
             p_data: {
                 name: name,
                 phone: phone,

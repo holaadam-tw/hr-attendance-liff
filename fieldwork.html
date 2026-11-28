@@ -302,6 +302,7 @@
     </div>
 
 <script src="common.js?v=20261127-lunchsum"></script>
+<script src="modules/verified-rpc.js?v=20261128-planb163c1"></script>
     <script>
         // === 全域錯誤監控 ===
         window._errLogCount = 0; window._errLogResetTs = 0;
@@ -555,8 +556,7 @@
             const batch = fwTrackBuffer.slice();
             try {
                 // RLS deny-all：走 SECURITY DEFINER RPC，employee/company 由 DB 依行程認定（防偽造）
-                const { data, error } = await sb.rpc('insert_fw_trackpoints', {
-                    p_line_user_id: liffProfile?.userId || currentEmployee.line_user_id,
+                const { data, error } = await callSelfRpc('insert_fw_trackpoints', {
                     p_trip_id: fwTrip.id,
                     p_points: batch
                 });
@@ -587,8 +587,7 @@
         async function loadTrackCount() {
             if (!fwTrip) return;
             try {
-                const { data, error } = await sb.rpc('count_fw_trackpoints', {
-                    p_line_user_id: liffProfile?.userId || currentEmployee.line_user_id,
+                const { data, error } = await callSelfRpc('count_fw_trackpoints', {
                     p_trip_id: fwTrip.id
                 });
                 if (!error && typeof data === 'number') fwTrackCount = data;

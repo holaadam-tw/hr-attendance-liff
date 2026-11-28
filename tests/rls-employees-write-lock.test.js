@@ -92,7 +92,8 @@ check('helper 不再由前端帶 p_line_user_id／不直接呼叫 RPC', !/p_line
 check('helper 把失敗轉成 error（沿用既有 throw 寫法）', /if \(!result\.ok\)/.test(verifiedHelper) && /error: err/.test(verifiedHelper));
 check('employees.js 不再直接寫 employees', !/from\('employees'\)[^;]{0,400}?\.(insert|update|delete)\(/.test(empSrc));
 check('employees.js 新增員工不再由前端帶 company_id／is_active', !/company_id: window\.currentAdminEmployee\?\.company_id \|\| window\.currentCompanyId,\s*created_at/.test(empSrc));
-check('employee_register 改走 register_employee', /rpc\('register_employee'/.test(regSrc) && !/from\('employees'\)\.insert/.test(regSrc));
+check('employee_register 改走 LINE 驗證的 register_employee', /callRegisterSelfRpc\('register_employee'/.test(regSrc)
+  && !/sb\.rpc\('register_employee'/.test(regSrc) && !/from\('employees'\)\.insert/.test(regSrc));
 check('i18n 改走 set_my_preferred_language', /rpc\('set_my_preferred_language'/.test(i18nSrc) && !/from\('employees'\)\s*\.update/.test(i18nSrc));
 
 console.log(`\n結果：${pass} 通過 / ${fail} 失敗`);
