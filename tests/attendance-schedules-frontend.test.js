@@ -95,6 +95,9 @@ function makeEnv({ reply = () => ({ ok: true, data: { ok: true, saved_count: 1, 
     sb, window: { currentCompanyId: 'co-a', currentAdminEmployee: { id: 'emp-admin', line_user_id: 'Uadmin' } },
     document: { getElementById: () => status },
     callVerifiedAction: async (action, payload) => { calls.push({ action, payload }); return reply(action, payload); },
+    callVerifiedRpc: async (fn) => fn === 'get_company_shift_types'
+      ? { data: [{ id: 'st-d', code: 'D' }, { id: 'st-n', code: 'N' }], error: null }
+      : { data: null, error: null },
     confirm: () => confirmAnswer, prompt: () => '人手不足',
     showToast: (m) => toasts.push(m), friendlyError: (e) => e.message,
     writeAuditLog: (...a) => audits.push(a), sendUserNotify: (...a) => notifies.push(a), loadSwapApprovals: () => {},

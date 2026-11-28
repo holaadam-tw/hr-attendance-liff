@@ -49,9 +49,9 @@ Object.entries(files).forEach(([name, source]) => {
   check(`${name} 無 from('leave_requests')`, !source.includes("from('leave_requests')"));
 });
 
-const rpcNeedle = "sb.rpc('get_company_leave_requests'";
+const rpcNeedles = ["sb.rpc('get_company_leave_requests'", "callVerifiedRpc('get_company_leave_requests'"];
 const allCalls = Object.entries(files).flatMap(([name, source]) =>
-  callWindows(source, rpcNeedle).map(code => ({ name, code }))
+  rpcNeedles.flatMap(rpcNeedle => callWindows(source, rpcNeedle).map(code => ({ name, code })))
 );
 check('管理端恰有 8 個 get_company_leave_requests 呼叫', allCalls.length === 8, `實得 ${allCalls.length}`);
 allCalls.forEach(({ name, code }, index) => {
@@ -61,7 +61,7 @@ allCalls.forEach(({ name, code }, index) => {
 });
 
 check('反向對照：還原任一直接查表會被靜態規則抓到',
-  files['modules/payroll.js'].replace(rpcNeedle, "sb.from('leave_requests')").includes("from('leave_requests')"));
+  files['modules/payroll.js'].replace(rpcNeedles[1], "sb.from('leave_requests')").includes("from('leave_requests')"));
 
 console.log('\n=== 2. RPC 欄位形狀與錯誤處理 ===');
 const migration = read('migrations/149_leave_requests_read_rpcs.sql');

@@ -5,6 +5,14 @@
 
 ---
 
+## 🟡 2026-11-28 乙案第二批管理 RPC 已完成本機準備（尚未上線）
+
+- 已準備 migration 162：29 支既有管理 RPC 各新增一支只允許 `service_role` 的 `*_verified` 包裝函式；既有函式、既有 ACL 與 `quick_check_in` 均未變更。
+- `line-push` 已準備單一白名單 action `admin_rpc`，LINE 身分僅採 LIFF token 驗證結果；前端另以 `callVerifiedRpc` 維持原 `{ data, error }` 呼叫契約。
+- 2a 範圍僅替換 `schedules.js`、`leave.js`、`audit.js`、`payroll.js`、`settings.js`；2b（attendance_overview）、2c（attendance_public/common/records/fieldwork）及第三方呼叫仍待後續批次。
+- 狀態：本機準備與自動測試完成，不代表已套用 migration、部署 Edge/前端或撤除舊 ACL；本次未碰正式庫、未 commit、未 push。
+- 未來 rollout 固定順序：162 → line-push → 2a → 2b/2c/第三方盤點 → 至少一個工作日觀察 → 另行授權執行 `revoke_old.sql`。每一步均須重新跑 punch guard 與正反向驗證。
+
 ## 🟡 2026-11-27 薪資與請假核准改走 LINE 驗證（161，本地完成、未部署）
 
 - 六支薪資／請假核准入口新增只授權 `service_role` 的 verified wrapper；wrapper 以 `SECURITY DEFINER`、固定 `pg_catalog, public, pg_temp` `search_path` 委派現行函式，以相容三支未自行固定 `search_path` 的正式唯讀舊函式，並把暫存 schema 放最後。請假核准委派前另以既有主管 helper 排除公務機帳號；161 本身不撤舊函式權限。

@@ -161,7 +161,7 @@ export async function loadAuditData() {
             sb.from('employees').select('id, name, employee_number, department, status, salary_type, resigned_date').eq('company_id', window.currentCompanyId).eq('no_checkin', false).in('status', ['approved', 'resigned']),
             callPayrollVerified('payroll_salaries_get', { company_id: window.currentCompanyId }, '薪資資料載入失敗'),
             sb.from('attendance').select('employee_id, date, check_in_time, is_manual, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).gte('date', startDate).lte('date', endDate),
-            sb.rpc('get_company_leave_requests_for_audit', {
+            callVerifiedRpc('get_company_leave_requests_for_audit', {
                 p_company_id: window.currentCompanyId,
                 p_line_user_id: window.currentAdminEmployee?.line_user_id || liffProfile?.userId || null,
                 p_from: startDate,
@@ -169,7 +169,7 @@ export async function loadAuditData() {
                 p_include_pending: false
             }),
             // overtime_requests 改走 RPC（migration 109；110 收 RLS 後直接查表會查不到）
-            sb.rpc('get_company_overtime_requests', {
+            callVerifiedRpc('get_company_overtime_requests', {
                 p_company_id: window.currentCompanyId,
                 p_line_user_id: window.currentAdminEmployee?.line_user_id || null,
                 p_from: startDate, p_to: endDate, p_status: 'approved', p_limit: 1000
@@ -374,7 +374,7 @@ export async function loadHybridBonusData() {
             sb.from('employees').select('id, name, employee_number, department, hire_date').eq('company_id', window.currentCompanyId).eq('is_active', true).order('department').order('name'),
             callPayrollVerified('payroll_salaries_get', { company_id: window.currentCompanyId }, '薪資資料載入失敗'),
             sb.from('attendance').select('employee_id, is_late, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).gte('date', `${year}-01-01`).lte('date', `${year}-12-31`),
-            sb.rpc('get_company_leave_requests', {
+            callVerifiedRpc('get_company_leave_requests', {
                 p_line_user_id: window.currentAdminEmployee?.line_user_id || null,
                 p_company_id: window.currentCompanyId,
                 p_from: `${year}-01-01`, p_to: `${year}-12-31`,
@@ -893,14 +893,14 @@ export async function loadPayrollData() {
             sb.from('employees').select('id, name, employee_number, department, is_active, status, resigned_date').eq('company_id', window.currentCompanyId).eq('no_checkin', false).in('status', ['approved', 'resigned']),
             callPayrollVerified('payroll_salaries_get', { company_id: window.currentCompanyId }, '薪資資料載入失敗'),
             sb.from('attendance').select('employee_id, date, is_late, total_work_hours, overtime_hours, check_in_time, check_out_time, employees!inner(company_id)').eq('employees.company_id', window.currentCompanyId).gte('date', startDate).lte('date', endDate),
-            sb.rpc('get_company_leave_requests', {
+            callVerifiedRpc('get_company_leave_requests', {
                 p_line_user_id: window.currentAdminEmployee?.line_user_id || null,
                 p_company_id: window.currentCompanyId,
                 p_from: startDate, p_to: endDate,
                 p_statuses: ['approved'], p_employee_id: null, p_limit: 1000
             }),
             // 同上：改走 RPC（migration 109）
-            sb.rpc('get_company_overtime_requests', {
+            callVerifiedRpc('get_company_overtime_requests', {
                 p_company_id: window.currentCompanyId,
                 p_line_user_id: window.currentAdminEmployee?.line_user_id || null,
                 p_from: startDate, p_to: endDate, p_status: 'approved', p_limit: 1000
@@ -1054,7 +1054,7 @@ function computeEmployeeExpectedDays(empId, startStr, endStr, schedMap, holidayS
 // 118：讀公司假日 → Set；RPC 失敗回空 Set（應出勤退回舊行為，不擋頁面）
 async function loadCompanyHolidaySet(startDate, endDate) {
     try {
-        const { data, error } = await sb.rpc('get_company_holidays', {
+        const { data, error } = await callVerifiedRpc('get_company_holidays', {
             p_company_id: window.currentCompanyId,
             p_line_user_id: window.currentAdminEmployee?.line_user_id || liffProfile?.userId || null,
             p_from: startDate,

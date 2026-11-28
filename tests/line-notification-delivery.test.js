@@ -232,7 +232,7 @@ function buildLineHelpers({ response, fetchError, extraSettings = {}, liffToken 
   check('本機 Edge Function 回傳不包含 Channel Token', !/json\(\{[^\n]*\btoken\b/.test(edgeSrc));
   check('本機 Edge Function 例外訊息不直接外洩', /LINE 推播服務暫時無法使用/.test(edgeSrc) && !/error:\s*e\.message/.test(edgeSrc));
 
-  check('管理模組快取版本已更新', /settings\.js\?v=20260927-verified130/.test(moduleIndexSrc));
+  check('管理模組快取版本已更新', /settings\.js\?v=20261128-planb162/.test(moduleIndexSrc));
   const htmlFiles = fs.readdirSync(root).filter(name => name.endsWith('.html'));
   const commonRefs = htmlFiles
     .map(name => ({ name, src: fs.readFileSync(path.join(root, name), 'utf8') }))

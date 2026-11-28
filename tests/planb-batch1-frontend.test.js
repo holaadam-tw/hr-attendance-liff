@@ -81,9 +81,11 @@ const count = (source, pattern) => (source.match(pattern) || []).length;
     && /payroll_save[\s\S]*?is_published: true/.test(sources.payroll)
     && count(sources.payroll, /finally\s*\{[\s\S]{0,160}btn\.disabled = false/g) >= 2);
 
-  check('admin 與四個模組使用 161 快取版本', /modules\/index\.js\?v=20261127-planb161/.test(adminSource)
-    && ['audit', 'employees', 'leave', 'payroll'].every(name => new RegExp(`${name}\\.js\\?v=20261127-planb161`).test(indexSource)));
-  check('salary.html 的 payroll 模組使用 161 快取版本', /modules\/payroll\.js\?v=20261127-planb161/.test(salarySource));
+  check('admin 升版 162 後仍保留第一批四個模組接線', /modules\/index\.js\?v=20261128-planb162/.test(adminSource)
+    && ['audit', 'leave', 'payroll'].every(name => new RegExp(`${name}\\.js\\?v=20261128-planb162`).test(indexSource))
+    && /employees\.js\?v=20261127-planb161/.test(indexSource));
+  check('salary.html 升版 162 且載入 verified-rpc 相容層', /modules\/payroll\.js\?v=20261128-planb162/.test(salarySource)
+    && /modules\/verified-rpc\.js\?v=20261128-planb162/.test(salarySource));
 
   console.log(`\n結果：${pass} 通過、${fail} 失敗`);
   process.exitCode = fail ? 1 : 0;
