@@ -85,6 +85,7 @@ const SUITES = [
   { name: 'Plan B Batch 2 line-push admin_rpc（162）', file: 'planb-batch2-edge.test.js' },
   { name: 'Plan B Batch 2 前端 callVerifiedRpc（162）', file: 'planb-batch2-frontend.test.js' },
   { name: 'Plan B Batch 2b 打卡總覽改走 LINE 驗證', file: 'planb-batch2b-overview.test.js' },
+  { name: 'Plan B Batch 2c attendance_public 改走 LINE 驗證', file: 'planb-batch2c-public.test.js' },
 ];
 
 const results = [];

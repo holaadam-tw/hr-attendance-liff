@@ -131,8 +131,8 @@ function gitUnchanged(file) {
     commonPos >= 0 && commonPos < helperPos && helperPos < pagePos);
 
   const protectedFiles = [
-    'common.js', 'checkin.html', 'index.html', 'kiosk.html', 'records.html', 'attendance_public.html',
-    'modules', 'supabase/functions/line-push/handler.ts', 'migrations',
+    'common.js', 'checkin.html', 'index.html', 'kiosk.html', 'records.html',
+    'modules', 'supabase/functions/line-push/handler.ts', 'supabase/migrations',
   ];
   for (const file of protectedFiles) check(`受保護檔 ${file} 與 ${diffBase} 無差異`, gitUnchanged(file));
 

@@ -119,7 +119,10 @@ function rest() {
   check('工時模式改走 employee_update（經 line-push）', /callAttendanceVerifiedAction\('employee_update', \{ employee_id: empId, updates: updates \}\)/.test(ap));
   check('排班改走 schedule_save 批次（不再送 scheduler_id）', /callAttendanceVerifiedAction\('schedule_save'/.test(ap) && !/p_scheduler_id/.test(ap));
   check('送出的身分是 LIFF access token，不是 line_user_id', /liff_access_token: token/.test(grab(ap, 'callAttendanceVerifiedAction')) && !/line_user_id/.test(grab(ap, 'callAttendanceVerifiedAction')));
-  check('token 過期／缺少：清掉並回 LINE 重新登入', /reloginAttendancePublic/.test(grab(ap, 'callAttendanceVerifiedAction')) && /buildAttendancePublicLiffUrl\(\)/.test(grab(ap, 'reloginAttendancePublic')));
+  check('token 過期／缺少：清掉並經防迴圈 helper 回 LINE 重新登入',
+    /reloginAttendancePublic/.test(grab(ap, 'callAttendanceVerifiedAction'))
+    && /redirectAttendancePublicForRelogin\(true\)/.test(grab(ap, 'reloginAttendancePublic'))
+    && /buildAttendancePublicLiffUrl\(\)/.test(grab(ap, 'redirectAttendancePublicForRelogin')));
   check('index.html：LIFF access token 只放 sessionStorage、key＝公司＋LINE 使用者、帶 expires_at',
     /sessionStorage\.setItem\(_pubTokenKey, JSON\.stringify\(\{ token: _pubToken, expires_at: Date\.now\(\) \+ /.test(idx)
     && /_pubTokenKey = 'attendance_public_liff_token_' \+ _pubCompany \+ '_' \+ liffProfile\.userId/.test(idx) && /getLiffAccessTokenSafe\(\)/.test(idx));
@@ -139,10 +142,11 @@ function rest() {
 
   // 實跑：用頁面原文組出 token 讀取函式，注入假的 storage
   try {
-    const src = ['attendanceLiffTokenKey', 'clearAttendanceLiffToken', 'getCachedAttendanceLiffToken'].map(n => grab(ap, n)).join('\n');
+    const src = ['attendanceLiffTokenKey', 'attendanceReloginGuardKey', 'clearAttendanceReloginGuard', 'clearAttendanceLiffToken', 'getCachedAttendanceLiffToken'].map(n => grab(ap, n)).join('\n');
     const mkStore = () => { const m = new Map(); return { getItem: k => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), removeItem: k => m.delete(k), _m: m }; };
-    const build = (company, user, ss, ls) => new Function('companyId', 'currentLineUserId', 'sessionStorage', 'localStorage',
-      `${src}; return { get: getCachedAttendanceLiffToken, clear: clearAttendanceLiffToken, key: attendanceLiffTokenKey };`)(company, user, ss, ls);
+    const fakeDocument = { getElementById: () => null };
+    const build = (company, user, ss, ls) => new Function('companyId', 'currentLineUserId', 'sessionStorage', 'localStorage', 'document',
+      `let attendanceReadLoginNoticeShown = false; ${src}; return { get: getCachedAttendanceLiffToken, clear: clearAttendanceLiffToken, key: attendanceLiffTokenKey };`)(company, user, ss, ls, fakeDocument);
     const ss = mkStore(), ls = mkStore();
     ss.setItem('attendance_public_liff_token_C1_Uaaa', JSON.stringify({ token: 'tok-a', expires_at: Date.now() + 60000 }));
     let f = build('C1', 'Uaaa', ss, ls);
