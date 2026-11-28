@@ -471,6 +471,7 @@
     </div>
 
 <script src="common.js?v=20261127-lunchsum"></script>
+<script src="modules/verified-rpc.js?v=20261128-planb162"></script>
     <script>
         let dailyData = [];
         let monthlyData = [];
@@ -522,7 +523,7 @@
             try {
                 // 下班定位距離與出勤資料並行載入（loadCheckoutDistances 內部自行吞錯，不會拖垮主流程）
                 const [attRes, holidayCtx] = await Promise.all([
-                    sb.rpc('get_company_daily_attendance', {
+                    callVerifiedRpc('get_company_daily_attendance', {
                         p_company_id: window.currentCompanyId,
                         p_date: dateStr,
                         p_line_user_id: liffProfile?.userId || null   // 099 呼叫者身分驗證
@@ -579,7 +580,7 @@
             if (!window.currentCompanyId) return null;
             let holiday = null;
             try {
-                const { data, error } = await sb.rpc('get_company_holidays', {
+                const { data, error } = await callVerifiedRpc('get_company_holidays', {
                     p_company_id: window.currentCompanyId,
                     p_line_user_id: liffProfile?.userId || null,
                     p_from: dateStr,
@@ -601,7 +602,7 @@
                         .eq('employees.company_id', window.currentCompanyId)
                         .eq('date', dateStr)
                         .limit(1000),
-                    sb.rpc('get_company_overtime_requests', {
+                    callVerifiedRpc('get_company_overtime_requests', {
                         p_company_id: window.currentCompanyId,
                         p_line_user_id: liffProfile?.userId || null,
                         p_from: dateStr,
@@ -998,7 +999,7 @@
                         .limit(1000),
                     // overtime_requests 改走 RPC（migration 109）——該表原本 RLS 未開、
                     // anon 可直接讀寫全部公司的加班資料，110 收 RLS 後直接查表會查不到。
-                    sb.rpc('get_company_overtime_requests', {
+                    callVerifiedRpc('get_company_overtime_requests', {
                         p_company_id: window.currentCompanyId,
                         p_line_user_id: liffProfile?.userId || null,
                         p_from: fromStr,
@@ -1131,7 +1132,7 @@
             if (!confirm(msg)) return;
 
             try {
-                const { data, error } = await sb.rpc('confirm_daily_overtime', {
+                const { data, error } = await callVerifiedRpc('confirm_daily_overtime', {
                     p_company_id: window.currentCompanyId,
                     p_line_user_id: liffProfile?.userId || null,
                     p_employee_id: r.employeeId,
@@ -1190,7 +1191,7 @@
                         .not('check_in_time', 'is', null)
                         .is('check_out_time', null)
                         .limit(1000),
-                    sb.rpc('get_company_leave_requests', {
+                    callVerifiedRpc('get_company_leave_requests', {
                         p_line_user_id: liffProfile?.userId || null,
                         p_company_id: window.currentCompanyId,
                         p_from: LEGACY_GAP_FROM,
@@ -1292,11 +1293,11 @@
                 return;
             }
             const [anomalyResult, controlResult] = await Promise.all([
-                sb.rpc('get_attendance_anomalies', {
+                callVerifiedRpc('get_attendance_anomalies', {
                     p_company_id: window.currentCompanyId,
                     p_line_user_id: liffProfile.userId
                 }),
-                sb.rpc('get_missing_work_hours_notification_control', {
+                callVerifiedRpc('get_missing_work_hours_notification_control', {
                     p_company_id: window.currentCompanyId,
                     p_line_user_id: liffProfile.userId
                 })
@@ -1333,7 +1334,7 @@
             const box = document.getElementById('linePushStatus');
             if (!box || !liffProfile?.userId) return;
             try {
-                const { data, error } = await sb.rpc('get_line_push_status', {
+                const { data, error } = await callVerifiedRpc('get_line_push_status', {
                     p_company_id: window.currentCompanyId,
                     p_line_user_id: liffProfile.userId
                 });
@@ -1408,7 +1409,7 @@
             const scanBtn = document.getElementById('missingWorkHoursScanBtn');
             if (scanBtn) scanBtn.textContent = '掃描中…';
             try {
-                const { data, error } = await sb.rpc('preview_company_missing_work_hours', {
+                const { data, error } = await callVerifiedRpc('preview_company_missing_work_hours', {
                     p_company_id: window.currentCompanyId,
                     p_line_user_id: liffProfile.userId,
                     p_days_back: 3
@@ -1439,7 +1440,7 @@
             missingWorkHoursControlBusy = true;
             renderMissingWorkHoursControl();
             try {
-                const { data, error } = await sb.rpc('set_missing_work_hours_notification_enabled', {
+                const { data, error } = await callVerifiedRpc('set_missing_work_hours_notification_enabled', {
                     p_company_id: window.currentCompanyId,
                     p_line_user_id: liffProfile.userId,
                     p_enabled: nextEnabled
@@ -1517,7 +1518,7 @@
         async function resolveAnomaly(id) {
             if (!confirm('確定手動結案？只會從追蹤清單移除，不會寫入出勤記錄。')) return;
             try {
-                const { data, error } = await sb.rpc('resolve_attendance_anomaly', {
+                const { data, error } = await callVerifiedRpc('resolve_attendance_anomaly', {
                     p_anomaly_id: id,
                     p_company_id: window.currentCompanyId,
                     p_line_user_id: liffProfile.userId
@@ -1568,7 +1569,7 @@
             if (!card) return;
             if (!liffProfile?.userId) { card.style.display = 'none'; return; }
 
-            const { data, error } = await sb.rpc('get_checkin_failures', {
+            const { data, error } = await callVerifiedRpc('get_checkin_failures', {
                 p_company_id: window.currentCompanyId,
                 p_line_user_id: liffProfile.userId,
                 p_days: 7
@@ -1730,7 +1731,7 @@
             btn.disabled = true;
             btn.textContent = '補登中...';
             try {
-                const { data, error } = await sb.rpc('admin_makeup_punch', {
+                const { data, error } = await callVerifiedRpc('admin_makeup_punch', {
                     p_company_id: window.currentCompanyId,
                     p_line_user_id: liffProfile?.userId || null,
                     p_employee_id: employeeId,
@@ -1912,14 +1913,14 @@
 
             try {
                 const [mainRes, missingRes] = await Promise.all([
-                    sb.rpc('get_company_monthly_attendance', {
+                    callVerifiedRpc('get_company_monthly_attendance', {
                         p_company_id: window.currentCompanyId,
                         p_year: mYear,
                         p_month: mMonth + 1,
                         p_line_user_id: liffProfile?.userId || null   // 099 呼叫者身分驗證
                     }),
                     // 118：缺工分鐘（遲到／早退／整日缺勤），失敗只影響三個欄位不擋整張表
-                    sb.rpc('get_company_monthly_missing_minutes', {
+                    callVerifiedRpc('get_company_monthly_missing_minutes', {
                         p_company_id: window.currentCompanyId,
                         p_year: mYear,
                         p_month: mMonth + 1,
