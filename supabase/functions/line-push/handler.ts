@@ -53,15 +53,20 @@ export async function sha256Hex(text: string): Promise<string> {
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-export type AdminRpcValueType = 'uuid' | 'date' | 'time' | 'text' | 'integer' | 'boolean' | 'text[]' | 'jsonb'
+export type AdminRpcValueType = 'uuid' | 'date' | 'time' | 'text' | 'integer' | 'number' | 'boolean' | 'text[]' | 'jsonb'
 export interface AdminRpcParamSpec {
   type: AdminRpcValueType
   required?: boolean
+  nullable?: boolean
   maxLength?: number
+  maxBytes?: number
   min?: number
   max?: number
+  allowed?: readonly string[]
+  allowEmpty?: boolean
 }
 export interface AdminRpcSpec { params: Record<string, AdminRpcParamSpec> }
+export interface SelfRpcSpec { signatures: AdminRpcSpec[] }
 
 const p = (type: AdminRpcValueType, required = false, extra: Partial<AdminRpcParamSpec> = {}): AdminRpcParamSpec => ({ type, required, ...extra })
 
@@ -99,6 +104,67 @@ export const ADMIN_RPC_SPECS: Record<string, AdminRpcSpec> = {
   upsert_company_holiday: { params: { p_company_id: p('uuid'), p_holiday_date: p('date', true), p_holiday_name: p('text', true, { maxLength: 200 }), p_holiday_type: p('text', false, { maxLength: 40 }) } },
 }
 
+const signature = (params: Record<string, AdminRpcParamSpec>): AdminRpcSpec => ({ params })
+
+// Employee self-service bridge. Overloads stay explicit so SQL and Edge drift can
+// be checked per signature. If any overload has p_company_id, self_rpc requires
+// the payload company and therefore selects the company-scoped overload.
+export const SELF_RPC_SPECS: Record<string, SelfRpcSpec> = {
+  count_fw_trackpoints: { signatures: [signature({ p_trip_id: p('uuid', true) })] },
+  get_company_leave_overlap: { signatures: [signature({
+    p_company_id: p('uuid', true), p_from: p('date', true), p_to: p('date', true),
+  })] },
+  get_employee_schedule: { signatures: [signature({
+    p_year: p('integer', true, { min: 2000, max: 2100 }), p_month: p('integer', true, { min: 1, max: 12 }),
+  })] },
+  get_leave_history: { signatures: [
+    signature({ p_company_id: p('uuid', true), p_limit: p('integer', false, { min: 1, max: 100 }) }),
+    signature({ p_limit: p('integer', false, { min: 1, max: 100 }) }),
+  ] },
+  get_monthly_attendance: { signatures: [signature({
+    p_year: p('integer', true, { min: 2000, max: 2100 }), p_month: p('integer', true, { min: 1, max: 12 }),
+  })] },
+  get_my_current_salary: { signatures: [signature({})] },
+  get_my_leave_requests: { signatures: [signature({
+    p_company_id: p('uuid', true), p_from: p('date'), p_to: p('date'), p_statuses: p('text[]'),
+    p_limit: p('integer', false, { min: 1, max: 1000 }),
+  })] },
+  get_my_overtime_requests: { signatures: [signature({ p_limit: p('integer', false, { min: 1, max: 100 }) })] },
+  get_my_payslip: { signatures: [signature({
+    p_year: p('integer', true, { min: 2000, max: 2100 }), p_month: p('integer', true, { min: 1, max: 12 }),
+  })] },
+  get_my_year_end_stats: { signatures: [signature({ p_year: p('integer', true, { min: 2000, max: 2100 }) })] },
+  insert_fw_trackpoints: { signatures: [signature({
+    p_trip_id: p('uuid', true), p_points: p('jsonb', true, { maxBytes: 65536 }),
+  })] },
+  register_employee: { signatures: [signature({
+    p_company_id: p('uuid', true), p_data: p('jsonb', true, { maxBytes: 16384 }),
+  })] },
+  set_my_preferred_language: { signatures: [signature({
+    p_company_id: p('uuid', true), p_language: p('text', true, { maxLength: 10, allowed: ['zh-TW', 'vi-VN'] }),
+  })] },
+  submit_leave_request: { signatures: [
+    signature({
+      p_company_id: p('uuid', true),
+      p_leave_type: p('text', true, { maxLength: 40, allowed: ['annual', 'sick', 'personal', 'compensatory', 'bereavement'] }),
+      p_start_date: p('date', true), p_end_date: p('date', true), p_reason: p('text', true, { maxLength: 2000 }),
+      p_leave_period: p('text', true, { maxLength: 20, allowed: ['full_day', 'am', 'pm', 'hourly'] }),
+      p_leave_start_time: p('time', true, { nullable: true }), p_leave_end_time: p('time', true, { nullable: true }),
+    }),
+    signature({
+      p_leave_type: p('text', true, { maxLength: 40, allowed: ['annual', 'sick', 'personal', 'compensatory', 'bereavement'] }),
+      p_start_date: p('date', true), p_end_date: p('date', true), p_reason: p('text', true, { maxLength: 2000 }),
+      p_leave_period: p('text', false, { maxLength: 20, allowed: ['full_day', 'am', 'pm'] }),
+      p_leave_hours: p('number', false, { nullable: true, min: 0.01, max: 24 }),
+    }),
+  ] },
+  submit_overtime_request: { signatures: [signature({
+    p_ot_date: p('date', true), p_hours: p('number', true, { min: 0.01, max: 12 }),
+    p_reason: p('text', true, { maxLength: 2000, allowEmpty: true }),
+    p_compensation_type: p('text', false, { maxLength: 40, allowed: ['pay', 'comp_leave'] }),
+  })] },
+}
+
 export function recipientKind(to: string): 'user' | 'group' | 'unknown' {
   if (/^U/.test(to)) return 'user'
   if (/^[CR]/.test(to)) return 'group'
@@ -130,6 +196,7 @@ const RPC_MIGRATION: Record<string, string> = {
   get_employee_current_salary_verified: '161', upsert_salary_setting_verified: '161',
   save_payroll_records_verified: '161', approve_leave_request_verified: '161',
   ...Object.fromEntries(Object.keys(ADMIN_RPC_SPECS).map((fn) => [`${fn}_verified`, '162'])),
+  ...Object.fromEntries(Object.keys(SELF_RPC_SPECS).map((fn) => [`${fn}_verified`, '163'])),
 }
 
 async function callRpc(deps: Deps, fn: string, args: Record<string, unknown>): Promise<{ ok: boolean; data: any; missing?: string }> {
@@ -327,6 +394,27 @@ function adminRpcResult(saved: { ok: boolean; data: any; missing?: string }): Re
   return json({ ok: true, status: 200, result: saved.data ?? null }, 200)
 }
 
+function selfRpcResult(saved: { ok: boolean; data: any; missing?: string }): Response {
+  if (saved.missing) {
+    return json({ ok: false, status: 503, code: 'db_not_migrated', error: `資料庫尚未套用 migration ${saved.missing}` }, 503)
+  }
+  if (!saved.ok) {
+    const message = typeof saved.data?.message === 'string' && saved.data.message
+      ? saved.data.message
+      : '員工功能暫時無法使用'
+    const dbCode = typeof saved.data?.code === 'string' && saved.data.code ? saved.data.code : null
+    const denied = dbCode === '42501' || /access_denied|permission denied|無權限/i.test(message)
+    const unavailable = saved.data == null
+    return json({
+      ok: false,
+      status: unavailable ? 503 : (denied ? 403 : 400),
+      code: dbCode || (unavailable ? 'service_unavailable' : (denied ? 'access_denied' : 'rpc_failed')),
+      error: message,
+    }, unavailable ? 503 : (denied ? 403 : 400))
+  }
+  return json({ ok: true, status: 200, result: saved.data ?? null }, 200)
+}
+
 const VERIFIED_ACTIONS = [
   'save_config', 'save_setting', 'save_settings', 'get_line_config', 'platform_admin_save', 'platform_link_company',
   // 131／132：員工管理、補卡／加班審核、排班（身分＝LINE 驗證的 userId；前端報的核准人／排班人一律不採信）
@@ -350,7 +438,7 @@ const VERIFIED_ACTIONS = [
   // 161：薪資讀寫與請假核准（公司必填；LINE 驗出的 userId 由 DB 再驗權）
   'payroll_company_get', 'payroll_salaries_get', 'salary_setting_get',
   'salary_setting_upsert', 'payroll_save', 'leave_review',
-  'admin_rpc',
+  'admin_rpc', 'self_rpc',
 ] as const
 const KIOSK_ACTIONS: readonly string[] = ['kiosk_get_company', 'kiosk_lookup', 'kiosk_check_in', 'kiosk_leave', 'kiosk_makeup', 'kiosk_lunch', 'kiosk_lunch_status', 'kiosk_lunch_default']
 export const MAX_BATCH_SETTINGS = 30
@@ -403,7 +491,7 @@ export function isRealDate(v: unknown): v is string {
 }
 
 export function validateAdminRpcValue(value: unknown, spec: AdminRpcParamSpec): boolean {
-  if (value == null) return spec.required !== true
+  if (value == null) return spec.nullable === true || spec.required !== true
   switch (spec.type) {
     case 'uuid':
       return typeof value === 'string' && UUID_RE.test(value)
@@ -412,9 +500,13 @@ export function validateAdminRpcValue(value: unknown, spec: AdminRpcParamSpec): 
     case 'time':
       return typeof value === 'string' && /^(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d{1,6})?)?$/.test(value)
     case 'text':
-      return typeof value === 'string' && value.length <= (spec.maxLength ?? 2000) && (!spec.required || value.length > 0)
+      return typeof value === 'string' && value.length <= (spec.maxLength ?? 2000)
+        && (!spec.required || spec.allowEmpty || value.length > 0) && (!spec.allowed || spec.allowed.includes(value))
     case 'integer':
       return Number.isInteger(value) && Number(value) >= (spec.min ?? -1000000000) && Number(value) <= (spec.max ?? 1000000000)
+    case 'number':
+      return typeof value === 'number' && Number.isFinite(value)
+        && value >= (spec.min ?? -1000000000) && value <= (spec.max ?? 1000000000)
     case 'boolean':
       return typeof value === 'boolean'
     case 'text[]':
@@ -422,7 +514,7 @@ export function validateAdminRpcValue(value: unknown, spec: AdminRpcParamSpec): 
     case 'jsonb':
       if (typeof value !== 'object') return false
       try {
-        return new TextEncoder().encode(JSON.stringify(value)).byteLength <= 65536
+        return new TextEncoder().encode(JSON.stringify(value)).byteLength <= (spec.maxBytes ?? 65536)
       } catch (_) {
         return false
       }
@@ -432,11 +524,20 @@ export function validateAdminRpcValue(value: unknown, spec: AdminRpcParamSpec): 
 async function handleVerifiedAction(body: any, deps: Deps): Promise<Response> {
   const action = String(body.action)
   const companyId = uuidOrNull(body.company_id)
+  const selfFn = action === 'self_rpc' && typeof body.fn === 'string' ? body.fn : ''
+  const selfSpec = action === 'self_rpc' && Object.prototype.hasOwnProperty.call(SELF_RPC_SPECS, selfFn)
+    ? SELF_RPC_SPECS[selfFn]
+    : undefined
+  const selfNeedsCompany = !!selfSpec?.signatures.some((item) => Object.prototype.hasOwnProperty.call(item.params, 'p_company_id'))
   // company_save 的 company_id 可省略（＝新增）；有帶就必須是 UUID
   // 公務機動作的公司由 DB 依公務機帳號決定，不帶 company_id
-  const needsCompany = action !== 'platform_admin_save' && action !== 'company_save' && !KIOSK_ACTIONS.includes(action)
+  // self_rpc 只在函式簽章含 p_company_id 時要求 company；其他 action 維持原判斷。
+  const needsCompany = action === 'self_rpc'
+    ? selfNeedsCompany
+    : action !== 'platform_admin_save' && action !== 'company_save' && !KIOSK_ACTIONS.includes(action)
   if (!body.liff_access_token || (needsCompany && !companyId)) return badRequest()
   if (action === 'company_save' && body.company_id != null && !companyId) return badRequest()
+  if (action === 'self_rpc' && body.company_id != null && !companyId) return badRequest('公司識別格式錯誤')
   const lineUserId = await verifyLiffAccessToken(deps, String(body.liff_access_token))
   if (!lineUserId) return unauthenticated()
 
@@ -459,6 +560,48 @@ async function handleVerifiedAction(body: any, deps: Deps): Promise<Response> {
       if (value !== undefined) rpcArgs[name] = value
     }
     return adminRpcResult(await callRpc(deps, `${fn}_verified`, rpcArgs))
+  }
+
+  if (action === 'self_rpc') {
+    if (!onlyKeys(body, ['action', 'liff_access_token', 'company_id', 'fn', 'args']) || !isObject(body.args)) {
+      return badRequest('員工 RPC 請求格式錯誤')
+    }
+    const fn = typeof body.fn === 'string' ? body.fn : ''
+    const spec = Object.prototype.hasOwnProperty.call(SELF_RPC_SPECS, fn) ? SELF_RPC_SPECS[fn] : undefined
+    if (!spec) return badRequest('不允許的員工 RPC')
+    if (Object.prototype.hasOwnProperty.call(body.args, 'p_line_user_id')) return badRequest('呼叫端不得指定 LINE 身分')
+    if (Object.prototype.hasOwnProperty.call(body.args, 'p_company_id') && body.args.p_company_id !== companyId) {
+      return badRequest('公司識別不一致')
+    }
+
+    const matches = spec.signatures.filter((candidate) => {
+      const candidateHasCompany = Object.prototype.hasOwnProperty.call(candidate.params, 'p_company_id')
+      if (selfNeedsCompany && !candidateHasCompany) return false
+      if (Object.keys(body.args).some((key) => !Object.prototype.hasOwnProperty.call(candidate.params, key))) return false
+      for (const [name, paramSpec] of Object.entries(candidate.params)) {
+        const hasValue = name === 'p_company_id'
+          ? companyId !== null
+          : Object.prototype.hasOwnProperty.call(body.args, name)
+        if (!hasValue) {
+          if (paramSpec.required) return false
+          continue
+        }
+        const value = name === 'p_company_id' ? companyId : body.args[name]
+        if (!validateAdminRpcValue(value, paramSpec)) return false
+      }
+      return true
+    })
+    if (matches.length !== 1) return badRequest('員工 RPC 參數不符合允許簽章')
+
+    const rpcArgs: Record<string, unknown> = { p_line_user_id: lineUserId }
+    for (const name of Object.keys(matches[0].params)) {
+      if (name === 'p_company_id') {
+        rpcArgs[name] = companyId
+      } else if (Object.prototype.hasOwnProperty.call(body.args, name)) {
+        rpcArgs[name] = body.args[name]
+      }
+    }
+    return selfRpcResult(await callRpc(deps, `${fn}_verified`, rpcArgs))
   }
 
   if (action === 'payroll_company_get') {

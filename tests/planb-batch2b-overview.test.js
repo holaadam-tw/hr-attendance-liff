@@ -109,6 +109,7 @@ function gitUnchanged(file) {
   const handler = await import(pathToFileURL(handlerPath).href);
   const specs = handler.ADMIN_RPC_SPECS;
   const adminFns = Object.keys(specs);
+  check('後續批次擴充後 ADMIN_RPC_SPECS 仍恰為 29 支', adminFns.length === 29, String(adminFns.length));
 
   const direct = adminFns.filter(fn => new RegExp(`sb\\.rpc\\(\\s*['"]${fn}['"]`).test(html));
   check('29 支 ADMIN_RPC_SPECS 在頁面直接 sb.rpc 為 0', direct.length === 0, direct.join(', '));
@@ -132,7 +133,7 @@ function gitUnchanged(file) {
 
   const protectedFiles = [
     'common.js', 'checkin.html', 'index.html', 'kiosk.html', 'records.html',
-    'modules', 'supabase/functions/line-push/handler.ts', 'supabase/migrations',
+    'modules', 'supabase/migrations',
   ];
   for (const file of protectedFiles) check(`受保護檔 ${file} 與 ${diffBase} 無差異`, gitUnchanged(file));
 
