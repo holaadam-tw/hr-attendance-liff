@@ -235,7 +235,13 @@ function unchangedFromBase(file) {
   const saveResult = await saveHarness.ctx.callVerifiedRpc('create_shift_type', { p_company_id: 'x', p_name: '早班' });
   check('存檔路徑無 token 維持 confirm', saveHarness.confirms.length === 1 && saveResult.error?.code === 'unauthenticated', String(saveHarness.confirms.length));
 
-  for (const file of ['common.js', 'checkin.html', 'index.html', 'kiosk.html', 'records.html', 'attendance_overview.html', 'modules', 'supabase/migrations']) {
+  for (const file of [
+    'common.js', 'checkin.html', 'index.html', 'kiosk.html', 'records.html', 'attendance_overview.html',
+    'modules/attendance-read-columns.js', 'modules/audit.js', 'modules/auth.js',
+    'modules/employee-read-columns.js', 'modules/employees.js', 'modules/index.js',
+    'modules/leave.js', 'modules/payroll.js', 'modules/schedules.js', 'modules/settings.js',
+    'modules/store.js', 'supabase/migrations',
+  ]) {
     check(`受保護檔 ${file} 對 ${diffBase} 無差異`, unchangedFromBase(file));
   }
 

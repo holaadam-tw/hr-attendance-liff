@@ -162,6 +162,7 @@
 
 
 <script src="common.js?v=20261127-lunchsum"></script>
+<script src="modules/verified-rpc.js?v=20261128-planb163c1"></script>
     <script>
         // === 全域錯誤監控 ===
         window._errLogCount = 0; window._errLogResetTs = 0;
@@ -235,8 +236,7 @@
 
             try {
                 if (typeof sb !== 'undefined' && currentEmployee) {
-                    const { data, error } = await sb.rpc('get_employee_schedule', {
-                        p_line_user_id: liffProfile.userId,
+                    const { data, error } = await callSelfRpc('get_employee_schedule', {
                         p_year: currentYear,
                         p_month: currentMonth + 1
                     });

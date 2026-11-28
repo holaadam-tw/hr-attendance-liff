@@ -133,7 +133,10 @@ function gitUnchanged(file) {
 
   const protectedFiles = [
     'common.js', 'checkin.html', 'index.html', 'kiosk.html', 'records.html',
-    'modules', 'supabase/migrations',
+    'modules/attendance-read-columns.js', 'modules/audit.js', 'modules/auth.js',
+    'modules/employee-read-columns.js', 'modules/employees.js', 'modules/index.js',
+    'modules/leave.js', 'modules/payroll.js', 'modules/schedules.js', 'modules/settings.js',
+    'modules/store.js', 'supabase/migrations',
   ];
   for (const file of protectedFiles) check(`受保護檔 ${file} 與 ${diffBase} 無差異`, gitUnchanged(file));
 

@@ -347,7 +347,7 @@
     </div>
 
 <script src="common.js?v=20261127-lunchsum"></script>
-<script src="modules/verified-rpc.js?v=20261128-planb162"></script>
+<script src="modules/verified-rpc.js?v=20261128-planb163c1"></script>
     <script type="module">
         import { loadHybridBonusData, renderSelectedBonusCard, saveAllBonuses, exportBonusCSV, toggleMatrixRef, updatePerformance, updateAdjustment } from './modules/payroll.js?v=20261128-planb162';
         window.loadHybridBonusData = loadHybridBonusData;
@@ -556,8 +556,7 @@
             try {
                 if (typeof sb !== 'undefined' && currentEmployee) {
                     // 只讀取管理員已發布的薪資（is_published = true）
-                    const { data: p } = await sb.rpc('get_my_payslip', {
-                        p_line_user_id: (window.liffProfile && window.liffProfile.userId) || null,
+                    const { data: p } = await callSelfRpc('get_my_payslip', {
                         p_year: salaryYear,
                         p_month: salaryMonth + 1
                     });
@@ -734,7 +733,7 @@
                     if (typeof sb !== 'undefined' && liffProfile) {
                         const now = new Date();
                         const y = now.getFullYear(), m = now.getMonth() + 1;
-                        const { data } = await sb.rpc('get_monthly_attendance', { p_line_user_id: currentEmployee?.line_user_id || liffProfile?.userId, p_year: y, p_month: m });
+                        const { data } = await callSelfRpc('get_monthly_attendance', { p_year: y, p_month: m });
                         if (data) {
                             const days = data.length;
                             document.getElementById('calcDays').value = days;
@@ -855,9 +854,7 @@
                     // 從 salary_settings 自動帶入
                     try {
                         if (currentEmployee?.id) {
-                            const { data } = await sb.rpc('get_my_current_salary', {
-                                p_line_user_id: (window.liffProfile && window.liffProfile.userId) || null
-                            });
+                            const { data } = await callSelfRpc('get_my_current_salary');
 
                             if (data) {
                                 if (data.salary_type === 'hourly') {

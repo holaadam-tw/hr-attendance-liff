@@ -89,6 +89,7 @@ const SUITES = [
   { name: 'Plan B Batch 3 self verified RPC（163，PGlite）', file: 'planb-batch3-self-verified.pglite.test.js' },
   { name: 'Plan B Batch 3 line-push self_rpc（163）', file: 'planb-batch3-edge.test.js' },
   { name: 'Plan B Batch 3 受保護檔與打卡範圍', file: 'planb-batch3-scope.test.js' },
+  { name: 'Plan B Batch 3 C0＋C1 員工頁改走 LINE 驗證', file: 'planb-batch3-c0c1.test.js' },
 ];
 
 const results = [];
