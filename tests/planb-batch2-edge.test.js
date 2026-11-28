@@ -93,6 +93,9 @@ function sample(name, spec) {
 
   for (const [label, payload] of [
     ['未知 fn', { fn: 'quick_check_in', args: {} }],
+    ['原型鏈 fn __proto__', { fn: '__proto__', args: {} }],
+    ['原型鏈 fn constructor', { fn: 'constructor', args: {} }],
+    ['原型鏈 arg toString', { fn: 'get_company_shift_types', args: { p_company_id: COMPANY, toString: 'x' } }],
     ['未知 arg', { fn: 'get_company_shift_types', args: { p_company_id: COMPANY, surprise: true } }],
     ['夾帶 p_line_user_id', { fn: 'get_company_shift_types', args: { p_company_id: COMPANY, p_line_user_id: 'Uspoof' } }],
     ['公司不一致', { fn: 'get_company_shift_types', args: { p_company_id: OTHER } }],

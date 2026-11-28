@@ -446,10 +446,10 @@ async function handleVerifiedAction(body: any, deps: Deps): Promise<Response> {
       return badRequest('管理 RPC 請求格式錯誤')
     }
     const fn = typeof body.fn === 'string' ? body.fn : ''
-    const spec = ADMIN_RPC_SPECS[fn]
+    const spec = Object.prototype.hasOwnProperty.call(ADMIN_RPC_SPECS, fn) ? ADMIN_RPC_SPECS[fn] : undefined
     if (!spec) return badRequest('不允許的管理 RPC')
     if ('p_line_user_id' in body.args) return badRequest('呼叫端不得指定 LINE 身分')
-    if (Object.keys(body.args).some((key) => !(key in spec.params))) return badRequest('管理 RPC 含未知參數')
+    if (Object.keys(body.args).some((key) => !Object.prototype.hasOwnProperty.call(spec.params, key))) return badRequest('管理 RPC 含未知參數')
     if (body.args.p_company_id != null && body.args.p_company_id !== companyId) return badRequest('公司識別不一致')
 
     const rpcArgs: Record<string, unknown> = { p_line_user_id: lineUserId }
