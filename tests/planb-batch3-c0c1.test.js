@@ -208,8 +208,8 @@ function unchangedFromBase(file) {
   check('fieldwork 呼叫未啟用 autoRelogin', !/callSelfRpc\(\s*['"]insert_fw_trackpoints['"][\s\S]{0,300}autoRelogin\s*:\s*true/.test(pages.fieldwork));
 
   const protectedFiles = [
-    'common.js', 'checkin.html', 'index.html', 'kiosk.html', 'records.html', 'services.html', 'admin.html',
-    'attendance_overview.html', 'attendance_public.html', 'i18n.js', 'supabase', 'migrations',
+    'checkin.html', 'kiosk.html', 'attendance_overview.html', 'attendance_public.html',
+    'supabase', 'migrations',
   ];
   for (const file of protectedFiles) check(`受保護檔 ${file} 對 ${diffBase} 無差異`, unchangedFromBase(file));
 

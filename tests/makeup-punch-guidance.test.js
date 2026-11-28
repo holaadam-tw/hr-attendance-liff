@@ -168,9 +168,10 @@ check('月曆先判斷不完整打卡再判定正常', recordsSrc.indexOf("getIn
   < recordsSrc.indexOf("if (att.is_late && att.is_early_leave)"));
 check('待補清單排除 pending／approved 重複申請', recordsSrc.includes("r.status === 'pending' || r.status === 'approved'"));
 check('平台管理員改用具公司與呼叫者驗證的每日考勤 RPC', recordsSrc.includes('canUseCompanyScopedMakeupGuidance')
-  && recordsSrc.includes("sb.rpc('get_company_daily_attendance'")
+  && recordsSrc.includes("callVerifiedRpc('get_company_daily_attendance'")
   && recordsSrc.includes('p_company_id: window.currentCompanyId')
-  && recordsSrc.includes('p_line_user_id: liffProfile.userId'));
+  && !grab(recordsSrc, 'loadCompanyScopedMakeupGuidance').includes('p_line_user_id')
+  && grab(recordsSrc, 'loadCompanyScopedMakeupGuidance').includes('autoRelogin: false'));
 check('公司範圍考勤只保留目前員工資料', recordsSrc.includes('item.employee_id === currentEmployee.id'));
 check('多公司帳號清空既有月考勤資料避免跨公司殘留', recordsSrc.includes('if (!makeupGuidanceScopeReady)')
   && recordsSrc.includes('attData = [];') && recordsSrc.includes('lvData = [];'));
@@ -200,8 +201,11 @@ const commonRefs = fs.readdirSync(root)
   .filter(name => name.endsWith('.html'))
   .map(name => ({ name, src: fs.readFileSync(path.join(root, name), 'utf8') }))
   .filter(file => /<script\s+src="common\.js/.test(file.src));
-const staleRefs = commonRefs.filter(file => !file.src.includes('common.js?v=20261127-lunchsum'));
-check('所有 common.js 引用已同步升版', staleRefs.length === 0, staleRefs.map(file => file.name).join(', '));
+const c2Pages = new Set(['admin.html', 'index.html', 'records.html', 'services.html']);
+const staleRefs = commonRefs.filter(file => !file.src.includes(
+  c2Pages.has(file.name) ? 'common.js?v=20261128-planb163c2' : 'common.js?v=20261127-lunchsum'
+));
+check('common.js 快取版本符合 C2 分批清單', staleRefs.length === 0, staleRefs.map(file => file.name).join(', '));
 
 console.log(`\n  結果：✅ ${pass} 通過  ❌ ${fail} 失敗\n`);
 process.exit(fail ? 1 : 0);

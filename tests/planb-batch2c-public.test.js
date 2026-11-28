@@ -236,7 +236,7 @@ function unchangedFromBase(file) {
   check('存檔路徑無 token 維持 confirm', saveHarness.confirms.length === 1 && saveResult.error?.code === 'unauthenticated', String(saveHarness.confirms.length));
 
   for (const file of [
-    'common.js', 'checkin.html', 'index.html', 'kiosk.html', 'records.html', 'attendance_overview.html',
+    'checkin.html', 'kiosk.html', 'attendance_overview.html',
     'modules/attendance-read-columns.js', 'modules/audit.js', 'modules/auth.js',
     'modules/employee-read-columns.js', 'modules/employees.js', 'modules/index.js',
     'modules/leave.js', 'modules/payroll.js', 'modules/schedules.js', 'modules/settings.js',

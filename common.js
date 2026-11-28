@@ -1205,9 +1205,7 @@ async function checkLeaveAvailability(startDate, endDate) {
         if (concurrentSetting?.max) maxConcurrent = concurrentSetting.max;
 
         // 2. 由 RPC 查詢同公司、排除自己的已核准/待審重疊假單
-        const lineUserId = currentEmployee?.line_user_id || liffProfile?.userId;
-        const { data: leaves, error: leaveError } = await sb.rpc('get_company_leave_overlap', {
-            p_line_user_id: lineUserId,
+        const { data: leaves, error: leaveError } = await callSelfRpc('get_company_leave_overlap', {
             p_company_id: window.currentCompanyId,
             p_from: startDate,
             p_to: endDate
@@ -1393,9 +1391,7 @@ function leavePeriodLabel(period) {
 async function findMyOverlappingLeave(start, end) {
     if (!currentEmployee?.id || !window.currentCompanyId || !start) return null;
     try {
-        const lineUserId = currentEmployee?.line_user_id || liffProfile?.userId;
-        const { data, error } = await sb.rpc('get_my_leave_requests', {
-            p_line_user_id: lineUserId,
+        const { data, error } = await callSelfRpc('get_my_leave_requests', {
             p_company_id: window.currentCompanyId,
             p_from: start,
             p_to: end || start,
@@ -1467,7 +1463,6 @@ async function submitLeave() {
     try {
         // 使用 SECURITY DEFINER RPC 繞過 RLS（048 SQL）
         const leavePayload = {
-            p_line_user_id: liffProfile.userId,
             p_company_id: window.currentCompanyId,
             p_leave_type: type,
             p_start_date: start,
@@ -1477,19 +1472,7 @@ async function submitLeave() {
             p_leave_end_time: period === 'hourly' ? leaveEndTime : null,
             p_reason: reason || ''
         };
-        let { data: rpcResult, error: rpcError } = await sb.rpc('submit_leave_request', leavePayload);
-        const rpcMessage = rpcError?.message || '';
-        if (rpcError && /p_company_id|p_leave_start_time|p_leave_end_time|schema cache|function .*submit_leave_request/i.test(rpcMessage)) {
-            if (period === 'hourly') {
-                throw new Error('時數假資料庫尚未更新，請先由管理者套用 migrations/113_hourly_leave_time_range.sql');
-            }
-            const fallbackPayload = { ...leavePayload };
-            delete fallbackPayload.p_company_id;
-            delete fallbackPayload.p_leave_start_time;
-            delete fallbackPayload.p_leave_end_time;
-            fallbackPayload.p_leave_hours = null;
-            ({ data: rpcResult, error: rpcError } = await sb.rpc('submit_leave_request', fallbackPayload));
-        }
+        const { data: rpcResult, error: rpcError } = await callSelfRpc('submit_leave_request', leavePayload, { autoRelogin: true });
         if (rpcError) throw rpcError;
         if (rpcResult && !rpcResult.success) throw new Error(rpcResult.error);
         showToast('✅ 申請成功');
@@ -1548,14 +1531,10 @@ async function loadLeaveHistory() {
     try {
         // 使用 SECURITY DEFINER RPC 繞過 RLS（048 SQL）
         let records = [];
-        let { data, error } = await sb.rpc('get_leave_history', {
-            p_line_user_id: liffProfile.userId,
+        const { data, error } = await callSelfRpc('get_leave_history', {
             p_company_id: window.currentCompanyId,
             p_limit: 10
         });
-        if (error && /p_company_id|schema cache|function .*get_leave_history/i.test(error.message || '')) {
-            ({ data, error } = await sb.rpc('get_leave_history', { p_line_user_id: liffProfile.userId, p_limit: 10 }));
-        }
         if (error) throw error;
         if (data) records = data;
         
@@ -2024,6 +2003,137 @@ async function callVerifiedAction(action, payload) {
     }
 }
 
+// Supabase-compatible adapters for LINE-verified RPCs.
+// common.js 內建這兩個 adapter，讓沒有另外載入 modules/verified-rpc.js 的頁面也能使用。
+(function installCommonVerifiedRpc(global) {
+    const SELF_RPC_COMPANY_FNS = new Set([
+        'get_company_leave_overlap',
+        'get_leave_history',
+        'get_my_leave_requests',
+        'register_employee',
+        'set_my_preferred_language',
+        'submit_leave_request'
+    ]);
+    let selfLoginNoticeShown = false;
+
+    function verifiedRpcError(response, fallbackMessage) {
+        return {
+            data: null,
+            error: {
+                message: response?.message || response?.error || fallbackMessage,
+                code: response?.code || 'verified_rpc_failed'
+            }
+        };
+    }
+
+    function notifySelfLoginRequired() {
+        if (selfLoginNoticeShown) return;
+        selfLoginNoticeShown = true;
+        if (typeof global.showToast === 'function') {
+            global.showToast('LINE 登入已失效，請從 LINE 重新開啟頁面');
+        }
+    }
+
+    async function callVerifiedActionWithoutRelogin(action, payload) {
+        const accessToken = typeof global.getLiffAccessTokenSafe === 'function'
+            ? global.getLiffAccessTokenSafe()
+            : null;
+        if (!accessToken) {
+            notifySelfLoginRequired();
+            return { ok: false, code: 'unauthenticated', message: 'LINE 登入已失效，請從 LINE 重新開啟頁面' };
+        }
+
+        try {
+            const config = typeof CONFIG !== 'undefined' ? CONFIG : global.CONFIG;
+            if (!config?.SUPABASE_URL || !config?.SUPABASE_ANON_KEY) {
+                return { ok: false, code: 'missing_config', message: '系統設定尚未就緒' };
+            }
+            const response = await global.fetch(config.SUPABASE_URL + '/functions/v1/line-push', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + config.SUPABASE_ANON_KEY
+                },
+                body: JSON.stringify({ ...payload, action, liff_access_token: accessToken })
+            });
+            const result = await response.json().catch(() => null);
+            if (!result) return { ok: false, code: 'invalid_response', message: '伺服器回傳無法辨識的結果' };
+            if (!result.ok) {
+                const code = result.code || 'failed';
+                if (code === 'unauthenticated') notifySelfLoginRequired();
+                return { ok: false, code, message: result.error || '操作失敗', data: result };
+            }
+            return { ok: true, code: 'ok', data: result };
+        } catch (error) {
+            return { ok: false, code: error?.code || 'network_error', message: error?.message || '目前無法連線伺服器，請檢查網路後重試' };
+        }
+    }
+
+    global.callVerifiedRpc = async function callVerifiedRpc(fn, args = {}, options = {}) {
+        const safeArgs = { ...args };
+        delete safeArgs.p_line_user_id;
+        const companyId = safeArgs.p_company_id || global.currentCompanyId;
+
+        try {
+            const payload = {
+                company_id: companyId,
+                fn,
+                args: safeArgs
+            };
+            const response = options.autoRelogin === false
+                ? await callVerifiedActionWithoutRelogin('admin_rpc', payload)
+                : await global.callVerifiedAction('admin_rpc', payload);
+            if (!response || response.ok !== true) {
+                return {
+                    data: null,
+                    error: {
+                        message: response?.message || '管理功能暫時無法使用',
+                        code: response?.code || 'verified_rpc_failed'
+                    }
+                };
+            }
+            return { data: response.data?.result ?? null, error: null };
+        } catch (error) {
+            return {
+                data: null,
+                error: {
+                    message: error?.message || '管理功能暫時無法使用',
+                    code: error?.code || 'network_error'
+                }
+            };
+        }
+    };
+
+    global.callSelfRpc = async function callSelfRpc(fn, args = {}, options = {}) {
+        const safeArgs = { ...args };
+        delete safeArgs.p_line_user_id;
+        const needsCompany = SELF_RPC_COMPANY_FNS.has(fn);
+        const companyId = needsCompany ? (safeArgs.p_company_id || global.currentCompanyId) : null;
+        if (!needsCompany) delete safeArgs.p_company_id;
+        const payload = { fn, args: safeArgs };
+        if (companyId) payload.company_id = companyId;
+
+        try {
+            const autoRelogin = options.autoRelogin === true;
+            const response = autoRelogin
+                ? await global.callVerifiedAction('self_rpc', payload)
+                : await callVerifiedActionWithoutRelogin('self_rpc', payload);
+            if (!response || response.ok !== true) {
+                return verifiedRpcError(response, '員工功能暫時無法使用');
+            }
+            return { data: response.data?.result ?? null, error: null };
+        } catch (error) {
+            return {
+                data: null,
+                error: {
+                    message: error?.message || '員工功能暫時無法使用',
+                    code: error?.code || 'network_error'
+                }
+            };
+        }
+    };
+})(window);
+
 // 管理員儲存 LINE 設定：token 只送到 Edge Function（驗 LIFF 身分後寫 DB），前端之後也讀不回來
 // channelToken 留空 = 沿用目前的 token（只改群組 ID）
 async function saveLineMessagingConfig(channelToken, groupId) {
@@ -2170,9 +2280,7 @@ async function loadMonthlyAttendance() {
     list.innerHTML = '<p class="text-center-gray">查詢中...</p>';
     
     try {
-        const lineUserId = currentEmployee?.line_user_id || liffProfile?.userId;
-        const { data, error } = await sb.rpc('get_monthly_attendance', {
-            p_line_user_id: lineUserId,
+        const { data, error } = await callSelfRpc('get_monthly_attendance', {
             p_year: year,
             p_month: month
         });
@@ -2192,9 +2300,7 @@ async function loadMonthlyAttendance() {
         try {
             const monthStart = `${year}-${String(month).padStart(2,'0')}-01`;
             const monthEnd = fmtDate(new Date(year, month, 0));
-            const lineUserId = currentEmployee?.line_user_id || liffProfile?.userId;
-            const { data: leaveData, error: leaveError } = await sb.rpc('get_my_leave_requests', {
-                p_line_user_id: lineUserId,
+            const { data: leaveData, error: leaveError } = await callSelfRpc('get_my_leave_requests', {
                 p_company_id: window.currentCompanyId,
                 p_from: monthStart,
                 p_to: monthEnd,
@@ -2299,8 +2405,7 @@ async function loadAnnualSummary() {
     statsGrid.style.display = 'none';
     
     try {
-        const { data, error } = await sb.rpc('get_my_year_end_stats', { 
-            p_line_user_id: liffProfile.userId, 
+        const { data, error } = await callSelfRpc('get_my_year_end_stats', {
             p_year: year 
         });
         
@@ -2495,10 +2600,6 @@ async function saveLocationsToDB(newLocations) {
 }
 
 // ===== 119：公司假日維護（admin.html 地點管理頁；holidays 有 RLS，一律走 RPC） =====
-function holidayAdminLineUserId() {
-    return window.currentAdminEmployee?.line_user_id || liffProfile?.userId || null;
-}
-
 function holidayTypeLabel(type) {
     return ({ national: '國定假日', makeup: '補假', company: '公司自訂' })[type] || type || '';
 }
@@ -2522,12 +2623,11 @@ async function loadHolidayList() {
     const year = document.getElementById('holidayYear')?.value || getTaiwanDate().slice(0, 4);
     listEl.innerHTML = '<p class="text-center-muted">載入中...</p>';
     try {
-        const { data, error } = await sb.rpc('get_company_holidays', {
+        const { data, error } = await callVerifiedRpc('get_company_holidays', {
             p_company_id: window.currentCompanyId,
-            p_line_user_id: holidayAdminLineUserId(),
             p_from: `${year}-01-01`,
             p_to: `${year}-12-31`
-        });
+        }, { autoRelogin: false });
         if (error) throw error;
         renderHolidayList(data || [], year);
     } catch (e) {
@@ -2568,13 +2668,12 @@ async function addHoliday() {
     if (!date) return showToast('⚠️ 請選擇日期');
     if (!name) return showToast('⚠️ 請輸入假日名稱');
     try {
-        const { data, error } = await sb.rpc('upsert_company_holiday', {
+        const { data, error } = await callVerifiedRpc('upsert_company_holiday', {
             p_company_id: window.currentCompanyId,
-            p_line_user_id: holidayAdminLineUserId(),
             p_holiday_date: date,
             p_holiday_name: name,
             p_holiday_type: type
-        });
+        }, { autoRelogin: true });
         if (error) throw error;
         if (!data?.success) throw new Error(data?.error || '儲存失敗');
         showToast(data.updated_existing ? '✅ 已更新該日假日' : '✅ 已新增假日');
@@ -2591,11 +2690,10 @@ async function deleteHoliday(date, name) {
     if (!date) return;
     if (!confirm(`確定刪除假日？\n${date} ${name || ''}\n\n刪除後該日會恢復為應出勤日。`)) return;
     try {
-        const { data, error } = await sb.rpc('delete_company_holiday', {
+        const { data, error } = await callVerifiedRpc('delete_company_holiday', {
             p_company_id: window.currentCompanyId,
-            p_line_user_id: holidayAdminLineUserId(),
             p_holiday_date: date
-        });
+        }, { autoRelogin: true });
         if (error) throw error;
         if (!data?.success) throw new Error(data?.error || '刪除失敗');
         showToast('✅ 已刪除');
@@ -3229,13 +3327,12 @@ async function submitOvertime() {
 
     try {
         // 使用 SECURITY DEFINER RPC 繞過 RLS（050 SQL）
-        const { data: rpcResult, error: rpcError } = await sb.rpc('submit_overtime_request', {
-            p_line_user_id: liffProfile.userId,
+        const { data: rpcResult, error: rpcError } = await callSelfRpc('submit_overtime_request', {
             p_ot_date: date,
             p_hours: hours,
             p_reason: reason || '',
             p_compensation_type: compType
-        });
+        }, { autoRelogin: true });
         if (rpcError) throw rpcError;
         if (rpcResult && !rpcResult.success) throw new Error(rpcResult.error);
 
@@ -3259,8 +3356,7 @@ async function loadOvertimeHistory() {
 
     try {
         // 使用 SECURITY DEFINER RPC 繞過 RLS（050 SQL）
-        const { data } = await sb.rpc('get_my_overtime_requests', {
-            p_line_user_id: liffProfile.userId,
+        const { data } = await callSelfRpc('get_my_overtime_requests', {
             p_limit: 10
         });
         

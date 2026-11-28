@@ -34,12 +34,8 @@ function grabFunction(source, name) {
   throw new Error(`函式括號不完整：${name}`);
 }
 
-function createMockSb(leaves, totalCount = 10) {
+function createMockSb(totalCount = 10) {
   return {
-    rpc(name) {
-      if (name === 'get_company_leave_overlap') return Promise.resolve({ data: leaves, error: null });
-      throw new Error(`未預期的 RPC：${name}`);
-    },
     from(table) {
       if (table === 'employees') {
         let eqCount = 0;
@@ -60,12 +56,16 @@ function createMockSb(leaves, totalCount = 10) {
 function buildAvailability(leaves, maxConcurrent) {
   const source = grabFunction(commonSrc, 'checkLeaveAvailability');
   const factory = new Function(
-    'currentEmployee', 'sb', 'getCachedSetting', 'fmtDate', 'window', 'console',
+    'currentEmployee', 'sb', 'callSelfRpc', 'getCachedSetting', 'fmtDate', 'window', 'console',
     `${source}; return checkLeaveAvailability;`
   );
   return factory(
     { id: 'employee-self', line_user_id: 'line-self' },
-    createMockSb(leaves),
+    createMockSb(),
+    async name => {
+      if (name === 'get_company_leave_overlap') return { data: leaves, error: null };
+      throw new Error(`未預期的 RPC：${name}`);
+    },
     key => key === 'max_concurrent_leave' ? { max: maxConcurrent } : null,
     value => {
       const date = new Date(value);
@@ -110,12 +110,13 @@ const existingLeave = (id, name) => ({
   const availabilitySrc = grabFunction(commonSrc, 'checkLeaveAvailability');
   const submitSrc = grabFunction(commonSrc, 'submitLeave');
   const dateChangeSrc = grabFunction(recordsSrc, 'onLeaveDateChange');
-  check('衝突查詢改走公司重疊 RPC', /sb\.rpc\('get_company_leave_overlap'/.test(availabilitySrc));
+  check('衝突查詢改走本人 LINE 驗證 RPC', /callSelfRpc\('get_company_leave_overlap'/.test(availabilitySrc));
   check('衝突 RPC 帶目前公司', /p_company_id:\s*window\.currentCompanyId/.test(availabilitySrc));
-  check('衝突 RPC 帶既有員工 LINE 身分來源', /currentEmployee\?\.line_user_id \|\| liffProfile\?\.userId/.test(availabilitySrc));
+  check('衝突 RPC 不再由前端傳 LINE 身分', !/p_line_user_id/.test(availabilitySrc));
   check('衝突姓名改讀 RPC 頂層 employee_name', /l\.employee_name \|\| '同事'/.test(availabilitySrc));
   check('送出流程不再以 !check.ok 中止', !/if\s*\(\s*!check\.ok\s*\)/.test(submitSrc));
-  check('送出仍使用既有 submit_leave_request RPC', /sb\.rpc\('submit_leave_request'/.test(submitSrc));
+  check('送出使用本人 LINE 驗證 submit_leave_request', /callSelfRpc\('submit_leave_request'/.test(submitSrc)
+    && /autoRelogin:\s*true/.test(submitSrc));
   check('超額日期畫面保持送出按鈕可用', /if\s*\(check\.thresholdExceeded\)[\s\S]*?btn\.disabled\s*=\s*false/.test(dateChangeSrc));
   check('合法日期檢查仍會暫時鎖按鈕等待結果', /檢查人力狀態[\s\S]*?btn\.disabled\s*=\s*true/.test(dateChangeSrc));
   check('錯誤日期與錯誤時數假仍維持硬性阻擋', /結束日期不能早於開始日期[\s\S]*?btn\.disabled\s*=\s*true/.test(dateChangeSrc) && /至少 1 小時[\s\S]*?btn\.disabled\s*=\s*true/.test(dateChangeSrc));
@@ -129,8 +130,11 @@ const existingLeave = (id, name) => ({
   const commonRefs = htmlFiles
     .map(name => ({ name, src: fs.readFileSync(path.join(root, name), 'utf8') }))
     .filter(file => file.src.includes('common.js'));
-  const staleRefs = commonRefs.filter(file => !file.src.includes('common.js?v=20261127-lunchsum'));
-  check('所有 common.js 引用已同步升版', staleRefs.length === 0, staleRefs.map(file => file.name).join(', '));
+  const c2Pages = new Set(['admin.html', 'index.html', 'records.html', 'services.html']);
+  const staleRefs = commonRefs.filter(file => !file.src.includes(
+    c2Pages.has(file.name) ? 'common.js?v=20261128-planb163c2' : 'common.js?v=20261127-lunchsum'
+  ));
+  check('common.js 快取版本符合 C2 分批清單', staleRefs.length === 0, staleRefs.map(file => file.name).join(', '));
 
   console.log(`\n  結果：${pass} 通過，${fail} 失敗`);
   if (fail > 0) process.exit(1);

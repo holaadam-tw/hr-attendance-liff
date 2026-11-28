@@ -185,7 +185,12 @@ function rest() {
   console.log('\n=== 快取版本 ===');
   const htmls = files.filter(f => f.rel.endsWith('.html') && /common\.js\?v=/.test(f.src));
   const versions = [...new Set(htmls.map(f => f.src.match(/common\.js\?v=([^"']+)/)[1]))];
-  check('所有頁面的 common.js 版本一致且已更新（不是 PR #2 的 linesecure2）', versions.length === 1 && versions[0] !== '20260927-linesecure2', versions.join(','));
+  const c2Pages = new Set(['admin.html', 'index.html', 'records.html', 'services.html']);
+  const badCommonVersions = htmls.filter(file => file.src.match(/common\.js\?v=([^"']+)/)?.[1] !== (
+    c2Pages.has(file.rel) ? '20261128-planb163c2' : '20261127-lunchsum'
+  ));
+  check('所有頁面的 common.js 版本符合 C2 分批清單', badCommonVersions.length === 0,
+    badCommonVersions.map(file => file.rel).join(', ') || versions.join(','));
   const modIdx = read('modules/index.js');
   check('modules/index.js 的 schedules.js／settings.js 版本已更新', !/schedules\.js\?v=20260927-linebudget/.test(modIdx) && !/settings\.js\?v=20260927-linesecure2/.test(modIdx));
   check('admin.html 的 modules/index.js 版本已更新', !/modules\/index\.js\?v=20260927-linesecure2/.test(read('admin.html')));

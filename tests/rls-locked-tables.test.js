@@ -165,6 +165,16 @@ WRITE_LOCKED.forEach(({ table, migration, rpcs, note }) => {
       }));
       return;
     }
+    if (rpc === 'set_my_preferred_language') {
+      const users = sources.filter(s => /callSelfRpc\(\s*['"`]set_my_preferred_language['"`]/.test(s.text));
+      check('set_my_preferred_language 改經 self_rpc 驗證呼叫', users.length > 0, users.map(s => s.rel).join(', '));
+      check('set_my_preferred_language 呼叫帶 p_company_id 且不帶 p_line_user_id', users.every(s => {
+        const start = s.text.indexOf("callSelfRpc('set_my_preferred_language'");
+        const win = s.text.slice(start, start + 600);
+        return win.includes('p_company_id') && !win.includes('p_line_user_id');
+      }));
+      return;
+    }
     // 131／132：admin_* 改經 line-push 驗 LIFF 身分代呼叫（身分來自 LINE，不由前端帶 p_line_user_id），前端不得直接 rpc
     if (VERIFIED_VIA_EDGE[rpc]) {
       const direct = sources.filter(s => new RegExp("rpc\\(\\s*['\"`]" + rpc + "['\"`]").test(s.text)).map(s => s.rel);
@@ -193,9 +203,9 @@ WRITE_LOCKED.forEach(({ table, migration, rpcs, note }) => {
 });
 const commonSource = sources.find(s => s.rel === 'common.js')?.text || '';
 const leavePayload = commonSource.match(/const leavePayload = \{[\s\S]{0,800}?\n\s*\};/)?.[0] || '';
-check('submit_leave_request 有被前端呼叫', /rpc\(\s*['"`]submit_leave_request['"`],\s*leavePayload\s*\)/.test(commonSource));
-check('submit_leave_request 主要 payload 帶 p_company_id 與 p_line_user_id',
-  leavePayload.includes('p_company_id') && leavePayload.includes('p_line_user_id'));
+check('submit_leave_request 改經 self_rpc 驗證呼叫', /callSelfRpc\(\s*['"`]submit_leave_request['"`],\s*leavePayload\s*,\s*\{\s*autoRelogin:\s*true\s*\}\s*\)/.test(commonSource));
+check('submit_leave_request 主要 payload 帶 p_company_id 且身分不由前端提供',
+  leavePayload.includes('p_company_id') && !leavePayload.includes('p_line_user_id'));
 check('寫入偵測探針：多行鏈式 update 抓得到', writeRe('employees').test("sb.from('employees')\n  .update({ role: 1 })\n  .eq('id', x)"));
 check('寫入偵測探針：純 select 不誤判', !writeRe('employees').test("sb.from('employees').select('id').eq('id', x);"));
 const migration157 = fs.readFileSync(path.join(ROOT, 'migrations', '157_selfies_storage_write_lock.sql'), 'utf8');
