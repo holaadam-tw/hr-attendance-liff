@@ -96,8 +96,12 @@ function makeHarness() {
   return { ctx, nodes, calls, alerts, toasts, elements };
 }
 
+// 比對基準：本機有 origin/main 就用它；CI（PR merge commit、淺 clone）沒有時改用 merge commit 的第一個 parent（＝main）；都沒有就比 HEAD
+const gitOk = (args) => spawnSync('git', args, { cwd: root }).status === 0;
+const diffBase = gitOk(['rev-parse', '--verify', '--quiet', 'origin/main']) ? 'origin/main'
+  : (gitOk(['rev-parse', '--verify', '--quiet', 'HEAD^2']) ? 'HEAD^1' : 'HEAD');
 function gitUnchanged(file) {
-  return spawnSync('git', ['diff', '--quiet', 'origin/main', '--', file], { cwd: root }).status === 0;
+  return spawnSync('git', ['diff', '--quiet', diffBase, '--', file], { cwd: root }).status === 0;
 }
 
 (async () => {
@@ -130,7 +134,7 @@ function gitUnchanged(file) {
     'common.js', 'checkin.html', 'index.html', 'kiosk.html', 'records.html', 'attendance_public.html',
     'modules', 'supabase/functions/line-push/handler.ts', 'migrations',
   ];
-  for (const file of protectedFiles) check(`受保護檔 ${file} 與 origin/main 無差異`, gitUnchanged(file));
+  for (const file of protectedFiles) check(`受保護檔 ${file} 與 ${diffBase} 無差異`, gitUnchanged(file));
 
   const h = makeHarness();
   const { ctx, elements, calls: rpcCalls, toasts } = h;
