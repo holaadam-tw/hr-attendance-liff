@@ -128,8 +128,11 @@ const commonRefs = fs.readdirSync(root)
   .filter(name => name.endsWith('.html'))
   .map(name => ({ name, src: fs.readFileSync(path.join(root, name), 'utf8') }))
   .filter(file => /<script\s+src="common\.js/.test(file.src));
-const staleRefs = commonRefs.filter(file => !file.src.includes('common.js?v=20261127-lunchsum'));
-check('所有 common.js 引用已同步升版', staleRefs.length === 0, staleRefs.map(file => file.name).join(', '));
+const c2Pages = new Set(['admin.html', 'index.html', 'records.html', 'services.html']);
+const staleRefs = commonRefs.filter(file => !file.src.includes(
+  c2Pages.has(file.name) ? 'common.js?v=20261128-planb163c2' : 'common.js?v=20261127-lunchsum'
+));
+check('common.js 快取版本符合 C2 分批清單', staleRefs.length === 0, staleRefs.map(file => file.name).join(', '));
 
 const stateCode = [
   grab(commonSrc, 'getTodayPendingPunchState'),

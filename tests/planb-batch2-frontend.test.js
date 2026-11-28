@@ -62,15 +62,15 @@ function check(name, ok, detail = '') {
   }
   check('五個 2a modules 均已改用 callVerifiedRpc', modules.every(name => /callVerifiedRpc\(/.test(sources[name])));
 
-  const commonPos = admin.indexOf('common.js?v=20261127-lunchsum');
-  const helperPos = admin.indexOf('modules/verified-rpc.js?v=20261128-planb162');
+  const commonPos = admin.indexOf('common.js?v=20261128-planb163c2');
+  const helperPos = admin.indexOf('modules/verified-rpc.js?v=20261128-planb163c2');
   const indexPos = admin.indexOf('modules/index.js?v=20261128-planb162');
   check('admin.html 載入順序為 common → verified-rpc → modules', commonPos >= 0 && commonPos < helperPos && helperPos < indexPos);
   check('五個 module cache key 同步為 planb162', modules.every(name => new RegExp(`${name}\\.js\\?v=20261128-planb162`).test(index)));
   check('salary.html 在 payroll 之前載入 C1 verified-rpc，payroll 維持 planb162',
     salary.indexOf('modules/verified-rpc.js?v=20261128-planb163c1') < salary.indexOf('modules/payroll.js?v=20261128-planb162'));
 
-  const protectedFiles = ['checkin.html', 'index.html', 'kiosk.html', 'common.js', 'records.html'];
+  const protectedFiles = ['checkin.html', 'kiosk.html'];
   for (const file of protectedFiles) {
     let unchanged = true;
     try { execFileSync('git', ['diff', '--quiet', 'HEAD', '--', file], { cwd: root }); } catch (_) { unchanged = false; }

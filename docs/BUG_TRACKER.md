@@ -7,13 +7,15 @@
 
 ## 2026-11-28 乙案第三批：員工本人 RPC LINE 驗證（本機準備）
 
-- 狀態：後端與 C0＋C1 前端／測試已在本機工作區準備，尚未套用、部署、commit 或 push。
+- 狀態：後端與 C0＋C1＋C2 前端／測試已在本機工作區準備，尚未套用、部署、commit 或 push。
 - migration 163 為 15 個第三批函式名稱建立 17 個 `*_verified` 簽名，只授 `service_role`；舊函式與 ACL 不變。
 - `line-push` 新增嚴格白名單 action `self_rpc`，LINE ID 只採 LIFF token 驗證結果；帶公司／無公司多載會精確選擇。
 - `modules/verified-rpc.js` 新增 `callSelfRpc`；讀取預設不自動重登，同頁只提示一次，明確指定 `autoRelogin: true` 才沿用既有表單保留與重登流程。
 - `salary.html`、`schedule.html`、`fieldwork.html` 的六支 C1 呼叫已改走 `self_rpc`；外勤軌跡失敗仍保留 buffer 並在後續呼叫重新取 token。`employee_register.html` 只採當下 LIFF token，不再以 sessionStorage LINE ID 備援送出。
+- C2 已把工作單指定的 `common.js`、`records.html`、`index.html`、`i18n.js` 呼叫改走 LINE 驗證；`common.js` 自帶 adapter，後載 `verified-rpc.js` 不覆寫。本人／管理讀取不自動轉頁，主動送出請假、加班、語言與假日異動才啟用表單保留重登；舊請假多載 fallback 已移除。
+- C2 專屬測試共 76 項，涵蓋白名單參數、無 token、adapter 載入順序、重疊查詢退讓、快取分批、產品檔上限、第四批逐字保護及 3 組反向突變；完整 `npm.cmd test` 與 `bash scripts/qa_check.sh` 的最終結果另見私有 `planB/batch3c2/REPORT.md`。
 - `quick_check_in`、`quick_check_out_after_clock_in_makeup`、`log_checkin_failure`、`submit_makeup_punch`、`get_my_makeup_requests` 因位於自動打卡路徑，保留至需真人手機驗證的第四批。
-- C0＋C1 未修改 `common.js`、打卡頁、首頁、kiosk、records、services、admin、attendance 頁、i18n、Edge 或 migration；token 失效防護與撤權門檻見私有 `planB/batch3/DESIGN.md`。
+- C2 未修改 `checkin.html`、`kiosk.html`、attendance 頁、Edge、migration 與既有模組；`services.html`、`admin.html` 僅升工作單指定快取字串。token 失效防護與撤權門檻見私有 `planB/batch3/DESIGN.md`。
 - 正式狀態：未上線；未執行正式庫 drill；舊匿名呼叫仍可用，不得提前撤權。
 
 ## 🟡 2026-11-28 乙案第二批管理 RPC 已完成本機準備（尚未上線）

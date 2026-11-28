@@ -90,11 +90,11 @@ function buildAvailability(source, rpcResult, totalCount = 10) {
     getCachedSetting: key => key === 'max_concurrent_leave' ? { max: 2 } : null,
     fmtDate: taiwanLikeDate,
     console: { error() {}, warn() {} },
+    callSelfRpc(name, args) {
+      calls.push({ name, args });
+      return Promise.resolve(rpcResult);
+    },
     sb: {
-      rpc(name, args) {
-        calls.push({ name, args });
-        return Promise.resolve(rpcResult);
-      },
       from(table) {
         if (table !== 'employees') throw new Error(`未預期直查：${table}`);
         let eqCount = 0;
@@ -146,25 +146,23 @@ function buildPublicContext(source = publicSrc) {
   check("排除 tests/ 後 0 處 from('leave_requests')", offenders.length === 0,
     offenders.map(file => path.relative(ROOT, file)).join(', '));
 
-  const overlapCalls = callWindows(commonSrc, "sb.rpc('get_company_leave_overlap'");
+  const overlapCalls = callWindows(commonSrc, "callSelfRpc('get_company_leave_overlap'");
   check('checkLeaveAvailability 恰有 1 個重疊 RPC', overlapCalls.length === 1);
   check('重疊 RPC 帶 p_company_id', overlapCalls[0]?.includes('p_company_id: window.currentCompanyId'));
-  check('重疊 RPC 帶 p_line_user_id', overlapCalls[0]?.includes('p_line_user_id: lineUserId'));
+  check('重疊 RPC 不由前端傳 p_line_user_id', !overlapCalls[0]?.includes('p_line_user_id'));
   check('重疊 RPC 不再由前端 limit／排除本人', !/\.limit\(200\)|\.neq\('employee_id'/.test(grabFunction(commonSrc, 'checkLeaveAvailability')));
 
   const myCalls = [
-    ...callWindows(commonSrc, "sb.rpc('get_my_leave_requests'"),
-    ...callWindows(recordsSrc, "sb.rpc('get_my_leave_requests'")
+    ...callWindows(commonSrc, "callSelfRpc('get_my_leave_requests'"),
+    ...callWindows(recordsSrc, "callSelfRpc('get_my_leave_requests'")
   ];
   check('員工端恰有 3 個 get_my_leave_requests 呼叫', myCalls.length === 3, `實得 ${myCalls.length}`);
   myCalls.forEach((code, index) => {
     check(`#${index + 1} 本人 RPC 帶 p_company_id`, code.includes('p_company_id: window.currentCompanyId'));
-    check(`#${index + 1} 本人 RPC 帶 p_line_user_id`, code.includes('p_line_user_id:'));
+    check(`#${index + 1} 本人 RPC 不由前端傳 p_line_user_id`, !code.includes('p_line_user_id:'));
     check(`#${index + 1} 本人 RPC 明確限制 p_limit`, code.includes('p_limit:'));
   });
-  check('三處 LINE ID 均沿用員工端既有 fallback',
-    (commonSrc.match(/currentEmployee\?\.line_user_id \|\| liffProfile\?\.userId/g) || []).length >= 3
-      && recordsSrc.includes('currentEmployee?.line_user_id || liffProfile?.userId'));
+  check('三處本人查詢均交由 Edge 驗證 LINE 身分', myCalls.every(code => !code.includes('p_line_user_id')));
 
   const publicCall = callWindows(publicSrc, "sb.rpc('get_public_today_leave_employees'");
   const publicLoaderSource = grabFunction(publicSrc, 'loadPublicTodayLeaveEmployees');
@@ -177,9 +175,13 @@ function buildPublicContext(source = publicSrc) {
     const matches = [...read(name).matchAll(/common\.js\?v=([^"'\s<]+)/g)];
     return matches.map(match => ({ name, version: match[1] }));
   });
-  check('所有 HTML 的 common.js 引用版本一致',
-    commonRefs.length > 0 && commonRefs.every(ref => ref.version === '20261127-lunchsum'),
-    [...new Set(commonRefs.map(ref => ref.version))].join(', '));
+  const c2Pages = new Set(['admin.html', 'index.html', 'records.html', 'services.html']);
+  const badCommonRefs = commonRefs.filter(ref => ref.version !== (
+    c2Pages.has(ref.name) ? '20261128-planb163c2' : '20261127-lunchsum'
+  ));
+  check('HTML 的 common.js 快取版本符合 C2 分批清單',
+    commonRefs.length > 0 && badCommonRefs.length === 0,
+    badCommonRefs.map(ref => `${ref.name}:${ref.version}`).join(', '));
 
   console.log('\n=== 2. VM：checkLeaveAvailability 改前／改後行為 ===');
   const legacyRows = [
@@ -197,7 +199,7 @@ function buildPublicContext(source = publicSrc) {
   check('VM 實際送出正確重疊 RPC 參數',
     availability.calls.length === 1
       && availability.calls[0].name === 'get_company_leave_overlap'
-      && availability.calls[0].args.p_line_user_id === 'line-self'
+      && !Object.prototype.hasOwnProperty.call(availability.calls[0].args, 'p_line_user_id')
       && availability.calls[0].args.p_company_id === 'company-a'
       && availability.calls[0].args.p_from === '2026-10-12'
       && availability.calls[0].args.p_to === '2026-10-14');
@@ -218,7 +220,7 @@ function buildPublicContext(source = publicSrc) {
     currentEmployee: { id: 'employee-self', line_user_id: 'line-self' },
     liffProfile: { userId: 'line-profile' },
     window: { currentCompanyId: 'company-a' },
-    sb: { rpc: (name, args) => Promise.resolve({ data: null, error: new Error(`${name}:${args.p_company_id}`) }) }
+    callSelfRpc: (name, args) => Promise.resolve({ data: null, error: new Error(`${name}:${args.p_company_id}`) })
   };
   vm.createContext(findContext);
   vm.runInContext([

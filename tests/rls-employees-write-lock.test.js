@@ -94,7 +94,8 @@ check('employees.js 不再直接寫 employees', !/from\('employees'\)[^;]{0,400}
 check('employees.js 新增員工不再由前端帶 company_id／is_active', !/company_id: window\.currentAdminEmployee\?\.company_id \|\| window\.currentCompanyId,\s*created_at/.test(empSrc));
 check('employee_register 改走 LINE 驗證的 register_employee', /callRegisterSelfRpc\('register_employee'/.test(regSrc)
   && !/sb\.rpc\('register_employee'/.test(regSrc) && !/from\('employees'\)\.insert/.test(regSrc));
-check('i18n 改走 set_my_preferred_language', /rpc\('set_my_preferred_language'/.test(i18nSrc) && !/from\('employees'\)\s*\.update/.test(i18nSrc));
+check('i18n 改走 LINE 驗證 set_my_preferred_language', /callSelfRpc\('set_my_preferred_language'/.test(i18nSrc)
+  && !/p_line_user_id/.test(i18nSrc) && !/from\('employees'\)\s*\.update/.test(i18nSrc));
 
 console.log(`\n結果：${pass} 通過 / ${fail} 失敗`);
 process.exit(fail > 0 ? 1 : 0);

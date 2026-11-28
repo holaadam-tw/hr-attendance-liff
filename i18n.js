@@ -515,14 +515,12 @@
         }
         applyI18n();
 
-        if (options && options.persist && employee && employee.id && window.sb) {
+        if (options && options.persist && employee && employee.id && typeof window.callSelfRpc === 'function') {
             // 124：employees 寫入走 RPC，呼叫者必須就是該員工（line_user_id＋company_id）
-            var lineId = employee.line_user_id || (window.liffProfile && window.liffProfile.userId) || null;
-            window.sb.rpc('set_my_preferred_language', {
+            window.callSelfRpc('set_my_preferred_language', {
                 p_company_id: employee.company_id,
-                p_line_user_id: lineId,
                 p_language: normalized
-            }).then(function (res) {
+            }, { autoRelogin: true }).then(function (res) {
                 if (res && (res.error || (res.data && res.data.success === false))) {
                     console.warn('preferred_language update failed', res.error || res.data);
                 }

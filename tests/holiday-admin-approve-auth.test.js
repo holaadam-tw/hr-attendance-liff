@@ -86,9 +86,12 @@ check('地點頁顯示時載入假日', /if \(id === 'locationPage'\) \{ window\
 let loadSrc = '', addSrc = '', delSrc = '';
 try { loadSrc = grab(commonSrc, 'loadHolidayList'); addSrc = grab(commonSrc, 'addHoliday'); delSrc = grab(commonSrc, 'deleteHoliday'); }
 catch (e) { check('common.js 具備假日維護函式', false, e.message); }
-check('讀取走 get_company_holidays 並帶公司', /rpc\('get_company_holidays'/.test(loadSrc) && /p_company_id: window\.currentCompanyId/.test(loadSrc));
-check('新增走 upsert_company_holiday 並帶公司與身分', /rpc\('upsert_company_holiday'/.test(addSrc) && /p_company_id: window\.currentCompanyId/.test(addSrc) && /holidayAdminLineUserId\(\)/.test(addSrc));
-check('刪除走 delete_company_holiday 且先 confirm', /rpc\('delete_company_holiday'/.test(delSrc) && /confirm\(/.test(delSrc));
+check('讀取走 LINE 驗證 get_company_holidays 並帶公司', /callVerifiedRpc\('get_company_holidays'/.test(loadSrc)
+  && /p_company_id: window\.currentCompanyId/.test(loadSrc) && /autoRelogin:\s*false/.test(loadSrc));
+check('新增走 LINE 驗證 upsert_company_holiday 並帶公司', /callVerifiedRpc\('upsert_company_holiday'/.test(addSrc)
+  && /p_company_id: window\.currentCompanyId/.test(addSrc) && !/p_line_user_id/.test(addSrc));
+check('刪除走 LINE 驗證 delete_company_holiday 且先 confirm', /callVerifiedRpc\('delete_company_holiday'/.test(delSrc)
+  && !/p_line_user_id/.test(delSrc) && /confirm\(/.test(delSrc));
 check('沒有任何直接寫 holidays 表', !/from\('holidays'\)\s*\.(insert|update|upsert|delete)/.test(commonSrc));
 check('RPC 回 success=false 會拋錯顯示', /if \(!data\?\.success\) throw new Error\(data\?\.error/.test(addSrc) && /if \(!data\?\.success\) throw new Error\(data\?\.error/.test(delSrc));
 let lbl = null;

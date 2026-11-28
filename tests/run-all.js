@@ -90,6 +90,7 @@ const SUITES = [
   { name: 'Plan B Batch 3 line-push self_rpc（163）', file: 'planb-batch3-edge.test.js' },
   { name: 'Plan B Batch 3 受保護檔與打卡範圍', file: 'planb-batch3-scope.test.js' },
   { name: 'Plan B Batch 3 C0＋C1 員工頁改走 LINE 驗證', file: 'planb-batch3-c0c1.test.js' },
+  { name: 'Plan B Batch 3 C2 common／records／index／i18n 改走 LINE 驗證', file: 'planb-batch3-c2.test.js' },
 ];
 
 const results = [];

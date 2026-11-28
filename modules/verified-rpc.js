@@ -3,6 +3,9 @@
 // callSelfRpc serves migration 163 employee RPCs; reads do not relogin unless autoRelogin is true.
 // The Edge Function, never the browser, supplies the verified LINE user ID.
 (function installVerifiedRpc(global) {
+    // common.js 自 C2 起已內建同契約 adapter；同時載入時保留 common.js 的實作。
+    if (typeof global.callVerifiedRpc === 'function' && typeof global.callSelfRpc === 'function') return;
+
     const SELF_RPC_COMPANY_FNS = new Set([
         'get_company_leave_overlap',
         'get_leave_history',
@@ -31,7 +34,7 @@
         }
     }
 
-    async function callSelfActionWithoutRelogin(payload) {
+    async function callVerifiedActionWithoutRelogin(action, payload) {
         const accessToken = typeof global.getLiffAccessTokenSafe === 'function'
             ? global.getLiffAccessTokenSafe()
             : null;
@@ -51,7 +54,7 @@
                     'Content-Type': 'application/json',
                     'Authorization': 'Bearer ' + config.SUPABASE_ANON_KEY
                 },
-                body: JSON.stringify({ ...payload, action: 'self_rpc', liff_access_token: accessToken })
+                body: JSON.stringify({ ...payload, action, liff_access_token: accessToken })
             });
             const result = await response.json().catch(() => null);
             if (!result) return { ok: false, code: 'invalid_response', message: '伺服器回傳無法辨識的結果' };
@@ -66,17 +69,20 @@
         }
     }
 
-    global.callVerifiedRpc = async function callVerifiedRpc(fn, args = {}) {
+    global.callVerifiedRpc = async function callVerifiedRpc(fn, args = {}, options = {}) {
         const safeArgs = { ...args };
         delete safeArgs.p_line_user_id;
         const companyId = safeArgs.p_company_id || global.currentCompanyId;
 
         try {
-            const response = await global.callVerifiedAction('admin_rpc', {
+            const payload = {
                 company_id: companyId,
                 fn,
                 args: safeArgs
-            });
+            };
+            const response = options.autoRelogin === false
+                ? await callVerifiedActionWithoutRelogin('admin_rpc', payload)
+                : await global.callVerifiedAction('admin_rpc', payload);
             if (!response || response.ok !== true) {
                 return {
                     data: null,
@@ -111,7 +117,7 @@
             const autoRelogin = options.autoRelogin === true;
             const response = autoRelogin
                 ? await global.callVerifiedAction('self_rpc', payload)
-                : await callSelfActionWithoutRelogin(payload);
+                : await callVerifiedActionWithoutRelogin('self_rpc', payload);
             if (!response || response.ok !== true) {
                 return verifiedRpcError(response, '員工功能暫時無法使用');
             }

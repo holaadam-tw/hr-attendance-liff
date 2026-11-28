@@ -69,7 +69,7 @@ let submitSrc = '';
 try { submitSrc = grab(commonSrc, 'submitLeave'); } catch (e) { check('找得到 submitLeave', false, e.message); }
 const idxMine = submitSrc.indexOf('findMyOverlappingLeave(start, end)');
 const idxCheck = submitSrc.indexOf('checkLeaveAvailability(start, end)');
-const idxRpc = submitSrc.indexOf("rpc('submit_leave_request'");
+const idxRpc = submitSrc.indexOf("callSelfRpc('submit_leave_request'");
 check('submitLeave 先查自己重疊', idxMine > 0);
 check('重疊檢查在人力門檻檢查之前', idxMine > 0 && idxCheck > idxMine);
 check('重疊檢查在 RPC 送出之前', idxMine > 0 && idxRpc > idxMine);
@@ -78,9 +78,9 @@ check('有重疊時恢復按鈕狀態', /if \(mine\) \{[\s\S]*?setBtnLoading\(su
 
 let findSrc = '';
 try { findSrc = grab(commonSrc, 'findMyOverlappingLeave'); } catch (e) { check('找得到 findMyOverlappingLeave', false, e.message); }
-check('自查改走本人請假 RPC', /sb\.rpc\('get_my_leave_requests'/.test(findSrc));
+check('自查改走 LINE 驗證的本人請假 RPC', /callSelfRpc\('get_my_leave_requests'/.test(findSrc));
 check('自查帶公司隔離', /p_company_id:\s*window\.currentCompanyId/.test(findSrc));
-check('自查帶員工 LINE 身分', /p_line_user_id:\s*lineUserId/.test(findSrc));
+check('自查身分由 Edge 驗證，不由前端傳 LINE ID', !/p_line_user_id/.test(findSrc));
 check('自查只看 approved/pending', /p_statuses:\s*\['approved', 'pending'\]/.test(findSrc));
 check('查詢失敗不阻擋送出（交給 RPC）', /if \(error\) return null/.test(findSrc));
 

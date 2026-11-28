@@ -132,7 +132,7 @@ function gitUnchanged(file) {
     commonPos >= 0 && commonPos < helperPos && helperPos < pagePos);
 
   const protectedFiles = [
-    'common.js', 'checkin.html', 'index.html', 'kiosk.html', 'records.html',
+    'checkin.html', 'kiosk.html',
     'modules/attendance-read-columns.js', 'modules/audit.js', 'modules/auth.js',
     'modules/employee-read-columns.js', 'modules/employees.js', 'modules/index.js',
     'modules/leave.js', 'modules/payroll.js', 'modules/schedules.js', 'modules/settings.js',
