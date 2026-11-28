@@ -263,11 +263,12 @@ function makeCommonHarness(source = common, token = 'token-c2') {
 
   const adminDiffLines = gitText(['diff', '--unified=0', diffBase, '--', 'admin.html'])
     .split(/\r?\n/).filter(line => /^[+-](?![+-])/.test(line));
-  check('admin.html 2a 行為只變更 common/helper 快取字串', adminDiffLines.length === 4
+  // 對基準無差異（CI 淺 clone 只能比 HEAD、或本批已合併）時沒有可檢查的 diff；快取字串另由下方檢查保證
+  check('admin.html 2a 行為只變更 common/helper 快取字串', adminDiffLines.length === 0 || adminDiffLines.length === 4
     && adminDiffLines.every(line => /(?:common\.js|modules\/verified-rpc\.js)\?v=/.test(line)));
   const servicesDiffLines = gitText(['diff', '--unified=0', diffBase, '--', 'services.html'])
     .split(/\r?\n/).filter(line => /^[+-](?![+-])/.test(line));
-  check('services.html 只變更 common/i18n 快取字串', servicesDiffLines.length === 4
+  check('services.html 只變更 common/i18n 快取字串', servicesDiffLines.length === 0 || servicesDiffLines.length === 4
     && servicesDiffLines.every(line => /(?:common|i18n)\.js\?v=/.test(line)));
 
   const c2Cache = '20261128-planb163c2';
