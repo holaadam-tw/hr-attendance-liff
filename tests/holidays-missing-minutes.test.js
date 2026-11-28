@@ -80,7 +80,7 @@ check('匯出含三個分鐘欄', /'遲到分鐘'/.test(aoSrc) && /'早退分鐘
 
 console.log('\n=== attendance_public.html 假日改走 RPC ===');
 check('不再直接 select holidays', !/from\('holidays'\)/.test(publicSrc));
-check('改用 get_company_holidays', /rpc\('get_company_holidays'/.test(publicSrc));
+check('attendance_public 改由本頁 verified helper 讀取 get_company_holidays', /callVerifiedRpc\('get_company_holidays'/.test(publicSrc));
 
 console.log('\n=== migration 118：holidays 表 ===');
 check('date→holiday_date 冪等改名', /RENAME COLUMN date TO holiday_date/.test(m118Code) && /column_name = 'date'/.test(m118Code));

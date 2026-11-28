@@ -18,6 +18,9 @@ body{font-family:'Noto Sans TC',-apple-system,sans-serif;background:var(--bg);co
 .card{background:var(--card);border:1px solid rgba(148,163,184,.22);border-radius:8px;padding:20px;box-shadow:0 10px 30px rgba(15,23,42,0.06);margin-bottom:16px;}
 .btn{padding:10px 16px;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;}
 .hidden{display:none;}
+.attendance-login-notice{display:none;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;padding:13px 15px;border:1px solid #F59E0B;border-radius:10px;background:#FFFBEB;color:#92400E;box-shadow:0 8px 22px rgba(146,64,14,.08);}
+.attendance-login-notice button{flex:0 0 auto;padding:8px 12px;border:1px solid #D97706;border-radius:8px;background:#fff;color:#92400E;font:800 12px 'Noto Sans TC',sans-serif;cursor:pointer;}
+.attendance-login-notice button:disabled{cursor:not-allowed;opacity:.65;}
 .spinner{width:40px;height:40px;border:4px solid var(--border);border-top-color:var(--primary);border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 16px;}
 @keyframes spin{to{transform:rotate(360deg)}}
 
@@ -249,6 +252,11 @@ body{font-family:'Noto Sans TC',-apple-system,sans-serif;background:var(--bg);co
                     <button onclick="showPublicRegisterQR()" style="padding:8px 12px;border:2px solid #10B981;border-radius:10px;background:#F0FDF4;color:#059669;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;">📱 登記 QR</button>
                     <button class="export-btn" onclick="exportExcel()">📥 匯出</button>
                 </div>
+            </div>
+
+            <div id="attendanceLoginNotice" class="attendance-login-notice" role="status" aria-live="polite">
+                <span id="attendanceLoginMessage">此頁需要重新以 LINE 登入後才能讀取資料。</span>
+                <button id="attendanceReloginButton" type="button" onclick="startAttendanceReadRelogin()">重新登入</button>
             </div>
 
             <!-- Tab 切換 -->
@@ -711,7 +719,8 @@ const I18N = {
         anomalyResolve:'結案', anomalyResolveConfirm:'確定手動結案？只會從追蹤清單移除，不會寫入出勤記錄。', anomalyResolveOk:'✅ 已結案', anomalyResolveFail:'結案失敗：',
         anomalyResolvedRecent:'近 7 天已結案', anomalyResolutionMakeup:'補卡結案', anomalyResolutionLeave:'請假結案', anomalyResolutionManual:'手動結案',
         pendingMakeup:'待審補卡', pendingMakeupCorrection:'補卡修正待審', pendingClockIn:'待審補上班', pendingClockOut:'待審補下班', pendingLeave:'待審請假', orders:'份', open:'↗', prev:'◀', next:'▶',
-        leaveCalTitle:'🏖️ 請假月曆', leaveCalEmpty:'本月無請假紀錄', leaveCalHint:'每人一個顏色，直接標在請假日期上；虛線＝待審核', leaveCalCount:'本月 {n} 人請假', halfAmShort:'上', halfPmShort:'下', pendingShort:'待審核', approvedShort:'已核准', dayUnit:'天'
+        leaveCalTitle:'🏖️ 請假月曆', leaveCalEmpty:'本月無請假紀錄', leaveCalHint:'每人一個顏色，直接標在請假日期上；虛線＝待審核', leaveCalCount:'本月 {n} 人請假', halfAmShort:'上', halfPmShort:'下', pendingShort:'待審核', approvedShort:'已核准', dayUnit:'天',
+        verifiedReadLoginRequired:'此頁需要重新以 LINE 登入後才能讀取資料。', verifiedReadRelogin:'重新登入', verifiedReadRedirecting:'正在前往 LINE 驗證，請稍候。'
     },
     vi: {
         langLabel:'Ngôn ngữ', loading:'Đang tải...', loadFailed:'Tải thất bại', noData:'Không có dữ liệu', employee:'Nhân viên', department:'Bộ phận', shift:'Ca làm', checkIn:'Giờ vào', checkOut:'Giờ ra', hours:'Giờ công', status:'Trạng thái',
@@ -737,7 +746,8 @@ const I18N = {
         anomalyResolve:'Đóng', anomalyResolveConfirm:'Xác nhận đóng thủ công? Chỉ xóa khỏi danh sách theo dõi, không ghi vào chấm công.', anomalyResolveOk:'✅ Đã đóng', anomalyResolveFail:'Đóng thất bại: ',
         anomalyResolvedRecent:'Đã đóng trong 7 ngày qua', anomalyResolutionMakeup:'Đóng do bổ sung giờ', anomalyResolutionLeave:'Đóng do nghỉ phép', anomalyResolutionManual:'Đóng thủ công',
         pendingMakeup:'Chờ duyệt bổ sung', pendingMakeupCorrection:'Chờ duyệt sửa giờ', pendingClockIn:'Chờ duyệt giờ vào', pendingClockOut:'Chờ duyệt giờ ra', pendingLeave:'Chờ duyệt nghỉ phép', orders:'phần', open:'↗', prev:'◀', next:'▶',
-        leaveCalTitle:'🏖️ Lịch nghỉ phép tháng', leaveCalEmpty:'Tháng này không có nghỉ phép', leaveCalHint:'Mỗi người một màu, hiện ngay trên ngày nghỉ; viền đứt = chờ duyệt', leaveCalCount:'Tháng này {n} người nghỉ', halfAmShort:'S', halfPmShort:'C', pendingShort:'chờ duyệt', approvedShort:'đã duyệt', dayUnit:'ngày'
+        leaveCalTitle:'🏖️ Lịch nghỉ phép tháng', leaveCalEmpty:'Tháng này không có nghỉ phép', leaveCalHint:'Mỗi người một màu, hiện ngay trên ngày nghỉ; viền đứt = chờ duyệt', leaveCalCount:'Tháng này {n} người nghỉ', halfAmShort:'S', halfPmShort:'C', pendingShort:'chờ duyệt', approvedShort:'đã duyệt', dayUnit:'ngày',
+        verifiedReadLoginRequired:'Cần đăng nhập lại bằng LINE để đọc dữ liệu trên trang này.', verifiedReadRelogin:'Đăng nhập lại', verifiedReadRedirecting:'Đang chuyển đến LINE để xác minh. Vui lòng chờ.'
     }
 };
 
@@ -828,6 +838,7 @@ function applyTranslations() {
             ? '公務機只讀：可查看今日、月度、週班表；不可編輯、匯出或進入管理後台。'
             : (employeeView && manager ? t('entrySubtitleEmployee') : t('entrySubtitleManager'));
     }
+    if (attendanceReadLoginNoticeShown) updateAttendanceReadLoginNotice(false);
 }
 function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = String(s); return d.innerHTML; }
 function getDailyColumnStorageKey() { return 'attendance_public_daily_columns_' + (companyId || 'default'); }
@@ -948,6 +959,48 @@ function openCheckinEntry(action) { window.location.href = buildCheckinUrl(actio
 function attendanceLiffTokenKey() {
     return 'attendance_public_liff_token_' + companyId + '_' + (currentLineUserId || '');
 }
+const ATTENDANCE_RELOGIN_COOLDOWN_MS = 60 * 1000;
+const ATTENDANCE_VERIFIED_WRITE_FNS = new Set(['resolve_attendance_anomaly', 'create_shift_type', 'update_shift_type', 'delete_shift_type']);
+let attendanceReadLoginNoticeShown = false;
+function attendanceReloginGuardKey() {
+    return 'attendance_public_relogin_started_' + companyId + '_' + (currentLineUserId || '');
+}
+function updateAttendanceReadLoginNotice(redirecting) {
+    const notice = document.getElementById('attendanceLoginNotice');
+    const message = document.getElementById('attendanceLoginMessage');
+    const button = document.getElementById('attendanceReloginButton');
+    if (!notice || !message || !button) return;
+    notice.style.display = 'flex';
+    message.textContent = t(redirecting ? 'verifiedReadRedirecting' : 'verifiedReadLoginRequired');
+    button.textContent = t('verifiedReadRelogin');
+    button.disabled = !!redirecting;
+}
+function notifyAttendanceReadLoginRequired() {
+    if (attendanceReadLoginNoticeShown) return;
+    attendanceReadLoginNoticeShown = true;
+    updateAttendanceReadLoginNotice(false);
+}
+function clearAttendanceReloginGuard() {
+    try { sessionStorage.removeItem(attendanceReloginGuardKey()); } catch (e) {}
+}
+function redirectAttendancePublicForRelogin(force) {
+    const now = Date.now();
+    try {
+        const lastStarted = Number(sessionStorage.getItem(attendanceReloginGuardKey()) || 0);
+        if (!force && lastStarted > 0 && now - lastStarted < ATTENDANCE_RELOGIN_COOLDOWN_MS) {
+            updateAttendanceReadLoginNotice(true);
+            return false;
+        }
+        sessionStorage.setItem(attendanceReloginGuardKey(), String(now));
+    } catch (e) {}
+    updateAttendanceReadLoginNotice(true);
+    window.location.replace(buildAttendancePublicLiffUrl());
+    return true;
+}
+function startAttendanceReadRelogin() {
+    clearAttendanceLiffToken();
+    redirectAttendancePublicForRelogin(false);
+}
 function clearAttendanceLiffToken() {
     try {
         sessionStorage.removeItem(attendanceLiffTokenKey());
@@ -961,33 +1014,67 @@ function getCachedAttendanceLiffToken() {
         const saved = raw ? JSON.parse(raw) : null;
         if (!saved || typeof saved.token !== 'string' || !saved.token) return null;
         if (!(Number(saved.expires_at) > Date.now())) { clearAttendanceLiffToken(); return null; }
+        clearAttendanceReloginGuard();
+        attendanceReadLoginNoticeShown = false;
+        const notice = document.getElementById('attendanceLoginNotice');
+        if (notice) notice.style.display = 'none';
         return saved.token;
     } catch (e) { return null; }
 }
 function reloginAttendancePublic(message) {
     clearAttendanceLiffToken();
     if (confirm((message || 'LINE 登入已過期') + '\n需要重新以 LINE 登入後才能儲存（這次尚未儲存的變更會遺失）。現在重新登入？')) {
-        window.location.replace(buildAttendancePublicLiffUrl());
+        redirectAttendancePublicForRelogin(true);
     }
 }
-async function callAttendanceVerifiedAction(action, payload) {
+async function callAttendanceVerifiedAction(action, payload, options) {
+    const interactive = !options || options.interactive !== false;
     const token = getCachedAttendanceLiffToken();
-    if (!token) { reloginAttendancePublic('需要重新以 LINE 驗證身分'); return { ok: false, code: 'unauthenticated', message: '需要重新以 LINE 登入' }; }
+    if (!token) {
+        if (interactive) reloginAttendancePublic('需要重新以 LINE 驗證身分');
+        else notifyAttendanceReadLoginRequired();
+        return { ok: false, code: 'unauthenticated', message: '需要重新以 LINE 登入' };
+    }
     try {
+        const requestPayload = Object.assign({}, payload || {});
+        const requestCompanyId = requestPayload.company_id || companyId;
         const res = await fetch(SUPABASE_URL + '/functions/v1/line-push', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY },
-            body: JSON.stringify(Object.assign({}, payload || {}, { action: action, company_id: companyId, liff_access_token: token }))
+            body: JSON.stringify(Object.assign({}, requestPayload, { action: action, company_id: requestCompanyId, liff_access_token: token }))
         });
         const result = await res.json().catch(() => null);
         if (!result) return { ok: false, code: 'invalid_response', message: '伺服器回傳無法辨識的結果' };
         if (!result.ok) {
-            if (result.code === 'unauthenticated') { reloginAttendancePublic(result.error); return { ok: false, code: 'unauthenticated', message: result.error || 'LINE 登入已過期' }; }
+            if (result.code === 'unauthenticated') {
+                clearAttendanceLiffToken();
+                if (interactive) reloginAttendancePublic(result.error);
+                else notifyAttendanceReadLoginRequired();
+                return { ok: false, code: 'unauthenticated', message: result.error || 'LINE 登入已過期' };
+            }
             return { ok: false, code: result.code || 'failed', message: result.error || '操作失敗', data: result };
         }
         return { ok: true, code: 'ok', data: result };
     } catch (e) {
         return { ok: false, code: 'network_error', message: '目前無法連線伺服器，請檢查網路後重試' };
+    }
+}
+async function callVerifiedRpc(fn, args = {}) {
+    const safeArgs = { ...args };
+    delete safeArgs.p_line_user_id;
+    const verifiedCompanyId = safeArgs.p_company_id || companyId;
+    try {
+        const response = await callAttendanceVerifiedAction('admin_rpc', {
+            company_id: verifiedCompanyId,
+            fn: fn,
+            args: safeArgs
+        }, { interactive: ATTENDANCE_VERIFIED_WRITE_FNS.has(fn) });
+        if (!response || response.ok !== true) {
+            return { data: null, error: { message: response?.message || '管理功能暫時無法使用', code: response?.code || 'verified_rpc_failed' } };
+        }
+        return { data: response.data?.result ?? null, error: null };
+    } catch (error) {
+        return { data: null, error: { message: error?.message || '管理功能暫時無法使用', code: error?.code || 'network_error' } };
     }
 }
 function openRegisterEntry() { window.location.href = buildRegisterUrl(); }
@@ -1280,7 +1367,7 @@ async function loadPublicTodayLeaveEmployees(dateStr) {
 }
 
 async function loadDailyPendingMakeupRequests() {
-    const reviewRes = await runOptionalDailyQuery(sb.rpc('get_makeup_review_requests', {
+    const reviewRes = await runOptionalDailyQuery(callVerifiedRpc('get_makeup_review_requests', {
         p_company_id: companyId,
         p_status: 'pending',
         p_review_filter: 'all',
@@ -1289,7 +1376,7 @@ async function loadDailyPendingMakeupRequests() {
     if (!reviewRes.error) return reviewRes;
 
     console.warn('Load makeup review RPC warning:', reviewRes.error);
-    const legacyRes = await runOptionalDailyQuery(sb.rpc('get_pending_makeup_requests', { p_company_id: companyId, p_line_user_id: currentLineUserId || null }));
+    const legacyRes = await runOptionalDailyQuery(callVerifiedRpc('get_pending_makeup_requests', { p_company_id: companyId, p_line_user_id: currentLineUserId || null }));
     return legacyRes.error ? reviewRes : legacyRes;
 }
 
@@ -1304,13 +1391,16 @@ async function loadAnomalyData() {
     const card = document.getElementById('anomalyCard');
     if (!card) return;
     if (!canViewAnomalies()) { card.style.display = 'none'; return; }
-    const res = await runOptionalDailyQuery(sb.rpc('get_attendance_anomalies', {
+    const res = await runOptionalDailyQuery(callVerifiedRpc('get_attendance_anomalies', {
         p_company_id: companyId,
         p_line_user_id: currentLineUserId
     }));
     if (res.error) {
         console.warn('Load anomalies warning:', res.error);
-        card.style.display = 'none';
+        anomalyData = [];
+        document.getElementById('anomalyPendingBadge').textContent = '';
+        document.getElementById('anomalyList').innerHTML = '<div style="font-size:12px;color:#92400E;">' + esc(res.error.message || t('verifiedReadLoginRequired')) + '</div>';
+        card.style.display = 'block';
         return;
     }
     anomalyData = (res.data || []).filter(r => !isHiddenEmployeeName(r.employee_name));
@@ -1378,7 +1468,7 @@ function renderAnomalyCard() {
 async function resolveAnomaly(id) {
     if (!confirm(t('anomalyResolveConfirm'))) return;
     try {
-        const { data, error } = await sb.rpc('resolve_attendance_anomaly', {
+        const { data, error } = await callVerifiedRpc('resolve_attendance_anomaly', {
             p_anomaly_id: id,
             p_company_id: companyId,
             p_line_user_id: currentLineUserId
@@ -1405,7 +1495,7 @@ async function loadDailyData() {
 
     try {
         const [dailyRes, makeupRes, leaveRes] = await Promise.all([
-            sb.rpc('get_company_daily_attendance', { p_company_id: companyId, p_date: dateStr, p_line_user_id: currentLineUserId || null }),
+            callVerifiedRpc('get_company_daily_attendance', { p_company_id: companyId, p_date: dateStr, p_line_user_id: currentLineUserId || null }),
             loadDailyPendingMakeupRequests(),
             loadPublicTodayLeaveEmployees(dateStr)
         ]);
@@ -2008,7 +2098,7 @@ async function loadCompanyPolicyAndHolidays() {
             .eq('company_id', companyId)
             .in('key', ['default_weekend_work_start', 'default_weekend_work_end']),
         // 118：holidays 有 RLS（anon 無政策），改走 get_company_holidays RPC（has_company_access 驗證）
-        sb.rpc('get_company_holidays', {
+        callVerifiedRpc('get_company_holidays', {
             p_company_id: companyId,
             p_line_user_id: currentLineUserId || null,
             p_from: startDate,
@@ -2040,7 +2130,7 @@ function getMonthRange() {
 
 async function loadMonthLeaveRequests() {
     const { startDate, endDate } = getMonthRange();
-    return runOptionalDailyQuery(sb.rpc('get_company_leave_requests_for_audit', {
+    return runOptionalDailyQuery(callVerifiedRpc('get_company_leave_requests_for_audit', {
         p_company_id: companyId,
         p_line_user_id: currentLineUserId || null,
         p_from: startDate,
@@ -2095,7 +2185,7 @@ async function loadMonthlyData() {
     // 政策/假日/請假/遲到為非核心查詢，與主表 RPC 並行載入，失敗不擋主表
     const [, monthlyRes, leaveRes, lateRes] = await Promise.all([
         loadCompanyPolicyAndHolidays(),
-        sb.rpc('get_company_monthly_attendance', { p_company_id: companyId, p_year: mYear, p_month: mMonth + 1, p_line_user_id: currentLineUserId || null }),
+        callVerifiedRpc('get_company_monthly_attendance', { p_company_id: companyId, p_year: mYear, p_month: mMonth + 1, p_line_user_id: currentLineUserId || null }),
         loadMonthLeaveRequests(),
         loadMonthLateAttendance()
     ]);
@@ -2767,7 +2857,7 @@ async function loadScheduleData() {
     document.getElementById('schedBody').innerHTML = '<tr><td colspan="8" style="text-align:center;padding:30px;color:#94A3B8;">載入中...</td></tr>';
 
     try {
-        const { data, error } = await sb.rpc('get_weekly_schedules', {
+        const { data, error } = await callVerifiedRpc('get_weekly_schedules', {
             p_company_id: companyId,
             p_start_date: startStr,
             p_line_user_id: currentLineUserId || null   // 099 呼叫者身分驗證
@@ -2867,8 +2957,8 @@ async function loadHumanManagement() {
     document.getElementById('humanBody').innerHTML = '<tr><td style="padding:36px;text-align:center;color:#94A3B8;">\u8f09\u5165\u4e2d...</td></tr>'; document.getElementById('humanStatus').textContent = '';
     try {
         const [weekRes, shiftRes] = await Promise.all([
-            sb.rpc('get_weekly_schedules', { p_company_id: companyId, p_start_date: startStr, p_line_user_id: currentLineUserId || null }),
-            sb.rpc('get_company_shift_types', { p_company_id: companyId, p_line_user_id: currentLineUserId })
+            callVerifiedRpc('get_weekly_schedules', { p_company_id: companyId, p_start_date: startStr, p_line_user_id: currentLineUserId || null }),
+            callVerifiedRpc('get_company_shift_types', { p_company_id: companyId, p_line_user_id: currentLineUserId })
         ]);
         if (weekRes.error) throw weekRes.error;
         if (shiftRes.error) throw shiftRes.error;
@@ -2951,7 +3041,7 @@ async function saveHumanShiftType() {
     if (!name || !start || !end) return showToast('請填班別名稱、開始與結束時間');
     try {
         const args = { p_company_id: companyId, p_line_user_id: currentLineUserId, p_name: name, p_code: code, p_start_time: start, p_end_time: end, p_is_overnight: overnight };
-        const res = id ? await sb.rpc('update_shift_type', Object.assign({ p_id: id }, args)) : await sb.rpc('create_shift_type', args);
+        const res = id ? await callVerifiedRpc('update_shift_type', Object.assign({ p_id: id }, args)) : await callVerifiedRpc('create_shift_type', args);
         if (res.error) throw res.error;
         showToast(id ? '班別已更新' : '班別已新增');
         clearHumanShiftForm();
@@ -2967,7 +3057,7 @@ async function deleteHumanShiftType(id) {
     if (!st) return;
     if (!confirm('刪除班別「' + st.name + '」？既有排班不會被刪除，但之後不可再選。')) return;
     try {
-        const { error } = await sb.rpc('delete_shift_type', { p_id: id, p_company_id: companyId, p_line_user_id: currentLineUserId });
+        const { error } = await callVerifiedRpc('delete_shift_type', { p_id: id, p_company_id: companyId, p_line_user_id: currentLineUserId });
         if (error) throw error;
         showToast('班別已刪除');
         clearHumanShiftForm();
@@ -2989,7 +3079,7 @@ async function seedBenmiShiftTypes() {
         for (const [name, code, start, end] of defaults) {
             const existed = humanShiftTypes.find(st => st.company_id && (st.name === name || st.code === code));
             const args = { p_company_id: companyId, p_line_user_id: currentLineUserId, p_name: name, p_code: code, p_start_time: start, p_end_time: end, p_is_overnight: false };
-            const res = existed ? await sb.rpc('update_shift_type', Object.assign({ p_id: existed.id }, args)) : await sb.rpc('create_shift_type', args);
+            const res = existed ? await callVerifiedRpc('update_shift_type', Object.assign({ p_id: existed.id }, args)) : await callVerifiedRpc('create_shift_type', args);
             if (res.error) throw res.error;
         }
         showToast('預設班別已建立');
