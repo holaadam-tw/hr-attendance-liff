@@ -12,7 +12,7 @@ import {
 
 import {
     loadAuditLogs, exportReport, initReportMonth
-} from './audit.js?v=20261127-planb161';
+} from './audit.js?v=20261128-planb162';
 
 import {
     showAddEmployeeModal, closeAddEmployeeModal, initEmployeeFormHandler,
@@ -39,7 +39,7 @@ import {
     loadStaffOverview, changeLeaveCal,
     resetLeaveCal, loadLeaveCal,
     clearLeaveState
-} from './leave.js?v=20261127-planb161';
+} from './leave.js?v=20261128-planb162';
 
 import {
     changeShiftWeek, resetShiftWeek, loadShiftMgr, cycleShift,
@@ -50,7 +50,7 @@ import {
     loadShiftTypeList, showAddShiftTypeForm, editShiftTypeById, deleteShiftTypeById, saveShiftType, deleteShiftType,
     loadEmployeeShiftModes, toggleShiftModeRow, saveAllShiftModes, smMarkChanged, smClearChanged, smHasUnsavedChanges,
     clearSchedulesState
-} from './schedules.js?v=20261013-leaverpc149b';
+} from './schedules.js?v=20261128-planb162';
 
 import {
     BONUS_MATRIX, loadHybridBonusData, renderSelectedBonusCard,
@@ -66,7 +66,7 @@ import {
     editInsBracket, saveInsBracket, deleteInsBracket, updateAllInsRates,
     switchPayTab,
     initAuditPage, loadAuditData
-} from './payroll.js?v=20261127-planb161';
+} from './payroll.js?v=20261128-planb162';
 
 import {
     loadRestaurantList, openRestaurantDetail, previewStoreOrder, openKDS,
@@ -110,7 +110,7 @@ import {
     closeCompanyModal, editCompany, saveCompany,
     initSalesTargetPage, stChangeWeek, saveDefaultTarget,
     switchSysTab
-} from './settings.js?v=20260927-verified130';
+} from './settings.js?v=20261128-planb162';
 
 // ===== 綁定 window（供 HTML onclick 使用）=====
 

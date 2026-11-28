@@ -137,9 +137,9 @@ function makeContext({ verifiedResult, employeeRows = [] } = {}) {
   check('薪資稽核以 salaryMap 優先、employees.salary_type fallback，且與 origin/main 相同', payrollSource.includes(
     "const salaryType = (salaryMap[emp.id]?.salary_type) || emp.salary_type || 'monthly';"
   ));
-  check('admin 與 employees／payroll 模組快取版本皆維持目前批次', /modules\/index\.js\?v=20261127-(?:empcols159-attcols160|planb161)/.test(adminSource)
+  check('admin 與 employees／payroll 模組快取版本皆維持目前批次', /modules\/index\.js\?v=20261128-planb162/.test(adminSource)
     && /employees\.js\?v=20261127-(?:empcols159|planb161)/.test(indexSource)
-    && /payroll\.js\?v=20261127-(?:empcols159|planb161)/.test(indexSource));
+    && /payroll\.js\?v=20261128-planb162/.test(indexSource));
 
   console.log(`\n結果：${pass} 通過、${fail} 失敗`);
   process.exitCode = fail ? 1 : 0;

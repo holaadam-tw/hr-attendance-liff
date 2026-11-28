@@ -65,7 +65,7 @@ export async function loadShiftMgr() {
     document.getElementById('shiftDaySummary').innerHTML = '';
     try {
         // 動態載入公司班別（透過 RPC）
-        const { data: stData } = await sb.rpc('get_company_shift_types', { p_company_id: window.currentCompanyId, p_line_user_id: window.currentAdminEmployee?.line_user_id });
+        const { data: stData } = await callVerifiedRpc('get_company_shift_types', { p_company_id: window.currentCompanyId, p_line_user_id: window.currentAdminEmployee?.line_user_id });
         smShiftTypes = stData || [];
         SHIFT_TYPES = [null, ...smShiftTypes.map(s => s.code), 'off'];
         SHIFT_DISPLAY = { null: { label: '⬜', bg: '#F8FAFC', color: '#94A3B8', name: '未排' }, off: { label: '🏖️', bg: '#ECFDF5', color: '#059669', name: '休假' } };
@@ -86,7 +86,7 @@ export async function loadShiftMgr() {
         });
         smScheduleOriginal = { ...smScheduleData };
         smLeaveData = {};
-        const { data: lvs, error: leaveError } = await sb.rpc('get_company_leave_requests', {
+        const { data: lvs, error: leaveError } = await callVerifiedRpc('get_company_leave_requests', {
             p_line_user_id: window.currentAdminEmployee?.line_user_id || null,
             p_company_id: window.currentCompanyId,
             p_from: startStr,
@@ -234,7 +234,7 @@ export async function saveSchedule() {
     statusEl.style.display = 'block'; statusEl.style.color = '#F59E0B'; statusEl.textContent = '⏳ 儲存中...';
     const nameOf = (id) => (smEmployees.find(e => e.id === id) || {}).name || '';
     try {
-        const { data: shiftTypes } = await sb.rpc('get_company_shift_types', { p_company_id: window.currentCompanyId, p_line_user_id: window.currentAdminEmployee?.line_user_id });
+        const { data: shiftTypes } = await callVerifiedRpc('get_company_shift_types', { p_company_id: window.currentCompanyId, p_line_user_id: window.currentAdminEmployee?.line_user_id });
         const stMap = {};
         (shiftTypes || []).forEach(st => { stMap[st.code || st.name] = st.id; });
         // 只送有變更的格子（沒動到的排班不重寫）
@@ -459,7 +459,7 @@ export async function loadMakeupApprovals(status = 'pending', filter = 'all') {
     try {
         let data = null;
         let error = null;
-        const reviewResult = await sb.rpc('get_makeup_review_requests', {
+        const reviewResult = await callVerifiedRpc('get_makeup_review_requests', {
             p_company_id: window.currentCompanyId,
             p_status: status,
             p_review_filter: filter,
@@ -474,7 +474,7 @@ export async function loadMakeupApprovals(status = 'pending', filter = 'all') {
         );
 
         if (missingReviewRpc && status === 'pending' && filter === 'all') {
-            const fallback = await sb.rpc('get_pending_makeup_requests', {
+            const fallback = await callVerifiedRpc('get_pending_makeup_requests', {
                 p_company_id: window.currentCompanyId,
                 p_line_user_id: liffProfile?.userId || null   // 101 呼叫者身分驗證
             });
@@ -553,7 +553,7 @@ export async function batchApproveTodayGpsMakeups() {
     const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' });
     let data, error;
     try {
-        const res = await sb.rpc('get_makeup_review_requests', {
+        const res = await callVerifiedRpc('get_makeup_review_requests', {
             p_company_id: window.currentCompanyId,
             p_status: 'pending',
             p_review_filter: 'gps_review',
@@ -638,7 +638,7 @@ export async function loadOtApprovals(status) {
     el.innerHTML = '<p style="text-align:center;color:#666;">載入中...</p>';
     try {
         // 使用 SECURITY DEFINER RPC 繞過 RLS（050 SQL）
-        const { data, error } = await sb.rpc('get_pending_overtime_requests', {
+        const { data, error } = await callVerifiedRpc('get_pending_overtime_requests', {
             p_company_id: window.currentCompanyId,
             p_status: status || 'pending',
             p_line_user_id: liffProfile?.userId || null   // 101 呼叫者身分驗證
@@ -811,7 +811,7 @@ export async function loadShiftTypeList() {
     const el = document.getElementById('shiftTypeList');
     if (!el) return;
     try {
-        const { data, error } = await sb.rpc('get_company_shift_types', { p_company_id: window.currentCompanyId, p_line_user_id: window.currentAdminEmployee?.line_user_id });
+        const { data, error } = await callVerifiedRpc('get_company_shift_types', { p_company_id: window.currentCompanyId, p_line_user_id: window.currentAdminEmployee?.line_user_id });
         if (error) throw error;
         const list = data || [];
         if (list.length === 0) {
@@ -873,14 +873,14 @@ export async function saveShiftType() {
     if (!name || !start || !end) { showToast('⚠️ 請填寫名稱和時間'); return; }
     try {
         if (id) {
-            const { error } = await sb.rpc('update_shift_type', {
+            const { error } = await callVerifiedRpc('update_shift_type', {
                 p_id: id, p_company_id: window.currentCompanyId, p_line_user_id: window.currentAdminEmployee?.line_user_id,
                 p_name: name, p_code: code, p_start_time: start, p_end_time: end, p_is_overnight: overnight
             });
             if (error) throw error;
             showToast('✅ 班別已更新');
         } else {
-            const { error } = await sb.rpc('create_shift_type', {
+            const { error } = await callVerifiedRpc('create_shift_type', {
                 p_company_id: window.currentCompanyId, p_line_user_id: window.currentAdminEmployee?.line_user_id,
                 p_name: name, p_code: code, p_start_time: start, p_end_time: end, p_is_overnight: overnight
             });
@@ -898,7 +898,7 @@ export async function saveShiftType() {
 export async function deleteShiftType(id, name) {
     if (!confirm('確定刪除班別「' + name + '」？')) return;
     try {
-        const { error } = await sb.rpc('delete_shift_type', { p_id: id, p_company_id: window.currentCompanyId, p_line_user_id: window.currentAdminEmployee?.line_user_id });
+        const { error } = await callVerifiedRpc('delete_shift_type', { p_id: id, p_company_id: window.currentCompanyId, p_line_user_id: window.currentAdminEmployee?.line_user_id });
         if (error) throw error;
         showToast('🗑️ 已刪除');
         loadShiftTypeList();

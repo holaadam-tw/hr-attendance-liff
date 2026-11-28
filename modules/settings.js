@@ -800,7 +800,7 @@ export async function showTripMap(tripId) {
     let trackpoints = [];
     try {
         // RLS deny-all：走 SECURITY DEFINER RPC（本人 / 同公司 admin/manager / platform_admin）
-        const { data, error } = await sb.rpc('get_fw_trackpoints', {
+        const { data, error } = await callVerifiedRpc('get_fw_trackpoints', {
             p_line_user_id: window.currentAdminEmployee?.line_user_id,
             p_trip_id: tripId
         });

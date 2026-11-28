@@ -53,6 +53,52 @@ export async function sha256Hex(text: string): Promise<string> {
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
+export type AdminRpcValueType = 'uuid' | 'date' | 'time' | 'text' | 'integer' | 'boolean' | 'text[]' | 'jsonb'
+export interface AdminRpcParamSpec {
+  type: AdminRpcValueType
+  required?: boolean
+  maxLength?: number
+  min?: number
+  max?: number
+}
+export interface AdminRpcSpec { params: Record<string, AdminRpcParamSpec> }
+
+const p = (type: AdminRpcValueType, required = false, extra: Partial<AdminRpcParamSpec> = {}): AdminRpcParamSpec => ({ type, required, ...extra })
+
+// The generic admin bridge accepts only this allowlist. Parameter names mirror
+// migration 162 so the test suite can detect any SQL/Edge drift mechanically.
+export const ADMIN_RPC_SPECS: Record<string, AdminRpcSpec> = {
+  admin_makeup_punch: { params: { p_company_id: p('uuid'), p_employee_id: p('uuid', true), p_punch_date: p('date', true), p_punch_type: p('text', true, { maxLength: 40 }), p_punch_time: p('time', true), p_note: p('text', false, { maxLength: 1000 }) } },
+  confirm_daily_overtime: { params: { p_company_id: p('uuid'), p_employee_id: p('uuid', true), p_ot_date: p('date', true), p_decision: p('text', true, { maxLength: 40 }), p_minutes: p('integer', false, { min: 0, max: 1440 }), p_note: p('text', false, { maxLength: 1000 }) } },
+  create_shift_type: { params: { p_company_id: p('uuid'), p_name: p('text', true, { maxLength: 100 }), p_code: p('text', true, { maxLength: 50 }), p_start_time: p('time', true), p_end_time: p('time', true), p_is_overnight: p('boolean') } },
+  delete_company_holiday: { params: { p_company_id: p('uuid'), p_holiday_date: p('date', true) } },
+  delete_shift_type: { params: { p_id: p('uuid', true), p_company_id: p('uuid') } },
+  get_attendance_anomalies: { params: { p_company_id: p('uuid') } },
+  get_checkin_failures: { params: { p_company_id: p('uuid'), p_days: p('integer', false, { min: 1, max: 3650 }) } },
+  get_company_daily_attendance: { params: { p_company_id: p('uuid'), p_date: p('date', true) } },
+  get_company_holidays: { params: { p_company_id: p('uuid'), p_from: p('date', true), p_to: p('date', true) } },
+  get_company_leave_requests: { params: { p_company_id: p('uuid'), p_from: p('date'), p_to: p('date'), p_statuses: p('text[]'), p_employee_id: p('uuid'), p_limit: p('integer', false, { min: 1, max: 5000 }) } },
+  get_company_leave_requests_for_audit: { params: { p_company_id: p('uuid'), p_from: p('date', true), p_to: p('date', true), p_include_pending: p('boolean') } },
+  get_company_monthly_attendance: { params: { p_company_id: p('uuid'), p_year: p('integer', true, { min: 2000, max: 2100 }), p_month: p('integer', true, { min: 1, max: 12 }) } },
+  get_company_monthly_missing_minutes: { params: { p_company_id: p('uuid'), p_year: p('integer', true, { min: 2000, max: 2100 }), p_month: p('integer', true, { min: 1, max: 12 }) } },
+  get_company_overtime_requests: { params: { p_company_id: p('uuid'), p_from: p('date'), p_to: p('date'), p_status: p('text', false, { maxLength: 40 }), p_limit: p('integer', false, { min: 1, max: 5000 }) } },
+  get_company_shift_types: { params: { p_company_id: p('uuid') } },
+  get_fw_trackpoints: { params: { p_trip_id: p('uuid', true) } },
+  get_leave_approval_requests: { params: { p_company_id: p('uuid'), p_status: p('text', false, { maxLength: 40 }) } },
+  get_leave_approval_requests_v2: { params: { p_company_id: p('uuid'), p_status: p('text', false, { maxLength: 40 }) } },
+  get_line_push_status: { params: { p_company_id: p('uuid') } },
+  get_makeup_review_requests: { params: { p_company_id: p('uuid'), p_status: p('text', false, { maxLength: 40 }), p_review_filter: p('text', false, { maxLength: 40 }) } },
+  get_missing_work_hours_notification_control: { params: { p_company_id: p('uuid') } },
+  get_pending_makeup_requests: { params: { p_company_id: p('uuid') } },
+  get_pending_overtime_requests: { params: { p_company_id: p('uuid'), p_status: p('text', false, { maxLength: 40 }) } },
+  get_weekly_schedules: { params: { p_company_id: p('uuid'), p_start_date: p('date', true) } },
+  preview_company_missing_work_hours: { params: { p_company_id: p('uuid'), p_days_back: p('integer', false, { min: 1, max: 3650 }) } },
+  resolve_attendance_anomaly: { params: { p_anomaly_id: p('uuid', true), p_company_id: p('uuid') } },
+  set_missing_work_hours_notification_enabled: { params: { p_company_id: p('uuid'), p_enabled: p('boolean', true) } },
+  update_shift_type: { params: { p_id: p('uuid', true), p_company_id: p('uuid'), p_name: p('text', true, { maxLength: 100 }), p_code: p('text', true, { maxLength: 50 }), p_start_time: p('time', true), p_end_time: p('time', true), p_is_overnight: p('boolean') } },
+  upsert_company_holiday: { params: { p_company_id: p('uuid'), p_holiday_date: p('date', true), p_holiday_name: p('text', true, { maxLength: 200 }), p_holiday_type: p('text', false, { maxLength: 40 }) } },
+}
+
 export function recipientKind(to: string): 'user' | 'group' | 'unknown' {
   if (/^U/.test(to)) return 'user'
   if (/^[CR]/.test(to)) return 'group'
@@ -83,6 +129,7 @@ const RPC_MIGRATION: Record<string, string> = {
   get_company_payroll_verified: '161', get_company_current_salaries_verified: '161',
   get_employee_current_salary_verified: '161', upsert_salary_setting_verified: '161',
   save_payroll_records_verified: '161', approve_leave_request_verified: '161',
+  ...Object.fromEntries(Object.keys(ADMIN_RPC_SPECS).map((fn) => [`${fn}_verified`, '162'])),
 }
 
 async function callRpc(deps: Deps, fn: string, args: Record<string, unknown>): Promise<{ ok: boolean; data: any; missing?: string }> {
@@ -259,6 +306,27 @@ function rpcValueResult(saved: { ok: boolean; data: any; missing?: string }): Re
   return json({ ok: true, status: 200, result: saved.data ?? null }, 200)
 }
 
+function adminRpcResult(saved: { ok: boolean; data: any; missing?: string }): Response {
+  if (saved.missing) {
+    return json({ ok: false, status: 503, code: 'db_not_migrated', error: `資料庫尚未套用 migration ${saved.missing}` }, 503)
+  }
+  if (!saved.ok) {
+    const message = typeof saved.data?.message === 'string' && saved.data.message
+      ? saved.data.message
+      : '管理功能暫時無法使用'
+    const dbCode = typeof saved.data?.code === 'string' && saved.data.code ? saved.data.code : null
+    const denied = dbCode === '42501' || /access_denied|permission denied|無權限/i.test(message)
+    const unavailable = saved.data == null
+    return json({
+      ok: false,
+      status: unavailable ? 503 : (denied ? 403 : 400),
+      code: dbCode || (unavailable ? 'service_unavailable' : (denied ? 'access_denied' : 'rpc_failed')),
+      error: message,
+    }, unavailable ? 503 : (denied ? 403 : 400))
+  }
+  return json({ ok: true, status: 200, result: saved.data ?? null }, 200)
+}
+
 const VERIFIED_ACTIONS = [
   'save_config', 'save_setting', 'save_settings', 'get_line_config', 'platform_admin_save', 'platform_link_company',
   // 131／132：員工管理、補卡／加班審核、排班（身分＝LINE 驗證的 userId；前端報的核准人／排班人一律不採信）
@@ -282,6 +350,7 @@ const VERIFIED_ACTIONS = [
   // 161：薪資讀寫與請假核准（公司必填；LINE 驗出的 userId 由 DB 再驗權）
   'payroll_company_get', 'payroll_salaries_get', 'salary_setting_get',
   'salary_setting_upsert', 'payroll_save', 'leave_review',
+  'admin_rpc',
 ] as const
 const KIOSK_ACTIONS: readonly string[] = ['kiosk_get_company', 'kiosk_lookup', 'kiosk_check_in', 'kiosk_leave', 'kiosk_makeup', 'kiosk_lunch', 'kiosk_lunch_status', 'kiosk_lunch_default']
 export const MAX_BATCH_SETTINGS = 30
@@ -333,6 +402,33 @@ export function isRealDate(v: unknown): v is string {
   return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === v
 }
 
+export function validateAdminRpcValue(value: unknown, spec: AdminRpcParamSpec): boolean {
+  if (value == null) return spec.required !== true
+  switch (spec.type) {
+    case 'uuid':
+      return typeof value === 'string' && UUID_RE.test(value)
+    case 'date':
+      return isRealDate(value)
+    case 'time':
+      return typeof value === 'string' && /^(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d{1,6})?)?$/.test(value)
+    case 'text':
+      return typeof value === 'string' && value.length <= (spec.maxLength ?? 2000) && (!spec.required || value.length > 0)
+    case 'integer':
+      return Number.isInteger(value) && Number(value) >= (spec.min ?? -1000000000) && Number(value) <= (spec.max ?? 1000000000)
+    case 'boolean':
+      return typeof value === 'boolean'
+    case 'text[]':
+      return Array.isArray(value) && value.length <= 100 && value.every((item) => typeof item === 'string' && item.length <= 100)
+    case 'jsonb':
+      if (typeof value !== 'object') return false
+      try {
+        return new TextEncoder().encode(JSON.stringify(value)).byteLength <= 65536
+      } catch (_) {
+        return false
+      }
+  }
+}
+
 async function handleVerifiedAction(body: any, deps: Deps): Promise<Response> {
   const action = String(body.action)
   const companyId = uuidOrNull(body.company_id)
@@ -345,6 +441,26 @@ async function handleVerifiedAction(body: any, deps: Deps): Promise<Response> {
   if (!lineUserId) return unauthenticated()
 
   // ---- 161：薪資讀寫與請假核准。所有 action 嚴格白名單，身分只採 LINE 驗證結果。 ----
+  if (action === 'admin_rpc') {
+    if (!onlyKeys(body, ['action', 'liff_access_token', 'company_id', 'fn', 'args']) || !isObject(body.args)) {
+      return badRequest('管理 RPC 請求格式錯誤')
+    }
+    const fn = typeof body.fn === 'string' ? body.fn : ''
+    const spec = Object.prototype.hasOwnProperty.call(ADMIN_RPC_SPECS, fn) ? ADMIN_RPC_SPECS[fn] : undefined
+    if (!spec) return badRequest('不允許的管理 RPC')
+    if ('p_line_user_id' in body.args) return badRequest('呼叫端不得指定 LINE 身分')
+    if (Object.keys(body.args).some((key) => !Object.prototype.hasOwnProperty.call(spec.params, key))) return badRequest('管理 RPC 含未知參數')
+    if (body.args.p_company_id != null && body.args.p_company_id !== companyId) return badRequest('公司識別不一致')
+
+    const rpcArgs: Record<string, unknown> = { p_line_user_id: lineUserId }
+    for (const [name, paramSpec] of Object.entries(spec.params)) {
+      const value = name === 'p_company_id' ? companyId : body.args[name]
+      if (!validateAdminRpcValue(value, paramSpec)) return badRequest(`管理 RPC 參數錯誤：${name}`)
+      if (value !== undefined) rpcArgs[name] = value
+    }
+    return adminRpcResult(await callRpc(deps, `${fn}_verified`, rpcArgs))
+  }
+
   if (action === 'payroll_company_get') {
     const allowed = ['action', 'liff_access_token', 'company_id', 'year', 'month']
     if (!onlyKeys(body, allowed) || !intInRange(body.year, 2000, 2100) || !intInRange(body.month, 1, 12)) return badRequest('薪資年月不正確')

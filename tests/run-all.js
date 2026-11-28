@@ -81,6 +81,9 @@ const SUITES = [
   { name: 'RLS 已鎖定資料表', file: 'rls-locked-tables.test.js' },
   { name: '批次薪資設定', file: 'salary-batch.test.js' },
   { name: '便當頁統計只算本公司', file: 'lunch-summary-company.test.js' },
+  { name: 'Plan B Batch 2 verified RPC（162，PGlite）', file: 'planb-batch2-verified.pglite.test.js' },
+  { name: 'Plan B Batch 2 line-push admin_rpc（162）', file: 'planb-batch2-edge.test.js' },
+  { name: 'Plan B Batch 2 前端 callVerifiedRpc（162）', file: 'planb-batch2-frontend.test.js' },
 ];
 
 const results = [];

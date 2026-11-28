@@ -49,13 +49,13 @@ export async function loadLeaveApprovals(status) {
     if (!listEl) return;
     listEl.innerHTML = '<p style="text-align:center;color:#666;">載入中...</p>';
     try {
-        let { data, error } = await sb.rpc('get_leave_approval_requests_v2', {
+        let { data, error } = await callVerifiedRpc('get_leave_approval_requests_v2', {
             p_company_id: window.currentCompanyId,
             p_status: status,
             p_line_user_id: liffProfile?.userId || null
         });
         if (error && /get_leave_approval_requests_v2|schema cache|Could not find the function/i.test(error.message || '')) {
-            ({ data, error } = await sb.rpc('get_leave_approval_requests', {
+            ({ data, error } = await callVerifiedRpc('get_leave_approval_requests', {
                 p_company_id: window.currentCompanyId,
                 p_status: status,
                 p_line_user_id: liffProfile?.userId || null
@@ -646,7 +646,7 @@ export async function loadStaffOverview() {
             return;
         }
         const todayStr = getTaiwanDate();
-        const { data: todayLeaves, error: leaveError } = await sb.rpc('get_company_leave_requests', {
+        const { data: todayLeaves, error: leaveError } = await callVerifiedRpc('get_company_leave_requests', {
             p_line_user_id: window.currentAdminEmployee?.line_user_id || liffProfile?.userId || null,
             p_company_id: window.currentCompanyId,
             p_from: todayStr,
@@ -701,7 +701,7 @@ export async function loadLeaveCal() {
     try {
         const { data: emps } = await sb.from('employees').select('id, name, department').eq('company_id', window.currentCompanyId).eq('is_active', true).order('department').order('name');
         employees = emps || [];
-        const { data: lvs, error: leaveError } = await sb.rpc('get_company_leave_requests', {
+        const { data: lvs, error: leaveError } = await callVerifiedRpc('get_company_leave_requests', {
             p_line_user_id: window.currentAdminEmployee?.line_user_id || liffProfile?.userId || null,
             p_company_id: window.currentCompanyId,
             p_from: ms,

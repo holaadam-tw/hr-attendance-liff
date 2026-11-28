@@ -51,7 +51,7 @@ if (calc) {
   check('2026-09-25 中秋＋9/28 教師節 → 9/21~9/30 應出勤 6', calc('e1', '2026-09-21', '2026-09-30', {}, new Set(['2026-09-25', '2026-09-28'])) === 6);
 }
 const loadSrc = (() => { try { return grab(payrollSrc, 'loadCompanyHolidaySet'); } catch (e) { return ''; } })();
-check('loadCompanyHolidaySet 走 get_company_holidays RPC', /rpc\('get_company_holidays'/.test(loadSrc));
+check('loadCompanyHolidaySet 走 get_company_holidays verified RPC', /callVerifiedRpc\('get_company_holidays'/.test(loadSrc));
 check('RPC 失敗回空 Set（不擋頁面）', /return new Set\(\)/.test(loadSrc));
 check('稽核報表把假日集合傳進應出勤', /computeEmployeeExpectedDays\(emp\.id, startDate, effEnd, schedMap, auditHolidaySet\)/.test(payrollSrc));
 check('薪資計算把假日集合傳進應出勤', /computeEmployeeExpectedDays\(emp\.id, startDate, effectiveEndDate, schedMap, payrollHolidaySet\)/.test(payrollSrc));
