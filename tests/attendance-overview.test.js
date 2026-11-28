@@ -72,6 +72,8 @@ const ctx = {
 ctx.globalThis = ctx;
 vm.createContext(ctx);
 vm.runInContext(commonFns, ctx);
+// 2b：頁面 RPC 經 LINE 驗證 adapter；既有測試沿用 sb.rpc 替身驗證資料與畫面行為。
+ctx.callVerifiedRpc = (...args) => ctx.sb.rpc(...args);
 vm.runInContext(page, ctx);
 // 第 7 段會把 loadDailyData 換成空函式；第 12 段要測真本，先留一份
 const realLoadDailyData = ctx.loadDailyData;

@@ -9,7 +9,7 @@
 
 - 已準備 migration 162：29 支既有管理 RPC 各新增一支只允許 `service_role` 的 `*_verified` 包裝函式；既有函式、既有 ACL 與 `quick_check_in` 均未變更。
 - `line-push` 已準備單一白名單 action `admin_rpc`，LINE 身分僅採 LIFF token 驗證結果；前端另以 `callVerifiedRpc` 維持原 `{ data, error }` 呼叫契約。
-- 2a 範圍僅替換 `schedules.js`、`leave.js`、`audit.js`、`payroll.js`、`settings.js`；2b（attendance_overview）、2c（attendance_public/common/records/fieldwork）及第三方呼叫仍待後續批次。
+- 2a 已替換 `schedules.js`、`leave.js`、`audit.js`、`payroll.js`、`settings.js`；2b 的 `attendance_overview.html` 已於本機改走 LINE 驗證並通過自動測試，尚未 commit／push／部署；2c（attendance_public/common/records/fieldwork）及第三方呼叫仍待後續批次。
 - 狀態：本機準備與自動測試完成，不代表已套用 migration、部署 Edge/前端或撤除舊 ACL；本次未碰正式庫、未 commit、未 push。
 - 未來 rollout 固定順序：162 → line-push → 2a → 2b/2c/第三方盤點 → 至少一個工作日觀察 → 另行授權執行 `revoke_old.sql`。每一步均須重新跑 punch guard 與正反向驗證。
 

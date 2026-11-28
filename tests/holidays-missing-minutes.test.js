@@ -58,7 +58,7 @@ check('薪資計算把假日集合傳進應出勤', /computeEmployeeExpectedDays
 
 console.log('\n=== attendance_overview.html 月統計缺工分鐘 ===');
 check('表頭有 遲到分／早退分／缺工分', /遲到分<\/th>/.test(aoSrc) && /早退分<\/th>/.test(aoSrc) && /缺工分<\/th>/.test(aoSrc));
-check('載入 get_company_monthly_missing_minutes', /rpc\('get_company_monthly_missing_minutes'/.test(aoSrc));
+check('透過 verified RPC 載入 get_company_monthly_missing_minutes', /callVerifiedRpc\('get_company_monthly_missing_minutes'/.test(aoSrc));
 check('RPC 失敗不擋主表', /\.catch\(e => \(\{ data: null, error: e \}\)\)/.test(aoSrc));
 check('colspan 全部改 12', !/colspan="9"/.test(aoSrc) && (aoSrc.match(/colspan="12"/g) || []).length >= 4);
 let fmt = null;
