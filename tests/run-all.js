@@ -86,6 +86,9 @@ const SUITES = [
   { name: 'Plan B Batch 2 前端 callVerifiedRpc（162）', file: 'planb-batch2-frontend.test.js' },
   { name: 'Plan B Batch 2b 打卡總覽改走 LINE 驗證', file: 'planb-batch2b-overview.test.js' },
   { name: 'Plan B Batch 2c attendance_public 改走 LINE 驗證', file: 'planb-batch2c-public.test.js' },
+  { name: 'Plan B Batch 3 self verified RPC（163，PGlite）', file: 'planb-batch3-self-verified.pglite.test.js' },
+  { name: 'Plan B Batch 3 line-push self_rpc（163）', file: 'planb-batch3-edge.test.js' },
+  { name: 'Plan B Batch 3 受保護檔與打卡範圍', file: 'planb-batch3-scope.test.js' },
 ];
 
 const results = [];

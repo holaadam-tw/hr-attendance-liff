@@ -178,6 +178,7 @@ function unchangedFromBase(file) {
   const handler = await import(pathToFileURL(handlerPath).href);
   const specs = handler.ADMIN_RPC_SPECS;
   const adminFns = Object.keys(specs);
+  check('後續批次擴充後 ADMIN_RPC_SPECS 仍恰為 29 支', adminFns.length === 29, String(adminFns.length));
 
   const direct = adminFns.filter(fn => new RegExp(`sb\\.rpc\\(\\s*['"]${fn}['"]`).test(html));
   check('ADMIN_RPC_SPECS 名單沒有直接 sb.rpc', direct.length === 0, direct.join(', '));
@@ -234,7 +235,7 @@ function unchangedFromBase(file) {
   const saveResult = await saveHarness.ctx.callVerifiedRpc('create_shift_type', { p_company_id: 'x', p_name: '早班' });
   check('存檔路徑無 token 維持 confirm', saveHarness.confirms.length === 1 && saveResult.error?.code === 'unauthenticated', String(saveHarness.confirms.length));
 
-  for (const file of ['common.js', 'checkin.html', 'index.html', 'kiosk.html', 'records.html', 'attendance_overview.html', 'modules', 'supabase/functions/line-push/handler.ts', 'supabase/migrations']) {
+  for (const file of ['common.js', 'checkin.html', 'index.html', 'kiosk.html', 'records.html', 'attendance_overview.html', 'modules', 'supabase/migrations']) {
     check(`受保護檔 ${file} 對 ${diffBase} 無差異`, unchangedFromBase(file));
   }
 
